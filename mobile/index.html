@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>无人机租赁平台 - 移动端预览</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root { width: 100%; height: 100%; overflow: auto; }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #f0f2f5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #phone-frame {
+      width: 390px;
+      height: 844px;
+      border: 8px solid #1a1a1a;
+      border-radius: 40px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      background: #fff;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    #phone-frame::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 150px;
+      height: 28px;
+      background: #1a1a1a;
+      border-radius: 0 0 16px 16px;
+      z-index: 10;
+    }
+    #root {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    /* 隐藏滚动条 */
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+    * {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .preview-label {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: #1890ff;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-label">Mobile Preview</div>
+  <div id="phone-frame">
+    <div id="root"></div>
+  </div>
+  <script type="module" src="/src/index.web.tsx"></script>
+</body>
+</html>

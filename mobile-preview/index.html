@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>无人机租赁平台 - 移动端预览</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+      .phone-frame {
+        width: 390px;
+        height: 844px;
+        border: 8px solid #1a1a1a;
+        border-radius: 44px;
+        overflow: hidden;
+        box-shadow: 0 25px 80px rgba(0,0,0,0.4), inset 0 0 2px rgba(255,255,255,0.1);
+        background: #fff;
+        position: relative;
+      }
+      .phone-frame::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 126px;
+        height: 28px;
+        background: #1a1a1a;
+        border-radius: 0 0 18px 18px;
+        z-index: 100;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      .preview-badge {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.2);
+      }
+      .preview-info {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        color: rgba(255,255,255,0.8);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview-badge">Mobile Web Preview</div>
+    <div class="phone-frame">
+      <div id="root"></div>
+    </div>
+    <div class="preview-info">React Native Web | 无人机租赁平台演示</div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

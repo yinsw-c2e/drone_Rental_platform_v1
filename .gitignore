@@ -1,0 +1,60 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+/backend/tmp/
+/backend/vendor/
+
+# Node
+node_modules/
+dist/
+.next/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env & Config
+.env
+.env.local
+.env.*.local
+.env.production
+
+# 后端配置文件（包含敏感信息）
+# 使用 config.example.yaml 作为模板
+/backend/config.yaml
+/backend/config.*.yaml
+!/backend/config.example.yaml
+
+# Uploads
+/backend/uploads/**
+!/backend/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+mysql_data/
+redis_data/
+
+# Windows reserved names
+nul
+NUL
+con
+CON
+prn
+PRN
+aux
+AUX
