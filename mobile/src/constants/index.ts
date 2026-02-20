@@ -1,6 +1,15 @@
 import {Platform} from 'react-native';
 import Config from 'react-native-config';
 
+// 安全获取 Config 值，防止 react-native-config 未正确初始化
+const getConfig = (key: string): string | undefined => {
+  try {
+    return (Config as any)?.[key];
+  } catch {
+    return undefined;
+  }
+};
+
 // ============================================================
 // API 配置
 // ============================================================
@@ -11,8 +20,9 @@ import Config from 'react-native-config';
  */
 const getApiBaseUrl = (): string => {
   // 优先使用环境变量
-  if (Config.API_BASE_URL) {
-    return Config.API_BASE_URL;
+  const apiBaseUrl = getConfig('API_BASE_URL');
+  if (apiBaseUrl) {
+    return apiBaseUrl;
   }
 
   // 开发环境默认配置
@@ -33,8 +43,9 @@ const getApiBaseUrl = (): string => {
  */
 const getWsBaseUrl = (): string => {
   // 优先使用环境变量
-  if (Config.WS_BASE_URL) {
-    return Config.WS_BASE_URL;
+  const wsBaseUrl = getConfig('WS_BASE_URL');
+  if (wsBaseUrl) {
+    return wsBaseUrl;
   }
 
   // 开发环境默认配置
@@ -50,16 +61,16 @@ const getWsBaseUrl = (): string => {
 // 导出配置常量
 export const API_BASE_URL = getApiBaseUrl();
 export const WS_BASE_URL = getWsBaseUrl();
-export const API_TIMEOUT = parseInt(Config.API_TIMEOUT || '15000', 10);
+export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 
 // ============================================================
 // 高德地图配置
 // ============================================================
 export const AMAP_CONFIG = {
   // Android SDK Key
-  androidKey: Config.AMAP_ANDROID_KEY || '',
+  androidKey: getConfig('AMAP_ANDROID_KEY') || '',
   // iOS SDK Key
-  iosKey: Config.AMAP_IOS_KEY || '',
+  iosKey: getConfig('AMAP_IOS_KEY') || '',
 };
 
 // ============================================================
@@ -67,9 +78,9 @@ export const AMAP_CONFIG = {
 // ============================================================
 export const PUSH_CONFIG = {
   // 极光推送AppKey
-  appKey: Config.JPUSH_APP_KEY || '',
+  appKey: getConfig('JPUSH_APP_KEY') || '',
   // 是否启用推送
-  enabled: Config.PUSH_ENABLED === 'true',
+  enabled: getConfig('PUSH_ENABLED') === 'true',
 };
 
 // ============================================================
@@ -77,9 +88,9 @@ export const PUSH_CONFIG = {
 // ============================================================
 export const THIRD_PARTY_LOGIN = {
   // 微信登录AppID
-  wechatAppId: Config.WECHAT_APP_ID || '',
+  wechatAppId: getConfig('WECHAT_APP_ID') || '',
   // QQ登录AppID
-  qqAppId: Config.QQ_APP_ID || '',
+  qqAppId: getConfig('QQ_APP_ID') || '',
 };
 
 // ============================================================
@@ -87,11 +98,11 @@ export const THIRD_PARTY_LOGIN = {
 // ============================================================
 export const APP_CONFIG = {
   // 应用环境
-  env: Config.APP_ENV || (__DEV__ ? 'development' : 'production'),
+  env: getConfig('APP_ENV') || (__DEV__ ? 'development' : 'production'),
   // 是否调试模式
-  debugMode: Config.DEBUG_MODE === 'true' || __DEV__,
+  debugMode: getConfig('DEBUG_MODE') === 'true' || __DEV__,
   // 版本检查地址
-  versionCheckUrl: Config.VERSION_CHECK_URL || '',
+  versionCheckUrl: getConfig('VERSION_CHECK_URL') || '',
 };
 
 // ============================================================
