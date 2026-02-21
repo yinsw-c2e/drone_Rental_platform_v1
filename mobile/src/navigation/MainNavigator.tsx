@@ -5,6 +5,7 @@ import {Text} from 'react-native';
 
 import HomeScreen from '../screens/home/HomeScreen';
 import OrderListScreen from '../screens/order/OrderListScreen';
+import OrderDetailScreen from '../screens/order/OrderDetailScreen';
 import ConversationListScreen from '../screens/message/ConversationListScreen';
 import ChatScreen from '../screens/message/ChatScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -17,6 +18,11 @@ import PublishCargoScreen from '../screens/publish/PublishCargoScreen';
 // Drone screens
 import MyDronesScreen from '../screens/drone/MyDronesScreen';
 import NearbyDronesScreen from '../screens/drone/NearbyDronesScreen';
+import DroneDetailScreen from '../screens/drone/DroneDetailScreen';
+
+// Order flow screens
+import PaymentScreen from '../screens/order/PaymentScreen';
+import ReviewScreen from '../screens/order/ReviewScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -29,6 +35,7 @@ function HomeStack() {
       <Stack.Screen name="PublishDemand" component={PublishDemandScreen} options={{title: '发布需求'}} />
       <Stack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '货运需求'}} />
       <Stack.Screen name="NearbyDrones" component={NearbyDronesScreen} options={{title: '附近无人机'}} />
+      <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
     </Stack.Navigator>
   );
 }
@@ -37,6 +44,10 @@ function OrderStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="OrderMain" component={OrderListScreen} options={{title: '我的订单'}} />
+      <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
+      <Stack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
+      <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
     </Stack.Navigator>
   );
 }
