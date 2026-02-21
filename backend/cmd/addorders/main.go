@@ -199,11 +199,12 @@ func main() {
 	}
 
 	// 添加消息
+	// conversation_id 格式: "小ID-大ID"（与 message_service.go 的 makeConversationID 一致）
 	readAt := twoDaysAgo
 	messages := []Message{
-		{ConversationID: "conv_1_2", SenderID: 2, ReceiverID: 1, MessageType: "text", Content: "您好，管理员，您的订单已接受，欢迎体验！", IsRead: 1, ReadAt: &readAt, CreatedAt: twoDaysAgo},
-		{ConversationID: "conv_1_2", SenderID: 1, ReceiverID: 2, MessageType: "text", Content: "谢谢！我会按时取机的", IsRead: 1, ReadAt: &readAt, CreatedAt: twoDaysAgo},
-		{ConversationID: "conv_1_3", SenderID: 3, ReceiverID: 1, MessageType: "text", Content: "感谢您的预订！期待为您服务", IsRead: 1, ReadAt: &readAt, CreatedAt: oneDayAgo},
+		{ConversationID: "1-2", SenderID: 2, ReceiverID: 1, MessageType: "text", Content: "您好，管理员，您的订单已接受，欢迎体验！", IsRead: 1, ReadAt: &readAt, CreatedAt: twoDaysAgo},
+		{ConversationID: "1-2", SenderID: 1, ReceiverID: 2, MessageType: "text", Content: "谢谢！我会按时取机的", IsRead: 1, ReadAt: &readAt, CreatedAt: twoDaysAgo},
+		{ConversationID: "1-3", SenderID: 3, ReceiverID: 1, MessageType: "text", Content: "感谢您的预订！期待为您服务", IsRead: 1, ReadAt: &readAt, CreatedAt: oneDayAgo},
 	}
 	db.Create(&messages)
 

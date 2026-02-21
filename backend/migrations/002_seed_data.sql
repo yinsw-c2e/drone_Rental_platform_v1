@@ -98,17 +98,18 @@ INSERT INTO payments (id, payment_no, order_id, user_id, payment_type, payment_m
 (5, 'PAY202602190005', 1, 4, 'refund', 'wechat', 70000, 'refunded', 'WX2026021923456789', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- 9. 插入消息数据
+-- conversation_id 格式: "小ID-大ID"（与 message_service.go 的 makeConversationID 一致）
 INSERT INTO messages (conversation_id, sender_id, receiver_id, message_type, content, is_read, read_at, created_at) VALUES
-('conv_2_4', 2, 4, 'text', '您好，我是机主张三，您的订单已接受', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
-('conv_2_4', 4, 2, 'text', '谢谢！请问取机地点在哪里？', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
-('conv_2_4', 2, 4, 'text', '北京市朝阳区三里屯SOHO，可以约时间当面交接', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
-('conv_2_4', 4, 2, 'text', '好的，明天上午10点可以吗？', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
-('conv_2_4', 2, 4, 'text', '可以的，到时候见', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
-('conv_3_5', 3, 5, 'text', '感谢预订！我会准时提供服务', 1, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY)),
-('conv_3_5', 5, 3, 'text', '好的，期待合作', 1, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY)),
-('conv_7_5', 7, 5, 'text', '您好，已收到您的订单，我会准时到达', 0, NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
-('conv_3_4', 3, 4, 'text', '您的订单已确认，请注意查收', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
-('conv_3_4', 4, 3, 'text', '收到，谢谢！', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY));
+('2-4', 2, 4, 'text', '您好，我是机主张三，您的订单已接受', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('2-4', 4, 2, 'text', '谢谢！请问取机地点在哪里？', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('2-4', 2, 4, 'text', '北京市朝阳区三里屯SOHO，可以约时间当面交接', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('2-4', 4, 2, 'text', '好的，明天上午10点可以吗？', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('2-4', 2, 4, 'text', '可以的，到时候见', 1, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('3-5', 3, 5, 'text', '感谢预订！我会准时提供服务', 1, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY)),
+('3-5', 5, 3, 'text', '好的，期待合作', 1, DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY)),
+('5-7', 7, 5, 'text', '您好，已收到您的订单，我会准时到达', 0, NULL, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+('3-4', 3, 4, 'text', '您的订单已确认，请注意查收', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('3-4', 4, 3, 'text', '收到，谢谢！', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY));
 
 -- 10. 插入评价数据
 INSERT INTO reviews (order_id, reviewer_id, reviewee_id, review_type, target_type, target_id, rating, content, images, tags, created_at, updated_at) VALUES

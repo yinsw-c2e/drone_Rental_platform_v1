@@ -27,9 +27,10 @@ INSERT INTO payments (payment_no, order_id, user_id, payment_type, payment_metho
 ('PAY202602250007', @order7_id, 1, 'order', 'alipay', 20000, 'paid', 'ALI2026022512345678', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 -- 添加消息记录
+-- conversation_id 格式: "小ID-大ID"（与 message_service.go 的 makeConversationID 一致）
 INSERT INTO messages (conversation_id, sender_id, receiver_id, message_type, content, is_read, read_at, created_at) VALUES
-('conv_1_2', 2, 1, 'text', '您好，管理员，您的订单已接受，欢迎体验！', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
-('conv_1_2', 1, 2, 'text', '谢谢！我会按时取机的', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
-('conv_1_3', 3, 1, 'text', '感谢您的预订！期待为您服务', 1, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY));
+('1-2', 2, 1, 'text', '您好，管理员，您的订单已接受，欢迎体验！', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('1-2', 1, 2, 'text', '谢谢！我会按时取机的', 1, DATE_SUB(NOW(), INTERVAL 2 DAY), DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('1-3', 3, 1, 'text', '感谢您的预订！期待为您服务', 1, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 SELECT '✅ 已为管理员账号添加 2 条测试订单' AS status;
