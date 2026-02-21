@@ -30,33 +30,28 @@ func (r *MessageRepo) GetConversationMessages(conversationID string, page, pageS
 
 func (r *MessageRepo) GetConversations(userID int64) ([]ConversationSummary, error) {
 	var results []ConversationSummary
-	// Fix: Group by peer_id to handle inconsistent conversation_id formats (e.g., "5-7" vs "7-5")
-	// This ensures only one conversation entry per peer, regardless of conversation_id format
+	// MySQL 5.7 compatible query
+	// Get latest message for each peer by using a temporary table approach
 	err := r.db.Raw(`
 		SELECT 
-			conversation_id,
-			last_message,
-			last_time,
-			last_type,
-			peer_id,
-			(SELECT COUNT(*) FROM messages WHERE receiver_id = ? AND sender_id = sub.peer_id AND is_read = 0) AS unread_count
-		FROM (
+			m.conversation_id,
+			m.content AS last_message,
+			m.created_at AS last_time,
+			m.message_type AS last_type,
+			CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS peer_id,
+			(SELECT COUNT(*) FROM messages 
+			 WHERE receiver_id = ? AND sender_id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END 
+			 AND is_read = 0) AS unread_count
+		FROM messages m
+		INNER JOIN (
 			SELECT 
-				m.conversation_id,
-				m.content AS last_message,
-				m.created_at AS last_time,
-				m.message_type AS last_type,
-				CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS peer_id,
-				ROW_NUMBER() OVER (
-					PARTITION BY CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END 
-					ORDER BY m.created_at DESC
-				) AS rn
-			FROM messages m
-			WHERE m.sender_id = ? OR m.receiver_id = ?
-		) sub
-		WHERE rn = 1
-		ORDER BY last_time DESC
-	`, userID, userID, userID, userID, userID).Scan(&results).Error
+				MAX(id) as max_id
+			FROM messages
+			WHERE sender_id = ? OR receiver_id = ?
+			GROUP BY CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
+		) latest ON m.id = latest.max_id
+		ORDER BY m.created_at DESC
+	`, userID, userID, userID, userID, userID, userID).Scan(&results).Error
 	return results, err
 }
 

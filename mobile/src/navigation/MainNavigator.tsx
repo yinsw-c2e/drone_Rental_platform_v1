@@ -17,12 +17,20 @@ import PublishCargoScreen from '../screens/publish/PublishCargoScreen';
 
 // Drone screens
 import MyDronesScreen from '../screens/drone/MyDronesScreen';
+import AddDroneScreen from '../screens/drone/AddDroneScreen';
 import NearbyDronesScreen from '../screens/drone/NearbyDronesScreen';
 import DroneDetailScreen from '../screens/drone/DroneDetailScreen';
+
+// Demand screens
+import OfferListScreen from '../screens/demand/OfferListScreen';
+import OfferDetailScreen from '../screens/demand/OfferDetailScreen';
+import DemandListScreen from '../screens/demand/DemandListScreen';
+import DemandDetailScreen from '../screens/demand/DemandDetailScreen';
 
 // Order flow screens
 import PaymentScreen from '../screens/order/PaymentScreen';
 import ReviewScreen from '../screens/order/ReviewScreen';
+import CreateOrderScreen from '../screens/order/CreateOrderScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -36,6 +44,11 @@ function HomeStack() {
       <Stack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '货运需求'}} />
       <Stack.Screen name="NearbyDrones" component={NearbyDronesScreen} options={{title: '附近无人机'}} />
       <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{title: '创建订单'}} />
+      <Stack.Screen name="OfferList" component={OfferListScreen} options={{title: '供给列表'}} />
+      <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
+      <Stack.Screen name="DemandList" component={DemandListScreen} options={{title: '需求列表'}} />
+      <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
     </Stack.Navigator>
   );
 }
@@ -66,6 +79,7 @@ function ProfileStack() {
     <Stack.Navigator>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{headerShown: false}} />
       <Stack.Screen name="MyDrones" component={MyDronesScreen} options={{title: '我的无人机'}} />
+      <Stack.Screen name="AddDrone" component={AddDroneScreen} options={{title: '添加无人机'}} />
       <Stack.Screen name="MyOrders" component={OrderListScreen} options={{title: '我的订单'}} />
     </Stack.Navigator>
   );
