@@ -44,13 +44,17 @@ export default function CreateOrderScreen({route, navigation}: any) {
     try {
       const days = calculateDays();
       const total = calculateTotal();
+      // 将日期字符串转换为 ISO 8601 格式
+      const startDateTime = new Date(form.startDate + 'T00:00:00Z').toISOString();
+      const endDateTime = new Date(form.endDate + 'T23:59:59Z').toISOString();
+      
       const res = await orderService.create({
         order_type: 'rental',
         drone_id: drone.id,
         title: `租赁 ${drone.brand} ${drone.model}`,
         service_type: 'drone_rental',
-        start_time: form.startDate,
-        end_time: form.endDate,
+        start_time: startDateTime,
+        end_time: endDateTime,
         total_amount: total,
       });
       Alert.alert('成功', '订单创建成功', [
