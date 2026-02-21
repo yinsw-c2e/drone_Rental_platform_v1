@@ -148,6 +148,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 		messageGroup := authenticated.Group("/message")
 		{
 			messageGroup.GET("/conversations", h.Message.GetConversations)
+			messageGroup.GET("/peer/:peerId", h.Message.GetMessagesByPeer)
+			messageGroup.PUT("/peer/:peerId/read", h.Message.MarkReadByPeer)
 			messageGroup.GET("/:conversationId", h.Message.GetMessages)
 			messageGroup.POST("", h.Message.Send)
 			messageGroup.PUT("/:conversationId/read", h.Message.MarkRead)

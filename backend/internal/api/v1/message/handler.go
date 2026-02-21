@@ -85,3 +85,36 @@ func (h *Handler) UnreadCount(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"count": count})
 }
+
+// GetMessagesByPeer retrieves all messages between current user and a peer
+func (h *Handler) GetMessagesByPeer(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	peerID, err := strconv.ParseInt(c.Param("peerId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的用户ID")
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	messages, total, err := h.messageService.GetMessagesByPeer(userID, peerID, page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, messages, total, page, pageSize)
+}
+
+// MarkReadByPeer marks all messages from a peer as read
+func (h *Handler) MarkReadByPeer(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	peerID, err := strconv.ParseInt(c.Param("peerId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的用户ID")
+		return
+	}
+	if err := h.messageService.MarkAsReadByPeer(userID, peerID); err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}

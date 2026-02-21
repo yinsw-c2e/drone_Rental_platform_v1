@@ -6,22 +6,23 @@ import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 
 export default function ChatScreen({route}: any) {
-  const {conversationId, peerId} = route.params;
+  const {peerId, peerName} = route.params;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
   const fetchMessages = async () => {
     try {
-      const res = await messageService.getMessages(conversationId, 1, 50);
+      // Use peerId to fetch messages, handles inconsistent conversation_id formats
+      const res = await messageService.getMessagesByPeer(peerId, 1, 50);
       setMessages((res.data.list || []).reverse());
-      messageService.markRead(conversationId);
+      messageService.markReadByPeer(peerId);
     } catch (e) {
       console.error(e);
     }
   };
 
-  useEffect(() => { fetchMessages(); }, []);
+  useEffect(() => { fetchMessages(); }, [peerId]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;

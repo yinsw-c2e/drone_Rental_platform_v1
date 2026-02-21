@@ -76,7 +76,7 @@ yarn-error.log
 
 # Environment variables
 .env
-.env.local
+.env.local。
 .env.*.local
 .env.production
 !.env.example

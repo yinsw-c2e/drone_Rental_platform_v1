@@ -53,6 +53,14 @@ func (s *MessageService) GetUnreadCount(userID int64) (int64, error) {
 	return s.messageRepo.GetUnreadCount(userID)
 }
 
+func (s *MessageService) GetMessagesByPeer(userID, peerID int64, page, pageSize int) ([]model.Message, int64, error) {
+	return s.messageRepo.GetMessagesByPeer(userID, peerID, page, pageSize)
+}
+
+func (s *MessageService) MarkAsReadByPeer(userID, peerID int64) error {
+	return s.messageRepo.MarkAsReadByPeer(userID, peerID)
+}
+
 func makeConversationID(userA, userB int64) string {
 	if userA < userB {
 		return fmt.Sprintf("%d-%d", userA, userB)
