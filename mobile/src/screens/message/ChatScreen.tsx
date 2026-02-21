@@ -1,11 +1,11 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform} from 'react-native';
 import {messageService} from '../../services/message';
 import {Message} from '../../types';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 
-export default function ChatScreen({route}: any) {
+export default function ChatScreen({route, navigation}: any) {
   const {peerId, peerName} = route.params;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -24,12 +24,24 @@ export default function ChatScreen({route}: any) {
 
   useEffect(() => { fetchMessages(); }, [peerId]);
 
+  // 监听页面获得焦点时刷新消息
+  useEffect(() => {
+    const unsubscribe = navigation?.addListener?.('focus', () => {
+      fetchMessages();
+    });
+    return unsubscribe;
+  }, [navigation, fetchMessages]);
+
   const handleSend = async () => {
     if (!inputText.trim()) return;
     try {
       const res = await messageService.send(peerId, inputText.trim());
       setMessages(prev => [...prev, res.data]);
       setInputText('');
+      // 触发全局事件通知会话列表刷新
+      if (route.params?.onMessageSent) {
+        route.params.onMessageSent();
+      }
     } catch (e) {
       console.error(e);
     }

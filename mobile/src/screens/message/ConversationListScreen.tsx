@@ -56,6 +56,10 @@ export default function ConversationListScreen({navigation}: any) {
       onPress={() => navigation.navigate('Chat', {
         conversationId: item.conversation_id,
         peerId: item.peer_id,
+        onMessageSent: () => {
+          // 从聊天页面返回后刷新会话列表
+          fetchConversations();
+        },
       })}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>👤</Text>
