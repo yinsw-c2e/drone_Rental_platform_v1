@@ -93,7 +93,10 @@ export default function OfferDetailScreen({route, navigation}: any) {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.contactBtn} onPress={() => {
           if (offer.owner?.id) {
-            navigation.navigate('Chat', {peerId: offer.owner.id});
+            navigation.navigate('Messages', {
+              screen: 'Chat',
+              params: {peerId: offer.owner.id, peerName: offer.owner.nickname},
+            });
           }
         }}>
           <Text style={styles.contactBtnText}>联系机主</Text>

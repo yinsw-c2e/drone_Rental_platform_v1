@@ -60,6 +60,18 @@ export default function ChatScreen({route, navigation}: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with back button */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>{'<'} 返回</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{peerName || `用户 ${peerId}`}</Text>
+        <TouchableOpacity 
+          style={styles.listBtn} 
+          onPress={() => navigation.navigate('ConversationList')}>
+          <Text style={styles.listText}>列表</Text>
+        </TouchableOpacity>
+      </View>
       <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
           data={messages}
@@ -86,6 +98,16 @@ export default function ChatScreen({route, navigation}: any) {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#f5f5f5'},
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#e8e8e8',
+  },
+  backBtn: {paddingHorizontal: 8, paddingVertical: 4},
+  backText: {fontSize: 16, color: '#1890ff'},
+  headerTitle: {fontSize: 17, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center'},
+  listBtn: {paddingHorizontal: 8, paddingVertical: 4},
+  listText: {fontSize: 15, color: '#1890ff'},
   msgRow: {flexDirection: 'row', marginBottom: 12},
   msgRowRight: {justifyContent: 'flex-end'},
   bubble: {maxWidth: '75%', padding: 12, borderRadius: 12},

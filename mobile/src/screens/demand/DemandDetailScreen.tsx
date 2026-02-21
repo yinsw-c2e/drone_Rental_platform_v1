@@ -90,7 +90,10 @@ export default function DemandDetailScreen({route, navigation}: any) {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.contactBtn} onPress={() => {
           if (demand.renter?.id) {
-            navigation.navigate('Chat', {peerId: demand.renter.id});
+            navigation.navigate('Messages', {
+              screen: 'Chat',
+              params: {peerId: demand.renter.id, peerName: demand.renter.nickname},
+            });
           }
         }}>
           <Text style={styles.contactBtnText}>联系租客</Text>

@@ -1,25 +1,29 @@
 import React, {useState} from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, Alert,
+  SafeAreaView, ScrollView, Alert, Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {orderService} from '../../services/order';
 import {Drone} from '../../types';
 
 export default function CreateOrderScreen({route, navigation}: any) {
   const {drone} = route.params;
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    startDate: '',
-    endDate: '',
-    remark: '',
-  });
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [remark, setRemark] = useState('');
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return '';
+    return date.toISOString().split('T')[0];
+  };
 
   const calculateDays = () => {
-    if (!form.startDate || !form.endDate) return 0;
-    const start = new Date(form.startDate);
-    const end = new Date(form.endDate);
-    const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    if (!startDate || !endDate) return 0;
+    const diff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     return diff > 0 ? diff : 0;
   };
 
@@ -29,7 +33,7 @@ export default function CreateOrderScreen({route, navigation}: any) {
   };
 
   const handleSubmit = async () => {
-    if (!form.startDate || !form.endDate) {
+    if (!startDate || !endDate) {
       Alert.alert('提示', '请选择租赁开始和结束日期');
       return;
     }
@@ -42,19 +46,14 @@ export default function CreateOrderScreen({route, navigation}: any) {
 
     setLoading(true);
     try {
-      const days = calculateDays();
       const total = calculateTotal();
-      // 将日期字符串转换为 ISO 8601 格式
-      const startDateTime = new Date(form.startDate + 'T00:00:00Z').toISOString();
-      const endDateTime = new Date(form.endDate + 'T23:59:59Z').toISOString();
-      
       const res = await orderService.create({
         order_type: 'rental',
         drone_id: drone.id,
         title: `租赁 ${drone.brand} ${drone.model}`,
         service_type: 'drone_rental',
-        start_time: startDateTime,
-        end_time: endDateTime,
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
         total_amount: total,
       });
       Alert.alert('成功', '订单创建成功', [
@@ -65,6 +64,20 @@ export default function CreateOrderScreen({route, navigation}: any) {
       Alert.alert('错误', e.message || '创建订单失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartPicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setStartDate(selectedDate);
+    }
+  };
+
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndPicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setEndDate(selectedDate);
     }
   };
 
@@ -81,22 +94,38 @@ export default function CreateOrderScreen({route, navigation}: any) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>租赁时间</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>开始日期 (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="如：2026-02-20"
-              value={form.startDate}
-              onChangeText={(text) => setForm({...form, startDate: text})}
-            />
+            <Text style={styles.label}>开始日期</Text>
+            <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+              <Text style={startDate ? styles.dateText : styles.datePlaceholder}>
+                {startDate ? formatDate(startDate) : '选择开始日期'}
+              </Text>
+            </TouchableOpacity>
+            {showStartPicker && (
+              <DateTimePicker
+                value={startDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={onStartDateChange}
+                minimumDate={new Date()}
+              />
+            )}
           </View>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>结束日期 (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="如：2026-02-22"
-              value={form.endDate}
-              onChangeText={(text) => setForm({...form, endDate: text})}
-            />
+            <Text style={styles.label}>结束日期</Text>
+            <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+              <Text style={endDate ? styles.dateText : styles.datePlaceholder}>
+                {endDate ? formatDate(endDate) : '选择结束日期'}
+              </Text>
+            </TouchableOpacity>
+            {showEndPicker && (
+              <DateTimePicker
+                value={endDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={onEndDateChange}
+                minimumDate={startDate || new Date()}
+              />
+            )}
           </View>
           {calculateDays() > 0 && (
             <Text style={styles.daysText}>共 {calculateDays()} 天</Text>
@@ -109,8 +138,8 @@ export default function CreateOrderScreen({route, navigation}: any) {
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="填写备注信息（可选）"
-            value={form.remark}
-            onChangeText={(text) => setForm({...form, remark: text})}
+            value={remark}
+            onChangeText={setRemark}
             multiline
             numberOfLines={3}
           />
@@ -168,6 +197,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 15,
   },
+  dateInput: {
+    borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 14, fontSize: 15,
+    backgroundColor: '#fff',
+  },
+  dateText: {fontSize: 15, color: '#333'},
+  datePlaceholder: {fontSize: 15, color: '#999'},
   textArea: {height: 80, textAlignVertical: 'top'},
   daysText: {fontSize: 14, color: '#1890ff', marginTop: 8},
   priceRow: {

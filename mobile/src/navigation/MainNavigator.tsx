@@ -45,6 +45,7 @@ function HomeStack() {
       <Stack.Screen name="NearbyDrones" component={NearbyDronesScreen} options={{title: '附近无人机'}} />
       <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
       <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{title: '创建订单'}} />
+      <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
       <Stack.Screen name="OfferList" component={OfferListScreen} options={{title: '供给列表'}} />
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <Stack.Screen name="DemandList" component={DemandListScreen} options={{title: '需求列表'}} />
