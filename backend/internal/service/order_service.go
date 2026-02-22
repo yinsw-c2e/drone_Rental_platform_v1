@@ -104,6 +104,9 @@ func (s *OrderService) AcceptOrder(orderID, ownerID int64) error {
 		return err
 	}
 
+	// 更新无人机状态为已出租
+	s.droneRepo.UpdateFields(order.DroneID, map[string]interface{}{"availability_status": "rented"})
+
 	s.orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID: orderID, Status: "accepted", Note: "订单已接受",
 		OperatorID: ownerID, OperatorType: "owner",
@@ -155,8 +158,8 @@ func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) e
 		return err
 	}
 
-	// Restore drone availability
-	s.droneRepo.UpdateFields(order.DroneID, map[string]interface{}{"availability_status": "available"})
+	// 检查是否还有其他活跃订单，如果没有则恢复无人机状态
+	s.restoreDroneStatusIfNoActiveOrders(order.DroneID, orderID)
 
 	s.orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID: orderID, Status: "cancelled", Note: "订单已取消: " + reason,
@@ -203,7 +206,8 @@ func (s *OrderService) CompleteOrder(orderID, userID int64, role string) error {
 		return err
 	}
 
-	s.droneRepo.UpdateFields(order.DroneID, map[string]interface{}{"availability_status": "available"})
+	// 检查是否还有其他活跃订单，如果没有则恢复无人机状态
+	s.restoreDroneStatusIfNoActiveOrders(order.DroneID, orderID)
 
 	s.orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID: orderID, Status: "completed", Note: "订单已完成",
@@ -230,6 +234,37 @@ func (s *OrderService) AdminListOrders(page, pageSize int, filters map[string]in
 
 func (s *OrderService) GetStatistics() (map[string]int64, error) {
 	return s.orderRepo.GetStatistics()
+}
+
+// restoreDroneStatusIfNoActiveOrders 检查无人机是否还有其他活跃订单，如果没有则恢复为可用状态
+func (s *OrderService) restoreDroneStatusIfNoActiveOrders(droneID, excludeOrderID int64) {
+	// 查询是否还有其他进行中的订单
+	activeStatuses := []string{"accepted", "paid", "in_progress"}
+	hasOtherOrders := false
+
+	for _, status := range activeStatuses {
+		orders, _, _ := s.orderRepo.List(1, 1, map[string]interface{}{
+			"drone_id": droneID,
+			"status":   status,
+		})
+
+		// 过滤掉当前订单
+		for _, order := range orders {
+			if order.ID != excludeOrderID {
+				hasOtherOrders = true
+				break
+			}
+		}
+
+		if hasOtherOrders {
+			break
+		}
+	}
+
+	// 如果没有其他活跃订单，恢复无人机状态
+	if !hasOtherOrders {
+		s.droneRepo.UpdateFields(droneID, map[string]interface{}{"availability_status": "available"})
+	}
 }
 
 func generateOrderNo() string {
