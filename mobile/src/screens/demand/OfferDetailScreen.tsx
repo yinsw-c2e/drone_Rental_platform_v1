@@ -61,6 +61,13 @@ export default function OfferDetailScreen({route, navigation}: any) {
           </View>
           <Text style={styles.title}>{offer.title}</Text>
           <Text style={styles.price}>{formatPrice()}</Text>
+          {offer.status !== 'active' && (
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusText}>
+                {offer.status === 'closed' ? '已关闭' : '不可用'}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -91,15 +98,41 @@ export default function OfferDetailScreen({route, navigation}: any) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.contactBtn} onPress={() => {
-          if (offer.owner?.id) {
-            navigation.navigate('Messages', {
-              screen: 'Chat',
-              params: {peerId: offer.owner.id, peerName: offer.owner.nickname},
-            });
-          }
-        }}>
-          <Text style={styles.contactBtnText}>联系机主</Text>
+        {offer.status === 'active' && (
+          <TouchableOpacity
+            style={styles.rentBtn}
+            onPress={() => {
+              Alert.alert(
+                '确认租赁',
+                `是否确认租赁「${offer.title}」？`,
+                [
+                  {text: '取消', style: 'cancel'},
+                  {
+                    text: '确认',
+                    onPress: () => {
+                      // TODO: 实现创建订单逻辑
+                      Alert.alert('提示', '租赁功能开发中，请先联系机主');
+                    },
+                  },
+                ],
+              );
+            }}>
+            <Text style={styles.rentBtnText}>立即租赁</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.contactBtn, offer.status === 'active' && styles.contactBtnSecondary]}
+          onPress={() => {
+            if (offer.owner?.id) {
+              navigation.navigate('Messages', {
+                screen: 'Chat',
+                params: {peerId: offer.owner.id, peerName: offer.owner.nickname},
+              });
+            }
+          }}>
+          <Text style={[styles.contactBtnText, offer.status === 'active' && styles.contactBtnTextSecondary]}>
+            联系机主
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -119,6 +152,11 @@ const styles = StyleSheet.create({
   },
   title: {fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center'},
   price: {fontSize: 24, color: '#f5222d', fontWeight: 'bold', marginTop: 8},
+  statusBadge: {
+    backgroundColor: '#ff4d4f', paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: 12, marginTop: 8,
+  },
+  statusText: {color: '#fff', fontSize: 12, fontWeight: '500'},
   section: {
     backgroundColor: '#fff', marginTop: 10, padding: 16,
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f0f0f0',
@@ -133,11 +171,20 @@ const styles = StyleSheet.create({
   description: {fontSize: 14, color: '#666', lineHeight: 22},
   footer: {
     backgroundColor: '#fff', padding: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0',
+    flexDirection: 'row', gap: 10,
   },
+  rentBtn: {
+    flex: 1, backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+  },
+  rentBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
   contactBtn: {
-    backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+    flex: 1, backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+  },
+  contactBtnSecondary: {
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#1890ff',
   },
   contactBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  contactBtnTextSecondary: {color: '#1890ff'},
   empty: {alignItems: 'center', paddingTop: 100},
   emptyIcon: {fontSize: 48, marginBottom: 12},
   emptyText: {fontSize: 16, color: '#999'},

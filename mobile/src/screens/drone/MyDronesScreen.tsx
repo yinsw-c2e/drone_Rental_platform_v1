@@ -49,7 +49,12 @@ export default function MyDronesScreen({navigation}: any) {
   };
 
   const renderDrone = ({item}: {item: Drone}) => (
-    <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('DroneDetail', {id: item.id})}>
+    <TouchableOpacity 
+      style={styles.card} 
+      onPress={() => {
+        console.log('Navigating to DroneDetail with id:', item.id);
+        navigation.navigate('DroneDetail', {id: item.id});
+      }}>
       <View style={styles.cardTop}>
         <View style={styles.droneIcon}><Text style={{fontSize: 24}}>🚁</Text></View>
         <View style={{flex: 1}}>

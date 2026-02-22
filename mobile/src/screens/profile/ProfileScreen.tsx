@@ -10,7 +10,7 @@ export default function ProfileScreen({navigation}: any) {
 
   const menuItems = [
     {title: '我的无人机', screen: 'MyDrones'},
-    {title: '我的订单', screen: 'OrderList'},
+    {title: '我的订单', screen: 'MyOrders'},
     {title: '我的供给', screen: 'MyOffers'},
     {title: '我的需求', screen: 'MyDemands'},
     {title: '实名认证', screen: 'Verification'},

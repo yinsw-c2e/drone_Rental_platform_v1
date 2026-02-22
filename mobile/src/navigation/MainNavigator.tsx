@@ -10,6 +10,12 @@ import ConversationListScreen from '../screens/message/ConversationListScreen';
 import ChatScreen from '../screens/message/ChatScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
+// Profile screens
+import MyOffersScreen from '../screens/profile/MyOffersScreen';
+import MyDemandsScreen from '../screens/profile/MyDemandsScreen';
+import VerificationScreen from '../screens/profile/VerificationScreen';
+import SettingsScreen from '../screens/profile/SettingsScreen';
+
 // Publish screens
 import PublishOfferScreen from '../screens/publish/PublishOfferScreen';
 import PublishDemandScreen from '../screens/publish/PublishDemandScreen';
@@ -82,6 +88,14 @@ function ProfileStack() {
       <Stack.Screen name="MyDrones" component={MyDronesScreen} options={{title: '我的无人机'}} />
       <Stack.Screen name="AddDrone" component={AddDroneScreen} options={{title: '添加无人机'}} />
       <Stack.Screen name="MyOrders" component={OrderListScreen} options={{title: '我的订单'}} />
+      <Stack.Screen name="MyOffers" component={MyOffersScreen} options={{title: '我的供给'}} />
+      <Stack.Screen name="MyDemands" component={MyDemandsScreen} options={{title: '我的需求'}} />
+      <Stack.Screen name="Verification" component={VerificationScreen} options={{title: '实名认证'}} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{title: '设置'}} />
+      <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
+      <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
+      <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
     </Stack.Navigator>
   );
 }

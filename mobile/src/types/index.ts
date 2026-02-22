@@ -52,6 +52,7 @@ export interface RentalOffer {
   price_type: string;
   price: number;
   status: string;
+  views?: number;
   drone?: Drone;
   owner?: User;
 }
