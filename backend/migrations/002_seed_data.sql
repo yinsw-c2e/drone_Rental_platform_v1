@@ -19,17 +19,17 @@ DELETE FROM users;
 DELETE FROM system_configs;
 
 -- 1. 插入用户数据
--- 密码都是: password123 (bcrypt加密后)
+-- 密码都是: password123 (bcrypt加密后: $2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W)
 -- 注意：以下手机号均为虚拟测试号码，非真实用户
 INSERT INTO users (id, phone, password_hash, nickname, avatar_url, user_type, id_verified, credit_score, status, created_at, updated_at) VALUES
-(1, '13800000001', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '系统管理员', '', 'admin', 'approved', 100, 'active', NOW(), NOW()),
-(2, '13800000002', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户A', 'https://picsum.photos/200?random=1', 'drone_owner', 'approved', 95, 'active', NOW(), NOW()),
-(3, '13800000003', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户B', 'https://picsum.photos/200?random=2', 'drone_owner', 'approved', 98, 'active', NOW(), NOW()),
-(4, '13800000004', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户C', 'https://picsum.photos/200?random=3', 'renter', 'approved', 92, 'active', NOW(), NOW()),
-(5, '13800000005', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户D', 'https://picsum.photos/200?random=4', 'renter', 'approved', 88, 'active', NOW(), NOW()),
-(6, '13800000006', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户E', 'https://picsum.photos/200?random=5', 'both', 'pending', 100, 'active', NOW(), NOW()),
-(7, '13800000007', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户F', 'https://picsum.photos/200?random=6', 'drone_owner', 'approved', 96, 'active', NOW(), NOW()),
-(8, '13800000008', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '测试用户G', 'https://picsum.photos/200?random=7', 'renter', 'rejected', 85, 'active', NOW(), NOW());
+(1, '13800000001', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '系统管理员', '', 'admin', 'approved', 100, 'active', NOW(), NOW()),
+(2, '13800000002', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户A', 'https://picsum.photos/200?random=1', 'drone_owner', 'approved', 95, 'active', NOW(), NOW()),
+(3, '13800000003', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户B', 'https://picsum.photos/200?random=2', 'drone_owner', 'approved', 98, 'active', NOW(), NOW()),
+(4, '13800000004', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户C', 'https://picsum.photos/200?random=3', 'renter', 'approved', 92, 'active', NOW(), NOW()),
+(5, '13800000005', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户D', 'https://picsum.photos/200?random=4', 'renter', 'approved', 88, 'active', NOW(), NOW()),
+(6, '13800000006', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户E', 'https://picsum.photos/200?random=5', 'both', 'pending', 100, 'active', NOW(), NOW()),
+(7, '13800000007', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户F', 'https://picsum.photos/200?random=6', 'drone_owner', 'approved', 96, 'active', NOW(), NOW()),
+(8, '13800000008', '$2a$10$R62/GJPBz8atrx/fQKxfd.QKISEi7KKNhWfnp0MnOXeNbw3v0sr1W', '测试用户G', 'https://picsum.photos/200?random=7', 'renter', 'rejected', 85, 'active', NOW(), NOW());
 
 -- 2. 插入无人机数据
 INSERT INTO drones (id, owner_id, brand, model, serial_number, max_load, max_flight_time, max_distance, features, images, certification_status, daily_price, hourly_price, deposit, latitude, longitude, address, city, availability_status, rating, order_count, description, created_at, updated_at) VALUES
