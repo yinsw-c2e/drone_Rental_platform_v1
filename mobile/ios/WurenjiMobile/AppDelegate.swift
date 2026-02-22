@@ -40,7 +40,8 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    // 强制使用指定 IP 地址连接 Metro
+    return URL(string: "http://192.168.3.97:8081/index.bundle?platform=ios&dev=true&lazy=true&minify=false")
 #else
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif

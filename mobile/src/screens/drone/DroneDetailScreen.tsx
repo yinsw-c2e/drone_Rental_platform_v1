@@ -62,7 +62,16 @@ export default function DroneDetailScreen({route, navigation}: any) {
       Alert.alert('提示', '该无人机当前不可租赁');
       return;
     }
-    navigation.navigate('CreateOrder', {drone});
+    // 只传递必要的字段，避免参数过大
+    const droneParams = {
+      id: drone.id,
+      brand: drone.brand,
+      model: drone.model,
+      daily_price: drone.daily_price,
+      deposit: drone.deposit,
+      owner_id: drone.owner_id,
+    };
+    navigation.navigate('CreateOrder', {drone: droneParams});
   };
 
   if (loading) {

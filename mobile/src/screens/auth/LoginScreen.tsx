@@ -63,6 +63,26 @@ export default function LoginScreen({navigation}: any) {
     }
   };
 
+  // 快速登录（开发模式）
+  const quickLogin = async (userPhone: string, userPassword: string, role: string) => {
+    try {
+      const res = await authService.login(userPhone, userPassword);
+      dispatch(setCredentials(res.data));
+      Alert.alert('成功', `已登录为${role}`);
+    } catch (e: any) {
+      const errorMsg = e.message || '登录失败';
+      if (errorMsg.includes('账号或密码错误') || errorMsg.includes('Network') || errorMsg.includes('timeout')) {
+        Alert.alert(
+          '快速登录失败',
+          `账号: ${userPhone}\n密码: password123\n\n可能原因：\n1. 后端服务未启动（请检查 :8080）\n2. 数据库种子数据未执行\n3. 网络连接问题`,
+          [{text: '确定'}]
+        );
+      } else {
+        Alert.alert('快速登录失败', errorMsg);
+      }
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -126,6 +146,33 @@ export default function LoginScreen({navigation}: any) {
           onPress={() => navigation.navigate('Register')}>
           <Text style={styles.switchBtnText}>注册新账号</Text>
         </TouchableOpacity>
+
+        {/* 开发模式快速登录 */}
+        <View style={styles.devSection}>
+          <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
+          <View style={styles.devButtons}>
+            <TouchableOpacity
+              style={styles.devBtn}
+              onPress={() => quickLogin('13800000001', 'password123', '机主1')}>
+              <Text style={styles.devBtnText}>机主1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.devBtn}
+              onPress={() => quickLogin('13800000002', 'password123', '机主2')}>
+              <Text style={styles.devBtnText}>机主2</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.devBtn}
+              onPress={() => quickLogin('13800000003', 'password123', '租客1')}>
+              <Text style={styles.devBtnText}>租客1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.devBtn}
+              onPress={() => quickLogin('13800000004', 'password123', '租客2')}>
+              <Text style={styles.devBtnText}>租客2</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -155,4 +202,37 @@ const styles = StyleSheet.create({
   loginBtnText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
   switchBtn: {marginTop: 16, alignItems: 'center'},
   switchBtnText: {color: '#1890ff', fontSize: 14},
+  devSection: {
+    marginTop: 40,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e8e8e8',
+  },
+  devTitle: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  devButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  devBtn: {
+    width: '48%',
+    height: 44,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+  },
+  devBtnText: {
+    color: '#666',
+    fontSize: 15,
+    fontWeight: '500',
+  },
 });
