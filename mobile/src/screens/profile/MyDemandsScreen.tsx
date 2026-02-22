@@ -13,7 +13,7 @@ export default function MyDemandsScreen({navigation}: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await demandService.listDemands({page: 1, page_size: 100});
+      const res = await demandService.myDemands({page: 1, page_size: 100});
       setDemands(res.data?.list || []);
     } catch (e) {
       console.warn('获取需求失败:', e);

@@ -13,7 +13,7 @@ export default function MyOffersScreen({navigation}: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await demandService.listOffers({page: 1, page_size: 100});
+      const res = await demandService.myOffers({page: 1, page_size: 100});
       setOffers(res.data?.list || []);
     } catch (e) {
       console.warn('获取供给失败:', e);
