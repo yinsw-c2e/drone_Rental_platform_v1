@@ -49,12 +49,26 @@ func (h *Handler) GetOffer(c *gin.Context) {
 
 func (h *Handler) UpdateOffer(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	userID := c.GetInt64("user_id")
+
+	// 验证是否是供给的机主
+	existingOffer, err := h.demandService.GetOffer(id)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "供给不存在")
+		return
+	}
+	if existingOffer.OwnerID != userID {
+		response.Error(c, response.CodeForbidden, "无权操作此供给")
+		return
+	}
+
 	var offer model.RentalOffer
 	if err := c.ShouldBindJSON(&offer); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
 	offer.ID = id
+	offer.OwnerID = userID // 保持原机主
 	if err := h.demandService.UpdateOffer(&offer); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return

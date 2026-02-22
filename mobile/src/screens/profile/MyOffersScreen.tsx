@@ -57,39 +57,14 @@ export default function MyOffersScreen({navigation}: any) {
     return colorMap[status] || '#999';
   };
 
-  const getDroneStatusColor = (status: string) => {
-    const colorMap: Record<string, string> = {
-      available: '#1890ff',
-      rented: '#fa8c16',
-      maintenance: '#999',
-    };
-    return colorMap[status] || '#999';
-  };
-
-  const getDroneStatusLabel = (status: string) => {
-    const labelMap: Record<string, string> = {
-      available: '可用',
-      rented: '已租',
-      maintenance: '维护',
-    };
-    return labelMap[status] || status;
-  };
-
   const renderItem = ({item}: {item: RentalOffer}) => (
     <TouchableOpacity
       style={styles.item}
       onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
       <View style={styles.itemHeader}>
         <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-        <View style={styles.badgeContainer}>
-          <View style={[styles.statusBadge, {backgroundColor: getStatusColor(item.status)}]}>
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-          </View>
-          {item.drone && (
-            <View style={[styles.droneBadge, {backgroundColor: getDroneStatusColor(item.drone.availability_status)}]}>
-              <Text style={styles.droneStatusText}>{getDroneStatusLabel(item.drone.availability_status)}</Text>
-            </View>
-          )}
+        <View style={[styles.statusBadge, {backgroundColor: getStatusColor(item.status)}]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
         </View>
       </View>
       <Text style={styles.itemDesc} numberOfLines={2}>{item.description || '暂无描述'}</Text>
@@ -143,11 +118,8 @@ const styles = StyleSheet.create({
   },
   itemHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8},
   itemTitle: {flex: 1, fontSize: 16, fontWeight: '600', color: '#333', marginRight: 8},
-  badgeContainer: {flexDirection: 'row', gap: 6},
   statusBadge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4},
   statusText: {color: '#fff', fontSize: 11, fontWeight: '500'},
-  droneBadge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4},
-  droneStatusText: {color: '#fff', fontSize: 11, fontWeight: '500'},
   itemDesc: {fontSize: 13, color: '#666', lineHeight: 20, marginBottom: 12},
   itemFooter: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   itemPrice: {fontSize: 16, color: '#f5222d', fontWeight: 'bold'},
