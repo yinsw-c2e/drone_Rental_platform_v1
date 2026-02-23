@@ -1,6 +1,7 @@
 package service
 
 import (
+	"time"
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/repository"
 )
@@ -15,6 +16,14 @@ func NewDemandService(demandRepo *repository.DemandRepo) *DemandService {
 
 // Rental Offers
 func (s *DemandService) CreateOffer(offer *model.RentalOffer) error {
+	// 如果没有设置可用时间，设置默认值
+	if offer.AvailableFrom.IsZero() {
+		offer.AvailableFrom = time.Now()
+	}
+	if offer.AvailableTo.IsZero() {
+		// 默认可用1年
+		offer.AvailableTo = time.Now().AddDate(1, 0, 0)
+	}
 	return s.demandRepo.CreateOffer(offer)
 }
 
