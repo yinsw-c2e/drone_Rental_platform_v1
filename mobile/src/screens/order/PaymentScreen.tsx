@@ -33,20 +33,34 @@ export default function PaymentScreen({route, navigation}: any) {
   const totalPay = order.total_amount + order.deposit_amount;
 
   const handlePay = async () => {
+    console.log('开始支付流程...');
     setPaying(true);
     try {
+      console.log('创建支付记录, order.id:', order.id, 'method:', selected);
       const createRes = await paymentService.create(order.id, selected);
-      const paymentNo = createRes.data?.payment_no;
+      console.log('创建支付成功:', createRes);
+      const paymentNo = createRes.data?.payment?.payment_no;
+      console.log('paymentNo:', paymentNo);
+
+      if (!paymentNo) {
+        throw new Error('获取支付单号失败');
+      }
 
       if (selected === 'mock' && paymentNo) {
-        await paymentService.mockCallback(paymentNo);
+        console.log('执行模拟支付回调, paymentNo:', paymentNo);
+        const callbackRes = await paymentService.mockCallback(paymentNo);
+        console.log('模拟支付回调成功:', callbackRes);
+        console.log('设置结果为 success');
         setResult('success');
+        console.log('result 已设置为 success');
       } else if (paymentNo) {
+        console.log('轮询支付状态...');
         // For real payment, we'd invoke native SDK here.
         // For now, poll payment status after a delay.
         let attempts = 0;
         const poll = async (): Promise<boolean> => {
           const statusRes = await paymentService.getStatus(paymentNo);
+          console.log('支付状态:', statusRes.data?.status);
           if (statusRes.data?.status === 'paid') return true;
           if (++attempts < 10) {
             await new Promise(r => setTimeout(r, 2000));
@@ -55,13 +69,18 @@ export default function PaymentScreen({route, navigation}: any) {
           return false;
         };
         const paid = await poll();
+        console.log('轮询结果:', paid);
         setResult(paid ? 'success' : 'fail');
       }
     } catch (e: any) {
       console.error('支付失败:', e);
+      console.error('错误详情:', e.message, e.response?.data);
+      Alert.alert('支付失败', e.message || '请稍后重试');
       setResult('fail');
+    } finally {
+      console.log('支付流程结束, paying 设置为 false');
+      setPaying(false);
     }
-    setPaying(false);
   };
 
   if (result) {
