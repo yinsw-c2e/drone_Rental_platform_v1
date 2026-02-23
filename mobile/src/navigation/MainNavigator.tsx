@@ -37,6 +37,7 @@ import DemandDetailScreen from '../screens/demand/DemandDetailScreen';
 // Cargo screens
 import CargoListScreen from '../screens/cargo/CargoListScreen';
 import CargoDetailScreen from '../screens/cargo/CargoDetailScreen';
+import CargoAcceptScreen from '../screens/cargo/CargoAcceptScreen';
 
 // Order flow screens
 import PaymentScreen from '../screens/order/PaymentScreen';
@@ -65,6 +66,7 @@ function HomeStack() {
       <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
       <Stack.Screen name="CargoList" component={CargoListScreen} options={{title: '货运列表'}} />
       <Stack.Screen name="CargoDetail" component={CargoDetailScreen} options={{title: '货运详情'}} />
+      <Stack.Screen name="CargoAccept" component={CargoAcceptScreen} options={{title: '确认接单'}} />
     </Stack.Navigator>
   );
 }

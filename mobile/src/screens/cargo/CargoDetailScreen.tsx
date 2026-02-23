@@ -63,15 +63,22 @@ export default function CargoDetailScreen({route, navigation}: any) {
 
   const handleContact = () => {
     if (!cargo?.publisher_id) return;
-    // 跳转到聊天页面
-    navigation.navigate('Chat', {
-      peerId: cargo.publisher_id,
-      peerName: cargo.publisher?.nickname || '发布者',
+    // 跳转到聊天页面（使用嵌套导航）
+    navigation.navigate('Messages', {
+      screen: 'Chat',
+      params: {
+        peerId: cargo.publisher_id,
+        peerName: cargo.publisher?.nickname || '发布者',
+      },
     });
   };
 
   const handleAccept = () => {
-    Alert.alert('接单功能', '货运接单功能开发中，敬请期待！');
+    // 跳转到选择无人机页面，然后创建货运订单
+    navigation.navigate('CargoAccept', {
+      cargoId: cargo?.id,
+      cargoData: cargo,
+    });
   };
 
   // 判断是否为发布者
