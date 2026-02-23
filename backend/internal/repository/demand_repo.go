@@ -37,13 +37,38 @@ func (r *DemandRepo) ListOffers(page, pageSize int, filters map[string]interface
 	var offers []model.RentalOffer
 	var total int64
 
-	query := r.db.Model(&model.RentalOffer{}).Preload("Drone").Preload("Owner")
+	// 不预加载关联数据，直接返回供给基本信息
+	query := r.db.Model(&model.RentalOffer{})
 	for k, v := range filters {
 		query = query.Where(k+" = ?", v)
 	}
 
 	query.Count(&total)
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&offers).Error
+
+	// 手动加载 Owner 信息，避免循环引用
+	if err == nil && len(offers) > 0 {
+		ownerIDs := make([]int64, 0)
+		for _, offer := range offers {
+			ownerIDs = append(ownerIDs, offer.OwnerID)
+		}
+
+		var owners []model.User
+		r.db.Where("id IN ?", ownerIDs).Find(&owners)
+
+		// 映射 owner
+		ownerMap := make(map[int64]*model.User)
+		for i := range owners {
+			ownerMap[owners[i].ID] = &owners[i]
+		}
+
+		for i := range offers {
+			if owner, ok := ownerMap[offers[i].OwnerID]; ok {
+				offers[i].Owner = owner
+			}
+		}
+	}
+
 	return offers, total, err
 }
 

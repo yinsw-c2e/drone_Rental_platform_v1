@@ -162,8 +162,9 @@ func createDrones(db *gorm.DB, users []model.User, count int) []model.Drone {
 			selectedFeatures = append(selectedFeatures, featureCopy[j])
 		}
 
-		featuresJSON := fmt.Sprintf(`["%s"]`, joinStrings(selectedFeatures, `","`))
-		imagesJSON := fmt.Sprintf(`["/uploads/drone/%s_%s.jpg"]`, droneModel.Brand, droneModel.Model)
+		// 使用简单的 JSON 格式
+		featuresJSON := `["4K摄像","避障系统"]`
+		imagesJSON := `["/uploads/drone/default.jpg"]`
 
 		// 随机状态（80% available, 15% rented, 5% maintenance）
 		status := "available"
