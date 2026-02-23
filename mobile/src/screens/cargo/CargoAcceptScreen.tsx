@@ -44,6 +44,10 @@ export default function CargoAcceptScreen({route, navigation}: any) {
       return;
     }
 
+    // 立即禁用按钮，防止重复提交
+    if (submitting) {
+      return;
+    }
     setSubmitting(true);
     try {
       // 创建货运订单（直接为 accepted 状态）

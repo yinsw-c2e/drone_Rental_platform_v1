@@ -42,6 +42,21 @@ func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 			return nil, errors.New("货运需求不存在")
 		}
 		renterID = cargo.PublisherID
+
+		// 幂等性检查：同一飞手不能重复接同一个货运订单
+		existingOrders, _, _ := s.orderRepo.List(1, 1, map[string]interface{}{
+			"order_type": "cargo",
+			"related_id": req.RelatedID,
+			"owner_id":   drone.OwnerID,
+		})
+		if len(existingOrders) > 0 {
+			// 检查是否有活跃订单（非cancelled/rejected）
+			for _, order := range existingOrders {
+				if order.Status != "cancelled" && order.Status != "rejected" {
+					return nil, errors.New("您已经接过这个货运订单")
+				}
+			}
+		}
 	}
 
 	commissionRate := float64(s.cfg.Payment.CommissionRate)

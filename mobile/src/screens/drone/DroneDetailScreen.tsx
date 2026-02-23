@@ -4,6 +4,8 @@ import {
   ActivityIndicator, SafeAreaView, FlatList, Dimensions,
   Alert,
 } from 'react-native';
+import {useSelector} from 'react-redux';
+import {RootState} from '../../store/store';
 import {droneService} from '../../services/drone';
 import {reviewService} from '../../services/review';
 import {Drone, Review} from '../../types';
@@ -19,10 +21,14 @@ const AVAILABILITY_MAP: Record<string, {label: string; color: string}> = {
 
 export default function DroneDetailScreen({route, navigation}: any) {
   const {id} = route.params;
+  const currentUser = useSelector((state: RootState) => state.auth.user);
   const [drone, setDrone] = useState<Drone | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentImage, setCurrentImage] = useState(0);
+
+  // 判断是否是自己的无人机
+  const isOwner = drone?.owner_id === currentUser?.id;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -195,19 +201,19 @@ export default function DroneDetailScreen({route, navigation}: any) {
           <View style={styles.priceRow}>
             {drone.daily_price > 0 && (
               <View style={styles.priceItem}>
-                <Text style={styles.priceValue}>{'\u00a5'}{drone.daily_price}</Text>
+                <Text style={styles.priceValue}>{'¥'}{(drone.daily_price / 100).toFixed(0)}</Text>
                 <Text style={styles.priceLabel}>日租金</Text>
               </View>
             )}
             {drone.hourly_price > 0 && (
               <View style={styles.priceItem}>
-                <Text style={styles.priceValue}>{'\u00a5'}{drone.hourly_price}</Text>
+                <Text style={styles.priceValue}>{'¥'}{(drone.hourly_price / 100).toFixed(0)}</Text>
                 <Text style={styles.priceLabel}>时租金</Text>
               </View>
             )}
             {drone.deposit > 0 && (
               <View style={styles.priceItem}>
-                <Text style={[styles.priceValue, {color: '#faad14'}]}>{'\u00a5'}{drone.deposit}</Text>
+                <Text style={[styles.priceValue, {color: '#faad14'}]}>{'¥'}{(drone.deposit / 100).toFixed(0)}</Text>
                 <Text style={styles.priceLabel}>押金</Text>
               </View>
             )}
@@ -243,7 +249,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
         </View>
 
         {/* Owner Info */}
-        {drone.owner && (
+        {drone.owner && !isOwner && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>机主信息</Text>
             <View style={styles.ownerRow}>
@@ -300,21 +306,23 @@ export default function DroneDetailScreen({route, navigation}: any) {
       </ScrollView>
 
       {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomContactBtn} onPress={handleContact}>
-          <Text style={styles.bottomContactText}>联系机主</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.bottomRentBtn,
-            drone.availability_status !== 'available' && styles.bottomBtnDisabled,
-          ]}
-          onPress={handleRent}>
-          <Text style={styles.bottomRentText}>
-            {drone.availability_status === 'available' ? '立即租赁' : availability.label}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {!isOwner && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity style={styles.bottomContactBtn} onPress={handleContact}>
+            <Text style={styles.bottomContactText}>联系机主</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.bottomRentBtn,
+              drone.availability_status !== 'available' && styles.bottomBtnDisabled,
+            ]}
+            onPress={handleRent}>
+            <Text style={styles.bottomRentText}>
+              {drone.availability_status === 'available' ? '立即租赁' : availability.label}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

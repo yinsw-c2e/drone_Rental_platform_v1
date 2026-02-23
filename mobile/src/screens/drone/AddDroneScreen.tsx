@@ -31,7 +31,7 @@ export default function AddDroneScreen({navigation}: any) {
         serial_number: form.serial_number,
         max_load: parseFloat(form.max_load) || 0,
         max_flight_time: parseFloat(form.max_flight_time) || 0,
-        daily_price: parseFloat(form.daily_price) || 0,
+        daily_price: (parseFloat(form.daily_price) || 0) * 100, // 转换为分
         description: form.description,
       });
       Alert.alert('成功', '无人机添加成功', [
