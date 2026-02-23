@@ -46,7 +46,7 @@ export default function CargoAcceptScreen({route, navigation}: any) {
 
     setSubmitting(true);
     try {
-      // 创建货运订单
+      // 创建货运订单（直接为 accepted 状态）
       const orderData = {
         order_type: 'cargo',
         related_id: cargoId,
@@ -58,6 +58,7 @@ export default function CargoAcceptScreen({route, navigation}: any) {
         service_address: cargoData.pickup_address,
         total_amount: cargoData.offered_price,
         deposit_amount: 0, // 货运无押金
+        auto_accept: true, // 标记为自动接单
       };
 
       const res = await orderService.create(orderData);

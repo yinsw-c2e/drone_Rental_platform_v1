@@ -58,10 +58,18 @@ func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 		Status:                 "created",
 	}
 
+	// 货运订单自动接单
+	if req.AutoAccept {
+		order.Status = "accepted"
+		// 更新无人机状态
+		s.droneRepo.UpdateFields(req.DroneID, map[string]interface{}{"availability_status": "rented"})
+	}
+
 	if err := s.orderRepo.Create(order); err != nil {
 		return nil, err
 	}
 
+	// 记录创建时间线
 	s.orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      order.ID,
 		Status:       "created",
@@ -69,6 +77,17 @@ func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 		OperatorID:   req.RenterID,
 		OperatorType: "renter",
 	})
+
+	// 如果自动接单，记录接单时间线
+	if req.AutoAccept {
+		s.orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "accepted",
+			Note:         "飞手已接单",
+			OperatorID:   drone.OwnerID,
+			OperatorType: "owner",
+		})
+	}
 
 	return order, nil
 }
@@ -86,6 +105,7 @@ type CreateOrderRequest struct {
 	Longitude   float64   `json:"longitude"`
 	Address     string    `json:"address"`
 	TotalAmount int64     `json:"total_amount"`
+	AutoAccept  bool      `json:"auto_accept"` // 货运订单自动接单
 }
 
 func (s *OrderService) AcceptOrder(orderID, ownerID int64) error {
