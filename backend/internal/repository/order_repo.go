@@ -22,7 +22,18 @@ func (r *OrderRepo) GetByID(id int64) (*model.Order, error) {
 	var order model.Order
 	err := r.db.Preload("Drone").Preload("Owner").Preload("Renter").
 		Where("id = ?", id).First(&order).Error
-	return &order, err
+	if err != nil {
+		return &order, err
+	}
+
+	// 检查是否已评价（租客对订单进行评价）
+	var count int64
+	r.db.Model(&model.Review{}).
+		Where("order_id = ? AND reviewer_id = ?", order.ID, order.RenterID).
+		Count(&count)
+	order.Reviewed = count > 0
+
+	return &order, nil
 }
 
 func (r *OrderRepo) GetByOrderNo(orderNo string) (*model.Order, error) {

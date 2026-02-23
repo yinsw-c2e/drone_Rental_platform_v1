@@ -180,6 +180,9 @@ type Order struct {
 	Drone  *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
 	Owner  *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	Renter *User  `gorm:"foreignKey:RenterID" json:"renter,omitempty"`
+
+	// 虚拟字段：是否已评件（不存储在数据库）
+	Reviewed bool `gorm:"-" json:"reviewed"`
 }
 
 func (Order) TableName() string {

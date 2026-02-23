@@ -155,7 +155,10 @@ export default function OrderDetailScreen({route, navigation}: any) {
         buttons.push({label: '完成订单', onPress: handleComplete, type: 'primary'});
       }
     } else if (order.status === 'completed') {
-      buttons.push({label: '去评价', onPress: handleReview, type: 'primary'});
+      // 只有租客可以评价，且未评价过才显示按钮
+      if (isRenter && !(order as any).reviewed) {
+        buttons.push({label: '去评价', onPress: handleReview, type: 'primary'});
+      }
     }
 
     if (buttons.length === 0) return null;
@@ -196,14 +199,16 @@ export default function OrderDetailScreen({route, navigation}: any) {
         {timeline.map((item, index) => {
           const status = ORDER_STATUS[item.status] || {label: item.status, color: '#999'};
           const isLast = index === timeline.length - 1;
+          // 当前订单状态匹配当前时间线项时高亮
+          const isCurrent = order?.status === item.status;
           return (
             <View key={item.id} style={styles.timelineItem}>
               <View style={styles.timelineDotCol}>
-                <View style={[styles.timelineDot, {backgroundColor: index === 0 ? status.color : '#ddd'}]} />
+                <View style={[styles.timelineDot, {backgroundColor: isCurrent ? status.color : '#ddd'}]} />
                 {!isLast && <View style={styles.timelineLine} />}
               </View>
               <View style={styles.timelineContent}>
-                <Text style={[styles.timelineStatus, index === 0 && {color: status.color, fontWeight: '600'}]}>
+                <Text style={[styles.timelineStatus, isCurrent && {color: status.color, fontWeight: '600'}]}>
                   {item.note || status.label}
                 </Text>
                 <Text style={styles.timelineTime}>{item.created_at?.slice(0, 19).replace('T', ' ')}</Text>
