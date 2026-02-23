@@ -3,6 +3,8 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native';
+import {useSelector} from 'react-redux';
+import {RootState} from '../../store/store';
 import {demandService} from '../../services/demand';
 import {CargoDemand} from '../../types';
 
@@ -10,6 +12,7 @@ export default function CargoDetailScreen({route, navigation}: any) {
   const {id} = route.params;
   const [cargo, setCargo] = useState<CargoDemand | null>(null);
   const [loading, setLoading] = useState(true);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     fetchCargo();
@@ -57,6 +60,22 @@ export default function CargoDetailScreen({route, navigation}: any) {
     };
     return colorMap[status] || '#999';
   };
+
+  const handleContact = () => {
+    if (!cargo?.publisher_id) return;
+    // 跳转到聊天页面
+    navigation.navigate('Chat', {
+      peerId: cargo.publisher_id,
+      peerName: cargo.publisher?.nickname || '发布者',
+    });
+  };
+
+  const handleAccept = () => {
+    Alert.alert('接单功能', '货运接单功能开发中，敬请期待！');
+  };
+
+  // 判断是否为发布者
+  const isPublisher = cargo?.publisher_id === currentUser?.id;
 
   if (loading) {
     return (
@@ -168,18 +187,20 @@ export default function CargoDetailScreen({route, navigation}: any) {
                   信用分：{cargo.publisher.credit_score || 0}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.contactBtn}>
-                <Text style={styles.contactBtnText}>联系</Text>
-              </TouchableOpacity>
+              {!isPublisher && (
+                <TouchableOpacity style={styles.contactBtn} onPress={handleContact}>
+                  <Text style={styles.contactBtnText}>联系</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
       </ScrollView>
 
       {/* 底部操作栏 */}
-      {cargo.status === 'active' && (
+      {cargo.status === 'active' && !isPublisher && (
         <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.acceptBtn}>
+          <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
             <Text style={styles.acceptBtnText}>接单</Text>
           </TouchableOpacity>
         </View>

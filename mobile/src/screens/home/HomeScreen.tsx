@@ -175,7 +175,7 @@ export default function HomeScreen({navigation}: any) {
                   {item.cargo_weight}kg · {item.distance > 0 ? `${item.distance.toFixed(1)}km` : '距离未知'}
                 </Text>
               </View>
-              <Text style={styles.cargoPrice}>xa5{(item.offered_price / 100).toFixed(2)}</Text>
+              <Text style={styles.cargoPrice}>¥{(item.offered_price / 100).toFixed(2)}</Text>
             </TouchableOpacity>
           ))
         ) : (

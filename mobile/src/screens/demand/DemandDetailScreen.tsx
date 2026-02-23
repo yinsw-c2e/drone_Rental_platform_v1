@@ -3,6 +3,8 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native';
+import {useSelector} from 'react-redux';
+import {RootState} from '../../store/store';
 import {demandService} from '../../services/demand';
 import {RentalDemand} from '../../types';
 
@@ -10,6 +12,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
   const {id} = route.params;
   const [demand, setDemand] = useState<RentalDemand | null>(null);
   const [loading, setLoading] = useState(true);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     fetchDemand();
@@ -25,6 +28,9 @@ export default function DemandDetailScreen({route, navigation}: any) {
       setLoading(false);
     }
   };
+
+  // 判断是否为发布者
+  const isPublisher = demand?.renter_id === currentUser?.id;
 
   if (loading) {
     return (
@@ -87,18 +93,20 @@ export default function DemandDetailScreen({route, navigation}: any) {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.contactBtn} onPress={() => {
-          if (demand.renter?.id) {
-            navigation.navigate('Messages', {
-              screen: 'Chat',
-              params: {peerId: demand.renter.id, peerName: demand.renter.nickname},
-            });
-          }
-        }}>
-          <Text style={styles.contactBtnText}>联系租客</Text>
-        </TouchableOpacity>
-      </View>
+      {!isPublisher && (
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.contactBtn} onPress={() => {
+            if (demand.renter?.id) {
+              navigation.navigate('Messages', {
+                screen: 'Chat',
+                params: {peerId: demand.renter.id, peerName: demand.renter.nickname},
+              });
+            }
+          }}>
+            <Text style={styles.contactBtnText}>联系租客</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
