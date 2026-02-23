@@ -13,14 +13,15 @@ import (
 )
 
 type OrderService struct {
-	orderRepo *repository.OrderRepo
-	droneRepo *repository.DroneRepo
-	cfg       *config.Config
-	logger    *zap.Logger
+	orderRepo  *repository.OrderRepo
+	droneRepo  *repository.DroneRepo
+	demandRepo *repository.DemandRepo
+	cfg        *config.Config
+	logger     *zap.Logger
 }
 
-func NewOrderService(orderRepo *repository.OrderRepo, droneRepo *repository.DroneRepo, cfg *config.Config, logger *zap.Logger) *OrderService {
-	return &OrderService{orderRepo: orderRepo, droneRepo: droneRepo, cfg: cfg, logger: logger}
+func NewOrderService(orderRepo *repository.OrderRepo, droneRepo *repository.DroneRepo, demandRepo *repository.DemandRepo, cfg *config.Config, logger *zap.Logger) *OrderService {
+	return &OrderService{orderRepo: orderRepo, droneRepo: droneRepo, demandRepo: demandRepo, cfg: cfg, logger: logger}
 }
 
 func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error) {
@@ -30,6 +31,17 @@ func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 	}
 	if drone.AvailabilityStatus != "available" {
 		return nil, errors.New("该无人机当前不可用")
+	}
+
+	// 确定 renter_id（支付方）
+	renterID := req.RenterID
+	if req.OrderType == "cargo" && req.RelatedID > 0 {
+		// 货运订单：从 cargo_demand 获取 publisher_id（货主）作为 renter_id
+		cargo, err := s.demandRepo.GetCargoByID(req.RelatedID)
+		if err != nil {
+			return nil, errors.New("货运需求不存在")
+		}
+		renterID = cargo.PublisherID
 	}
 
 	commissionRate := float64(s.cfg.Payment.CommissionRate)
@@ -42,7 +54,7 @@ func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 		RelatedID:              req.RelatedID,
 		DroneID:                req.DroneID,
 		OwnerID:                drone.OwnerID,
-		RenterID:               req.RenterID,
+		RenterID:               renterID,
 		Title:                  req.Title,
 		ServiceType:            req.ServiceType,
 		StartTime:              req.StartTime,
@@ -74,7 +86,7 @@ func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error
 		OrderID:      order.ID,
 		Status:       "created",
 		Note:         "订单已创建",
-		OperatorID:   req.RenterID,
+		OperatorID:   renterID,
 		OperatorType: "renter",
 	})
 

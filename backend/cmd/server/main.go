@@ -115,7 +115,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, rds, smsService, cfg, zapLogger)
 	userService := service.NewUserService(userRepo)
 	droneService := service.NewDroneService(droneRepo)
-	orderService := service.NewOrderService(orderRepo, droneRepo, cfg, zapLogger)
+	orderService := service.NewOrderService(orderRepo, droneRepo, demandRepo, cfg, zapLogger)
 	demandService := service.NewDemandService(demandRepo)
 	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, zapLogger)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, paymentProvider, zapLogger)
