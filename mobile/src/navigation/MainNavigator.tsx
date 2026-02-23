@@ -52,6 +52,8 @@ function HomeStack() {
       <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
       <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{title: '创建订单'}} />
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
+      <Stack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <Stack.Screen name="OfferList" component={OfferListScreen} options={{title: '供给列表'}} />
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <Stack.Screen name="DemandList" component={DemandListScreen} options={{title: '需求列表'}} />
@@ -95,6 +97,8 @@ function ProfileStack() {
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
+      <Stack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
     </Stack.Navigator>
   );
