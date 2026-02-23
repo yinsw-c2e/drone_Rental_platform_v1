@@ -34,9 +34,10 @@ export default function OfferDetailScreen({route, navigation}: any) {
 
   const formatPrice = () => {
     if (!offer?.price) return '价格面议';
+    const priceInYuan = (offer.price / 100).toFixed(0);
     return offer.price_type === 'hourly'
-      ? `¥${offer.price}/小时`
-      : `¥${offer.price}/天`;
+      ? `¥${priceInYuan}/小时`
+      : `¥${priceInYuan}/天`;
   };
 
   const handleUpdateStatus = async (newStatus: string) => {

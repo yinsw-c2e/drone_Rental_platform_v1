@@ -68,7 +68,7 @@ export default function MyDronesScreen({navigation}: any) {
       <View style={styles.cardBottom}>
         <Text style={styles.spec}>载重 {item.max_load || 0}kg</Text>
         <Text style={styles.spec}>续航 {item.max_flight_time || 0}min</Text>
-        <Text style={styles.priceText}>¥{item.daily_price || 0}/天</Text>
+        <Text style={styles.priceText}>¥{(item.daily_price / 100).toFixed(0)}/天</Text>
       </View>
     </TouchableOpacity>
   );

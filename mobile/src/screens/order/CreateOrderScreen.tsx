@@ -87,7 +87,7 @@ export default function CreateOrderScreen({route, navigation}: any) {
         {/* Drone Info */}
         <View style={styles.droneCard}>
           <Text style={styles.droneName}>{drone.brand} {drone.model}</Text>
-          <Text style={styles.dronePrice}>¥{drone.daily_price}/天</Text>
+          <Text style={styles.dronePrice}>¥{(drone.daily_price / 100).toFixed(0)}/天</Text>
         </View>
 
         {/* Date Selection */}
@@ -150,15 +150,15 @@ export default function CreateOrderScreen({route, navigation}: any) {
           <Text style={styles.sectionTitle}>费用明细</Text>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>租金 ({calculateDays()}天)</Text>
-            <Text style={styles.priceValue}>¥{calculateTotal()}</Text>
+            <Text style={styles.priceValue}>¥{(calculateTotal() / 100).toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>押金</Text>
-            <Text style={styles.priceValue}>¥{drone.deposit || 0}</Text>
+            <Text style={styles.priceLabel}>压金</Text>
+            <Text style={styles.priceValue}>¥{((drone.deposit || 0) / 100).toFixed(2)}</Text>
           </View>
           <View style={[styles.priceRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>合计</Text>
-            <Text style={styles.totalValue}>¥{calculateTotal() + (drone.deposit || 0)}</Text>
+            <Text style={styles.totalValue}>¥{((calculateTotal() + (drone.deposit || 0)) / 100).toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>

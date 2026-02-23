@@ -39,7 +39,7 @@ export default function NearbyDronesScreen({navigation}: any) {
         <Text style={styles.meta}>{item.owner?.nickname || '无人机主'} · ⭐{item.rating || '0.0'}</Text>
         <Text style={styles.address}>{item.address || item.city || '位置未知'}</Text>
       </View>
-      <Text style={styles.price}>¥{item.daily_price || 0}/天</Text>
+      <Text style={styles.price}>¥{(item.daily_price / 100).toFixed(0)}/天</Text>
     </TouchableOpacity>
   );
 
