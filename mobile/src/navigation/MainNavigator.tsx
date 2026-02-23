@@ -96,6 +96,7 @@ function ProfileStack() {
       <Stack.Screen name="Settings" component={SettingsScreen} options={{title: '设置'}} />
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
+      <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{title: '创建订单'}} />
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
       <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />

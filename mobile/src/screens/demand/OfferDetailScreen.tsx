@@ -155,19 +155,16 @@ export default function OfferDetailScreen({route, navigation}: any) {
                 Alert.alert('提示', '无人机当前使用中，请联系机主预约');
                 return;
               }
-              Alert.alert(
-                '确认租赁',
-                `是否确认租赁「${offer.title}」？`,
-                [
-                  {text: '取消', style: 'cancel'},
-                  {
-                    text: '确认',
-                    onPress: () => {
-                      Alert.alert('提示', '租赁功能开发中，请先联系机主');
-                    },
-                  },
-                ],
-              );
+              // 跳转到创建订单页面
+              navigation.navigate('CreateOrder', {
+                offerId: offer.id,
+                droneId: offer.drone_id,
+                ownerId: offer.owner_id,
+                serviceType: offer.service_type,
+                title: offer.title,
+                price: offer.price,
+                priceType: offer.price_type,
+              });
             }}>
             <Text style={styles.rentBtnText}>立即租赁</Text>
           </TouchableOpacity>
