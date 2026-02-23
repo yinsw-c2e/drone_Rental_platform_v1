@@ -4,11 +4,12 @@ import {
   SafeAreaView, Image, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import {demandService} from '../../services/demand';
-import {RentalOffer, RentalDemand} from '../../types';
+import {RentalOffer, RentalDemand, CargoDemand} from '../../types';
 
 export default function HomeScreen({navigation}: any) {
   const [offers, setOffers] = useState<RentalOffer[]>([]);
   const [demands, setDemands] = useState<RentalDemand[]>([]);
+  const [cargos, setCargos] = useState<CargoDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -21,12 +22,14 @@ export default function HomeScreen({navigation}: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [offersRes, demandsRes] = await Promise.all([
+      const [offersRes, demandsRes, cargosRes] = await Promise.all([
         demandService.listOffers({page: 1, page_size: 5}),
         demandService.listDemands({page: 1, page_size: 5}),
+        demandService.listCargos({page: 1, page_size: 5}),
       ]);
       setOffers(offersRes.data?.list || []);
       setDemands(demandsRes.data?.list || []);
+      setCargos(cargosRes.data?.list || []);
     } catch (e) {
       console.warn('首页数据加载失败:', e);
     } finally {
@@ -145,6 +148,39 @@ export default function HomeScreen({navigation}: any) {
         ) : (
           <Text style={styles.emptyText}>暂无需求信息</Text>
         )}
+
+        {/* 最新货运 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>最新货运</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('CargoList')}>
+            <Text style={styles.moreText}>查看更多 &gt;</Text>
+          </TouchableOpacity>
+        </View>
+        {loading ? (
+          <ActivityIndicator style={{paddingVertical: 20}} color="#fa8c16" />
+        ) : cargos.length > 0 ? (
+          cargos.map(item => (
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.listItem, {borderLeftColor: '#fa8c16'}]}
+              onPress={() => navigation.navigate('CargoDetail', {id: item.id})}>
+              <View style={styles.cargoIconBox}>
+                <Text style={{fontSize: 20}}>📦</Text>
+              </View>
+              <View style={styles.itemContent}>
+                <Text style={styles.itemTitle} numberOfLines={1}>
+                  {item.pickup_address} → {item.delivery_address}
+                </Text>
+                <Text style={styles.cargoMeta}>
+                  {item.cargo_weight}kg · {item.distance > 0 ? `${item.distance.toFixed(1)}km` : '距离未知'}
+                </Text>
+              </View>
+              <Text style={styles.cargoPrice}>xa5{(item.offered_price / 100).toFixed(2)}</Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>暂无货运需求</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -191,5 +227,11 @@ const styles = StyleSheet.create({
   demandBudget: {fontSize: 13, color: '#f5222d', marginTop: 4},
   urgentBadge: {backgroundColor: '#ff4d4f', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 3, marginLeft: 8},
   urgentText: {color: '#fff', fontSize: 10},
+  cargoIconBox: {
+    width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff7e6',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  },
+  cargoMeta: {fontSize: 12, color: '#999', marginTop: 3},
+  cargoPrice: {fontSize: 14, color: '#fa8c16', fontWeight: 'bold'},
   emptyText: {textAlign: 'center', color: '#999', padding: 20},
 });

@@ -13,6 +13,7 @@ import ProfileScreen from '../screens/profile/ProfileScreen';
 // Profile screens
 import MyOffersScreen from '../screens/profile/MyOffersScreen';
 import MyDemandsScreen from '../screens/profile/MyDemandsScreen';
+import MyCargoScreen from '../screens/profile/MyCargoScreen';
 import VerificationScreen from '../screens/profile/VerificationScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 
@@ -32,6 +33,10 @@ import OfferListScreen from '../screens/demand/OfferListScreen';
 import OfferDetailScreen from '../screens/demand/OfferDetailScreen';
 import DemandListScreen from '../screens/demand/DemandListScreen';
 import DemandDetailScreen from '../screens/demand/DemandDetailScreen';
+
+// Cargo screens
+import CargoListScreen from '../screens/cargo/CargoListScreen';
+import CargoDetailScreen from '../screens/cargo/CargoDetailScreen';
 
 // Order flow screens
 import PaymentScreen from '../screens/order/PaymentScreen';
@@ -58,6 +63,8 @@ function HomeStack() {
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <Stack.Screen name="DemandList" component={DemandListScreen} options={{title: '需求列表'}} />
       <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
+      <Stack.Screen name="CargoList" component={CargoListScreen} options={{title: '货运列表'}} />
+      <Stack.Screen name="CargoDetail" component={CargoDetailScreen} options={{title: '货运详情'}} />
     </Stack.Navigator>
   );
 }
@@ -92,10 +99,12 @@ function ProfileStack() {
       <Stack.Screen name="MyOrders" component={OrderListScreen} options={{title: '我的订单'}} />
       <Stack.Screen name="MyOffers" component={MyOffersScreen} options={{title: '我的供给'}} />
       <Stack.Screen name="MyDemands" component={MyDemandsScreen} options={{title: '我的需求'}} />
+      <Stack.Screen name="MyCargo" component={MyCargoScreen} options={{title: '我的货运'}} />
       <Stack.Screen name="Verification" component={VerificationScreen} options={{title: '实名认证'}} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{title: '设置'}} />
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <Stack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
+      <Stack.Screen name="CargoDetail" component={CargoDetailScreen} options={{title: '货运详情'}} />
       <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{title: '创建订单'}} />
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
       <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />

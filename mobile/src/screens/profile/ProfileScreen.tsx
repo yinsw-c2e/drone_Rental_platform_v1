@@ -13,6 +13,7 @@ export default function ProfileScreen({navigation}: any) {
     {title: '我的订单', screen: 'MyOrders'},
     {title: '我的供给', screen: 'MyOffers'},
     {title: '我的需求', screen: 'MyDemands'},
+    {title: '我的货运', screen: 'MyCargo'},
     {title: '实名认证', screen: 'Verification'},
     {title: '设置', screen: 'Settings'},
   ];
