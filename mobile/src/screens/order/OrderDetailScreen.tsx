@@ -4,6 +4,7 @@ import {
   ActivityIndicator, SafeAreaView, Alert,
 } from 'react-native';
 import {useSelector} from 'react-redux';
+import {useFocusEffect} from '@react-navigation/native';
 import {RootState} from '../../store/store';
 import {orderService} from '../../services/order';
 import {Order} from '../../types';
@@ -61,6 +62,13 @@ export default function OrderDetailScreen({route, navigation}: any) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 当页面获得焦点时刷新数据（从支付页面返回时）
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const isOwner = user?.id === order?.owner_id;
   const isRenter = user?.id === order?.renter_id;

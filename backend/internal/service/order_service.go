@@ -146,11 +146,45 @@ func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) e
 		return errors.New("订单不存在")
 	}
 
-	allowCancel := order.Status == "created" || order.Status == "accepted" || order.Status == "paid"
-	if !allowCancel {
-		return errors.New("当前状态不允许取消")
+	// 判断是否允许取消
+	if order.Status == "completed" || order.Status == "cancelled" || order.Status == "refunded" {
+		return errors.New("该订单不能取消")
 	}
 
+	// 如果订单已开始（in_progress），不允许取消
+	if order.Status == "in_progress" {
+		return errors.New("服务已开始，无法取消。请在服务结束后协商解决")
+	}
+
+	// 计算退款金额（如果已支付）
+	var refundAmount int64 = 0
+	var refundReason string
+
+	if order.Status == "paid" {
+		now := time.Now()
+
+		// 退款策略：
+		// 1. 开始时间前24小时以上：全额退款
+		// 2. 开始时间前24小时内：退款70%
+		// 3. 开始时间后：不退款
+
+		hoursUntilStart := order.StartTime.Sub(now).Hours()
+
+		if hoursUntilStart > 24 {
+			// 全额退款（订单金额 + 压金）
+			refundAmount = order.TotalAmount + order.DepositAmount
+			refundReason = "提前24小时以上取消，全额退款"
+		} else if hoursUntilStart > 0 {
+			// 部分退款：订单金额70% + 全部压金
+			refundAmount = int64(float64(order.TotalAmount)*0.7) + order.DepositAmount
+			refundReason = fmt.Sprintf("提前%.1f小时取消，退款70%%订单金额和全部压金", hoursUntilStart)
+		} else {
+			// 开始时间后，不退款
+			return errors.New("服务已过开始时间，无法取消")
+		}
+	}
+
+	// 更新订单状态
 	order.Status = "cancelled"
 	order.CancelReason = reason
 	order.CancelBy = role
@@ -165,6 +199,18 @@ func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) e
 		OrderID: orderID, Status: "cancelled", Note: "订单已取消: " + reason,
 		OperatorID: userID, OperatorType: role,
 	})
+
+	// 如果有退款，创建退款记录
+	if refundAmount > 0 {
+		s.logger.Info("Creating refund",
+			zap.Int64("order_id", orderID),
+			zap.Int64("refund_amount", refundAmount),
+			zap.String("reason", refundReason),
+		)
+		// TODO: 实际生产环境中，需要调用支付服务的退款接口
+		// 这里先记录日志，实际退款由PaymentService处理
+	}
+
 	return nil
 }
 
