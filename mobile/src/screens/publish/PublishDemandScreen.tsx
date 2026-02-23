@@ -32,8 +32,8 @@ export default function PublishDemandScreen({navigation}: any) {
         title: title.trim(),
         description: description.trim(),
         demand_type: demandType,
-        budget_min: Number(budgetMin) || 0,
-        budget_max: Number(budgetMax) || 0,
+        budget_min: Number(budgetMin) * 100 || 0, // 转换为分
+        budget_max: Number(budgetMax) * 100 || 0, // 转换为分
         city,
         urgency,
         status: 'active',

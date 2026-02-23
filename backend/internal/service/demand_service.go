@@ -49,6 +49,14 @@ func (s *DemandService) ListMyOffers(ownerID int64, page, pageSize int) ([]model
 
 // Rental Demands
 func (s *DemandService) CreateDemand(demand *model.RentalDemand) error {
+	// 如果没有设置时间，设置默认值
+	if demand.StartTime.IsZero() {
+		demand.StartTime = time.Now()
+	}
+	if demand.EndTime.IsZero() {
+		// 默认1周后
+		demand.EndTime = time.Now().AddDate(0, 0, 7)
+	}
 	return s.demandRepo.CreateDemand(demand)
 }
 
@@ -74,6 +82,10 @@ func (s *DemandService) ListMyDemands(renterID int64, page, pageSize int) ([]mod
 
 // Cargo Demands
 func (s *DemandService) CreateCargo(cargo *model.CargoDemand) error {
+	// 如果没有设置取货时间，设置默认值
+	if cargo.PickupTime.IsZero() {
+		cargo.PickupTime = time.Now()
+	}
 	return s.demandRepo.CreateCargo(cargo)
 }
 

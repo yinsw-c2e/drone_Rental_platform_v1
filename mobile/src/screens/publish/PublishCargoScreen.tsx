@@ -34,7 +34,7 @@ export default function PublishCargoScreen({navigation}: any) {
         cargo_description: cargoDescription.trim(),
         pickup_address: pickupAddress.trim(),
         delivery_address: deliveryAddress.trim(),
-        offered_price: Number(offeredPrice) || 0,
+        offered_price: Number(offeredPrice) * 100 || 0, // 转换为分
         status: 'active',
       });
       Alert.alert('成功', '货运需求发布成功', [
