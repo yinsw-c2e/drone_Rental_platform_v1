@@ -14,17 +14,21 @@ export default function OfferListScreen({navigation}: any) {
   const [hasMore, setHasMore] = useState(true);
 
   const fetchOffers = useCallback(async (pageNum = 1, isRefresh = false) => {
+    console.log('开始获取供给列表, page:', pageNum);
     try {
       const res = await demandService.listOffers({page: pageNum, page_size: 10});
+      console.log('获取供给响应:', res);
       const list = res.data?.list || [];
+      console.log('供给数据 list:', list, 'length:', list.length);
       if (isRefresh || pageNum === 1) {
         setOffers(list);
       } else {
         setOffers(prev => [...prev, ...list]);
       }
       setHasMore(list.length === 10);
-    } catch (e) {
-      console.warn('获取供给列表失败:', e);
+    } catch (e: any) {
+      console.error('获取供给列表失败:', e);
+      console.error('错误详情:', e.message, e.response);
     } finally {
       setLoading(false);
       setRefreshing(false);
