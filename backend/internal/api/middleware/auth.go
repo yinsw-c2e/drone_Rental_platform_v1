@@ -4,11 +4,20 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 
 	"wurenji-backend/internal/config"
 	jwtpkg "wurenji-backend/internal/pkg/jwt"
 	"wurenji-backend/internal/pkg/response"
 )
+
+// tokenBlacklistChecker 用于检查token黑名单的Redis客户端
+var tokenBlacklistRedis *redis.Client
+
+// SetTokenBlacklistRedis 设置用于黑名单检查的Redis客户端
+func SetTokenBlacklistRedis(rds *redis.Client) {
+	tokenBlacklistRedis = rds
+}
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -26,7 +35,19 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := jwtpkg.ParseToken(parts[1], config.AppConfig.JWT.Secret)
+		tokenStr := parts[1]
+
+		// 检查token是否在黑名单中
+		if tokenBlacklistRedis != nil {
+			key := "token:blacklist:" + tokenStr
+			if _, err := tokenBlacklistRedis.Get(c.Request.Context(), key).Result(); err == nil {
+				response.Unauthorized(c, "token has been revoked")
+				c.Abort()
+				return
+			}
+		}
+
+		claims, err := jwtpkg.ParseToken(tokenStr, config.AppConfig.JWT.Secret)
 		if err != nil {
 			response.Unauthorized(c, "invalid or expired token")
 			c.Abort()

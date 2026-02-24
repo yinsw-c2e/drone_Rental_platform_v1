@@ -160,5 +160,49 @@ func (s *AuthService) RefreshToken(refreshToken string) (*jwtpkg.TokenPair, erro
 		return nil, errors.New("refresh token无效")
 	}
 
+	// 检查refresh token是否已被加入黑名单
+	if s.IsTokenBlacklisted(refreshToken) {
+		return nil, errors.New("refresh token已失效")
+	}
+
 	return jwtpkg.GenerateTokenPair(claims.UserID, claims.UserType, s.cfg.JWT.Secret, s.cfg.JWT.AccessExpire, s.cfg.JWT.RefreshExpire)
+}
+
+// Logout 将token加入黑名单
+func (s *AuthService) Logout(accessToken, refreshToken string) error {
+	ctx := context.Background()
+
+	// 将access token加入黑名单，过期时间与token原始过期时间一致
+	if accessToken != "" {
+		claims, err := jwtpkg.ParseToken(accessToken, s.cfg.JWT.Secret)
+		if err == nil {
+			ttl := time.Until(claims.ExpiresAt.Time)
+			if ttl > 0 {
+				key := fmt.Sprintf("token:blacklist:%s", accessToken)
+				s.rds.Set(ctx, key, "1", ttl)
+			}
+		}
+	}
+
+	// 将refresh token加入黑名单
+	if refreshToken != "" {
+		claims, err := jwtpkg.ParseToken(refreshToken, s.cfg.JWT.Secret)
+		if err == nil {
+			ttl := time.Until(claims.ExpiresAt.Time)
+			if ttl > 0 {
+				key := fmt.Sprintf("token:blacklist:%s", refreshToken)
+				s.rds.Set(ctx, key, "1", ttl)
+			}
+		}
+	}
+
+	return nil
+}
+
+// IsTokenBlacklisted 检查token是否在黑名单中
+func (s *AuthService) IsTokenBlacklisted(token string) bool {
+	ctx := context.Background()
+	key := fmt.Sprintf("token:blacklist:%s", token)
+	_, err := s.rds.Get(ctx, key).Result()
+	return err == nil // key存在说明在黑名单中
 }

@@ -123,5 +123,19 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 }
 
 func (h *Handler) Logout(c *gin.Context) {
+	// 从Header中获取access token
+	accessToken := ""
+	authHeader := c.GetHeader("Authorization")
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		accessToken = authHeader[7:]
+	}
+
+	// 从请求体中获取refresh token
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	c.ShouldBindJSON(&req)
+
+	_ = h.authService.Logout(accessToken, req.RefreshToken)
 	response.Success(c, nil)
 }

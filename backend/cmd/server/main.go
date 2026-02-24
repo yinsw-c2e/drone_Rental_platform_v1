@@ -87,6 +87,9 @@ func main() {
 	hub := ws.NewHub(zapLogger)
 	go hub.Run()
 
+	// 设置token黑名单Redis
+	middleware.SetTokenBlacklistRedis(rds)
+
 	// Init repositories
 	userRepo := repository.NewUserRepo(db)
 	droneRepo := repository.NewDroneRepo(db)

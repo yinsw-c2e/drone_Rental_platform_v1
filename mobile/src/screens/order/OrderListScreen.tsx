@@ -37,9 +37,17 @@ export default function OrderListScreen({navigation}: any) {
           ...(renterRes.data.list || []),
           ...(ownerRes.data.list || []),
         ];
+        
+        // 去重（避免同一订单ID重复）
+        const orderMap = new Map<number, Order>();
+        allOrders.forEach(order => {
+          orderMap.set(order.id, order);
+        });
+        const uniqueOrders = Array.from(orderMap.values());
+        
         // 按创建时间排序
-        allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        setOrders(allOrders);
+        uniqueOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setOrders(uniqueOrders);
       } else {
         // 按角色查询
         const res = await orderService.list({role: activeRole, status: activeTab || undefined, page: 1, page_size: 50});
