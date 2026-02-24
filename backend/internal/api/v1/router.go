@@ -47,6 +47,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 		authGroup.POST("/register", h.Auth.Register)
 		authGroup.POST("/login", h.Auth.Login)
 		authGroup.POST("/refresh-token", h.Auth.RefreshToken)
+		authGroup.POST("/wechat-login", h.Auth.WeChatLogin)
+		authGroup.POST("/qq-login", h.Auth.QQLogin)
 	}
 
 	// Payment callbacks (no auth required)

@@ -26,4 +26,14 @@ export const authService = {
     }),
 
   logout: () => api.post<any, ApiResponse>('/auth/logout'),
+
+  // 微信登录
+  wechatLogin: (code: string) =>
+    api.post<any, ApiResponse<{user: User; token: TokenPair}>>('/auth/wechat-login', {code}),
+
+  // QQ登录
+  qqLogin: (accessToken: string) =>
+    api.post<any, ApiResponse<{user: User; token: TokenPair}>>('/auth/qq-login', {
+      access_token: accessToken,
+    }),
 };

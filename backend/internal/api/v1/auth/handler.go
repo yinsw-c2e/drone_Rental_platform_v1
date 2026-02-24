@@ -3,16 +3,19 @@ package auth
 import (
 	"github.com/gin-gonic/gin"
 
+	"wurenji-backend/internal/pkg/oauth"
 	"wurenji-backend/internal/pkg/response"
 	"wurenji-backend/internal/service"
 )
 
 type Handler struct {
 	authService *service.AuthService
+	wechatOAuth *oauth.WeChatOAuth
+	qqOAuth     *oauth.QQOAuth
 }
 
-func NewHandler(authService *service.AuthService) *Handler {
-	return &Handler{authService: authService}
+func NewHandler(authService *service.AuthService, wechatOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth) *Handler {
+	return &Handler{authService: authService, wechatOAuth: wechatOAuth, qqOAuth: qqOAuth}
 }
 
 type SendCodeReq struct {
@@ -138,4 +141,74 @@ func (h *Handler) Logout(c *gin.Context) {
 
 	_ = h.authService.Logout(accessToken, req.RefreshToken)
 	response.Success(c, nil)
+}
+
+// WeChatLogin 微信登录
+func (h *Handler) WeChatLogin(c *gin.Context) {
+	var req struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "code不能为空")
+		return
+	}
+
+	if h.wechatOAuth == nil || !h.wechatOAuth.IsEnabled() {
+		response.Error(c, response.CodeParamError, "微信登录未配置")
+		return
+	}
+
+	// 通过code获取微信用户信息
+	wxUser, err := h.wechatOAuth.GetUserInfo(req.Code)
+	if err != nil {
+		response.Error(c, response.CodeUnauthorized, "微信授权失败: "+err.Error())
+		return
+	}
+
+	// 使用第三方登录信息进行登录或注册
+	user, tokens, err := h.authService.OAuthLogin(wxUser.OpenID, wxUser.UnionID, wxUser.Nickname, wxUser.Avatar, "wechat")
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"user":  user,
+		"token": tokens,
+	})
+}
+
+// QQLogin QQ登录
+func (h *Handler) QQLogin(c *gin.Context) {
+	var req struct {
+		AccessToken string `json:"access_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "access_token不能为空")
+		return
+	}
+
+	if h.qqOAuth == nil || !h.qqOAuth.IsEnabled() {
+		response.Error(c, response.CodeParamError, "QQ登录未配置")
+		return
+	}
+
+	// 通过access_token获取QQ用户信息
+	qqUser, err := h.qqOAuth.GetUserInfo(req.AccessToken)
+	if err != nil {
+		response.Error(c, response.CodeUnauthorized, "QQ授权失败: "+err.Error())
+		return
+	}
+
+	// 使用第三方登录信息进行登录或注册
+	user, tokens, err := h.authService.OAuthLogin(qqUser.OpenID, "", qqUser.Nickname, qqUser.Avatar, "qq")
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"user":  user,
+		"token": tokens,
+	})
 }

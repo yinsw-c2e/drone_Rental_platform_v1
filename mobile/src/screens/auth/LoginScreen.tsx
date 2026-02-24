@@ -22,6 +22,24 @@ export default function LoginScreen({navigation}: any) {
   const [loginMode, setLoginMode] = useState<'code' | 'password'>('code');
   const [countdown, setCountdown] = useState(0);
 
+  const handleWeChatLogin = () => {
+    // 微信SDK需要原生模块支持，这里提示需要配置
+    Alert.alert(
+      '微信登录',
+      '微信登录需要在微信开放平台注册应用并集成SDK。\n\n当前开发模式，请使用手机号登录。',
+      [{text: '确定'}],
+    );
+  };
+
+  const handleQQLogin = () => {
+    // QQ SDK需要原生模块支持，这里提示需要配置
+    Alert.alert(
+      'QQ登录',
+      'QQ登录需要在QQ互联平台注册应用并集成SDK。\n\n当前开发模式，请使用手机号登录。',
+      [{text: '确定'}],
+    );
+  };
+
   const sendCode = async () => {
     if (!phone || phone.length !== 11) {
       Alert.alert('提示', '请输入正确的手机号');
@@ -147,6 +165,29 @@ export default function LoginScreen({navigation}: any) {
           <Text style={styles.switchBtnText}>注册新账号</Text>
         </TouchableOpacity>
 
+        {/* 第三方登录 */}
+        <View style={styles.thirdPartySection}>
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>其他登录方式</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          <View style={styles.thirdPartyButtons}>
+            <TouchableOpacity
+              style={styles.thirdPartyBtn}
+              onPress={handleWeChatLogin}>
+              <Text style={styles.thirdPartyIcon}>{'💬'}</Text>
+              <Text style={styles.thirdPartyLabel}>微信</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.thirdPartyBtn}
+              onPress={handleQQLogin}>
+              <Text style={styles.thirdPartyIcon}>{'🐧'}</Text>
+              <Text style={styles.thirdPartyLabel}>QQ</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* 开发模式快速登录 */}
         <View style={styles.devSection}>
           <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
@@ -234,5 +275,39 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 15,
     fontWeight: '500',
+  },
+  thirdPartySection: {
+    marginTop: 24,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e8e8e8',
+  },
+  dividerText: {
+    color: '#999',
+    fontSize: 13,
+    marginHorizontal: 12,
+  },
+  thirdPartyButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  thirdPartyBtn: {
+    alignItems: 'center',
+    marginHorizontal: 24,
+  },
+  thirdPartyIcon: {
+    fontSize: 36,
+    marginBottom: 4,
+  },
+  thirdPartyLabel: {
+    fontSize: 12,
+    color: '#666',
   },
 });

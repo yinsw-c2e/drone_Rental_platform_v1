@@ -7,19 +7,22 @@ import (
 )
 
 type User struct {
-	ID           int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	Phone        string         `gorm:"type:varchar(20);uniqueIndex;not null" json:"phone"`
-	PasswordHash string         `gorm:"type:varchar(255)" json:"-"`
-	Nickname     string         `gorm:"type:varchar(50)" json:"nickname"`
-	AvatarURL    string         `gorm:"type:varchar(500)" json:"avatar_url"`
-	UserType     string         `gorm:"type:varchar(20);default:renter" json:"user_type"` // drone_owner, renter, cargo_owner, admin
-	IDCardNo     string         `gorm:"type:varchar(255)" json:"-"`
-	IDVerified   string         `gorm:"type:varchar(20);default:pending" json:"id_verified"` // pending, approved, rejected
-	CreditScore  int            `gorm:"default:100" json:"credit_score"`
-	Status       string         `gorm:"type:varchar(20);default:active" json:"status"` // active, suspended, banned
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ID            int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	Phone         string         `gorm:"type:varchar(20);uniqueIndex" json:"phone"`
+	PasswordHash  string         `gorm:"type:varchar(255)" json:"-"`
+	Nickname      string         `gorm:"type:varchar(50)" json:"nickname"`
+	AvatarURL     string         `gorm:"type:varchar(500)" json:"avatar_url"`
+	UserType      string         `gorm:"type:varchar(20);default:renter" json:"user_type"` // drone_owner, renter, cargo_owner, admin
+	IDCardNo      string         `gorm:"type:varchar(255)" json:"-"`
+	IDVerified    string         `gorm:"type:varchar(20);default:pending" json:"id_verified"` // pending, approved, rejected
+	CreditScore   int            `gorm:"default:100" json:"credit_score"`
+	Status        string         `gorm:"type:varchar(20);default:active" json:"status"` // active, suspended, banned
+	WechatOpenID  string         `gorm:"type:varchar(100);index" json:"-"`
+	WechatUnionID string         `gorm:"type:varchar(100);index" json:"-"`
+	QQOpenID      string         `gorm:"type:varchar(100);index" json:"-"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (User) TableName() string {

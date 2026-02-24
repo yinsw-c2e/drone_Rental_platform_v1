@@ -16,6 +16,7 @@ import MyDemandsScreen from '../screens/profile/MyDemandsScreen';
 import MyCargoScreen from '../screens/profile/MyCargoScreen';
 import VerificationScreen from '../screens/profile/VerificationScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
 
 // Publish screens
 import PublishOfferScreen from '../screens/publish/PublishOfferScreen';
@@ -96,6 +97,7 @@ function ProfileStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{headerShown: false}} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{title: '编辑资料'}} />
       <Stack.Screen name="MyDrones" component={MyDronesScreen} options={{title: '我的无人机'}} />
       <Stack.Screen name="AddDrone" component={AddDroneScreen} options={{title: '添加无人机'}} />
       <Stack.Screen name="MyOrders" component={OrderListScreen} options={{title: '我的订单'}} />

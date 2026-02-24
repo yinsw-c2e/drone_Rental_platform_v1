@@ -68,17 +68,20 @@ func (h *Handler) UploadAvatar(c *gin.Context) {
 }
 
 type IDVerifyReq struct {
-	IDCardNo string `json:"id_card_no" binding:"required"`
+	RealName   string `json:"real_name" binding:"required"`
+	IDNumber   string `json:"id_number" binding:"required"`
+	FrontImage string `json:"front_image"`
+	BackImage  string `json:"back_image"`
 }
 
 func (h *Handler) SubmitIDVerify(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	var req IDVerifyReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "身份证号不能为空")
+		response.BadRequest(c, "请填写完整的身份信息")
 		return
 	}
-	if err := h.userService.SubmitIDVerification(userID, req.IDCardNo); err != nil {
+	if err := h.userService.SubmitIDVerification(userID, req.IDNumber); err != nil {
 		response.Error(c, response.CodeParamError, err.Error())
 		return
 	}
@@ -92,7 +95,7 @@ func (h *Handler) GetIDVerifyStatus(c *gin.Context) {
 		response.Error(c, response.CodeNotFound, "用户不存在")
 		return
 	}
-	response.Success(c, gin.H{"status": user.IDVerified})
+	response.Success(c, user)
 }
 
 func (h *Handler) GetPublicProfile(c *gin.Context) {

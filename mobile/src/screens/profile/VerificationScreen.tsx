@@ -96,7 +96,7 @@ export default function VerificationScreen({navigation}: any) {
       <SafeAreaView style={styles.container}>
         <View style={styles.resultContainer}>
           <View style={[styles.resultIcon, {backgroundColor: '#f6ffed'}]}>
-            <Text style={{fontSize: 48}}>{'\\u2705'}</Text>
+            <Text style={{fontSize: 48}}>{'\u2705'}</Text>
           </View>
           <Text style={styles.resultTitle}>实名认证已通过</Text>
           <Text style={styles.resultDesc}>您的身份信息已经过验证</Text>
@@ -125,7 +125,7 @@ export default function VerificationScreen({navigation}: any) {
       <SafeAreaView style={styles.container}>
         <View style={styles.resultContainer}>
           <View style={[styles.resultIcon, {backgroundColor: '#e6f7ff'}]}>
-            <Text style={{fontSize: 48}}>{'\\u23F3'}</Text>
+            <Text style={{fontSize: 48}}>{'\u23F3'}</Text>
           </View>
           <Text style={styles.resultTitle}>认证审核中</Text>
           <Text style={styles.resultDesc}>

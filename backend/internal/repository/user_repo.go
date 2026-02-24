@@ -57,3 +57,15 @@ func (r *UserRepo) ExistsByPhone(phone string) (bool, error) {
 	err := r.db.Model(&model.User{}).Where("phone = ?", phone).Count(&count).Error
 	return count > 0, err
 }
+
+func (r *UserRepo) GetByWechatOpenID(openID string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("wechat_open_id = ?", openID).First(&user).Error
+	return &user, err
+}
+
+func (r *UserRepo) GetByQQOpenID(openID string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("qq_open_id = ?", openID).First(&user).Error
+	return &user, err
+}

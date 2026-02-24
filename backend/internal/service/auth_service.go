@@ -206,3 +206,55 @@ func (s *AuthService) IsTokenBlacklisted(token string) bool {
 	_, err := s.rds.Get(ctx, key).Result()
 	return err == nil // key存在说明在黑名单中
 }
+
+// OAuthLogin 第三方登录（微信/QQ）
+// 如果openID对应用户已存在则登录，否则自动注册
+func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform string) (*model.User, *jwtpkg.TokenPair, error) {
+	var user *model.User
+	var err error
+
+	// 根据平台查找已绑定的用户
+	switch platform {
+	case "wechat":
+		user, err = s.userRepo.GetByWechatOpenID(openID)
+	case "qq":
+		user, err = s.userRepo.GetByQQOpenID(openID)
+	default:
+		return nil, nil, fmt.Errorf("不支持的登录平台: %s", platform)
+	}
+
+	if err != nil {
+		// 用户不存在，自动注册
+		if nickname == "" {
+			nickname = platform + "用户"
+		}
+		user = &model.User{
+			Nickname:  nickname,
+			AvatarURL: avatar,
+			UserType:  "renter",
+			Status:    "active",
+		}
+		switch platform {
+		case "wechat":
+			user.WechatOpenID = openID
+			user.WechatUnionID = unionID
+		case "qq":
+			user.QQOpenID = openID
+		}
+
+		if createErr := s.userRepo.Create(user); createErr != nil {
+			return nil, nil, fmt.Errorf("创建用户失败: %w", createErr)
+		}
+	}
+
+	if user.Status != "active" {
+		return nil, nil, errors.New("账号已被禁用")
+	}
+
+	tokens, err := jwtpkg.GenerateTokenPair(user.ID, user.UserType, s.cfg.JWT.Secret, s.cfg.JWT.AccessExpire, s.cfg.JWT.RefreshExpire)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return user, tokens, nil
+}

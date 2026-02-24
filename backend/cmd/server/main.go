@@ -25,7 +25,9 @@ import (
 	"wurenji-backend/internal/api/v1/user"
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/oauth"
 	paymentpkg "wurenji-backend/internal/pkg/payment"
+	"wurenji-backend/internal/pkg/push"
 	"wurenji-backend/internal/pkg/sms"
 	"wurenji-backend/internal/pkg/upload"
 	"wurenji-backend/internal/repository"
@@ -114,6 +116,41 @@ func main() {
 	uploadService := upload.NewUploadService(cfg.Upload.SavePath, cfg.Upload.MaxSize, cfg.Upload.AllowedExts)
 	paymentProvider := paymentpkg.NewMockPayment(zapLogger)
 
+	// Init push service
+	var pushService push.PushService
+	if cfg.Push.IsJPushEnabled() {
+		pushService = push.NewJPushService(push.JPushConfig{
+			AppKey:       cfg.Push.JPush.AppKey,
+			MasterSecret: cfg.Push.JPush.MasterSecret,
+			Enabled:      true,
+		}, zapLogger)
+		zapLogger.Info("JPush push service initialized")
+	} else {
+		pushService = push.NewMockPushService(zapLogger)
+		zapLogger.Info("Using mock push service")
+	}
+	// pushService 变量保留用于后续订单状态推送等场景
+	_ = pushService
+
+	// Init OAuth providers
+	var wechatOAuth *oauth.WeChatOAuth
+	if cfg.OAuth.IsWeChatEnabled() {
+		wechatOAuth = oauth.NewWeChatOAuth(oauth.WeChatOAuthConfig{
+			AppID:     cfg.OAuth.WeChat.AppID,
+			AppSecret: cfg.OAuth.WeChat.AppSecret,
+		}, zapLogger)
+		zapLogger.Info("WeChat OAuth initialized")
+	}
+
+	var qqOAuth *oauth.QQOAuth
+	if cfg.OAuth.IsQQEnabled() {
+		qqOAuth = oauth.NewQQOAuth(oauth.QQOAuthConfig{
+			AppID:  cfg.OAuth.QQ.AppID,
+			AppKey: cfg.OAuth.QQ.AppKey,
+		}, zapLogger)
+		zapLogger.Info("QQ OAuth initialized")
+	}
+
 	// Init business services
 	authService := service.NewAuthService(userRepo, rds, smsService, cfg, zapLogger)
 	userService := service.NewUserService(userRepo)
@@ -127,7 +164,7 @@ func main() {
 
 	// Init handlers
 	handlers := &v1.Handlers{
-		Auth:    auth.NewHandler(authService),
+		Auth:    auth.NewHandler(authService, wechatOAuth, qqOAuth),
 		User:    user.NewHandler(userService, uploadService),
 		Drone:   drone.NewHandler(droneService, uploadService),
 		Order:   order.NewHandler(orderService),

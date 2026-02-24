@@ -26,6 +26,8 @@ type Config struct {
 	WebSocket WebSocketConfig `mapstructure:"websocket"`
 	Log       LogConfig       `mapstructure:"log"`
 	CORS      CORSConfig      `mapstructure:"cors"`
+	Push      PushConfig      `mapstructure:"push"`
+	OAuth     OAuthConfig     `mapstructure:"oauth"`
 }
 
 // ============================================================
@@ -350,6 +352,59 @@ type CORSConfig struct {
 }
 
 // ============================================================
+// 推送服务配置
+// ============================================================
+
+// PushConfig 推送服务配置
+type PushConfig struct {
+	Provider string   `mapstructure:"provider"` // 推送服务商: mock, jpush
+	JPush    JPushCfg `mapstructure:"jpush"`    // 极光推送配置
+}
+
+// JPushCfg 极光推送配置
+type JPushCfg struct {
+	AppKey       string `mapstructure:"app_key"`       // 应用Key
+	MasterSecret string `mapstructure:"master_secret"` // Master Secret
+}
+
+// IsJPushEnabled 检查极光推送是否已配置
+func (p *PushConfig) IsJPushEnabled() bool {
+	return p.Provider == "jpush" && p.JPush.AppKey != "" && p.JPush.MasterSecret != ""
+}
+
+// ============================================================
+// 第三方登录配置
+// ============================================================
+
+// OAuthConfig 第三方登录配置
+type OAuthConfig struct {
+	WeChat WeChatOAuthCfg `mapstructure:"wechat"` // 微信登录配置
+	QQ     QQOAuthCfg     `mapstructure:"qq"`     // QQ登录配置
+}
+
+// WeChatOAuthCfg 微信OAuth配置
+type WeChatOAuthCfg struct {
+	AppID     string `mapstructure:"app_id"`     // 应用ID
+	AppSecret string `mapstructure:"app_secret"` // 应用密钥
+}
+
+// QQOAuthCfg QQ OAuth配置
+type QQOAuthCfg struct {
+	AppID  string `mapstructure:"app_id"`  // 应用ID
+	AppKey string `mapstructure:"app_key"` // 应用Key
+}
+
+// IsWeChatEnabled 检查微信登录是否已配置
+func (o *OAuthConfig) IsWeChatEnabled() bool {
+	return o.WeChat.AppID != "" && o.WeChat.AppSecret != ""
+}
+
+// IsQQEnabled 检查QQ登录是否已配置
+func (o *OAuthConfig) IsQQEnabled() bool {
+	return o.QQ.AppID != "" && o.QQ.AppKey != ""
+}
+
+// ============================================================
 // 配置加载和验证
 // ============================================================
 
@@ -445,6 +500,9 @@ func (c *Config) PrintConfigStatus() {
 	fmt.Printf("微信支付: %s\n", boolToStatus(c.Payment.IsWeChatEnabled()))
 	fmt.Printf("支付宝: %s\n", boolToStatus(c.Payment.IsAlipayEnabled()))
 	fmt.Printf("高德地图: %s\n", boolToStatus(c.Amap.IsEnabled()))
+	fmt.Printf("推送服务: %s (%s)\n", boolToStatus(c.Push.IsJPushEnabled()), c.Push.Provider)
+	fmt.Printf("微信登录: %s\n", boolToStatus(c.OAuth.IsWeChatEnabled()))
+	fmt.Printf("QQ登录: %s\n", boolToStatus(c.OAuth.IsQQEnabled()))
 	fmt.Println("========================================")
 }
 
