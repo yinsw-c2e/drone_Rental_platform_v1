@@ -33,6 +33,10 @@ jobs:
       working-directory: mobile
       run: npm ci
     
+    - name: Make gradlew executable
+      working-directory: mobile/android
+      run: chmod +x gradlew
+    
     - name: Build Android Debug APK
       working-directory: mobile/android
       run: ./gradlew assembleDebug --no-daemon
