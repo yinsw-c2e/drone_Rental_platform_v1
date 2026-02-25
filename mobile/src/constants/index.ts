@@ -105,6 +105,14 @@ export const API_BASE_URL = getApiBaseUrl();
 export const WS_BASE_URL = getWsBaseUrl();
 export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 
+// 启动时打印最终配置（方便调试）
+console.log('='.repeat(60));
+console.log('📱 APP Configuration Loaded:');
+console.log('API_BASE_URL:', API_BASE_URL);
+console.log('WS_BASE_URL:', WS_BASE_URL);
+console.log('API_TIMEOUT:', API_TIMEOUT);
+console.log('='.repeat(60));
+
 // ============================================================
 // 高德地图配置
 // ============================================================
