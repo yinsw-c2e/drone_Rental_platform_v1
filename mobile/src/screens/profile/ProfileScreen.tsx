@@ -34,7 +34,7 @@ export default function ProfileScreen({navigation}: any) {
   const [uploading, setUploading] = useState(false);
   const [stats, setStats] = useState({orders: 0, drones: 0, offers: 0});
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = async () => {
     try {
       // 并行请求三个统计数据
       const [ordersRes, dronesRes, offersRes] = await Promise.all([
@@ -50,7 +50,7 @@ export default function ProfileScreen({navigation}: any) {
     } catch (_e) {
       // ignore
     }
-  }, []);
+  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -65,12 +65,13 @@ export default function ProfileScreen({navigation}: any) {
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch, fetchStats]);
+  }, [dispatch]);
 
   // 初始加载统计数据
   React.useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAvatarPress = () => {
     const options = ['拍照', '从相册选择', '取消'];
