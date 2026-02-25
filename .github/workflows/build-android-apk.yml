@@ -29,10 +29,6 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v2
     
-    - name: Install dependencies
-      working-directory: mobile
-      run: npm ci
-    
     - name: Create .env file with production config
       working-directory: mobile
       run: |
@@ -43,6 +39,10 @@ jobs:
         APP_ENV=production
         DEBUG_MODE=false
         EOF
+    
+    - name: Install dependencies
+      working-directory: mobile
+      run: npm ci
     
     - name: Make gradlew executable
       working-directory: mobile/android
