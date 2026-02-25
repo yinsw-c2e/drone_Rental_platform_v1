@@ -24,6 +24,7 @@ export default function LoginScreen({navigation}: any) {
   const [loginMode, setLoginMode] = useState<'code' | 'password'>('code');
   const [countdown, setCountdown] = useState(0);
   const [debugError, setDebugError] = useState<string>(''); // 调试错误信息
+  const [showConfig, setShowConfig] = useState(false); // 配置信息展开/折叠
 
   const handleWeChatLogin = () => {
     // 微信SDK需要原生模块支持，这里提示需要配置
@@ -197,13 +198,22 @@ export default function LoginScreen({navigation}: any) {
         </View>
 
         {/* 开发模式快速登录 */}
-        {/* 配置信息显示 */}
-        <View style={styles.configInfo}>
-          <Text style={styles.configTitle}>🔧 当前配置（调试信息）</Text>
-          <Text style={styles.configText}>API: {API_BASE_URL}</Text>
-          <Text style={styles.configText}>WS: {WS_BASE_URL}</Text>
-          <Text style={styles.configText}>环境: {APP_CONFIG.env}</Text>
-        </View>
+        {/* 配置信息显示（可折叠） */}
+        <TouchableOpacity 
+          style={styles.configToggle}
+          onPress={() => setShowConfig(!showConfig)}>
+          <Text style={styles.configToggleText}>
+            {showConfig ? '🔽' : '🔼'} 配置信息 {showConfig ? '(点击收起)' : '(点击展开)'}
+          </Text>
+        </TouchableOpacity>
+        
+        {showConfig && (
+          <View style={styles.configInfo}>
+            <Text style={styles.configText}>API: {API_BASE_URL}</Text>
+            <Text style={styles.configText}>WS: {WS_BASE_URL}</Text>
+            <Text style={styles.configText}>环境: {APP_CONFIG.env}</Text>
+          </View>
+        )}
 
         {/* 错误信息显示区域 */}
         {debugError ? (
@@ -337,11 +347,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  configToggle: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: '#91caff',
+    alignItems: 'center',
+  },
+  configToggleText: {
+    fontSize: 12,
+    color: '#1890ff',
+    fontWeight: '500',
+  },
   configInfo: {
     backgroundColor: '#f0f9ff',
     borderRadius: 12,
     padding: 16,
-    marginTop: 24,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: '#91caff',
   },
