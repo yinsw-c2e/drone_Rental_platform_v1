@@ -19,9 +19,10 @@ const getConfig = (key: string): string | undefined => {
  * 优先使用环境变量配置，否则使用默认值
  */
 const getApiBaseUrl = (): string => {
-  // 优先使用环境变量
+  // 优先使用环境变量（最高优先级）
   const apiBaseUrl = getConfig('API_BASE_URL');
   if (apiBaseUrl) {
+    console.log('[Config] Using API_BASE_URL from .env:', apiBaseUrl);
     return apiBaseUrl;
   }
 
@@ -30,10 +31,13 @@ const getApiBaseUrl = (): string => {
     // Android模拟器使用10.0.2.2访问宿主机localhost
     // iOS模拟器和Web直接使用localhost
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-    return `http://${devHost}:8080/api/v1`;
+    const devUrl = `http://${devHost}:8080/api/v1`;
+    console.log('[Config] Using DEV default:', devUrl);
+    return devUrl;
   }
 
   // 生产环境默认地址
+  console.log('[Config] Using production default');
   return 'https://api.wurenji.com/api/v1';
 };
 
@@ -42,19 +46,23 @@ const getApiBaseUrl = (): string => {
  * 优先使用环境变量配置，否则使用默认值
  */
 const getWsBaseUrl = (): string => {
-  // 优先使用环境变量
+  // 优先使用环境变量（最高优先级）
   const wsBaseUrl = getConfig('WS_BASE_URL');
   if (wsBaseUrl) {
+    console.log('[Config] Using WS_BASE_URL from .env:', wsBaseUrl);
     return wsBaseUrl;
   }
 
   // 开发环境默认配置
   if (__DEV__) {
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-    return `ws://${devHost}:8080/ws`;
+    const devWsUrl = `ws://${devHost}:8080/ws`;
+    console.log('[Config] Using WS DEV default:', devWsUrl);
+    return devWsUrl;
   }
 
   // 生产环境默认地址
+  console.log('[Config] Using WS production default');
   return 'wss://api.wurenji.com/ws';
 };
 
