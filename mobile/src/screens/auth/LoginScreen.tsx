@@ -13,6 +13,7 @@ import {
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
+import {API_BASE_URL, WS_BASE_URL, APP_CONFIG} from '../../constants';
 
 export default function LoginScreen({navigation}: any) {
   const dispatch = useDispatch();
@@ -189,6 +190,14 @@ export default function LoginScreen({navigation}: any) {
         </View>
 
         {/* 开发模式快速登录 */}
+        {/* 配置信息显示 */}
+        <View style={styles.configInfo}>
+          <Text style={styles.configTitle}>🔧 当前配置（调试信息）</Text>
+          <Text style={styles.configText}>API: {API_BASE_URL}</Text>
+          <Text style={styles.configText}>WS: {WS_BASE_URL}</Text>
+          <Text style={styles.configText}>环境: {APP_CONFIG.env}</Text>
+        </View>
+
         <View style={styles.devSection}>
           <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
           <View style={styles.devButtons}>
@@ -309,5 +318,25 @@ const styles = StyleSheet.create({
   thirdPartyLabel: {
     fontSize: 12,
     color: '#666',
+  },
+  configInfo: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: '#91caff',
+  },
+  configTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1890ff',
+    marginBottom: 10,
+  },
+  configText: {
+    fontSize: 11,
+    color: '#666',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginBottom: 4,
   },
 });
