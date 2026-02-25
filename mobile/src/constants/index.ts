@@ -28,21 +28,21 @@ const getApiBaseUrl = (): string => {
 
   // 开发环境默认配置
   if (__DEV__) {
+    // 远程测试：使用 cpolar 内网穿透（用于远程用户测试）
+    const HARDCODED_CPOLAR_URL = 'https://77e3f1d8.r3.cpolar.cn/api/v1';
+    const USE_CPOLAR = true; // 改为false使用局域网
+    
+    if (USE_CPOLAR && HARDCODED_CPOLAR_URL) {
+      console.log('[Config] Using cpolar URL for remote testing:', HARDCODED_CPOLAR_URL);
+      return HARDCODED_CPOLAR_URL;
+    }
+    
     // 本地真机测试：使用电脑局域网IP（手机和电脑在同一WiFi）
     const LOCAL_NETWORK_IP = '192.168.3.173';
-    const USE_LOCAL_NETWORK = true; // 改为false使用cpolar
-    
-    if (USE_LOCAL_NETWORK && LOCAL_NETWORK_IP) {
+    if (LOCAL_NETWORK_IP) {
       const localUrl = `http://${LOCAL_NETWORK_IP}:8080/api/v1`;
       console.log('[Config] Using local network IP for real device testing:', localUrl);
       return localUrl;
-    }
-    
-    // 检查是否有硬编码的测试地址（用于APK测试）
-    const HARDCODED_TEST_URL = 'https://77e3f1d8.r3.cpolar.cn/api/v1';
-    if (HARDCODED_TEST_URL && HARDCODED_TEST_URL.includes('cpolar')) {
-      console.log('[Config] Using hardcoded cpolar URL for testing:', HARDCODED_TEST_URL);
-      return HARDCODED_TEST_URL;
     }
     
     // Android模拟器使用10.0.2.2访问宿主机localhost
@@ -72,21 +72,21 @@ const getWsBaseUrl = (): string => {
 
   // 开发环境默认配置
   if (__DEV__) {
+    // 远程测试：使用 cpolar 内网穿透
+    const HARDCODED_CPOLAR_WS_URL = 'wss://68aa0ac9.r3.cpolar.cn/ws';
+    const USE_CPOLAR = true; // 改为false使用局域网
+    
+    if (USE_CPOLAR && HARDCODED_CPOLAR_WS_URL) {
+      console.log('[Config] Using cpolar WS URL for remote testing:', HARDCODED_CPOLAR_WS_URL);
+      return HARDCODED_CPOLAR_WS_URL;
+    }
+    
     // 本地真机测试：使用电脑局域网IP
     const LOCAL_NETWORK_IP = '192.168.3.173';
-    const USE_LOCAL_NETWORK = true; // 改为false使用cpolar
-    
-    if (USE_LOCAL_NETWORK && LOCAL_NETWORK_IP) {
+    if (LOCAL_NETWORK_IP) {
       const localWsUrl = `ws://${LOCAL_NETWORK_IP}:8080/ws`;
       console.log('[Config] Using local network IP for WS:', localWsUrl);
       return localWsUrl;
-    }
-    
-    // 检查是否有硬编码的测试地址（用于APK测试）
-    const HARDCODED_TEST_WS_URL = 'wss://68aa0ac9.r3.cpolar.cn/ws';
-    if (HARDCODED_TEST_WS_URL && HARDCODED_TEST_WS_URL.includes('cpolar')) {
-      console.log('[Config] Using hardcoded cpolar WS URL for testing:', HARDCODED_TEST_WS_URL);
-      return HARDCODED_TEST_WS_URL;
     }
     
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
