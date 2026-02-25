@@ -4,10 +4,14 @@ import {
   Alert, Image, Platform, ActionSheetIOS, RefreshControl,
 } from 'react-native';
 import {useSelector, useDispatch} from 'react-redux';
-import {launchCamera, launchImageLibrary, ImagePickerResponse} from 'react-native-image-picker';
+import * as ImagePicker from 'react-native-image-picker';
+import type {ImagePickerResponse} from 'react-native-image-picker';
 import {RootState} from '../../store/store';
 import {logout, updateUser} from '../../store/slices/authSlice';
 import {userService} from '../../services/user';
+import {orderService} from '../../services/order';
+import {droneService} from '../../services/drone';
+import {demandService} from '../../services/demand';
 
 const USER_TYPE_MAP: Record<string, string> = {
   drone_owner: '无人机机主',
@@ -28,6 +32,25 @@ export default function ProfileScreen({navigation}: any) {
   const dispatch = useDispatch();
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [stats, setStats] = useState({orders: 0, drones: 0, offers: 0});
+
+  const fetchStats = useCallback(async () => {
+    try {
+      // 并行请求三个统计数据
+      const [ordersRes, dronesRes, offersRes] = await Promise.all([
+        orderService.list({page: 1, page_size: 1, role: 'all'}).catch(() => ({data: {total: 0}})),
+        droneService.myDrones().catch(() => ({data: {list: []}})),
+        demandService.myOffers().catch(() => ({data: {list: []}})),
+      ]);
+      setStats({
+        orders: ordersRes.data?.total || 0,
+        drones: dronesRes.data?.list?.length || 0,
+        offers: offersRes.data?.list?.length || 0,
+      });
+    } catch (_e) {
+      // ignore
+    }
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -36,12 +59,18 @@ export default function ProfileScreen({navigation}: any) {
       if (res.data) {
         dispatch(updateUser(res.data));
       }
+      await fetchStats();
     } catch (_e) {
       // ignore
     } finally {
       setRefreshing(false);
     }
-  }, [dispatch]);
+  }, [dispatch, fetchStats]);
+
+  // 初始加载统计数据
+  React.useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   const handleAvatarPress = () => {
     const options = ['拍照', '从相册选择', '取消'];
@@ -95,10 +124,22 @@ export default function ProfileScreen({navigation}: any) {
       }
     };
 
-    if (source === 'camera') {
-      launchCamera(options, callback);
-    } else {
-      launchImageLibrary(options, callback);
+    try {
+      if (source === 'camera') {
+        if (ImagePicker.launchCamera) {
+          ImagePicker.launchCamera(options, callback);
+        } else {
+          Alert.alert('错误', '相机功能暂不可用');
+        }
+      } else {
+        if (ImagePicker.launchImageLibrary) {
+          ImagePicker.launchImageLibrary(options, callback);
+        } else {
+          Alert.alert('错误', '相册功能暂不可用');
+        }
+      }
+    } catch (error) {
+      Alert.alert('错误', '图片选择功能初始化失败');
     }
   };
 
@@ -166,17 +207,17 @@ export default function ProfileScreen({navigation}: any) {
         {/* 统计卡片 */}
         <View style={styles.statsCard}>
           <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('MyOrders')}>
-            <Text style={styles.statValue}>--</Text>
+            <Text style={styles.statValue}>{stats.orders}</Text>
             <Text style={styles.statLabel}>订单</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
           <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('MyDrones')}>
-            <Text style={styles.statValue}>--</Text>
+            <Text style={styles.statValue}>{stats.drones}</Text>
             <Text style={styles.statLabel}>无人机</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
           <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('MyOffers')}>
-            <Text style={styles.statValue}>--</Text>
+            <Text style={styles.statValue}>{stats.offers}</Text>
             <Text style={styles.statLabel}>供给</Text>
           </TouchableOpacity>
         </View>
