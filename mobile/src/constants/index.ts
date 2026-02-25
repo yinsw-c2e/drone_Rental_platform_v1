@@ -28,6 +28,13 @@ const getApiBaseUrl = (): string => {
 
   // 开发环境默认配置
   if (__DEV__) {
+    // 检查是否有硬编码的测试地址（用于APK测试）
+    const HARDCODED_TEST_URL = 'https://77e3f1d8.r3.cpolar.cn/api/v1';
+    if (HARDCODED_TEST_URL && HARDCODED_TEST_URL.includes('cpolar')) {
+      console.log('[Config] Using hardcoded cpolar URL for testing:', HARDCODED_TEST_URL);
+      return HARDCODED_TEST_URL;
+    }
+    
     // Android模拟器使用10.0.2.2访问宿主机localhost
     // iOS模拟器和Web直接使用localhost
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
@@ -55,6 +62,13 @@ const getWsBaseUrl = (): string => {
 
   // 开发环境默认配置
   if (__DEV__) {
+    // 检查是否有硬编码的测试地址（用于APK测试）
+    const HARDCODED_TEST_WS_URL = 'wss://68aa0ac9.r3.cpolar.cn/ws';
+    if (HARDCODED_TEST_WS_URL && HARDCODED_TEST_WS_URL.includes('cpolar')) {
+      console.log('[Config] Using hardcoded cpolar WS URL for testing:', HARDCODED_TEST_WS_URL);
+      return HARDCODED_TEST_WS_URL;
+    }
+    
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
     const devWsUrl = `ws://${devHost}:8080/ws`;
     console.log('[Config] Using WS DEV default:', devWsUrl);

@@ -1,0 +1,70 @@
+========================================
+快速 APK 打包方案（无需 Android SDK）
+========================================
+
+## 方案A：使用 GitHub Actions 云端构建（推荐！）
+
+### 步骤1：创建 GitHub workflow
+
+1. 在项目中创建 .github/workflows/build-apk.yml
+2. 使用 GitHub 提供的 Android 环境自动构建
+3. 构建完成后自动生成 APK 下载链接
+
+### 步骤2：推送代码触发构建
+
+```bash
+git add .
+git commit -m "配置 APK 自动构建"
+git push
+```
+
+### 优点：
+- ✅ 完全免费
+- ✅ 不需要本地环境
+- ✅ 构建速度快（5-10分钟）
+- ✅ 自动化，可重复使用
+
+---
+
+## 方案B：直接下载 Android SDK CommandLine Tools（轻量级）
+
+如果你想在本地构建，只需下载 CommandLine Tools（约 150MB）：
+
+### 下载地址：
+https://developer.android.com/studio#command-line-tools-only
+
+或国内镜像：
+https://mirrors.tuna.tsinghua.edu.cn/android/repository/commandlinetools-win-11076708_latest.zip
+
+### 安装步骤：
+1. 解压到 C:\Android\cmdline-tools
+2. 运行安装命令：
+   ```
+   cd C:\Android\cmdline-tools\bin
+   sdkmanager.bat "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+   ```
+3. 创建 local.properties：
+   ```
+   sdk.dir=C\:\\Android
+   ```
+
+---
+
+## 方案C：安装完整的 Android Studio（最稳定，但最大）
+
+下载地址：https://developer.android.com/studio
+国内镜像：https://mirrors.tuna.tsinghua.edu.cn/android/repository/
+
+大小：约 1.5 GB
+安装后会自动配置 SDK
+
+---
+
+## 我的建议
+
+✅ **现在立即使用：GitHub Actions 方案**
+   - 无需下载任何东西
+   - 5分钟配置，10分钟构建
+   - 最适合远程测试场景
+
+如果你选择这个方案，我立即帮你创建 workflow 文件！

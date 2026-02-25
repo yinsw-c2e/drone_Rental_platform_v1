@@ -1,0 +1,124 @@
+========================================
+无人机租赁平台 APK 打包使用说明
+========================================
+
+## 准备工作
+
+1. 确保后端服务正在运行
+   - 在 backend 目录运行: go run cmd/server/main.go
+   - 或使用已启动的后端服务
+
+2. 确保 cpolar 隧道已启动
+   - 打开 cpolar 客户端
+   - 启动 wurenji-backend 和 wurenji-ws 隧道
+   - 确认 .env 文件中的地址已更新
+
+3. 安装 JDK（如果还没有）
+   - 下载地址: https://adoptium.net/temurin/releases/
+   - 选择 JDK 17 LTS → Windows → x64 → .msi installer
+   - 双击安装即可
+
+## 使用方法
+
+### 方式1：使用自动化脚本（推荐）
+
+在 PowerShell 中运行：
+```
+cd d:\codes\wurenji\mobile
+.\build-apk.ps1
+```
+
+脚本会自动：
+- 检查 JDK 环境
+- 检查后端服务
+- 检查 cpolar 配置
+- 清理旧文件
+- 编译 APK
+- 显示结果和 APK 位置
+
+### 方式2：手动执行
+
+1. 打开 PowerShell
+2. 进入 mobile 目录: cd d:\codes\wurenji\mobile
+3. 进入 android 目录: cd android
+4. 运行编译命令: .\gradlew.bat assembleDebug
+5. 等待编译完成（首次约5-10分钟）
+6. APK 位置: android\app\build\outputs\apk\debug\app-debug.apk
+
+## 分发 APK
+
+### 选项1：直接发送（适合单人测试）
+- 通过微信/QQ/邮件发送 APK 文件
+- 用户在 Android 手机上下载并安装
+
+### 选项2：使用蒲公英平台（推荐）
+1. 访问 https://www.pgyer.com/
+2. 注册/登录账号
+3. 点击"上传应用"
+4. 选择编译好的 APK 文件
+5. 获得下载链接和二维码
+6. 发送给测试用户
+
+优点：
+- 生成专业的下载页面
+- 支持扫码下载
+- 可以管理多个版本
+- 提供下载统计
+
+## APK 位置
+
+编译成功后，APK 文件位于：
+d:\codes\wurenji\mobile\android\app\build\outputs\apk\debug\app-debug.apk
+
+文件大小约：30-50 MB
+
+## 测试前确认清单
+
+测试用户安装 APK 前，请确认：
+□ 你的电脑保持开机状态
+□ 后端服务正在运行
+□ cpolar 隧道已启动
+□ cpolar 地址已正确配置到 .env 文件
+
+## 常见问题
+
+Q: 提示"未找到 JDK"
+A: 请下载并安装 JDK 17: https://adoptium.net/temurin/releases/
+
+Q: 编译失败，提示网络错误
+A: Gradle 首次下载依赖需要网络，请确保网络畅通
+   或配置国内镜像源
+
+Q: 用户安装提示"未知来源"
+A: Android 设置 → 安全 → 允许安装未知应用 → 选择文件管理器
+
+Q: 用户打开 APP 无法连接
+A: 检查：
+   1. 你的电脑是否开机
+   2. 后端服务是否运行
+   3. cpolar 隧道是否启动
+   4. 手机网络是否正常
+
+Q: cpolar 地址改变了怎么办？
+A: 免费版每次重启地址会变，建议：
+   1. 升级 VIP（10元/月，固定域名）
+   2. 或重新编译 APK
+
+## 成本
+
+- JDK: 免费
+- cpolar: 免费（2GB流量）或 VIP 10元/月
+- 蒲公英: 免费
+- 总成本: 0-10元/月
+
+## 下次更新
+
+如果代码有更新，需要重新编译：
+```
+cd d:\codes\wurenji\mobile
+.\build-apk.ps1
+```
+
+然后重新发送新的 APK 给测试用户。
+
+========================================

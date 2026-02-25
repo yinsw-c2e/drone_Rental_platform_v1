@@ -54,6 +54,12 @@ jobs:
     
     - name: Build Android APK with bundled JS
       working-directory: mobile
+      env:
+        API_BASE_URL: https://77e3f1d8.r3.cpolar.cn/api/v1
+        WS_BASE_URL: wss://68aa0ac9.r3.cpolar.cn/ws
+        API_TIMEOUT: 15000
+        APP_ENV: production
+        DEBUG_MODE: false
       run: |
         npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
         cd android
