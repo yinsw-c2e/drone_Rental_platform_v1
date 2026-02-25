@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
@@ -22,6 +23,7 @@ export default function LoginScreen({navigation}: any) {
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState<'code' | 'password'>('code');
   const [countdown, setCountdown] = useState(0);
+  const [debugError, setDebugError] = useState<string>(''); // 调试错误信息
 
   const handleWeChatLogin = () => {
     // 微信SDK需要原生模块支持，这里提示需要配置
@@ -84,21 +86,26 @@ export default function LoginScreen({navigation}: any) {
 
   // 快速登录（开发模式）
   const quickLogin = async (userPhone: string, userPassword: string, role: string) => {
+    setDebugError(''); // 清空之前的错误
     try {
+      const startTime = Date.now();
       const res = await authService.login(userPhone, userPassword);
+      const elapsed = Date.now() - startTime;
+      
       dispatch(setCredentials(res.data));
+      
+      // 成功信息
+      const successMsg = `✅ 登录成功\n角色: ${role}\n耗时: ${elapsed}ms\nAPI: ${API_BASE_URL}`;
+      setDebugError(successMsg);
       Alert.alert('成功', `已登录为${role}`);
     } catch (e: any) {
-      const errorMsg = e.message || '登录失败';
-      if (errorMsg.includes('账号或密码错误') || errorMsg.includes('Network') || errorMsg.includes('timeout')) {
-        Alert.alert(
-          '快速登录失败',
-          `账号: ${userPhone}\n密码: password123\n\n可能原因：\n1. 后端服务未启动（请检查 :8080）\n2. 数据库种子数据未执行\n3. 网络连接问题`,
-          [{text: '确定'}]
-        );
-      } else {
-        Alert.alert('快速登录失败', errorMsg);
-      }
+      const errorMsg = e.message || '未知错误';
+      const errorDetails = `❌ 快速登录失败\n\n账号: ${userPhone}\n密码: ${userPassword}\n角色: ${role}\n\nAPI: ${API_BASE_URL}\n\n错误信息:\n${errorMsg}\n\n原始错误:\n${JSON.stringify(e, null, 2)}`;
+      
+      setDebugError(errorDetails);
+      
+      // 也显示 Alert，但不阻断查看详细信息
+      Alert.alert('快速登录失败', `${errorMsg}\n\n详细错误信息请查看下方红色区域`);
     }
   };
 
@@ -197,6 +204,17 @@ export default function LoginScreen({navigation}: any) {
           <Text style={styles.configText}>WS: {WS_BASE_URL}</Text>
           <Text style={styles.configText}>环境: {APP_CONFIG.env}</Text>
         </View>
+
+        {/* 错误信息显示区域 */}
+        {debugError ? (
+          <View style={debugError.includes('✅') ? styles.debugSuccess : styles.debugError}>
+            <ScrollView style={{maxHeight: 280}}>
+              <Text style={debugError.includes('✅') ? styles.debugSuccessText : styles.debugErrorText}>
+                {debugError}
+              </Text>
+            </ScrollView>
+          </View>
+        ) : null}
 
         <View style={styles.devSection}>
           <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
@@ -338,5 +356,34 @@ const styles = StyleSheet.create({
     color: '#666',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     marginBottom: 4,
+  },
+  debugError: {
+    backgroundColor: '#fff2f0',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#ff4d4f',
+    maxHeight: 300,
+  },
+  debugErrorText: {
+    fontSize: 11,
+    color: '#ff4d4f',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    lineHeight: 16,
+  },
+  debugSuccess: {
+    backgroundColor: '#f6ffed',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#52c41a',
+  },
+  debugSuccessText: {
+    fontSize: 11,
+    color: '#52c41a',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    lineHeight: 16,
   },
 });
