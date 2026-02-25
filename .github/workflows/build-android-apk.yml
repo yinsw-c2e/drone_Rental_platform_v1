@@ -33,17 +33,28 @@ jobs:
       working-directory: mobile
       run: npm ci
     
+    - name: Create .env file with production config
+      working-directory: mobile
+      run: |
+        cat > .env << EOF
+        API_BASE_URL=https://77e3f1d8.r3.cpolar.cn/api/v1
+        WS_BASE_URL=wss://68aa0ac9.r3.cpolar.cn/ws
+        API_TIMEOUT=15000
+        APP_ENV=production
+        DEBUG_MODE=false
+        EOF
+    
     - name: Make gradlew executable
       working-directory: mobile/android
       run: chmod +x gradlew
     
-    - name: Build Android Debug APK
+    - name: Build Android Release APK
       working-directory: mobile/android
-      run: ./gradlew assembleDebug --no-daemon
+      run: ./gradlew assembleRelease --no-daemon
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug
-        path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+        name: app-release
+        path: mobile/android/app/build/outputs/apk/release/app-release.apk
         retention-days: 30
