@@ -87,7 +87,7 @@ export default function PublishOfferScreen({navigation}: any) {
             <Text style={styles.emptyText}>您还没有添加无人机</Text>
             <TouchableOpacity 
               style={styles.addDroneBtn}
-              onPress={() => navigation.navigate('DroneAdd')}>
+              onPress={() => navigation.navigate('AddDrone')}>
               <Text style={styles.addDroneBtnText}>去添加无人机</Text>
             </TouchableOpacity>
           </View>

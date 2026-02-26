@@ -1,10 +1,12 @@
 import React, {useEffect, useState, useCallback} from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Image, ActivityIndicator, RefreshControl,
+  SafeAreaView, Image, ActivityIndicator, RefreshControl, Dimensions,
 } from 'react-native';
 import {demandService} from '../../services/demand';
 import {RentalOffer, RentalDemand, CargoDemand} from '../../types';
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 export default function HomeScreen({navigation}: any) {
   const [offers, setOffers] = useState<RentalOffer[]>([]);
@@ -12,6 +14,34 @@ export default function HomeScreen({navigation}: any) {
   const [cargos, setCargos] = useState<CargoDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [bannerIndex, setBannerIndex] = useState(0);
+
+  // 轮播图数据
+  const banners = [
+    {
+      title: '智能匹配，高效操合',
+      subtitle: '专业的无人机租赁平台',
+      gradient: ['#1890ff', '#096dd9'],
+    },
+    {
+      title: '全程保障，安全可靠',
+      subtitle: '实名认证，交易担保',
+      gradient: ['#52c41a', '#389e0d'],
+    },
+    {
+      title: '丰富资源，价格透明',
+      subtitle: '数百家机主在线服务',
+      gradient: ['#fa8c16', '#d46b08'],
+    },
+  ];
+
+  // 自动轮播
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setBannerIndex(prev => (prev + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   const cards = [
     {title: '发布出租', desc: '发布无人机出租服务', screen: 'PublishOffer', color: '#1890ff', icon: '🚁'},
@@ -62,11 +92,44 @@ export default function HomeScreen({navigation}: any) {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1890ff']} />}
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>无人机租赁平台</Text>
-          <Text style={styles.headerSubtitle}>智能匹配，高效撮合</Text>
+        {/* 轮播图 */}
+        <View style={styles.bannerContainer}>
+          <View style={[styles.banner, {backgroundColor: banners[bannerIndex].gradient[0]}]}>
+            <Text style={styles.bannerTitle}>{banners[bannerIndex].title}</Text>
+            <Text style={styles.bannerSubtitle}>{banners[bannerIndex].subtitle}</Text>
+          </View>
+          <View style={styles.bannerDots}>
+            {banners.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  index === bannerIndex && styles.dotActive,
+                ]}
+              />
+            ))}
+          </View>
         </View>
-
+  
+        {/* 数据统计 */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{offers.length}</Text>
+            <Text style={styles.statLabel}>在线供给</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{demands.length}</Text>
+            <Text style={styles.statLabel}>租赁需求</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{cargos.length}</Text>
+            <Text style={styles.statLabel}>货运订单</Text>
+          </View>
+        </View>
+  
+        {/* 快捷操作 */}
         <View style={styles.grid}>
           {cards.map((card, index) => (
             <TouchableOpacity
@@ -190,9 +253,75 @@ const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#f5f5f5'},
   scrollView: {flex: 1},
   scrollContent: {paddingBottom: 20},
-  header: {backgroundColor: '#1890ff', padding: 24, paddingTop: 16},
-  headerTitle: {fontSize: 24, fontWeight: 'bold', color: '#fff'},
-  headerSubtitle: {fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4},
+  // 轮播图样式
+  bannerContainer: {
+    height: 160,
+    marginBottom: 12,
+  },
+  banner: {
+    height: 140,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    justifyContent: 'center',
+  },
+  bannerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 8,
+  },
+  bannerDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    marginHorizontal: 4,
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: '#fff',
+  },
+  // 数据统计样式
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1890ff',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#f0f0f0',
+  },
   grid: {flexDirection: 'row', flexWrap: 'wrap', padding: 12},
   card: {
     width: '47%', backgroundColor: '#fff', borderRadius: 8,
