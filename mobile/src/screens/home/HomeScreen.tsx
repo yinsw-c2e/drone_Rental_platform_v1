@@ -55,6 +55,7 @@ export default function HomeScreen({navigation}: any) {
   ];
 
   const fetchData = useCallback(async () => {
+    console.log('开始加载首页数据...');
     try {
       const [offersRes, demandsRes, cargosRes] = await Promise.all([
         demandService.listOffers({page: 1, page_size: 5}),
@@ -87,8 +88,13 @@ export default function HomeScreen({navigation}: any) {
         demandsTotal: demandsRes.data?.total,
         cargosTotal: cargosRes.data?.total,
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error('首页数据加载失败:', e);
+      console.error('错误详情:', {
+        message: e.message,
+        stack: e.stack,
+        response: e.response,
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);

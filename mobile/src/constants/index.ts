@@ -111,6 +111,8 @@ console.log('📱 APP Configuration Loaded:');
 console.log('API_BASE_URL:', API_BASE_URL);
 console.log('WS_BASE_URL:', WS_BASE_URL);
 console.log('API_TIMEOUT:', API_TIMEOUT);
+console.log('Platform:', Platform.OS);
+console.log('__DEV__:', __DEV__);
 console.log('='.repeat(60));
 
 // ============================================================
