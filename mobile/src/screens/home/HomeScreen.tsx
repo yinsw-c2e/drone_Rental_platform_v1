@@ -61,19 +61,34 @@ export default function HomeScreen({navigation}: any) {
         demandService.listDemands({page: 1, page_size: 5}),
         demandService.listCargos({page: 1, page_size: 5}),
       ]);
-      console.log('首页数据加载结果:', {
-        offers: offersRes.data,
-        demands: demandsRes.data,
-        cargos: cargosRes.data,
+      console.log('首页数据加载详情:', {
+        offersRes,
+        demandsRes,
+        cargosRes,
       });
-      setOffers(offersRes.data?.list || []);
-      setDemands(demandsRes.data?.list || []);
-      setCargos(cargosRes.data?.list || []);
-      setOffersTotal(offersRes.data?.total || 0);
-      setDemandsTotal(demandsRes.data?.total || 0);
-      setCargosTotal(cargosRes.data?.total || 0);
+      
+      // 提取数据和总数
+      const offersList = offersRes.data?.list || [];
+      const demandsList = demandsRes.data?.list || [];
+      const cargosList = cargosRes.data?.list || [];
+      
+      setOffers(offersList);
+      setDemands(demandsList);
+      setCargos(cargosList);
+      setOffersTotal(offersRes.data?.total || offersList.length || 0);
+      setDemandsTotal(demandsRes.data?.total || demandsList.length || 0);
+      setCargosTotal(cargosRes.data?.total || cargosList.length || 0);
+      
+      console.log('首页数据设置完成:', {
+        offers: offersList.length,
+        demands: demandsList.length,
+        cargos: cargosList.length,
+        offersTotal: offersRes.data?.total,
+        demandsTotal: demandsRes.data?.total,
+        cargosTotal: cargosRes.data?.total,
+      });
     } catch (e) {
-      console.warn('首页数据加载失败:', e);
+      console.error('首页数据加载失败:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -98,7 +113,7 @@ export default function HomeScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -285,14 +300,14 @@ export default function HomeScreen({navigation}: any) {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#f5f5f5'},
   scrollView: {flex: 1},
-  scrollContent: {paddingBottom: 20},
+  scrollContent: {paddingBottom: 80},
   // 轮播图样式
   bannerContainer: {
     height: 180,
