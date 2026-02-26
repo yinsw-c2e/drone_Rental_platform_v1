@@ -310,7 +310,6 @@ const styles = StyleSheet.create({
   scrollContent: {paddingBottom: 80},
   // 轮播图样式
   bannerContainer: {
-    height: 180,
     marginBottom: 16,
   },
   banner: {
@@ -318,7 +317,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 32,
     justifyContent: 'center',
-    borderRadius: 0,
   },
   bannerTitle: {
     fontSize: 26,

@@ -71,7 +71,7 @@ const getWsBaseUrl = (): string => {
   }
 
   // 远程测试配置：cpolar 内网穿透（无条件优先）
-  const HARDCODED_CPOLAR_WS_URL = 'wss://68aa0ac9.r3.cpolar.cn/ws';
+  const HARDCODED_CPOLAR_WS_URL = 'https://68aa0ac9.r3.cpolar.cn/ws';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar
   
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_WS_URL) {
