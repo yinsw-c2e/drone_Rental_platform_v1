@@ -1,8 +1,9 @@
 import React, {useEffect, useState, useCallback} from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, Image, ActivityIndicator, RefreshControl, Dimensions,
+  SafeAreaView, ActivityIndicator, RefreshControl, Dimensions,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import {demandService} from '../../services/demand';
 import {RentalOffer, RentalDemand, CargoDemand} from '../../types';
 
@@ -12,6 +13,9 @@ export default function HomeScreen({navigation}: any) {
   const [offers, setOffers] = useState<RentalOffer[]>([]);
   const [demands, setDemands] = useState<RentalDemand[]>([]);
   const [cargos, setCargos] = useState<CargoDemand[]>([]);
+  const [offersTotal, setOffersTotal] = useState(0);
+  const [demandsTotal, setDemandsTotal] = useState(0);
+  const [cargosTotal, setCargosTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bannerIndex, setBannerIndex] = useState(0);
@@ -57,9 +61,17 @@ export default function HomeScreen({navigation}: any) {
         demandService.listDemands({page: 1, page_size: 5}),
         demandService.listCargos({page: 1, page_size: 5}),
       ]);
+      console.log('首页数据加载结果:', {
+        offers: offersRes.data,
+        demands: demandsRes.data,
+        cargos: cargosRes.data,
+      });
       setOffers(offersRes.data?.list || []);
       setDemands(demandsRes.data?.list || []);
       setCargos(cargosRes.data?.list || []);
+      setOffersTotal(offersRes.data?.total || 0);
+      setDemandsTotal(demandsRes.data?.total || 0);
+      setCargosTotal(cargosRes.data?.total || 0);
     } catch (e) {
       console.warn('首页数据加载失败:', e);
     } finally {
@@ -94,14 +106,20 @@ export default function HomeScreen({navigation}: any) {
       >
         {/* 轮播图 */}
         <View style={styles.bannerContainer}>
-          <View style={[styles.banner, {backgroundColor: banners[bannerIndex].gradient[0]}]}>
+          <LinearGradient
+            colors={banners[bannerIndex].gradient}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
+            style={styles.banner}>
             <Text style={styles.bannerTitle}>{banners[bannerIndex].title}</Text>
             <Text style={styles.bannerSubtitle}>{banners[bannerIndex].subtitle}</Text>
-          </View>
+          </LinearGradient>
           <View style={styles.bannerDots}>
             {banners.map((_, index) => (
-              <View
+              <TouchableOpacity
                 key={index}
+                onPress={() => setBannerIndex(index)}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
                 style={[
                   styles.dot,
                   index === bannerIndex && styles.dotActive,
@@ -114,17 +132,17 @@ export default function HomeScreen({navigation}: any) {
         {/* 数据统计 */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{offers.length}</Text>
+            <Text style={styles.statNumber}>{offersTotal}</Text>
             <Text style={styles.statLabel}>在线供给</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{demands.length}</Text>
+            <Text style={styles.statNumber}>{demandsTotal}</Text>
             <Text style={styles.statLabel}>租赁需求</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{cargos.length}</Text>
+            <Text style={styles.statNumber}>{cargosTotal}</Text>
             <Text style={styles.statLabel}>货运订单</Text>
           </View>
         </View>
@@ -134,9 +152,16 @@ export default function HomeScreen({navigation}: any) {
           {cards.map((card, index) => (
             <TouchableOpacity
               key={index}
-              style={[styles.card, {borderLeftColor: card.color}]}
+              style={[
+                styles.card,
+                {borderLeftColor: card.color},
+                (index + 1) % 2 === 0 && {marginRight: 0}, // 每行第2个卡片去掉右边距
+              ]}
+              activeOpacity={0.7}
               onPress={() => navigation.navigate(card.screen)}>
-              <Text style={styles.cardIcon}>{card.icon}</Text>
+              <View style={[styles.cardIconContainer, {backgroundColor: card.color + '15'}]}>
+                <Text style={styles.cardIcon}>{card.icon}</Text>
+              </View>
               <Text style={styles.cardTitle}>{card.title}</Text>
               <Text style={styles.cardDesc}>{card.desc}</Text>
             </TouchableOpacity>
@@ -146,7 +171,7 @@ export default function HomeScreen({navigation}: any) {
         {/* 最新供给 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>最新供给</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('OfferList')}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('OfferList')}>
             <Text style={styles.moreText}>查看更多 &gt;</Text>
           </TouchableOpacity>
         </View>
@@ -156,7 +181,8 @@ export default function HomeScreen({navigation}: any) {
           offers.map(item => (
             <TouchableOpacity
               key={item.id}
-              style={styles.listItem}
+              style={[styles.listItem, {borderLeftWidth: 3, borderLeftColor: '#1890ff'}]}
+              activeOpacity={0.8}
               onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
               <View style={styles.offerIconBox}>
                 <Text style={{fontSize: 24}}>🚁</Text>
@@ -172,13 +198,17 @@ export default function HomeScreen({navigation}: any) {
             </TouchableOpacity>
           ))
         ) : (
-          <Text style={styles.emptyText}>暂无供给信息</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🚁</Text>
+            <Text style={styles.emptyText}>暂无供给信息</Text>
+            <Text style={styles.emptyHint}>快来发布第一个供给吧</Text>
+          </View>
         )}
 
         {/* 最新需求 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>最新需求</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('DemandList')}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('DemandList')}>
             <Text style={styles.moreText}>查看更多 &gt;</Text>
           </TouchableOpacity>
         </View>
@@ -188,7 +218,8 @@ export default function HomeScreen({navigation}: any) {
           demands.map(item => (
             <TouchableOpacity
               key={item.id}
-              style={styles.listItem}
+              style={[styles.listItem, {borderLeftWidth: 3, borderLeftColor: '#52c41a'}]}
+              activeOpacity={0.8}
               onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
               <View style={styles.itemContent}>
                 <View style={styles.demandHeader}>
@@ -209,13 +240,17 @@ export default function HomeScreen({navigation}: any) {
             </TouchableOpacity>
           ))
         ) : (
-          <Text style={styles.emptyText}>暂无需求信息</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyText}>暂无需求信息</Text>
+            <Text style={styles.emptyHint}>期待您的租赁需求</Text>
+          </View>
         )}
 
         {/* 最新货运 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>最新货运</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('CargoList')}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('CargoList')}>
             <Text style={styles.moreText}>查看更多 &gt;</Text>
           </TouchableOpacity>
         </View>
@@ -225,7 +260,8 @@ export default function HomeScreen({navigation}: any) {
           cargos.map(item => (
             <TouchableOpacity
               key={item.id}
-              style={[styles.listItem, {borderLeftColor: '#fa8c16'}]}
+              style={[styles.listItem, {borderLeftWidth: 3, borderLeftColor: '#fa8c16'}]}
+              activeOpacity={0.8}
               onPress={() => navigation.navigate('CargoDetail', {id: item.id})}>
               <View style={styles.cargoIconBox}>
                 <Text style={{fontSize: 20}}>📦</Text>
@@ -242,7 +278,11 @@ export default function HomeScreen({navigation}: any) {
             </TouchableOpacity>
           ))
         ) : (
-          <Text style={styles.emptyText}>暂无货运需求</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📦</Text>
+            <Text style={styles.emptyText}>暂无货运需求</Text>
+            <Text style={styles.emptyHint}>发布您的货运任务</Text>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -255,112 +295,153 @@ const styles = StyleSheet.create({
   scrollContent: {paddingBottom: 20},
   // 轮播图样式
   bannerContainer: {
-    height: 160,
-    marginBottom: 12,
+    height: 180,
+    marginBottom: 16,
   },
   banner: {
-    height: 140,
+    height: 160,
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingVertical: 32,
     justifyContent: 'center',
+    borderRadius: 0,
   },
   bannerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#fff',
+    letterSpacing: 0.5,
   },
   bannerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.95)',
     marginTop: 8,
+    letterSpacing: 0.3,
   },
   bannerDots: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.15)',
     marginHorizontal: 4,
   },
   dotActive: {
-    width: 20,
-    backgroundColor: '#fff',
+    width: 24,
+    backgroundColor: '#1890ff',
   },
   // 数据统计样式
   statsContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    paddingVertical: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 16,
+    borderRadius: 16,
+    paddingVertical: 24,
+    shadowColor: '#1890ff',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: {width: 0, height: 4},
+    elevation: 4,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1890ff',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#999',
-    marginTop: 4,
+    marginTop: 6,
   },
   statDivider: {
     width: 1,
+    height: 40,
     backgroundColor: '#f0f0f0',
+    alignSelf: 'center',
   },
-  grid: {flexDirection: 'row', flexWrap: 'wrap', padding: 12},
+  grid: {flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingVertical: 8},
   card: {
-    width: '47%', backgroundColor: '#fff', borderRadius: 8,
-    padding: 16, margin: '1.5%', borderLeftWidth: 4,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    width: '48%', backgroundColor: '#fff', borderRadius: 12,
+    padding: 16, marginBottom: 12, borderLeftWidth: 4,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    marginRight: '4%',
   },
-  cardIcon: {fontSize: 28, marginBottom: 8},
-  cardTitle: {fontSize: 16, fontWeight: 'bold', color: '#333'},
-  cardDesc: {fontSize: 12, color: '#999', marginTop: 4},
+  cardIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardIcon: {fontSize: 32},
+  cardTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 4},
+  cardDesc: {fontSize: 12, color: '#999', lineHeight: 18},
   section: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
+    alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16,
+    marginTop: 8,
   },
-  sectionTitle: {fontSize: 18, fontWeight: 'bold', color: '#333'},
-  moreText: {fontSize: 14, color: '#1890ff'},
+  sectionTitle: {fontSize: 19, fontWeight: 'bold', color: '#333'},
+  moreText: {fontSize: 14, color: '#1890ff', fontWeight: '500'},
   listItem: {
     flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 16,
-    marginBottom: 10, padding: 12, borderRadius: 8,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+    marginBottom: 12, padding: 14, borderRadius: 12,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: {width: 0, height: 2},
+    elevation: 2,
     alignItems: 'center',
   },
   offerIconBox: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: '#e6f7ff',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+    width: 52, height: 52, borderRadius: 26, backgroundColor: '#e6f7ff',
+    justifyContent: 'center', alignItems: 'center', marginRight: 14,
+    borderWidth: 1,
+    borderColor: '#bae7ff',
   },
-  itemContent: {flex: 1, marginRight: 8},
-  itemTitle: {fontSize: 15, fontWeight: '600', color: '#333'},
-  itemMeta: {fontSize: 12, color: '#999', marginTop: 3},
-  itemPrice: {fontSize: 14, color: '#f5222d', fontWeight: 'bold'},
-  itemLocation: {fontSize: 12, color: '#999', marginTop: 2},
-  demandHeader: {flexDirection: 'row', alignItems: 'center'},
-  demandBudget: {fontSize: 13, color: '#f5222d', marginTop: 4},
-  urgentBadge: {backgroundColor: '#ff4d4f', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 3, marginLeft: 8},
-  urgentText: {color: '#fff', fontSize: 10},
+  itemContent: {flex: 1, marginRight: 10},
+  itemTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4},
+  itemMeta: {fontSize: 13, color: '#999', marginTop: 2},
+  itemPrice: {fontSize: 16, color: '#f5222d', fontWeight: 'bold'},
+  itemLocation: {fontSize: 13, color: '#999', marginTop: 4},
+  demandHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 4},
+  demandBudget: {fontSize: 14, color: '#f5222d', marginTop: 2, fontWeight: '500'},
+  urgentBadge: {backgroundColor: '#ff4d4f', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginLeft: 8},
+  urgentText: {color: '#fff', fontSize: 11, fontWeight: '600'},
   cargoIconBox: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff7e6',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+    width: 52, height: 52, borderRadius: 26, backgroundColor: '#fff7e6',
+    justifyContent: 'center', alignItems: 'center', marginRight: 14,
+    borderWidth: 1,
+    borderColor: '#ffd591',
   },
-  cargoMeta: {fontSize: 12, color: '#999', marginTop: 3},
-  cargoPrice: {fontSize: 14, color: '#fa8c16', fontWeight: 'bold'},
-  emptyText: {textAlign: 'center', color: '#999', padding: 20},
+  cargoMeta: {fontSize: 13, color: '#999', marginTop: 2},
+  cargoPrice: {fontSize: 16, color: '#fa8c16', fontWeight: 'bold'},
+  // 空状态样式
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+    opacity: 0.5,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: '#999',
+    marginBottom: 8,
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: '#bbb',
+  },
 });
