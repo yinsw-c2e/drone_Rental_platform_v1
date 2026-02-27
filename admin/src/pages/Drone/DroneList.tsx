@@ -24,7 +24,8 @@ interface Drone {
   order_count: number;
   description: string;
   created_at: string;
-  owner?: { nickname: string; phone: string };
+  owner_nickname: string;
+  owner_phone: string;
 }
 
 const CERT_STATUS_MAP: Record<string, { text: string; color: string }> = {
@@ -61,11 +62,15 @@ const DroneList: React.FC = () => {
       const params: any = { page: p, page_size: 20 };
       if (keyword) params.keyword = keyword;
       if (certFilter) params.certification_status = certFilter;
+      console.log('[DroneList] Fetching drones with params:', params);
       const res: any = await adminApi.getDrones(params);
-      setDrones(res.data.list || []);
-      setTotal(res.data.total);
+      console.log('[DroneList] API response:', res);
+      console.log('[DroneList] res.data:', res.data);
+      console.log('[DroneList] res.data.list:', res.data?.list);
+      setDrones(res.data?.list || []);
+      setTotal(res.data?.total || 0);
     } catch (e) {
-      console.error(e);
+      console.error('[DroneList] Error:', e);
     }
     setLoading(false);
   };
@@ -121,8 +126,8 @@ const DroneList: React.FC = () => {
       title: '所有者', width: 120,
       render: (_, r) => (
         <div>
-          <div>{r.owner?.nickname || '-'}</div>
-          <div style={{ color: '#999', fontSize: 12 }}>{r.owner?.phone || ''}</div>
+          <div>{r.owner_nickname || '-'}</div>
+          <div style={{ color: '#999', fontSize: 12 }}>{r.owner_phone || ''}</div>
         </div>
       ),
     },
@@ -243,7 +248,7 @@ const DroneList: React.FC = () => {
               <Col span={8}><strong>序列号:</strong></Col>
               <Col span={16}>{detailDrone.serial_number || '-'}</Col>
               <Col span={8}><strong>所有者:</strong></Col>
-              <Col span={16}>{detailDrone.owner?.nickname || '-'} ({detailDrone.owner?.phone || '-'})</Col>
+              <Col span={16}>{detailDrone.owner_nickname || '-'} ({detailDrone.owner_phone || '-'})</Col>
               <Col span={8}><strong>所在城市:</strong></Col>
               <Col span={16}>{detailDrone.city || '-'}</Col>
               <Col span={8}><strong>详细地址:</strong></Col>

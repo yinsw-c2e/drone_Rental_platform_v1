@@ -77,3 +77,12 @@ func (s *UserService) ApproveIDVerification(userID int64, approved bool) error {
 	}
 	return s.userRepo.UpdateFields(userID, map[string]interface{}{"id_verified": status})
 }
+
+// GetByIDs 批量查询用户（用于 DTO 转换）
+func (s *UserService) GetByIDs(ids []int64) (map[int64]*model.User, error) {
+	if len(ids) == 0 {
+		return make(map[int64]*model.User), nil
+	}
+	return s.userRepo.GetByIDs(ids)
+}
+

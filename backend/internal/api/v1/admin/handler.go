@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/response"
 	"wurenji-backend/internal/service"
 )
@@ -91,12 +92,32 @@ func (h *Handler) DroneList(c *gin.Context) {
 	if cs := c.Query("certification_status"); cs != "" {
 		filters["certification_status"] = cs
 	}
+	
+	// 1. 查询无人机列表
 	drones, total, err := h.droneService.List(page, pageSize, filters)
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
-	response.SuccessWithPage(c, drones, total, page, pageSize)
+	
+	// 2. 收集所有的 owner_id
+	ownerIDs := make([]int64, 0, len(drones))
+	for i := range drones {
+		ownerIDs = append(ownerIDs, drones[i].OwnerID)
+	}
+	
+	// 3. 批量查询用户信息（只查一次数据库）
+	owners, err := h.userService.GetByIDs(ownerIDs)
+	if err != nil {
+		// 如果查询用户失败，也不影响无人机列表返回
+		// 只是不会显示机主信息
+		owners = make(map[int64]*model.User)
+	}
+	
+	// 4. 转换为 DTO
+	dtoList := ToDroneDTOList(drones, owners)
+	
+	response.SuccessWithPage(c, dtoList, total, page, pageSize)
 }
 
 func (h *Handler) ApproveDroneCertification(c *gin.Context) {

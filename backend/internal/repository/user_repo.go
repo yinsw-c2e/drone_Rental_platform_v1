@@ -69,3 +69,20 @@ func (r *UserRepo) GetByQQOpenID(openID string) (*model.User, error) {
 	err := r.db.Where("qq_open_id = ?", openID).First(&user).Error
 	return &user, err
 }
+
+// GetByIDs 批量查询用户（用于 DTO 转换）
+func (r *UserRepo) GetByIDs(ids []int64) (map[int64]*model.User, error) {
+	var users []model.User
+	err := r.db.Where("id IN ?", ids).Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// 转换为 map 方便查找
+	userMap := make(map[int64]*model.User, len(users))
+	for i := range users {
+		userMap[users[i].ID] = &users[i]
+	}
+	return userMap, nil
+}
+

@@ -50,7 +50,7 @@ func (r *DroneRepo) List(page, pageSize int, filters map[string]interface{}) ([]
 	var drones []model.Drone
 	var total int64
 
-	query := r.db.Model(&model.Drone{}).Preload("Owner")
+	query := r.db.Model(&model.Drone{}) // 暂时移除 .Preload("Owner")
 	for k, v := range filters {
 		query = query.Where(k+" = ?", v)
 	}
