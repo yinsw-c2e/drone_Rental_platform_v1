@@ -1,8 +1,14 @@
 import React, {useState, useCallback} from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView,
-  Alert, Image, Platform, ActionSheetIOS, RefreshControl,
+  Alert, Image, Platform, RefreshControl,
 } from 'react-native';
+
+// 动态导入 ActionSheetIOS（Web环境下不存在）
+let ActionSheetIOS: any;
+if (Platform.OS === 'ios') {
+  ActionSheetIOS = require('react-native').ActionSheetIOS;
+}
 import {useSelector, useDispatch} from 'react-redux';
 import * as ImagePicker from 'react-native-image-picker';
 import type {ImagePickerResponse} from 'react-native-image-picker';
@@ -75,15 +81,16 @@ export default function ProfileScreen({navigation}: any) {
 
   const handleAvatarPress = () => {
     const options = ['拍照', '从相册选择', '取消'];
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && ActionSheetIOS) {
       ActionSheetIOS.showActionSheetWithOptions(
         {options, cancelButtonIndex: 2},
-        (index) => {
+        (index: number) => {
           if (index === 0) pickImage('camera');
           else if (index === 1) pickImage('library');
         },
       );
     } else {
+      // Web 环境或 Android 使用 Alert
       Alert.alert('更换头像', '选择头像来源', [
         {text: '拍照', onPress: () => pickImage('camera')},
         {text: '从相册选择', onPress: () => pickImage('library')},

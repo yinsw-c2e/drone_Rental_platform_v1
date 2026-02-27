@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Provider } from 'react-redux';
+import { Provider, useSelector, useDispatch } from 'react-redux';
+import { BrowserRouter, Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
 import { store } from './store/store';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
-import { setCredentials } from './store/slices/authSlice';
+import { setCredentials, logout } from './store/slices/authSlice';
 import { API_BASE_URL } from './constants';
 
 // Import screens directly
@@ -13,18 +14,150 @@ import HomeScreen from './screens/home/HomeScreen';
 import OrderListScreen from './screens/order/OrderListScreen';
 import OrderDetailScreen from './screens/order/OrderDetailScreen';
 import ChatScreen from './screens/message/ChatScreen';
+import ConversationListScreen from './screens/message/ConversationListScreen';
 import ProfileScreen from './screens/profile/ProfileScreen';
 
-// Simple mock navigation for web preview
-function createMockNavigation(setScreen: (name: string, params?: any) => void) {
+// Import profile screens
+import EditProfileScreen from './screens/profile/EditProfileScreen';
+import MyCargoScreen from './screens/profile/MyCargoScreen';
+import MyDemandsScreen from './screens/profile/MyDemandsScreen';
+import MyOffersScreen from './screens/profile/MyOffersScreen';
+import SettingsScreen from './screens/profile/SettingsScreen';
+import VerificationScreen from './screens/profile/VerificationScreen';
+
+// Import additional screens for navigation
+import DroneDetailScreen from './screens/drone/DroneDetailScreen';
+import NearbyDronesScreen from './screens/drone/NearbyDronesScreen';
+import AddDroneScreen from './screens/drone/AddDroneScreen';
+import MyDronesScreen from './screens/drone/MyDronesScreen';
+import DemandListScreen from './screens/demand/DemandListScreen';
+import DemandDetailScreen from './screens/demand/DemandDetailScreen';
+import OfferListScreen from './screens/demand/OfferListScreen';
+import OfferDetailScreen from './screens/demand/OfferDetailScreen';
+import PublishDemandScreen from './screens/publish/PublishDemandScreen';
+import PublishOfferScreen from './screens/publish/PublishOfferScreen';
+import PublishCargoScreen from './screens/publish/PublishCargoScreen';
+
+// Create React Router compatible navigation wrapper
+function createRouterNavigation(navigate: any) {
   return {
     navigate: (screen: string, params?: any) => {
-      setScreen(screen, params);
+      console.log('[Router] Navigate called:', { screen, params });
+      
+      // Helper to get ID from params
+      const getId = (paramObj: any, ...keys: string[]): string => {
+        for (const key of keys) {
+          const val = paramObj?.[key];
+          if (val !== undefined && val !== null) {
+            return String(val);
+          }
+        }
+        // If no valid ID found, return empty string to indicate error
+        console.error('[Router] No valid ID found in params:', paramObj);
+        return '';
+      };
+      
+      // Convert screen name to route path
+      let path: string | null = null;
+      
+      switch (screen) {
+        case 'OrderDetail': {
+          const id = getId(params, 'orderId', 'id');
+          path = id ? `/order/${id}` : null;
+          break;
+        }
+        case 'DroneDetail':
+        case 'OfferDetail': {
+          const id = getId(params, 'droneId', 'offerId', 'id');
+          path = id ? `/drone/${id}` : null;
+          break;
+        }
+        case 'DemandDetail': {
+          const id = getId(params, 'demandId', 'id');
+          path = id ? `/demand/${id}` : null;
+          break;
+        }
+        case 'OfferDetailPage': {
+          const id = getId(params, 'offerId', 'id');
+          path = id ? `/offer/${id}` : null;
+          break;
+        }
+        case 'Chat':
+        case 'ChatScreen': {
+          const id = getId(params, 'peerId', 'id');
+          path = id ? `/chat/${id}` : null;
+          break;
+        }
+        case 'ConversationList':
+          path = '/messages';
+          break;
+        case 'NearbyDrones':
+          path = '/nearby-drones';
+          break;
+        case 'MyDrones':
+          path = '/my-drones';
+          break;
+        case 'AddDrone':
+        case 'PublishDrone':
+          path = '/add-drone';
+          break;
+        case 'PublishOffer':
+          path = '/publish-offer';
+          break;
+        case 'PublishDemand':
+          path = '/publish-demand';
+          break;
+        case 'PublishCargo':
+          path = '/publish-cargo';
+          break;
+        case 'DemandList':
+          path = '/demands';
+          break;
+        case 'OfferList':
+          path = '/offers';
+          break;
+        // Profile pages
+        case 'MyOrders':
+          path = '/my-orders';
+          break;
+        case 'MyOffers':
+          path = '/my-offers';
+          break;
+        case 'MyDemands':
+          path = '/my-demands';
+          break;
+        case 'MyCargo':
+          path = '/my-cargo';
+          break;
+        case 'Verification':
+          path = '/verification';
+          break;
+        case 'Settings':
+          path = '/settings';
+          break;
+        case 'EditProfile':
+          path = '/edit-profile';
+          break;
+        default:
+          console.warn(`[Router] Unknown screen: ${screen}`);
+      }
+      
+      console.log('[Router] Resolved path:', path);
+      
+      if (path) {
+        navigate(path, { state: params });
+      } else {
+        console.error(`[Router] Failed to navigate to ${screen} - invalid params or unknown route`);
+      }
     },
-    goBack: () => {
-      console.log('Go back');
-    },
+    goBack: () => navigate(-1),
     setOptions: () => {},
+    addListener: (event: string, callback: () => void) => {
+      // Web 版本不需要真正监听 focus 事件
+      // 因为组件挂载时已经在 useEffect 中调用了数据加载
+      // 返回一个空的取消订阅函数
+      return () => {};
+    },
   };
 }
 
@@ -106,20 +239,16 @@ const tabStyles = StyleSheet.create({
 
 // Auth screens wrapper
 function AuthView({ onLogin }: { onLogin: () => void }) {
-  const [screen, setScreen] = useState<'Login' | 'Register'>('Login');
-  const nav = createMockNavigation((s) => setScreen(s as any));
-
   return (
     <View style={{ flex: 1 }}>
-      {screen === 'Login' ? (
-        <LoginScreen navigation={{ ...nav, navigate: (s: string) => {
-          if (s === 'Register') setScreen('Register');
-        }}} />
-      ) : (
-        <RegisterScreen navigation={{ ...nav, goBack: () => setScreen('Login') }} />
-      )}
+      <Routes>
+        <Route path="/register" element={<RegisterScreen navigation={{ navigate: () => {}, goBack: () => window.history.back() }} />} />
+        <Route path="/*" element={<LoginScreen navigation={{ navigate: (s: string) => {
+          if (s === 'Register') window.history.pushState({}, '', '/register');
+        }, goBack: () => {} }} />} />
+      </Routes>
       {/* Quick demo login button */}
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={{
           position: 'absolute',
           bottom: 40,
@@ -138,53 +267,69 @@ function AuthView({ onLogin }: { onLogin: () => void }) {
         <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
           演示模式 - 快速进入
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 }
 
-// Main app with tabs
+// Wrapper components for route params
+function OrderDetailWrapper() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return <OrderDetailScreen route={createMockRoute({ id, orderId: id })} navigation={nav} />;
+}
+
+function DroneDetailWrapper() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return <DroneDetailScreen route={createMockRoute({ id, droneId: id, offerId: id })} navigation={nav} />;
+}
+
+function DemandDetailWrapper() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return <DemandDetailScreen route={createMockRoute({ id, demandId: id })} navigation={nav} />;
+}
+
+function OfferDetailWrapper() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return <OfferDetailScreen route={createMockRoute({ id, offerId: id })} navigation={nav} />;
+}
+
+function ChatWrapper() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return <ChatScreen route={createMockRoute({ peerId: id, id })} navigation={nav} />;
+}
+
+// Screen wrappers with navigation
+function ScreenWrapper({ Component }: { Component: any }) {
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return <Component navigation={nav} />;
+}
+
+// Main app with tabs and routes
 function MainView({ onLogout }: { onLogout: () => void }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Home');
-  const [currentScreen, setCurrentScreen] = useState<{ name: string; params?: any } | null>(null);
   
-  const nav = createMockNavigation((screenName, params) => {
-    console.log(`Navigate to: ${screenName}`, params);
-    setCurrentScreen({ name: screenName, params });
-  });
+  const nav = createRouterNavigation(navigate);
 
-  // 如果有详情页，显示详情页
-  if (currentScreen) {
-    const goBack = () => setCurrentScreen(null);
-    
-    if (currentScreen.name === 'OrderDetail') {
-      return (
-        <View style={mainStyles.container}>
-          <View style={mainStyles.content}>
-            <OrderDetailScreen 
-              route={createMockRoute(currentScreen.params)} 
-              navigation={{ ...nav, goBack }}
-            />
-          </View>
-        </View>
-      );
-    }
-    
-    // 可以添加其他详情页
-    // if (currentScreen.name === 'OfferDetail') { ... }
-    
-    // 未知屏幕，返回主页
-    setCurrentScreen(null);
-  }
-
-  const renderScreen = () => {
+  const renderTabContent = () => {
     switch (activeTab) {
       case 'Home':
         return <HomeScreen navigation={nav} />;
       case 'Orders':
         return <OrderListScreen navigation={nav} />;
       case 'Messages':
-        return <ChatScreen route={createMockRoute({ conversationId: 'demo', peerId: 0 })} />;
+        return <ConversationListScreen navigation={nav} />;
       case 'Profile':
         return <ProfileScreen navigation={nav} />;
       default:
@@ -195,17 +340,54 @@ function MainView({ onLogout }: { onLogout: () => void }) {
   return (
     <View style={mainStyles.container}>
       <View style={mainStyles.content}>
-        {renderScreen()}
+        <Routes>
+          {/* Detail pages */}
+          <Route path="/order/:id" element={<OrderDetailWrapper />} />
+          <Route path="/drone/:id" element={<DroneDetailWrapper />} />
+          <Route path="/demand/:id" element={<DemandDetailWrapper />} />
+          <Route path="/offer/:id" element={<OfferDetailWrapper />} />
+          
+          {/* Message pages */}
+          <Route path="/chat/:id" element={<ChatWrapper />} />
+          <Route path="/messages" element={<ScreenWrapper Component={ConversationListScreen} />} />
+          
+          {/* List pages */}
+          <Route path="/nearby-drones" element={<ScreenWrapper Component={NearbyDronesScreen} />} />
+          <Route path="/my-drones" element={<ScreenWrapper Component={MyDronesScreen} />} />
+          <Route path="/demands" element={<ScreenWrapper Component={DemandListScreen} />} />
+          <Route path="/offers" element={<ScreenWrapper Component={OfferListScreen} />} />
+          
+          {/* Profile pages */}
+          <Route path="/my-orders" element={<ScreenWrapper Component={OrderListScreen} />} />
+          <Route path="/my-offers" element={<ScreenWrapper Component={MyOffersScreen} />} />
+          <Route path="/my-demands" element={<ScreenWrapper Component={MyDemandsScreen} />} />
+          <Route path="/my-cargo" element={<ScreenWrapper Component={MyCargoScreen} />} />
+          <Route path="/verification" element={<ScreenWrapper Component={VerificationScreen} />} />
+          <Route path="/settings" element={<ScreenWrapper Component={SettingsScreen} />} />
+          <Route path="/edit-profile" element={<ScreenWrapper Component={EditProfileScreen} />} />
+          
+          {/* Publish pages */}
+          <Route path="/add-drone" element={<ScreenWrapper Component={AddDroneScreen} />} />
+          <Route path="/publish-offer" element={<ScreenWrapper Component={PublishOfferScreen} />} />
+          <Route path="/publish-demand" element={<ScreenWrapper Component={PublishDemandScreen} />} />
+          <Route path="/publish-cargo" element={<ScreenWrapper Component={PublishCargoScreen} />} />
+          
+          {/* Main tabs - default route */}
+          <Route path="/*" element={renderTabContent()} />
+        </Routes>
       </View>
       <TabBar activeTab={activeTab} onTabPress={setActiveTab} />
     </View>
   );
 }
 
-// Root app
-function WebApp() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+// Root app inner component (needs to be inside Provider to use useSelector)
+function WebAppInner() {
+  const authToken = useSelector((state: any) => state.auth.accessToken);
   const [isLoading, setIsLoading] = useState(false);
+
+  // 根据 Redux 中的 token 判断是否已登录
+  const isLoggedIn = !!authToken;
 
   const handleDemoLogin = async () => {
     setIsLoading(true);
@@ -225,12 +407,11 @@ function WebApp() {
       const result = await response.json();
       
       if (result.code === 0 && result.data) {
-        // 登录成功，保存用户信息和 token
+        // 登录成功，保存用户信息和 token（Redux会自动触发重新渲染）
         store.dispatch(setCredentials({
           user: result.data.user,
           token: result.data.token,
         }));
-        setIsLoggedIn(true);
       } else {
         alert('演示登录失败: ' + (result.message || '未知错误'));
       }
@@ -243,10 +424,10 @@ function WebApp() {
   };
 
   return (
-    <Provider store={store}>
+    <BrowserRouter>
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
         {isLoggedIn ? (
-          <MainView onLogout={() => setIsLoggedIn(false)} />
+          <MainView onLogout={() => store.dispatch(logout())} />
         ) : (
           <AuthView onLogin={handleDemoLogin} />
         )}
@@ -265,6 +446,15 @@ function WebApp() {
           </View>
         )}
       </View>
+    </BrowserRouter>
+  );
+}
+
+// Root app wrapper with Provider
+function WebApp() {
+  return (
+    <Provider store={store}>
+      <WebAppInner />
     </Provider>
   );
 }

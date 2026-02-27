@@ -316,12 +316,13 @@ const styles = StyleSheet.create({
   scrollContent: {paddingBottom: 80},
   // 轮播图样式
   bannerContainer: {
+    marginTop: 50, // 为刘海屏顶部安全区域留出空间
     marginBottom: 16,
   },
   banner: {
-    height: 160,
+    height: 180, // 增加高度避免被截断
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingVertical: 0,
     justifyContent: 'center',
   },
   bannerTitle: {

@@ -27,8 +27,8 @@ const getApiBaseUrl = (): string => {
   }
 
   // 远程测试配置：cpolar 内网穿透（无条件优先）
-  const HARDCODED_CPOLAR_URL = 'https://77e3f1d8.r3.cpolar.cn/api/v1';
-  const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar
+  const HARDCODED_CPOLAR_URL = 'https://1ef057fb.r7.cpolar.top/api/v1';
+  const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar，使用局域网IP
   
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_URL) {
     console.log('[Config] Using cpolar URL for remote testing:', HARDCODED_CPOLAR_URL);
@@ -38,7 +38,7 @@ const getApiBaseUrl = (): string => {
   // 开发环境默认配置
   if (__DEV__) {
     // 本地真机测试：使用电脑局域网IP（手机和电脑在同一WiFi）
-    const LOCAL_NETWORK_IP = '192.168.3.173';
+    const LOCAL_NETWORK_IP = '192.168.3.97';
     if (LOCAL_NETWORK_IP) {
       const localUrl = `http://${LOCAL_NETWORK_IP}:8080/api/v1`;
       console.log('[Config] Using local network IP for real device testing:', localUrl);
@@ -71,7 +71,7 @@ const getWsBaseUrl = (): string => {
   }
 
   // 远程测试配置：cpolar 内网穿透（无条件优先）
-  const HARDCODED_CPOLAR_WS_URL = 'https://68aa0ac9.r3.cpolar.cn/ws';
+  const HARDCODED_CPOLAR_WS_URL = 'wss://1ef057fb.r7.cpolar.top/ws';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar
   
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_WS_URL) {
@@ -82,7 +82,7 @@ const getWsBaseUrl = (): string => {
   // 开发环境默认配置
   if (__DEV__) {
     // 本地真机测试：使用电脑局域网IP
-    const LOCAL_NETWORK_IP = '192.168.3.173';
+    const LOCAL_NETWORK_IP = '192.168.3.97';
     if (LOCAL_NETWORK_IP) {
       const localWsUrl = `ws://${LOCAL_NETWORK_IP}:8080/ws`;
       console.log('[Config] Using local network IP for WS:', localWsUrl);

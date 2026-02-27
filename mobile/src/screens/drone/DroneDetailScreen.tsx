@@ -21,6 +21,8 @@ const AVAILABILITY_MAP: Record<string, {label: string; color: string}> = {
 
 export default function DroneDetailScreen({route, navigation}: any) {
   const {id} = route.params;
+  console.log('[DroneDetailScreen] Mounted with params:', route.params, 'id:', id);
+  
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const [drone, setDrone] = useState<Drone | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -31,12 +33,14 @@ export default function DroneDetailScreen({route, navigation}: any) {
   const isOwner = drone?.owner_id === currentUser?.id;
 
   const fetchData = useCallback(async () => {
+    console.log('[DroneDetailScreen] fetchData called with id:', id);
     setLoading(true);
     try {
       const [droneRes, reviewRes] = await Promise.all([
         droneService.getById(id),
         reviewService.listByTarget('drone', id, {page: 1, page_size: 10}).catch(() => null),
       ]);
+      console.log('[DroneDetailScreen] API responses:', { droneRes, reviewRes });
       setDrone(droneRes.data);
       if (reviewRes?.data?.list) {
         setReviews(reviewRes.data.list);
