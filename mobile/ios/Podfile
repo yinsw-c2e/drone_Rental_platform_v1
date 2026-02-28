@@ -3,9 +3,6 @@ require '/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_
 
 platform :ios, '15.1'
 
-# 强制禁用 New Architecture
-ENV['RCT_NEW_ARCH_ENABLED'] = '0'
-
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -22,6 +19,13 @@ if config.nil?
 end
 
 target 'WurenjiMobile' do
+  # 高德地图 SDK
+  pod 'AMap3DMap', '~> 9.6'
+  pod 'AMapFoundation', '~> 1.7'
+  
+  # 手动添加 Geolocation（自动链接失败时的备用方案）
+  pod 'react-native-geolocation', :path => '../node_modules/@react-native-community/geolocation'
+
   use_react_native!(
     :path => config[:reactNativePath],
     :app_path => "#{Pod::Config.instance.installation_root}/.."
@@ -33,5 +37,19 @@ target 'WurenjiMobile' do
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
+    
+    # 设置高德地图 iOS Key 和架构配置
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['AMAP_IOS_KEY'] = '83b270b3867a8d230d620cb7a55ac74d'
+        
+        # 修复架构相关问题
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+        
+        # 确保所有 Pod 使用相同的 iOS 部署目标
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      end
+    end
   end
 end

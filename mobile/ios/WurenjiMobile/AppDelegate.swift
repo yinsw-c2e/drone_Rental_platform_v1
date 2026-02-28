@@ -2,6 +2,8 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import AMapFoundationKit
+import MAMapKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -14,6 +16,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // 高德地图 SDK 隐私合规（必须在 apiKey 和 MAMapView 实例化之前调用）
+    MAMapView.updatePrivacyShow(AMapPrivacyShowStatus.didShow, privacyInfo: AMapPrivacyInfoStatus.didContain)
+    MAMapView.updatePrivacyAgree(AMapPrivacyAgreeStatus.didAgree)
+
+    // 初始化高德地图 SDK
+    if let amapKey = Bundle.main.object(forInfoDictionaryKey: "AMapApiKey") as? String, !amapKey.isEmpty {
+      AMapServices.shared().enableHTTPS = true
+      AMapServices.shared().apiKey = amapKey
+      print("[AMap] SDK Key loaded: \(amapKey.prefix(8))..., HTTPS enabled, privacy agreed")
+    } else {
+      print("[AMap] WARNING: AMapApiKey not found or empty in Info.plist!")
+    }
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -40,8 +55,8 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    // 强制使用指定 IP 地址连接 Metro
-    return URL(string: "http://192.168.3.97:8081/index.bundle?platform=ios&dev=true&lazy=true&minify=false")
+    // 开发模式：连接 Metro bundler
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif

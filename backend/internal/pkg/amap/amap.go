@@ -11,6 +11,26 @@ import (
 	"go.uber.org/zap"
 )
 
+// FlexString 处理高德API中可能为字符串或空数组的字段
+// 例如直辖市的city字段返回[]而非""
+type FlexString string
+
+func (f *FlexString) UnmarshalJSON(data []byte) error {
+	// 尝试解析为字符串
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = FlexString(s)
+		return nil
+	}
+	// 如果不是字符串（比如空数组[]），则设为空字符串
+	*f = ""
+	return nil
+}
+
+func (f FlexString) String() string {
+	return string(f)
+}
+
 // AmapService 高德地图服务
 type AmapService struct {
 	apiKey string
@@ -155,13 +175,13 @@ func (s *AmapService) ReverseGeoCode(longitude, latitude float64) (*ReverseGeoRe
 		ReGeocode struct {
 			FormattedAddress string `json:"formatted_address"`
 			AddressComponent struct {
-				Province     string `json:"province"`
-				City         string `json:"city"`
-				District     string `json:"district"`
-				Township     string `json:"township"`
+				Province     FlexString `json:"province"`
+				City         FlexString `json:"city"`
+				District     FlexString `json:"district"`
+				Township     FlexString `json:"township"`
 				StreetNumber struct {
-					Street string `json:"street"`
-					Number string `json:"number"`
+					Street FlexString `json:"street"`
+					Number FlexString `json:"number"`
 				} `json:"streetNumber"`
 			} `json:"addressComponent"`
 		} `json:"regeocode"`
@@ -176,20 +196,20 @@ func (s *AmapService) ReverseGeoCode(longitude, latitude float64) (*ReverseGeoRe
 	}
 
 	addr := result.ReGeocode
-	cityStr := addr.AddressComponent.City
+	cityStr := addr.AddressComponent.City.String()
 	// 高德API中直辖市city可能为空数组[]
-	if cityStr == "" || cityStr == "[]" {
-		cityStr = addr.AddressComponent.Province
+	if cityStr == "" {
+		cityStr = addr.AddressComponent.Province.String()
 	}
 
 	return &ReverseGeoResult{
 		FormattedAddress: addr.FormattedAddress,
-		Province:         addr.AddressComponent.Province,
+		Province:         addr.AddressComponent.Province.String(),
 		City:             cityStr,
-		District:         addr.AddressComponent.District,
-		Township:         addr.AddressComponent.Township,
-		Street:           addr.AddressComponent.StreetNumber.Street,
-		Number:           addr.AddressComponent.StreetNumber.Number,
+		District:         addr.AddressComponent.District.String(),
+		Township:         addr.AddressComponent.Township.String(),
+		Street:           addr.AddressComponent.StreetNumber.Street.String(),
+		Number:           addr.AddressComponent.StreetNumber.Number.String(),
 	}, nil
 }
 
@@ -243,14 +263,14 @@ func (s *AmapService) SearchPOI(keyword, city string, page, pageSize int) ([]POI
 		Info   string `json:"info"`
 		Count  string `json:"count"`
 		POIs   []struct {
-			Name     string `json:"name"`
-			Address  string `json:"address"`
-			Province string `json:"pname"`
-			City     string `json:"cityname"`
-			District string `json:"adname"`
-			Location string `json:"location"`
-			Type     string `json:"type"`
-			Distance string `json:"distance"`
+			Name     FlexString `json:"name"`
+			Address  FlexString `json:"address"`
+			Province FlexString `json:"pname"`
+			City     FlexString `json:"cityname"`
+			District FlexString `json:"adname"`
+			Location FlexString `json:"location"`
+			Type     FlexString `json:"type"`
+			Distance FlexString `json:"distance"`
 		} `json:"pois"`
 	}
 
@@ -268,17 +288,17 @@ func (s *AmapService) SearchPOI(keyword, city string, page, pageSize int) ([]POI
 	var pois []POIResult
 	for _, p := range result.POIs {
 		var lng, lat float64
-		fmt.Sscanf(p.Location, "%f,%f", &lng, &lat)
+		fmt.Sscanf(p.Location.String(), "%f,%f", &lng, &lat)
 		pois = append(pois, POIResult{
-			Name:      p.Name,
-			Address:   p.Address,
-			Province:  p.Province,
-			City:      p.City,
-			District:  p.District,
+			Name:      p.Name.String(),
+			Address:   p.Address.String(),
+			Province:  p.Province.String(),
+			City:      p.City.String(),
+			District:  p.District.String(),
 			Longitude: lng,
 			Latitude:  lat,
-			Type:      p.Type,
-			Distance:  p.Distance,
+			Type:      p.Type.String(),
+			Distance:  p.Distance.String(),
 		})
 	}
 
@@ -320,14 +340,14 @@ func (s *AmapService) SearchNearby(longitude, latitude float64, radius int, keyw
 		Info   string `json:"info"`
 		Count  string `json:"count"`
 		POIs   []struct {
-			Name     string `json:"name"`
-			Address  string `json:"address"`
-			Province string `json:"pname"`
-			City     string `json:"cityname"`
-			District string `json:"adname"`
-			Location string `json:"location"`
-			Type     string `json:"type"`
-			Distance string `json:"distance"`
+			Name     FlexString `json:"name"`
+			Address  FlexString `json:"address"`
+			Province FlexString `json:"pname"`
+			City     FlexString `json:"cityname"`
+			District FlexString `json:"adname"`
+			Location FlexString `json:"location"`
+			Type     FlexString `json:"type"`
+			Distance FlexString `json:"distance"`
 		} `json:"pois"`
 	}
 
@@ -345,17 +365,17 @@ func (s *AmapService) SearchNearby(longitude, latitude float64, radius int, keyw
 	var pois []POIResult
 	for _, p := range result.POIs {
 		var lng, lat float64
-		fmt.Sscanf(p.Location, "%f,%f", &lng, &lat)
+		fmt.Sscanf(p.Location.String(), "%f,%f", &lng, &lat)
 		pois = append(pois, POIResult{
-			Name:      p.Name,
-			Address:   p.Address,
-			Province:  p.Province,
-			City:      p.City,
-			District:  p.District,
+			Name:      p.Name.String(),
+			Address:   p.Address.String(),
+			Province:  p.Province.String(),
+			City:      p.City.String(),
+			District:  p.District.String(),
 			Longitude: lng,
 			Latitude:  lat,
-			Type:      p.Type,
-			Distance:  p.Distance,
+			Type:      p.Type.String(),
+			Distance:  p.Distance.String(),
 		})
 	}
 

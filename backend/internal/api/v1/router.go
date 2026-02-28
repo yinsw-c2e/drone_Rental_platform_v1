@@ -4,10 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"wurenji-backend/internal/api/middleware"
+	"wurenji-backend/internal/api/v1/address"
 	"wurenji-backend/internal/api/v1/admin"
 	"wurenji-backend/internal/api/v1/auth"
 	"wurenji-backend/internal/api/v1/demand"
 	"wurenji-backend/internal/api/v1/drone"
+	"wurenji-backend/internal/api/v1/location"
 	"wurenji-backend/internal/api/v1/message"
 	"wurenji-backend/internal/api/v1/order"
 	"wurenji-backend/internal/api/v1/payment"
@@ -20,15 +22,17 @@ import (
 )
 
 type Handlers struct {
-	Auth    *auth.Handler
-	User    *user.Handler
-	Drone   *drone.Handler
-	Order   *order.Handler
-	Demand  *demand.Handler
-	Payment *payment.Handler
-	Message *message.Handler
-	Review  *review.Handler
-	Admin   *admin.Handler
+	Auth     *auth.Handler
+	User     *user.Handler
+	Drone    *drone.Handler
+	Order    *order.Handler
+	Demand   *demand.Handler
+	Payment  *payment.Handler
+	Message  *message.Handler
+	Review   *review.Handler
+	Admin    *admin.Handler
+	Location *location.Handler
+	Address  *address.Handler
 }
 
 func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config, logger *zap.Logger) {
@@ -165,6 +169,24 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 			reviewGroup.GET("/order/:orderId", h.Review.GetByOrder)
 			reviewGroup.GET("/user/:userId", h.Review.GetByUser)
 			reviewGroup.GET("/drone/:droneId", h.Review.GetByDrone)
+		}
+
+		// Location Service (AMap proxy)
+		locationGroup := authenticated.Group("/location")
+		{
+			locationGroup.GET("/search", h.Location.SearchPOI)
+			locationGroup.GET("/regeocode", h.Location.ReverseGeoCode)
+			locationGroup.GET("/nearby", h.Location.Nearby)
+		}
+
+		// User Addresses
+		addressGroup := authenticated.Group("/address")
+		{
+			addressGroup.GET("", h.Address.List)
+			addressGroup.POST("", h.Address.Create)
+			addressGroup.PUT("/:id", h.Address.Update)
+			addressGroup.DELETE("/:id", h.Address.Delete)
+			addressGroup.PUT("/:id/default", h.Address.SetDefault)
 		}
 	}
 

@@ -306,3 +306,25 @@ type AdminLog struct {
 func (AdminLog) TableName() string {
 	return "admin_logs"
 }
+
+// UserAddress 用户常用地址
+type UserAddress struct {
+	ID        int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID    int64          `gorm:"index;not null" json:"user_id"`
+	Label     string         `gorm:"type:varchar(20)" json:"label"`   // 家/公司/自定义标签
+	Name      string         `gorm:"type:varchar(100)" json:"name"`   // POI名称
+	Address   string         `gorm:"type:varchar(255);not null" json:"address"`
+	Province  string         `gorm:"type:varchar(50)" json:"province"`
+	City      string         `gorm:"type:varchar(50)" json:"city"`
+	District  string         `gorm:"type:varchar(50)" json:"district"`
+	Latitude  float64        `gorm:"type:decimal(10,7)" json:"latitude"`
+	Longitude float64        `gorm:"type:decimal(10,7)" json:"longitude"`
+	IsDefault bool           `gorm:"default:false" json:"is_default"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+func (UserAddress) TableName() string {
+	return "user_addresses"
+}

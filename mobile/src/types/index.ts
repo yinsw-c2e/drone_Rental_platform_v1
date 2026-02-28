@@ -178,3 +178,42 @@ export interface PageData<T = any> {
   page: number;
   page_size: number;
 }
+
+// ============ 地址 & 位置相关 ============
+
+export interface AddressData {
+  id?: number;
+  label?: string;
+  name?: string;
+  address: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  latitude: number;
+  longitude: number;
+  is_default?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface POIItem {
+  name: string;
+  address: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  longitude: number;
+  latitude: number;
+  type?: string;
+  distance?: string;
+}
+
+export interface ReverseGeoResult {
+  formatted_address: string;
+  province: string;
+  city: string;
+  district: string;
+  township?: string;
+  street?: string;
+  number?: string;
+}

@@ -40,6 +40,11 @@ import CargoListScreen from '../screens/cargo/CargoListScreen';
 import CargoDetailScreen from '../screens/cargo/CargoDetailScreen';
 import CargoAcceptScreen from '../screens/cargo/CargoAcceptScreen';
 
+// Location screens
+import AddressPickerScreen from '../screens/location/AddressPickerScreen';
+import AddressSearchScreen from '../screens/location/AddressSearchScreen';
+import MapPickerScreen from '../screens/location/MapPickerScreen';
+
 // Order flow screens
 import PaymentScreen from '../screens/order/PaymentScreen';
 import ReviewScreen from '../screens/order/ReviewScreen';
@@ -69,6 +74,9 @@ function HomeStack() {
       <Stack.Screen name="CargoList" component={CargoListScreen} options={{title: '货运列表'}} />
       <Stack.Screen name="CargoDetail" component={CargoDetailScreen} options={{title: '货运详情'}} />
       <Stack.Screen name="CargoAccept" component={CargoAcceptScreen} options={{title: '确认接单'}} />
+      <Stack.Screen name="AddressPicker" component={AddressPickerScreen} options={{title: '选择地址'}} />
+      <Stack.Screen name="AddressSearch" component={AddressSearchScreen} options={{headerShown: false}} />
+      <Stack.Screen name="MapPicker" component={MapPickerScreen} options={{title: '地图选点'}} />
     </Stack.Navigator>
   );
 }

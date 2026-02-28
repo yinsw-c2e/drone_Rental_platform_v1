@@ -47,7 +47,9 @@
 		</dict>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>需要获取您的位置以推荐附近的无人机服务和完成配送定位</string>
+	<key>AMapApiKey</key>
+	<string>$(AMAP_IOS_KEY)</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

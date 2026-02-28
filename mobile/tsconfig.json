@@ -2,7 +2,12 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "types": ["jest"],
-    "lib": ["DOM", "ESNext"]
+    "lib": ["DOM", "ESNext"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "react-native-amap3d": ["./src/types/react-native-amap3d.d.ts"]
+    }
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["**/node_modules", "**/Pods"]

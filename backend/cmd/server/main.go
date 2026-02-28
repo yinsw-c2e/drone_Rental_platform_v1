@@ -16,8 +16,10 @@ import (
 	v1 "wurenji-backend/internal/api/v1"
 	"wurenji-backend/internal/api/v1/admin"
 	"wurenji-backend/internal/api/v1/auth"
+	addresshandler "wurenji-backend/internal/api/v1/address"
 	"wurenji-backend/internal/api/v1/demand"
 	"wurenji-backend/internal/api/v1/drone"
+	locationhandler "wurenji-backend/internal/api/v1/location"
 	"wurenji-backend/internal/api/v1/message"
 	"wurenji-backend/internal/api/v1/order"
 	paymenthandler "wurenji-backend/internal/api/v1/payment"
@@ -25,6 +27,7 @@ import (
 	"wurenji-backend/internal/api/v1/user"
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/amap"
 	"wurenji-backend/internal/pkg/oauth"
 	paymentpkg "wurenji-backend/internal/pkg/payment"
 	"wurenji-backend/internal/pkg/push"
@@ -101,6 +104,7 @@ func main() {
 	paymentRepo := repository.NewPaymentRepo(db)
 	reviewRepo := repository.NewReviewRepo(db)
 	matchingRepo := repository.NewMatchingRepo(db)
+	addressRepo := repository.NewAddressRepo(db)
 
 	// Init pkg services
 	smsService := sms.NewSMSService(cfg.SMS.Provider, zapLogger)
@@ -161,18 +165,24 @@ func main() {
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, paymentProvider, zapLogger)
 	messageService := service.NewMessageService(messageRepo)
 	reviewService := service.NewReviewService(reviewRepo, droneRepo, orderRepo)
+	addressService := service.NewAddressService(addressRepo)
+
+	// Init AMap service
+	amapService := amap.NewAmapService(cfg.Amap.APIKey, zapLogger)
 
 	// Init handlers
 	handlers := &v1.Handlers{
-		Auth:    auth.NewHandler(authService, wechatOAuth, qqOAuth),
-		User:    user.NewHandler(userService, uploadService),
-		Drone:   drone.NewHandler(droneService, uploadService),
-		Order:   order.NewHandler(orderService),
-		Demand:  demand.NewHandler(demandService, matchingService),
-		Payment: paymenthandler.NewHandler(paymentService),
-		Message: message.NewHandler(messageService),
-		Review:  review.NewHandler(reviewService),
-		Admin:   admin.NewHandler(userService, droneService, orderService, paymentService),
+		Auth:     auth.NewHandler(authService, wechatOAuth, qqOAuth),
+		User:     user.NewHandler(userService, uploadService),
+		Drone:    drone.NewHandler(droneService, uploadService),
+		Order:    order.NewHandler(orderService),
+		Demand:   demand.NewHandler(demandService, matchingService),
+		Payment:  paymenthandler.NewHandler(paymentService),
+		Message:  message.NewHandler(messageService),
+		Review:   review.NewHandler(reviewService),
+		Admin:    admin.NewHandler(userService, droneService, orderService, paymentService),
+		Location: locationhandler.NewHandler(amapService),
+		Address:  addresshandler.NewHandler(addressService),
 	}
 
 	// Setup Gin
@@ -226,5 +236,6 @@ func autoMigrate(db *gorm.DB) {
 		&model.MatchingRecord{},
 		&model.SystemConfig{},
 		&model.AdminLog{},
+		&model.UserAddress{},
 	)
 }

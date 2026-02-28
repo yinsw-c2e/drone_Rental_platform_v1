@@ -4,6 +4,8 @@ import {
   SafeAreaView, ScrollView, Alert,
 } from 'react-native';
 import {demandService} from '../../services/demand';
+import {AddressData} from '../../types';
+import AddressInputField from '../../components/AddressInputField';
 
 export default function PublishDemandScreen({navigation}: any) {
   const [title, setTitle] = useState('');
@@ -12,6 +14,7 @@ export default function PublishDemandScreen({navigation}: any) {
   const [budgetMin, setBudgetMin] = useState('');
   const [budgetMax, setBudgetMax] = useState('');
   const [city, setCity] = useState('');
+  const [address, setAddress] = useState<AddressData | null>(null);
   const [urgency, setUrgency] = useState('normal');
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,7 +37,10 @@ export default function PublishDemandScreen({navigation}: any) {
         demand_type: demandType,
         budget_min: Number(budgetMin) * 100 || 0, // 转换为分
         budget_max: Number(budgetMax) * 100 || 0, // 转换为分
-        city,
+        city: address?.city || city,
+        address: address?.address || '',
+        latitude: address?.latitude || 0,
+        longitude: address?.longitude || 0,
         urgency,
         status: 'active',
       });
@@ -79,6 +85,18 @@ export default function PublishDemandScreen({navigation}: any) {
 
         <Text style={styles.label}>所在城市</Text>
         <TextInput style={styles.input} placeholder="例如：北京市" value={city} onChangeText={setCity} />
+
+        <Text style={styles.label}>详细地址（可选）</Text>
+        <AddressInputField
+          value={address}
+          placeholder="点击选择详细地址"
+          onSelect={(addr) => {
+            setAddress(addr);
+            if (addr.city) {
+              setCity(addr.city);
+            }
+          }}
+        />
 
         <Text style={styles.label}>紧急程度</Text>
         <View style={styles.typeRow}>

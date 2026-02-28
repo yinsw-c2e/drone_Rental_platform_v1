@@ -4,13 +4,15 @@ import {
   SafeAreaView, ScrollView, Alert,
 } from 'react-native';
 import {demandService} from '../../services/demand';
+import {AddressData} from '../../types';
+import AddressInputField from '../../components/AddressInputField';
 
 export default function PublishCargoScreen({navigation}: any) {
   const [cargoType, setCargoType] = useState('package');
   const [cargoWeight, setCargoWeight] = useState('');
   const [cargoDescription, setCargoDescription] = useState('');
-  const [pickupAddress, setPickupAddress] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
   const [offeredPrice, setOfferedPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,7 +24,7 @@ export default function PublishCargoScreen({navigation}: any) {
   ];
 
   const handleSubmit = async () => {
-    if (!pickupAddress.trim() || !deliveryAddress.trim()) {
+    if (!pickupAddress || !deliveryAddress) {
       Alert.alert('提示', '请填写取货和送达地址');
       return;
     }
@@ -32,8 +34,8 @@ export default function PublishCargoScreen({navigation}: any) {
         cargo_type: cargoType,
         cargo_weight: Number(cargoWeight) || 0,
         cargo_description: cargoDescription.trim(),
-        pickup_address: pickupAddress.trim(),
-        delivery_address: deliveryAddress.trim(),
+        pickup_address: pickupAddress.address,
+        delivery_address: deliveryAddress.address,
         offered_price: Number(offeredPrice) * 100 || 0, // 转换为分
         status: 'active',
       });
@@ -70,10 +72,18 @@ export default function PublishCargoScreen({navigation}: any) {
           onChangeText={setCargoDescription} multiline textAlignVertical="top" />
 
         <Text style={styles.label}>取货地址 *</Text>
-        <TextInput style={styles.input} placeholder="详细取货地址" value={pickupAddress} onChangeText={setPickupAddress} />
+        <AddressInputField
+          value={pickupAddress}
+          placeholder="点击选择取货地址"
+          onSelect={setPickupAddress}
+        />
 
         <Text style={styles.label}>送达地址 *</Text>
-        <TextInput style={styles.input} placeholder="详细送达地址" value={deliveryAddress} onChangeText={setDeliveryAddress} />
+        <AddressInputField
+          value={deliveryAddress}
+          placeholder="点击选择送达地址"
+          onSelect={setDeliveryAddress}
+        />
 
         <Text style={styles.label}>出价 (元)</Text>
         <TextInput style={styles.input} placeholder="您愿意支付的运费" keyboardType="numeric" value={offeredPrice} onChangeText={setOfferedPrice} />

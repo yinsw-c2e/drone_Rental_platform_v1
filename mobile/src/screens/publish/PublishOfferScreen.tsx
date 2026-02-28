@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import {demandService} from '../../services/demand';
 import {droneService} from '../../services/drone';
-import {Drone} from '../../types';
+import {Drone, AddressData} from '../../types';
+import AddressInputField from '../../components/AddressInputField';
 
 export default function PublishOfferScreen({navigation}: any) {
   const [title, setTitle] = useState('');
@@ -13,7 +14,7 @@ export default function PublishOfferScreen({navigation}: any) {
   const [serviceType, setServiceType] = useState('rental');
   const [price, setPrice] = useState('');
   const [priceType, setPriceType] = useState('daily');
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState<AddressData | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [drones, setDrones] = useState<Drone[]>([]);
   const [selectedDrone, setSelectedDrone] = useState<Drone | null>(null);
@@ -64,7 +65,9 @@ export default function PublishOfferScreen({navigation}: any) {
         service_type: serviceType,
         price: Number(price) * 100 || 0, // 转换为分
         price_type: priceType,
-        address,
+        address: address?.address || '',
+        latitude: address?.latitude || 0,
+        longitude: address?.longitude || 0,
         status: 'active',
       });
       Alert.alert('成功', '供给发布成功', [
@@ -134,7 +137,11 @@ export default function PublishOfferScreen({navigation}: any) {
             </View>
 
             <Text style={styles.label}>服务地址</Text>
-            <TextInput style={styles.input} placeholder="服务所在城市或地址" value={address} onChangeText={setAddress} />
+            <AddressInputField
+              value={address}
+              placeholder="点击选择服务地址"
+              onSelect={setAddress}
+            />
 
             <TouchableOpacity style={[styles.submitBtn, submitting && {opacity: 0.6}]} onPress={handleSubmit} disabled={submitting}>
               <Text style={styles.submitBtnText}>{submitting ? '发布中...' : '发布供给'}</Text>

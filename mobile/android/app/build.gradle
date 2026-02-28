@@ -84,6 +84,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+
+        // 注入高德 Key 到 AndroidManifest.xml
+        manifestPlaceholders = [
+            AMAP_ANDROID_KEY: project.findProperty('AMAP_ANDROID_KEY') ?: ''
+        ]
     }
     signingConfigs {
         debug {
@@ -110,6 +115,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // 高德地图 3D SDK
+    implementation 'com.amap.api:3dmap:latest.integration'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
