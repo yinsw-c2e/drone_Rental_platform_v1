@@ -72,7 +72,8 @@ type DatabaseConfig struct {
 
 // DSN 生成数据库连接字符串
 func (d *DatabaseConfig) DSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=Local",
+	// 添加更多参数确保UTF-8字符正确处理
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&parseTime=True&loc=Local&collation=utf8mb4_unicode_ci&interpolateParams=true",
 		d.User, d.Password, d.Host, d.Port, d.DBName, d.Charset)
 }
 

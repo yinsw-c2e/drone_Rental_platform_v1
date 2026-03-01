@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
       open: false,
       host: true, // 允许外部访问
       strictPort: false, // 端口被占用时自动尝试下一个,
-      allowedHosts: ["3217b6d9.r7.cpolar.top"]
+      allowedHosts: ["dronerentalplatweb.vip.cpolar.cn"]
     },
   };
 });

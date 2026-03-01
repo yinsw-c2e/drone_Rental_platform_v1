@@ -26,8 +26,8 @@ const getApiBaseUrl = (): string => {
     return apiBaseUrl;
   }
 
-  // 远程测试配置：cpolar 内网穿透（无条件优先）
-  const HARDCODED_CPOLAR_URL = 'https://1ef057fb.r7.cpolar.top/api/v1';
+  // 远程测试配置：cpolar 固定域名（无条件优先）
+  const HARDCODED_CPOLAR_URL = 'https://dronerentalplat.vip.cpolar.cn/api/v1';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar，使用局域网IP
   
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_URL) {
@@ -71,7 +71,7 @@ const getWsBaseUrl = (): string => {
   }
 
   // 远程测试配置：cpolar 内网穿透（无条件优先）
-  const HARDCODED_CPOLAR_WS_URL = 'wss://1ef057fb.r7.cpolar.top/ws';
+  const HARDCODED_CPOLAR_WS_URL = 'wss://dronerentalplat.vip.cpolar.cn/ws';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar
   
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_WS_URL) {

@@ -205,7 +205,7 @@ func main() {
 
 func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	db, err := gorm.Open(mysql.Open(cfg.Database.DSN()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Warn),
 	})
 	if err != nil {
 		return nil, err
@@ -215,8 +215,16 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	
+	// 设置连接池参数
 	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
 	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	
+	// 显式设置连接字符集
+	_, err = sqlDB.Exec("SET NAMES utf8mb4")
+	if err != nil {
+		return nil, fmt.Errorf("failed to set charset: %w", err)
+	}
 
 	return db, nil
 }

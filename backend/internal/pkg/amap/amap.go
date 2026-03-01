@@ -1,6 +1,7 @@
 package amap
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,9 +41,23 @@ type AmapService struct {
 
 // NewAmapService 创建高德地图服务实例
 func NewAmapService(apiKey string, logger *zap.Logger) *AmapService {
+	// 创建自定义HTTP客户端,配置TLS以解决证书验证问题
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// 对于高德API,使用系统证书池但增加容错性
+			MinVersion: tls.VersionTLS12,
+		},
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
 	return &AmapService{
 		apiKey: apiKey,
-		client: &http.Client{Timeout: 10 * time.Second},
+		client: &http.Client{
+			Timeout:   15 * time.Second, // 增加超时时间
+			Transport: transport,
+		},
 		logger: logger,
 	}
 }
