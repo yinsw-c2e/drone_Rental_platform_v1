@@ -1,0 +1,428 @@
+package service
+
+import (
+	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/repository"
+	"errors"
+	"time"
+)
+
+type ClientService struct {
+	clientRepo *repository.ClientRepo
+	userRepo   *repository.UserRepo
+}
+
+func NewClientService(clientRepo *repository.ClientRepo, userRepo *repository.UserRepo) *ClientService {
+	return &ClientService{
+		clientRepo: clientRepo,
+		userRepo:   userRepo,
+	}
+}
+
+// ==================== 客户注册与档案管理 ====================
+
+// RegisterIndividual 注册个人客户
+func (s *ClientService) RegisterIndividual(userID int64) (*model.Client, error) {
+	// 检查是否已存在
+	existing, _ := s.clientRepo.GetByUserID(userID)
+	if existing != nil {
+		return nil, errors.New("客户档案已存在")
+	}
+
+	client := &model.Client{
+		UserID:              userID,
+		ClientType:          "individual",
+		PlatformCreditScore: 600,
+		Status:              "active",
+	}
+
+	if err := s.clientRepo.Create(client); err != nil {
+		return nil, err
+	}
+
+	// 更新用户类型
+	if err := s.userRepo.UpdateUserType(userID, "client"); err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+// RegisterEnterprise 注册企业客户
+func (s *ClientService) RegisterEnterprise(userID int64, companyName, businessLicenseNo, businessLicenseDoc, legalRep, contactPerson, contactPhone, contactEmail string) (*model.Client, error) {
+	// 检查是否已存在
+	existing, _ := s.clientRepo.GetByUserID(userID)
+	if existing != nil {
+		return nil, errors.New("客户档案已存在")
+	}
+
+	// 检查营业执照是否已被注册
+	existingLicense, _ := s.clientRepo.GetByBusinessLicenseNo(businessLicenseNo)
+	if existingLicense != nil {
+		return nil, errors.New("该营业执照已被注册")
+	}
+
+	client := &model.Client{
+		UserID:              userID,
+		ClientType:          "enterprise",
+		CompanyName:         companyName,
+		BusinessLicenseNo:   businessLicenseNo,
+		BusinessLicenseDoc:  businessLicenseDoc,
+		LegalRepresentative: legalRep,
+		ContactPerson:       contactPerson,
+		ContactPhone:        contactPhone,
+		ContactEmail:        contactEmail,
+		PlatformCreditScore: 600,
+		Status:              "active",
+	}
+
+	if err := s.clientRepo.Create(client); err != nil {
+		return nil, err
+	}
+
+	// 更新用户类型
+	if err := s.userRepo.UpdateUserType(userID, "client"); err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+// GetProfile 获取客户档案
+func (s *ClientService) GetProfile(userID int64) (*model.Client, error) {
+	return s.clientRepo.GetByUserID(userID)
+}
+
+// GetByID 根据ID获取客户
+func (s *ClientService) GetByID(id int64) (*model.Client, error) {
+	return s.clientRepo.GetByID(id)
+}
+
+// UpdateProfile 更新客户档案
+func (s *ClientService) UpdateProfile(clientID int64, updates map[string]interface{}) error {
+	// 不允许更新敏感字段
+	delete(updates, "id")
+	delete(updates, "user_id")
+	delete(updates, "credit_score")
+	delete(updates, "platform_credit_score")
+	delete(updates, "verification_status")
+	delete(updates, "enterprise_verified")
+	
+	return s.clientRepo.UpdateFields(clientID, updates)
+}
+
+// List 获取客户列表
+func (s *ClientService) List(page, pageSize int, clientType, status string) ([]model.Client, int64, error) {
+	return s.clientRepo.List(page, pageSize, clientType, status)
+}
+
+// ==================== 征信查询 ====================
+
+// RequestCreditCheck 发起征信查询
+func (s *ClientService) RequestCreditCheck(clientID int64, provider, checkType string) (*model.ClientCreditCheck, error) {
+	client, err := s.clientRepo.GetByID(clientID)
+	if err != nil {
+		return nil, errors.New("客户不存在")
+	}
+
+	// 检查是否频繁查询(24小时内最多3次)
+	recentChecks, err := s.clientRepo.GetCreditChecksByClientID(clientID, 10)
+	if err == nil {
+		count := 0
+		for _, check := range recentChecks {
+			if time.Since(check.CreatedAt) < 24*time.Hour {
+				count++
+			}
+		}
+		if count >= 3 {
+			return nil, errors.New("24小时内查询次数已达上限")
+		}
+	}
+
+	// 创建查询记录
+	check := &model.ClientCreditCheck{
+		ClientID:      clientID,
+		CheckProvider: provider,
+		CheckType:     checkType,
+		Status:        "pending",
+	}
+
+	if err := s.clientRepo.CreateCreditCheck(check); err != nil {
+		return nil, err
+	}
+
+	// TODO: 实际调用第三方征信API
+	// 此处模拟征信查询结果
+	check.CreditScore = 650
+	check.CreditLevel = s.getCreditLevel(650)
+	check.RiskLevel = "low"
+	check.Overdue = false
+	check.Status = "success"
+
+	// 更新客户征信信息
+	now := time.Now()
+	s.clientRepo.UpdateFields(client.ID, map[string]interface{}{
+		"credit_provider":    provider,
+		"credit_score":       check.CreditScore,
+		"credit_check_status": "approved",
+		"credit_check_time":  &now,
+	})
+
+	return check, nil
+}
+
+func (s *ClientService) getCreditLevel(score int) string {
+	if score >= 700 {
+		return "excellent"
+	} else if score >= 600 {
+		return "good"
+	} else if score >= 500 {
+		return "fair"
+	}
+	return "poor"
+}
+
+// GetCreditHistory 获取征信查询历史
+func (s *ClientService) GetCreditHistory(clientID int64, limit int) ([]model.ClientCreditCheck, error) {
+	return s.clientRepo.GetCreditChecksByClientID(clientID, limit)
+}
+
+// GetLatestCreditCheck 获取最新征信结果
+func (s *ClientService) GetLatestCreditCheck(clientID int64) (*model.ClientCreditCheck, error) {
+	return s.clientRepo.GetLatestCreditCheck(clientID)
+}
+
+// ==================== 企业资质管理 ====================
+
+// SubmitEnterpriseCert 提交企业资质证书
+func (s *ClientService) SubmitEnterpriseCert(clientID int64, certType, certName, certNo, issuingAuthority string, issueDate, expireDate *time.Time, certImage string) (*model.ClientEnterpriseCert, error) {
+	client, err := s.clientRepo.GetByID(clientID)
+	if err != nil {
+		return nil, errors.New("客户不存在")
+	}
+
+	if client.ClientType != "enterprise" {
+		return nil, errors.New("仅企业客户可提交企业资质")
+	}
+
+	cert := &model.ClientEnterpriseCert{
+		ClientID:         clientID,
+		CertType:         certType,
+		CertName:         certName,
+		CertNo:           certNo,
+		IssuingAuthority: issuingAuthority,
+		IssueDate:        issueDate,
+		ExpireDate:       expireDate,
+		CertImage:        certImage,
+		Status:           "pending",
+	}
+
+	if err := s.clientRepo.CreateEnterpriseCert(cert); err != nil {
+		return nil, err
+	}
+
+	return cert, nil
+}
+
+// GetEnterpriseCerts 获取企业资质列表
+func (s *ClientService) GetEnterpriseCerts(clientID int64) ([]model.ClientEnterpriseCert, error) {
+	return s.clientRepo.GetEnterpriseCertsByClientID(clientID)
+}
+
+// ApproveEnterpriseCert 审批通过企业资质
+func (s *ClientService) ApproveEnterpriseCert(certID int64, reviewNote string, reviewedBy int64) error {
+	return s.clientRepo.UpdateEnterpriseCertStatus(certID, "approved", reviewNote, reviewedBy)
+}
+
+// RejectEnterpriseCert 审批拒绝企业资质
+func (s *ClientService) RejectEnterpriseCert(certID int64, reviewNote string, reviewedBy int64) error {
+	return s.clientRepo.UpdateEnterpriseCertStatus(certID, "rejected", reviewNote, reviewedBy)
+}
+
+// CheckHazmatPermit 检查是否有有效的危化品许可
+func (s *ClientService) CheckHazmatPermit(clientID int64) (bool, error) {
+	return s.clientRepo.CheckHazmatPermit(clientID)
+}
+
+// ==================== 货物申报管理 ====================
+
+// CreateCargoDeclaration 创建货物申报
+func (s *ClientService) CreateCargoDeclaration(clientID int64, decl *model.CargoDeclaration) (*model.CargoDeclaration, error) {
+	client, err := s.clientRepo.GetByID(clientID)
+	if err != nil {
+		return nil, errors.New("客户不存在")
+	}
+
+	// 危险品检查
+	if decl.IsHazardous {
+		hasPermit, err := s.clientRepo.CheckHazmatPermit(clientID)
+		if err != nil || !hasPermit {
+			return nil, errors.New("运输危险品需要有效的危化品运输许可证")
+		}
+	}
+
+	decl.ClientID = clientID
+	decl.DeclarationNo = s.clientRepo.GenerateDeclarationNo()
+	decl.ComplianceStatus = "pending"
+
+	// 根据货物类型自动设置合规状态
+	if !decl.IsHazardous && decl.CargoCategory == "normal" && decl.DeclaredValue < 1000000 {
+		// 普通货物且申报价值低于1万元，自动通过
+		decl.ComplianceStatus = "approved"
+		now := time.Now()
+		decl.ComplianceCheckedAt = &now
+		decl.ComplianceNote = "系统自动审批通过"
+	}
+
+	if err := s.clientRepo.CreateCargoDeclaration(decl); err != nil {
+		return nil, err
+	}
+
+	_ = client // 暂时不用
+	return decl, nil
+}
+
+// GetCargoDeclaration 获取货物申报详情
+func (s *ClientService) GetCargoDeclaration(id int64) (*model.CargoDeclaration, error) {
+	return s.clientRepo.GetCargoDeclarationByID(id)
+}
+
+// GetCargoDeclarationByOrderID 根据订单ID获取货物申报
+func (s *ClientService) GetCargoDeclarationByOrderID(orderID int64) (*model.CargoDeclaration, error) {
+	return s.clientRepo.GetCargoDeclarationByOrderID(orderID)
+}
+
+// ListCargoDeclarations 获取客户的货物申报列表
+func (s *ClientService) ListCargoDeclarations(clientID int64, page, pageSize int) ([]model.CargoDeclaration, int64, error) {
+	return s.clientRepo.GetCargoDeclarationsByClientID(clientID, page, pageSize)
+}
+
+// UpdateCargoDeclaration 更新货物申报
+func (s *ClientService) UpdateCargoDeclaration(clientID int64, declID int64, updates *model.CargoDeclaration) error {
+	existing, err := s.clientRepo.GetCargoDeclarationByID(declID)
+	if err != nil {
+		return errors.New("申报单不存在")
+	}
+
+	if existing.ClientID != clientID {
+		return errors.New("无权修改此申报单")
+	}
+
+	if existing.ComplianceStatus == "approved" {
+		return errors.New("已审批通过的申报单不可修改")
+	}
+
+	// 更新允许修改的字段
+	existing.CargoName = updates.CargoName
+	existing.CargoDescription = updates.CargoDescription
+	existing.Quantity = updates.Quantity
+	existing.TotalWeight = updates.TotalWeight
+	existing.Length = updates.Length
+	existing.Width = updates.Width
+	existing.Height = updates.Height
+	existing.DeclaredValue = updates.DeclaredValue
+	existing.ComplianceStatus = "pending" // 重新提交审核
+
+	return s.clientRepo.UpdateCargoDeclaration(existing)
+}
+
+// ApproveCargoDeclaration 审批通过货物申报
+func (s *ClientService) ApproveCargoDeclaration(declID int64, note string, approvedBy int64) error {
+	return s.clientRepo.UpdateCargoDeclarationCompliance(declID, "approved", note, approvedBy)
+}
+
+// RejectCargoDeclaration 审批拒绝货物申报
+func (s *ClientService) RejectCargoDeclaration(declID int64, note string, rejectedBy int64) error {
+	return s.clientRepo.UpdateCargoDeclarationCompliance(declID, "rejected", note, rejectedBy)
+}
+
+// ListPendingCargoDeclarations 获取待审批的货物申报列表
+func (s *ClientService) ListPendingCargoDeclarations(page, pageSize int) ([]model.CargoDeclaration, int64, error) {
+	return s.clientRepo.ListPendingCargoDeclarations(page, pageSize)
+}
+
+// ==================== 客户验证管理 ====================
+
+// ApproveClient 审批通过客户
+func (s *ClientService) ApproveClient(clientID int64, note string) error {
+	return s.clientRepo.ApproveVerification(clientID, note)
+}
+
+// RejectClient 审批拒绝客户
+func (s *ClientService) RejectClient(clientID int64, note string) error {
+	return s.clientRepo.RejectVerification(clientID, note)
+}
+
+// ApproveEnterpriseClient 审批通过企业客户
+func (s *ClientService) ApproveEnterpriseClient(clientID int64, note string) error {
+	return s.clientRepo.ApproveEnterpriseVerification(clientID, note)
+}
+
+// RejectEnterpriseClient 审批拒绝企业客户
+func (s *ClientService) RejectEnterpriseClient(clientID int64, note string) error {
+	return s.clientRepo.RejectEnterpriseVerification(clientID, note)
+}
+
+// ListPendingVerification 获取待审批客户列表
+func (s *ClientService) ListPendingVerification(page, pageSize int) ([]model.Client, int64, error) {
+	return s.clientRepo.ListPendingVerification(page, pageSize)
+}
+
+// ==================== 信用分管理 ====================
+
+// UpdatePlatformCreditScore 更新平台信用分
+func (s *ClientService) UpdatePlatformCreditScore(clientID int64, delta int, reason string) error {
+	client, err := s.clientRepo.GetByID(clientID)
+	if err != nil {
+		return err
+	}
+
+	newScore := client.PlatformCreditScore + delta
+	if newScore < 0 {
+		newScore = 0
+	}
+	if newScore > 1000 {
+		newScore = 1000
+	}
+
+	return s.clientRepo.UpdatePlatformCreditScore(clientID, newScore)
+}
+
+// CanPlaceOrder 检查客户是否可以下单
+func (s *ClientService) CanPlaceOrder(clientID int64) (bool, string) {
+	client, err := s.clientRepo.GetByID(clientID)
+	if err != nil {
+		return false, "客户档案不存在"
+	}
+
+	if client.Status != "active" {
+		return false, "账户状态异常"
+	}
+
+	if client.VerificationStatus != "verified" {
+		return false, "请先完成实名认证"
+	}
+
+	if client.PlatformCreditScore < 300 {
+		return false, "信用分过低，暂时无法下单"
+	}
+
+	return true, ""
+}
+
+// ==================== 统计更新 ====================
+
+// RecordOrderCompletion 记录订单完成
+func (s *ClientService) RecordOrderCompletion(clientID int64, amount int64) error {
+	return s.clientRepo.IncrementOrderStats(clientID, amount, true)
+}
+
+// RecordOrderCancellation 记录订单取消
+func (s *ClientService) RecordOrderCancellation(clientID int64) error {
+	return s.clientRepo.IncrementCancelledOrders(clientID)
+}
+
+// UpdateRating 更新评分
+func (s *ClientService) UpdateRating(clientID int64, rating float64) error {
+	return s.clientRepo.UpdateAverageRating(clientID, rating)
+}

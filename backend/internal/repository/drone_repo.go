@@ -91,3 +91,78 @@ func (r *DroneRepo) UpdateRating(droneID int64) error {
 			WHERE target_type = 'drone' AND target_id = ? AND rating > 0
 		) WHERE id = ?`, droneID, droneID).Error
 }
+
+// ==================== 维护记录 ====================
+
+// CreateMaintenanceLog 创建维护记录
+func (r *DroneRepo) CreateMaintenanceLog(log *model.DroneMaintenanceLog) error {
+	return r.db.Create(log).Error
+}
+
+// GetMaintenanceLogs 获取维护记录
+func (r *DroneRepo) GetMaintenanceLogs(droneID int64, page, pageSize int) ([]model.DroneMaintenanceLog, int64, error) {
+	var logs []model.DroneMaintenanceLog
+	var total int64
+
+	query := r.db.Model(&model.DroneMaintenanceLog{}).Where("drone_id = ?", droneID)
+	query.Count(&total)
+	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("maintenance_date DESC").Find(&logs).Error
+	return logs, total, err
+}
+
+// ==================== 保险记录 ====================
+
+// CreateInsuranceRecord 创建保险记录
+func (r *DroneRepo) CreateInsuranceRecord(record *model.DroneInsuranceRecord) error {
+	return r.db.Create(record).Error
+}
+
+// GetInsuranceRecords 获取保险记录
+func (r *DroneRepo) GetInsuranceRecords(droneID int64) ([]model.DroneInsuranceRecord, error) {
+	var records []model.DroneInsuranceRecord
+	err := r.db.Where("drone_id = ?", droneID).Order("created_at DESC").Find(&records).Error
+	return records, err
+}
+
+// GetActiveInsurance 获取有效保险
+func (r *DroneRepo) GetActiveInsurance(droneID int64, insuranceType string) (*model.DroneInsuranceRecord, error) {
+	var record model.DroneInsuranceRecord
+	query := r.db.Where("drone_id = ? AND status = 'active'", droneID)
+	if insuranceType != "" {
+		query = query.Where("insurance_type = ?", insuranceType)
+	}
+	query = query.Where("effective_to > NOW()")
+	err := query.First(&record).Error
+	return &record, err
+}
+
+// ==================== 合规性检查 ====================
+
+// FindFullyCertifiedDrones 查找完全认证的无人机
+func (r *DroneRepo) FindFullyCertifiedDrones(lat, lng, radiusKM float64, page, pageSize int) ([]model.Drone, int64, error) {
+	var drones []model.Drone
+	var total int64
+
+	distanceExpr := `(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))`
+
+	query := r.db.Model(&model.Drone{}).
+		Where("availability_status = ?", "available").
+		Where("certification_status = ?", "approved").
+		Where("uom_verified = ?", "verified").
+		Where("insurance_verified = ?", "verified").
+		Where("airworthiness_verified = ?", "verified").
+		Where("insurance_expire_date > NOW()").
+		Where("airworthiness_cert_expire > NOW()").
+		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM)
+
+	query.Count(&total)
+	err := query.
+		Select("*, "+distanceExpr+" AS distance", lat, lng, lat).
+		Order("distance ASC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Preload("Owner").
+		Find(&drones).Error
+
+	return drones, total, err
+}

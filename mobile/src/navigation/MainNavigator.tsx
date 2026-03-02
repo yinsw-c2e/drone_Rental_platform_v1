@@ -50,6 +50,31 @@ import PaymentScreen from '../screens/order/PaymentScreen';
 import ReviewScreen from '../screens/order/ReviewScreen';
 import CreateOrderScreen from '../screens/order/CreateOrderScreen';
 
+// Pilot screens
+import PilotRegisterScreen from '../screens/pilot/PilotRegisterScreen';
+import PilotProfileScreen from '../screens/pilot/PilotProfileScreen';
+import CertificationUploadScreen from '../screens/pilot/CertificationUploadScreen';
+import FlightLogScreen from '../screens/pilot/FlightLogScreen';
+import BoundDronesScreen from '../screens/pilot/BoundDronesScreen';
+import BindDroneScreen from '../screens/pilot/BindDroneScreen';
+import DroneCertificationScreen from '../screens/drone/DroneCertificationScreen';
+import DroneMaintenanceLogScreen from '../screens/drone/DroneMaintenanceLogScreen';
+import ClientRegisterScreen from '../screens/client/ClientRegisterScreen';
+import ClientProfileScreen from '../screens/client/ClientProfileScreen';
+import CargoDeclarationScreen from '../screens/client/CargoDeclarationScreen';
+import CreateDispatchTaskScreen from '../screens/dispatch/CreateDispatchTaskScreen';
+import DispatchTaskListScreen from '../screens/dispatch/DispatchTaskListScreen';
+import PilotTaskListScreen from '../screens/dispatch/PilotTaskListScreen';
+import FlightMonitoringScreen from '../screens/flight/FlightMonitoringScreen';
+import TrajectoryScreen from '../screens/flight/TrajectoryScreen';
+import MultiPointTaskScreen from '../screens/flight/MultiPointTaskScreen';
+import AirspaceApplicationScreen from '../screens/airspace/AirspaceApplicationScreen';
+import ComplianceCheckScreen from '../screens/airspace/ComplianceCheckScreen';
+import NoFlyZoneScreen from '../screens/airspace/NoFlyZoneScreen';
+import WalletScreen from '../screens/settlement/WalletScreen';
+import WithdrawalScreen from '../screens/settlement/WithdrawalScreen';
+import WithdrawalListScreen from '../screens/settlement/WithdrawalListScreen';
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -77,6 +102,12 @@ function HomeStack() {
       <Stack.Screen name="AddressPicker" component={AddressPickerScreen} options={{title: '选择地址'}} />
       <Stack.Screen name="AddressSearch" component={AddressSearchScreen} options={{headerShown: false}} />
       <Stack.Screen name="MapPicker" component={MapPickerScreen} options={{title: '地图选点'}} />
+      <Stack.Screen name="FlightMonitoring" component={FlightMonitoringScreen} options={{title: '飞行监控'}} />
+      <Stack.Screen name="TrajectoryRecord" component={TrajectoryScreen} options={{title: '轨迹记录'}} />
+      <Stack.Screen name="MultiPointTask" component={MultiPointTaskScreen} options={{title: '多点任务'}} />
+      <Stack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域申请'}} />
+      <Stack.Screen name="ComplianceCheck" component={ComplianceCheckScreen} options={{title: '合规检查'}} />
+      <Stack.Screen name="NoFlyZone" component={NoFlyZoneScreen} options={{title: '禁飞区'}} />
     </Stack.Navigator>
   );
 }
@@ -89,6 +120,12 @@ function OrderStack() {
       <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="FlightMonitoring" component={FlightMonitoringScreen} options={{title: '飞行监控'}} />
+      <Stack.Screen name="TrajectoryRecord" component={TrajectoryScreen} options={{title: '轨迹记录'}} />
+      <Stack.Screen name="MultiPointTask" component={MultiPointTaskScreen} options={{title: '多点任务'}} />
+      <Stack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域申请'}} />
+      <Stack.Screen name="ComplianceCheck" component={ComplianceCheckScreen} options={{title: '合规检查'}} />
+      <Stack.Screen name="NoFlyZone" component={NoFlyZoneScreen} options={{title: '禁飞区'}} />
     </Stack.Navigator>
   );
 }
@@ -123,6 +160,29 @@ function ProfileStack() {
       <Stack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
       <Stack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <Stack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
+      <Stack.Screen name="PilotProfile" component={PilotProfileScreen} options={{title: '飞手中心'}} />
+      <Stack.Screen name="PilotRegister" component={PilotRegisterScreen} options={{title: '飞手认证'}} />
+      <Stack.Screen name="CertificationUpload" component={CertificationUploadScreen} options={{title: '证书管理'}} />
+      <Stack.Screen name="FlightLog" component={FlightLogScreen} options={{title: '飞行记录'}} />
+      <Stack.Screen name="BoundDrones" component={BoundDronesScreen} options={{title: '绑定的无人机'}} />
+      <Stack.Screen name="BindDrone" component={BindDroneScreen} options={{title: '绑定无人机'}} />
+      <Stack.Screen name="DroneCertification" component={DroneCertificationScreen} options={{title: '无人机认证'}} />
+      <Stack.Screen name="DroneMaintenanceLog" component={DroneMaintenanceLogScreen} options={{title: '维护记录'}} />
+      <Stack.Screen name="ClientProfile" component={ClientProfileScreen} options={{title: '客户中心'}} />
+      <Stack.Screen name="ClientRegister" component={ClientRegisterScreen} options={{title: '客户注册'}} />
+      <Stack.Screen name="CargoDeclaration" component={CargoDeclarationScreen} options={{title: '货物申报'}} />
+      <Stack.Screen name="CreateDispatchTask" component={CreateDispatchTaskScreen} options={{title: '创建派单'}} />
+      <Stack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '派单任务'}} />
+      <Stack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '接单任务'}} />
+      <Stack.Screen name="FlightMonitoring" component={FlightMonitoringScreen} options={{title: '飞行监控'}} />
+      <Stack.Screen name="TrajectoryRecord" component={TrajectoryScreen} options={{title: '轨迹记录'}} />
+      <Stack.Screen name="MultiPointTask" component={MultiPointTaskScreen} options={{title: '多点任务'}} />
+      <Stack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域申请'}} />
+      <Stack.Screen name="ComplianceCheck" component={ComplianceCheckScreen} options={{title: '合规检查'}} />
+      <Stack.Screen name="NoFlyZone" component={NoFlyZoneScreen} options={{title: '禁飞区'}} />
+      <Stack.Screen name="Wallet" component={WalletScreen} options={{title: '我的钱包'}} />
+      <Stack.Screen name="Withdrawal" component={WithdrawalScreen} options={{title: '提现'}} />
+      <Stack.Screen name="WithdrawalList" component={WithdrawalListScreen} options={{title: '提现记录'}} />
     </Stack.Navigator>
   );
 }

@@ -17,12 +17,21 @@ import (
 	"wurenji-backend/internal/api/v1/admin"
 	"wurenji-backend/internal/api/v1/auth"
 	addresshandler "wurenji-backend/internal/api/v1/address"
+	clienthandler "wurenji-backend/internal/api/v1/client"
 	"wurenji-backend/internal/api/v1/demand"
+	dispatchhandler "wurenji-backend/internal/api/v1/dispatch"
 	"wurenji-backend/internal/api/v1/drone"
+	flighthandler "wurenji-backend/internal/api/v1/flight"
+	airspacehandler "wurenji-backend/internal/api/v1/airspace"
+	settlementhandler "wurenji-backend/internal/api/v1/settlement"
+	credithandler "wurenji-backend/internal/api/v1/credit"
+	insurancehandler "wurenji-backend/internal/api/v1/insurance"
+	analyticshandler "wurenji-backend/internal/api/v1/analytics"
 	locationhandler "wurenji-backend/internal/api/v1/location"
 	"wurenji-backend/internal/api/v1/message"
 	"wurenji-backend/internal/api/v1/order"
 	paymenthandler "wurenji-backend/internal/api/v1/payment"
+	pilothandler "wurenji-backend/internal/api/v1/pilot"
 	"wurenji-backend/internal/api/v1/review"
 	"wurenji-backend/internal/api/v1/user"
 	"wurenji-backend/internal/config"
@@ -105,6 +114,15 @@ func main() {
 	reviewRepo := repository.NewReviewRepo(db)
 	matchingRepo := repository.NewMatchingRepo(db)
 	addressRepo := repository.NewAddressRepo(db)
+	pilotRepo := repository.NewPilotRepo(db)
+	clientRepo := repository.NewClientRepo(db)
+	dispatchRepo := repository.NewDispatchRepo(db)
+	flightRepo := repository.NewFlightRepo(db)
+	airspaceRepo := repository.NewAirspaceRepo(db)
+	settlementRepo := repository.NewSettlementRepo(db)
+	creditRepo := repository.NewCreditRepository(db)
+	insuranceRepo := repository.NewInsuranceRepository(db)
+	analyticsRepo := repository.NewAnalyticsRepository(db)
 
 	// Init pkg services
 	smsService := sms.NewSMSService(cfg.SMS.Provider, zapLogger)
@@ -166,6 +184,15 @@ func main() {
 	messageService := service.NewMessageService(messageRepo)
 	reviewService := service.NewReviewService(reviewRepo, droneRepo, orderRepo)
 	addressService := service.NewAddressService(addressRepo)
+	pilotService := service.NewPilotService(pilotRepo, userRepo, zapLogger)
+	clientService := service.NewClientService(clientRepo, userRepo)
+	dispatchService := service.NewDispatchService(dispatchRepo, pilotRepo, droneRepo, clientRepo, zapLogger)
+	flightService := service.NewFlightService(flightRepo, orderRepo, zapLogger)
+	airspaceService := service.NewAirspaceService(airspaceRepo, pilotRepo, droneRepo, orderRepo, zapLogger)
+	settlementService := service.NewSettlementService(settlementRepo, orderRepo, zapLogger)
+	creditService := service.NewCreditService(creditRepo)
+	insuranceService := service.NewInsuranceService(insuranceRepo, zapLogger)
+	analyticsService := service.NewAnalyticsService(analyticsRepo)
 
 	// Init AMap service
 	amapService := amap.NewAmapService(cfg.Amap.APIKey, zapLogger)
@@ -183,6 +210,15 @@ func main() {
 		Admin:    admin.NewHandler(userService, droneService, orderService, paymentService),
 		Location: locationhandler.NewHandler(amapService),
 		Address:  addresshandler.NewHandler(addressService),
+		Pilot:    pilothandler.NewHandler(pilotService, uploadService),
+		Client:   clienthandler.NewHandler(clientService),
+		Dispatch: dispatchhandler.NewHandler(dispatchService, clientService, pilotService),
+		Flight:   flighthandler.NewHandler(flightService, pilotService),
+		Airspace: airspacehandler.NewHandler(airspaceService),
+		Settlement: settlementhandler.NewHandler(settlementService),
+		Credit:   credithandler.NewHandler(creditService),
+		Insurance: insurancehandler.NewHandler(insuranceService),
+		Analytics: analyticshandler.NewHandler(analyticsService),
 	}
 
 	// Setup Gin
@@ -245,5 +281,66 @@ func autoMigrate(db *gorm.DB) {
 		&model.SystemConfig{},
 		&model.AdminLog{},
 		&model.UserAddress{},
+		// 飞手相关表
+		&model.Pilot{},
+		&model.PilotCertification{},
+		&model.PilotFlightLog{},
+		&model.PilotDroneBinding{},
+		// 无人机维护与保险表
+		&model.DroneMaintenanceLog{},
+		&model.DroneInsuranceRecord{},
+		// 业主/客户相关表
+		&model.Client{},
+		&model.ClientCreditCheck{},
+		&model.ClientEnterpriseCert{},
+		&model.CargoDeclaration{},
+		// 派单相关表
+		&model.DispatchTask{},
+		&model.DispatchCandidate{},
+		&model.DispatchConfig{},
+		&model.DispatchLog{},
+		// 飞行监控相关表
+		&model.FlightPosition{},
+		&model.FlightAlert{},
+		&model.Geofence{},
+		&model.GeofenceViolation{},
+		// 轨迹与路线相关表
+		&model.FlightTrajectory{},
+		&model.FlightWaypoint{},
+		&model.SavedRoute{},
+		// 多点任务相关表
+		&model.MultiPointTask{},
+		&model.MultiPointTaskStop{},
+		&model.FlightMonitorConfig{},
+		// 空域管理与合规相关表
+		&model.AirspaceApplication{},
+		&model.NoFlyZone{},
+		&model.ComplianceCheck{},
+		&model.ComplianceCheckItem{},
+		// 支付结算与分账相关表
+		&model.OrderSettlement{},
+		&model.UserWallet{},
+		&model.WalletTransaction{},
+		&model.WithdrawalRecord{},
+		&model.PricingConfig{},
+		// 信用评价与风控相关表
+		&model.CreditScore{},
+		&model.CreditScoreLog{},
+		&model.RiskControl{},
+		&model.Violation{},
+		&model.Blacklist{},
+		&model.Deposit{},
+		// 保险与理赔相关表
+		&model.InsurancePolicy{},
+		&model.InsuranceClaim{},
+		&model.ClaimTimeline{},
+		&model.InsuranceProduct{},
+		// 数据分析与报表相关表
+		&model.DailyStatistics{},
+		&model.HourlyMetrics{},
+		&model.RegionStatistics{},
+		&model.AnalyticsReport{},
+		&model.HeatmapData{},
+		&model.RealtimeDashboard{},
 	)
 }

@@ -206,6 +206,51 @@ export const adminApi = {
     start_date?: string;
     end_date?: string;
   }) => api.get('/admin/statistics', { params }),
+
+  // ========== 数据分析 ==========
+  // 实时看板
+  getRealtimeDashboard: () => api.get('/analytics/dashboard/realtime'),
+  refreshDashboard: () => api.post('/analytics/dashboard/refresh'),
+  getOverview: () => api.get('/analytics/overview'),
+  
+  // 趋势数据
+  getTrendData: (days: number = 7) => api.get(`/analytics/trends?days=${days}`),
+  
+  // 每日统计
+  getDailyStatistics: (date?: string) => api.get('/analytics/daily', { params: { date } }),
+  getDailyStatisticsRange: (start: string, end: string) => 
+    api.get('/analytics/daily/range', { params: { start, end } }),
+  
+  // 小时指标
+  getHourlyMetrics: (hours: number = 24) => api.get(`/analytics/hourly?hours=${hours}`),
+  
+  // 热力图
+  getHeatmapData: (type: string, date?: string) => 
+    api.get('/analytics/heatmap', { params: { type, date } }),
+  
+  // 区域统计
+  getRegionStatistics: (date?: string) => api.get('/analytics/regions', { params: { date } }),
+  getTopRegions: (date?: string, limit: number = 10) => 
+    api.get('/analytics/regions/top', { params: { date, limit } }),
+  
+  // 报表管理
+  getReportList: (params?: { type?: string; page?: number; page_size?: number }) => 
+    api.get('/analytics/reports', { params }),
+  getReport: (id: number) => api.get(`/analytics/report/${id}`),
+  getReportByNo: (reportNo: string) => api.get(`/analytics/report/no/${reportNo}`),
+  getLatestReport: (type: string) => api.get(`/analytics/report/latest/${type}`),
+  generateReport: (reportType: string, startDate: string, endDate: string) => 
+    api.post('/analytics/report/generate', { 
+      report_type: reportType, 
+      start_date: startDate, 
+      end_date: endDate 
+    }),
+  deleteReport: (id: number) => api.delete(`/analytics/report/${id}`),
+  
+  // 管理员任务
+  triggerDailyJob: () => api.post('/analytics/admin/job/daily'),
+  triggerHourlyJob: () => api.post('/analytics/admin/job/hourly'),
+  triggerAutoReportJob: () => api.post('/analytics/admin/job/report'),
 };
 
 // ============================================================

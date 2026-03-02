@@ -6,6 +6,8 @@ import {
   RocketOutlined,
   ShoppingCartOutlined,
   DollarOutlined,
+  AreaChartOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
@@ -14,6 +16,8 @@ import UserList from './pages/User/UserList';
 import DroneList from './pages/Drone/DroneList';
 import OrderList from './pages/Order/OrderList';
 import TransactionList from './pages/Finance/TransactionList';
+import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
+import ReportList from './pages/Analytics/ReportList';
 
 const { Header, Sider, Content } = Layout;
 
@@ -23,6 +27,8 @@ function AdminLayout() {
 
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: '数据概览' },
+    { key: '/analytics', icon: <AreaChartOutlined />, label: '运营看板' },
+    { key: '/reports', icon: <FileTextOutlined />, label: '智能报表' },
     { key: '/users', icon: <UserOutlined />, label: '用户管理' },
     { key: '/drones', icon: <RocketOutlined />, label: '无人机管理' },
     { key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' },
@@ -54,6 +60,8 @@ function AdminLayout() {
         <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8, minHeight: 360 }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/analytics" element={<AnalyticsDashboard />} />
+            <Route path="/reports" element={<ReportList />} />
             <Route path="/users" element={<UserList />} />
             <Route path="/drones" element={<DroneList />} />
             <Route path="/orders" element={<OrderList />} />

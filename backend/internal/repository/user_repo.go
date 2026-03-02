@@ -86,3 +86,8 @@ func (r *UserRepo) GetByIDs(ids []int64) (map[int64]*model.User, error) {
 	return userMap, nil
 }
 
+// UpdateUserType 更新用户类型
+func (r *UserRepo) UpdateUserType(userID int64, userType string) error {
+	return r.db.Model(&model.User{}).Where("id = ?", userID).Update("user_type", userType).Error
+}
+

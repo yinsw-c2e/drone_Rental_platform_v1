@@ -391,6 +391,31 @@ export default function OrderDetailScreen({route, navigation}: any) {
         {/* Timeline */}
         {renderTimeline()}
 
+        {/* Flight actions for in-progress orders */}
+        {order.status === 'in_progress' && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>飞行管理</Text>
+            <TouchableOpacity
+              style={styles.flightActionItem}
+              onPress={() => navigation.navigate('FlightMonitoring', {orderId: order.id})}>
+              <Text style={styles.flightActionText}>飞行监控</Text>
+              <Text style={{color: '#1890ff', fontSize: 14}}>{'>'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.flightActionItem}
+              onPress={() => navigation.navigate('TrajectoryRecord', {orderId: order.id})}>
+              <Text style={styles.flightActionText}>轨迹记录</Text>
+              <Text style={{color: '#1890ff', fontSize: 14}}>{'>'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.flightActionItem, {borderBottomWidth: 0}]}
+              onPress={() => navigation.navigate('MultiPointTask', {orderId: order.id})}>
+              <Text style={styles.flightActionText}>多点任务</Text>
+              <Text style={{color: '#1890ff', fontSize: 14}}>{'>'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={{height: 100}} />
       </ScrollView>
 
@@ -477,4 +502,11 @@ const styles = StyleSheet.create({
   actionBtnText: {fontSize: 14, fontWeight: '500', color: '#333'},
   actionBtnTextPrimary: {color: '#fff'},
   actionBtnTextDanger: {color: '#ff4d4f'},
+
+  // Flight actions
+  flightActionItem: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+  },
+  flightActionText: {fontSize: 15, color: '#333'},
 });

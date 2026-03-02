@@ -158,6 +158,9 @@ export default function ProfileScreen({navigation}: any) {
   const verifyInfo = VERIFY_STATUS_MAP[user?.id_verified || 'unverified'] || VERIFY_STATUS_MAP.unverified;
 
   const menuItems = [
+    {title: '飞手中心', screen: 'PilotProfile', icon: '🎮'},
+    {title: '客户中心', screen: 'ClientProfile', icon: '👔'},
+    {title: '派单任务', screen: 'DispatchTaskList', icon: '📡'},
     {title: '我的无人机', screen: 'MyDrones', icon: '🛩️'},
     {title: '我的订单', screen: 'MyOrders', icon: '📋'},
     {title: '我的供给', screen: 'MyOffers', icon: '📦'},

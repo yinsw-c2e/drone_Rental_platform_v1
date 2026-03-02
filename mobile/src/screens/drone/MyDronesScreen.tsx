@@ -70,6 +70,14 @@ export default function MyDronesScreen({navigation}: any) {
         <Text style={styles.spec}>续航 {item.max_flight_time || 0}min</Text>
         <Text style={styles.priceText}>¥{(item.daily_price / 100).toFixed(0)}/天</Text>
       </View>
+      <TouchableOpacity
+        style={styles.certBtn}
+        onPress={(e) => {
+          e.stopPropagation?.();
+          navigation.navigate('DroneCertification', {id: item.id});
+        }}>
+        <Text style={styles.certBtnText}>认证管理</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -118,4 +126,9 @@ const styles = StyleSheet.create({
   emptyText: {fontSize: 16, color: '#999', marginBottom: 20},
   addBtn: {paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#1890ff', borderRadius: 20},
   addBtnText: {color: '#fff', fontSize: 14, fontWeight: '600'},
+  certBtn: {
+    marginTop: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0',
+    alignItems: 'center',
+  },
+  certBtnText: {fontSize: 13, color: '#1890ff', fontWeight: '500'},
 });
