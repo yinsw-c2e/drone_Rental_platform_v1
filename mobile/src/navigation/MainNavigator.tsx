@@ -108,6 +108,7 @@ function HomeStack() {
       <Stack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域申请'}} />
       <Stack.Screen name="ComplianceCheck" component={ComplianceCheckScreen} options={{title: '合规检查'}} />
       <Stack.Screen name="NoFlyZone" component={NoFlyZoneScreen} options={{title: '禁飞区'}} />
+      <Stack.Screen name="CargoDeclaration" component={CargoDeclarationScreen} options={{title: '货物申报'}} />
     </Stack.Navigator>
   );
 }
@@ -150,6 +151,10 @@ function ProfileStack() {
       <Stack.Screen name="MyOffers" component={MyOffersScreen} options={{title: '我的供给'}} />
       <Stack.Screen name="MyDemands" component={MyDemandsScreen} options={{title: '我的需求'}} />
       <Stack.Screen name="MyCargo" component={MyCargoScreen} options={{title: '我的货运'}} />
+      <Stack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '发布货运需求'}} />
+      <Stack.Screen name="AddressSearch" component={AddressSearchScreen} options={{headerShown: false}} />
+      <Stack.Screen name="AddressPicker" component={AddressPickerScreen} options={{title: '选择地址'}} />
+      <Stack.Screen name="MapPicker" component={MapPickerScreen} options={{title: '地图选点'}} />
       <Stack.Screen name="Verification" component={VerificationScreen} options={{title: '实名认证'}} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{title: '设置'}} />
       <Stack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />

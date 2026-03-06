@@ -11,8 +11,16 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  Image,
+  Platform,
+  ActionSheetIOS,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {
+  launchCamera,
+  launchImageLibrary,
+  ImagePickerResponse,
+} from 'react-native-image-picker';
 import {
   listCargoDeclarations,
   createCargoDeclaration,
@@ -53,11 +61,47 @@ export default function CargoDeclarationScreen({navigation}: any) {
   const [height, setHeight] = useState('');
   const [declaredValue, setDeclaredValue] = useState('');
   const [requiresInsurance, setRequiresInsurance] = useState(false);
+  const [cargoImages, setCargoImages] = useState<string[]>([]);
+
+  const MAX_IMAGES = 4;
+
+  const handleAddImage = () => {
+    const pick = (source: 'camera' | 'library') => {
+      const opts = {mediaType: 'photo' as const, maxWidth: 1280, maxHeight: 1280, quality: 0.8 as const};
+      const callback = (res: ImagePickerResponse) => {
+        if (res.didCancel || res.errorCode) return;
+        const uri = res.assets?.[0]?.uri;
+        if (uri) setCargoImages(prev => [...prev, uri]);
+      };
+      source === 'camera' ? launchCamera(opts, callback) : launchImageLibrary(opts, callback);
+    };
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {options: ['拍照', '从相册选择', '取消'], cancelButtonIndex: 2},
+        i => { if (i === 0) pick('camera'); else if (i === 1) pick('library'); },
+      );
+    } else {
+      Alert.alert('添加图片', '选择图片来源', [
+        {text: '拍照', onPress: () => pick('camera')},
+        {text: '从相册选择', onPress: () => pick('library')},
+        {text: '取消', style: 'cancel'},
+      ]);
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    Alert.alert('删除图片', '确定要删除这张图片吗？', [
+      {text: '取消', style: 'cancel'},
+      {text: '删除', style: 'destructive', onPress: () => {
+        setCargoImages(prev => prev.filter((_, i) => i !== index));
+      }},
+    ]);
+  };
 
   const loadData = async () => {
     try {
       const res = await listCargoDeclarations({page: 1, page_size: 50});
-      setDeclarations(res.data || []);
+      setDeclarations(res.list || []);
     } catch (e: any) {
       Alert.alert('错误', e.message);
     } finally {
@@ -88,6 +132,7 @@ export default function CargoDeclarationScreen({navigation}: any) {
     setHeight('');
     setDeclaredValue('');
     setRequiresInsurance(false);
+    setCargoImages([]);
   };
 
   const getCategoryLabel = (value: string): string => {
@@ -120,6 +165,7 @@ export default function CargoDeclarationScreen({navigation}: any) {
       height: height ? parseFloat(height) : undefined,
       declared_value: Math.round(parseFloat(declaredValue) * 100), // 元转分
       requires_insurance: requiresInsurance,
+      cargo_images: cargoImages.length > 0 ? cargoImages : undefined,
     };
 
     setSubmitting(true);
@@ -362,6 +408,27 @@ export default function CargoDeclarationScreen({navigation}: any) {
                 </View>
                 <Text style={styles.checkboxLabel}>需要保价运输</Text>
               </TouchableOpacity>
+
+              {/* 货物照片 */}
+              <Text style={styles.label}>货物照片（可选，最多{MAX_IMAGES}张）</Text>
+              <View style={styles.imageGrid}>
+                {cargoImages.map((uri, index) => (
+                  <View key={index} style={styles.imageWrapper}>
+                    <Image source={{uri}} style={styles.imageThumb} />
+                    <TouchableOpacity
+                      style={styles.imageRemoveBtn}
+                      onPress={() => handleRemoveImage(index)}>
+                      <Text style={styles.imageRemoveText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {cargoImages.length < MAX_IMAGES && (
+                  <TouchableOpacity style={styles.imageAddBtn} onPress={handleAddImage}>
+                    <Text style={styles.imageAddIcon}>+</Text>
+                    <Text style={styles.imageAddText}>添加照片</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
               {/* 提交 */}
               <TouchableOpacity
@@ -638,5 +705,57 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  imageWrapper: {
+    position: 'relative',
+  },
+  imageThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  imageRemoveBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ff4d4f',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageRemoveText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+    lineHeight: 18,
+  },
+  imageAddBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fafafa',
+  },
+  imageAddIcon: {
+    fontSize: 24,
+    color: '#999',
+  },
+  imageAddText: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 2,
   },
 });

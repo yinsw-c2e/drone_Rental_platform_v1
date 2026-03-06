@@ -102,6 +102,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 			droneGroup.POST("", h.Drone.Create)
 			droneGroup.GET("/my", h.Drone.MyDrones)
 			droneGroup.GET("/nearby", h.Drone.Nearby)
+			droneGroup.POST("/upload", h.Drone.UploadImages) // 通用图片上传，无需 drone ID
 			droneGroup.GET("/:id", h.Drone.GetByID)
 			droneGroup.PUT("/:id", h.Drone.Update)
 			droneGroup.DELETE("/:id", h.Drone.Delete)
@@ -541,7 +542,18 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 		adminGroup.PUT("/users/:id/status", h.Admin.UpdateUserStatus)
 		adminGroup.PUT("/users/:id/verify", h.Admin.ApproveIDVerification)
 		adminGroup.GET("/drones", h.Admin.DroneList)
+		adminGroup.GET("/drones/:id", h.Admin.GetDroneDetail)
 		adminGroup.PUT("/drones/:id/certification", h.Admin.ApproveDroneCertification)
+		adminGroup.PUT("/drones/:id/uom", h.Admin.ApproveUOMRegistration)
+		adminGroup.PUT("/drones/:id/insurance", h.Admin.ApproveInsurance)
+		adminGroup.PUT("/drones/:id/airworthiness", h.Admin.ApproveAirworthiness)
+		// 飞手管理
+		adminGroup.GET("/pilots", h.Admin.PilotList)
+		adminGroup.PUT("/pilots/:id/verify", h.Admin.VerifyPilot)
+		adminGroup.PUT("/pilots/:id/criminal-check", h.Admin.ApprovePilotCriminalCheck)
+		adminGroup.PUT("/pilots/:id/health-check", h.Admin.ApprovePilotHealthCheck)
+		adminGroup.GET("/clients", h.Admin.ClientList)
+		adminGroup.PUT("/clients/:id/verify", h.Admin.VerifyClient)
 		adminGroup.GET("/orders", h.Admin.OrderList)
 		adminGroup.GET("/payments", h.Admin.PaymentList)
 	}

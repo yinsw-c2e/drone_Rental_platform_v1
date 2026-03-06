@@ -207,7 +207,7 @@ func main() {
 		Payment:  paymenthandler.NewHandler(paymentService),
 		Message:  message.NewHandler(messageService),
 		Review:   review.NewHandler(reviewService),
-		Admin:    admin.NewHandler(userService, droneService, orderService, paymentService),
+		Admin:    admin.NewHandler(userService, droneService, orderService, paymentService, pilotService, clientService),
 		Location: locationhandler.NewHandler(amapService),
 		Address:  addresshandler.NewHandler(addressService),
 		Pilot:    pilothandler.NewHandler(pilotService, uploadService),

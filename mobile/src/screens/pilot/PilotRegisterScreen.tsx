@@ -9,30 +9,42 @@ import {
   SafeAreaView,
   ScrollView,
   Image,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
-import {registerPilot, RegisterPilotRequest} from '../../services/pilot';
+import {registerPilot, submitCriminalCheck, submitHealthCheck} from '../../services/pilot';
 import api from '../../services/api';
+import {API_BASE_URL} from '../../constants';
 
-const LICENSE_TYPES = [
-  {label: 'CAAC 无人机驾驶员执照', value: 'caac_pilot'},
-  {label: 'AOPA 无人机驾驶员合格证', value: 'aopa'},
-  {label: 'UTC 无人机操控师证', value: 'utc'},
-  {label: '其他资质', value: 'other'},
+const IMAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
+
+const CAAC_TYPES = [
+  {label: 'VLOS （视距内）', value: 'VLOS'},
+  {label: 'BVLOS （超视距）', value: 'BVLOS'},
+  {label: '教员证', value: 'instructor'},
 ];
 
 export default function PilotRegisterScreen({navigation}: any) {
-  const [licenseType, setLicenseType] = useState('caac_pilot');
+  // CAAC执照信息
+  const [licenseType, setLicenseType] = useState('VLOS');
   const [licenseNo, setLicenseNo] = useState('');
-  const [licenseIssuer, setLicenseIssuer] = useState('');
-  const [licenseIssueDate, setLicenseIssueDate] = useState('');
   const [licenseExpireDate, setLicenseExpireDate] = useState('');
-  const [licenseImage, setLicenseImage] = useState('');
+  const [licenseImage, setLicenseImage] = useState(''); // 存储完整URL
   const [serviceRadius, setServiceRadius] = useState('50');
+
+  // 无犯罪记录证明
+  const [criminalDoc, setCriminalDoc] = useState('');   // 完整URL
+  const [criminalExpireDate, setCriminalExpireDate] = useState('');
+
+  // 健康体检证明
+  const [healthDoc, setHealthDoc] = useState('');       // 完整URL
+  const [healthExpireDate, setHealthExpireDate] = useState('');
+
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const pickImage = async () => {
+  // 通用图片上传函数
+  const uploadImage = async (setter: (url: string) => void, label: string) => {
     try {
       const result = await launchImageLibrary({
         mediaType: 'photo',
@@ -40,69 +52,78 @@ export default function PilotRegisterScreen({navigation}: any) {
         maxWidth: 1200,
         maxHeight: 1200,
       });
-
-      if (result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        // 上传图片
-        const formData = new FormData();
-        formData.append('file', {
-          uri: asset.uri,
-          type: asset.type || 'image/jpeg',
-          name: asset.fileName || 'license.jpg',
-        } as any);
-
-        const uploadRes: any = await api.post('/pilot/upload-cert', formData, {
-          headers: {'Content-Type': 'multipart/form-data'},
-        });
-        setLicenseImage(uploadRes.data.url);
-        Alert.alert('提示', '图片上传成功');
-      }
+      if (!result.assets?.[0]) return;
+      const asset = result.assets[0];
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: asset.type || 'image/jpeg',
+        name: asset.fileName || 'cert.jpg',
+      } as any);
+      const uploadRes: any = await api.post('/pilot/upload-cert', formData, {
+        headers: {'Content-Type': 'multipart/form-data'},
+      });
+      const relUrl: string = uploadRes.data?.url || '';
+      const fullUrl = relUrl.startsWith('http') ? relUrl : `${IMAGE_BASE_URL}${relUrl}`;
+      setter(fullUrl);
+      Alert.alert('提示', `${label}上传成功`);
     } catch (e: any) {
       Alert.alert('错误', e.message || '图片上传失败');
+    } finally {
+      setUploading(false);
     }
   };
 
-  const validateDate = (dateStr: string): boolean => {
-    const regex = /^\d{4}-\d{2}-\d{2}$/;
-    return regex.test(dateStr);
-  };
+  const validateDate = (dateStr: string): boolean =>
+    /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
 
   const handleSubmit = async () => {
-    // 验证必填项
     if (!licenseNo.trim()) {
-      Alert.alert('提示', '请输入执照编号');
-      return;
-    }
-    if (!licenseIssuer.trim()) {
-      Alert.alert('提示', '请输入发证机关');
-      return;
-    }
-    if (!licenseIssueDate || !validateDate(licenseIssueDate)) {
-      Alert.alert('提示', '请输入正确的发证日期 (格式: YYYY-MM-DD)');
+      Alert.alert('提示', '请输入CAAC执照编号');
       return;
     }
     if (!licenseExpireDate || !validateDate(licenseExpireDate)) {
-      Alert.alert('提示', '请输入正确的有效期 (格式: YYYY-MM-DD)');
+      Alert.alert('提示', '请输入正确的执照有效期 (格式: YYYY-MM-DD)');
       return;
     }
     if (!licenseImage) {
-      Alert.alert('提示', '请上传执照照片');
+      Alert.alert('提示', '请上传CAAC执照照片');
       return;
     }
 
-    const data: RegisterPilotRequest = {
-      license_type: licenseType,
-      license_no: licenseNo.trim(),
-      license_issuer: licenseIssuer.trim(),
-      license_issue_date: licenseIssueDate,
-      license_expire_date: licenseExpireDate,
-      license_image: licenseImage,
-      service_radius_km: parseInt(serviceRadius, 10) || 50,
-    };
-
     setLoading(true);
     try {
-      await registerPilot(data);
+      // 第一步：注册飞手
+      await registerPilot({
+        caac_license_no: licenseNo.trim(),
+        caac_license_type: licenseType,
+        caac_license_expire_date: licenseExpireDate
+          ? `${licenseExpireDate}T00:00:00Z`
+          : undefined,
+        caac_license_image: licenseImage,
+        service_radius: parseInt(serviceRadius, 10) || 50,
+      });
+
+      // 第二步：提交无犯罪记录（如果已上传）
+      if (criminalDoc) {
+        try {
+          await submitCriminalCheck(criminalDoc);
+        } catch (_) {}
+      }
+
+      // 第三步：提交健康体检证明（如果已上传）
+      if (healthDoc) {
+        try {
+          await submitHealthCheck({
+            doc_url: healthDoc,
+            expire_date: healthExpireDate
+              ? `${healthExpireDate}T00:00:00Z`
+              : '',
+          });
+        } catch (_) {}
+      }
+
       Alert.alert('成功', '飞手注册申请已提交，请等待审核', [
         {text: '确定', onPress: () => navigation.goBack()},
       ]);
@@ -113,16 +134,48 @@ export default function PilotRegisterScreen({navigation}: any) {
     }
   };
 
+  const ImageUploadBlock = ({
+    label,
+    value,
+    required,
+    onPick,
+  }: {
+    label: string;
+    value: string;
+    required?: boolean;
+    onPick: () => void;
+  }) => (
+    <View>
+      <Text style={styles.label}>{label}{required ? ' *' : ''}</Text>
+      <TouchableOpacity style={styles.imageUpload} onPress={onPick} disabled={uploading}>
+        {value ? (
+          <Image source={{uri: value}} style={styles.uploadedImage} />
+        ) : (
+          <View style={styles.uploadPlaceholder}>
+            {uploading ? (
+              <ActivityIndicator color="#1890ff" />
+            ) : (
+              <>
+                <Text style={styles.uploadIcon}>+</Text>
+                <Text style={styles.uploadText}>点击上传{label}</Text>
+              </>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>飞手资质认证</Text>
-        <Text style={styles.subtitle}>请填写您的飞行执照信息</Text>
+        <Text style={styles.subtitle}>请填写您的执照信息及相关证明</Text>
 
-        {/* 执照类型 */}
-        <Text style={styles.label}>执照类型</Text>
+        {/* CAAC执照类型 */}
+        <Text style={styles.label}>CAAC执照类型 *</Text>
         <View style={styles.typeContainer}>
-          {LICENSE_TYPES.map(type => (
+          {CAAC_TYPES.map(type => (
             <TouchableOpacity
               key={type.value}
               style={[
@@ -141,36 +194,18 @@ export default function PilotRegisterScreen({navigation}: any) {
           ))}
         </View>
 
-        {/* 执照编号 */}
-        <Text style={styles.label}>执照编号 *</Text>
+        {/* CAAC执照编号 */}
+        <Text style={styles.label}>CAAC执照编号 *</Text>
         <TextInput
           style={styles.input}
-          placeholder="请输入执照编号"
+          placeholder="请输入CAAC执照编号"
           value={licenseNo}
           onChangeText={setLicenseNo}
+          autoCapitalize="none"
         />
 
-        {/* 发证机关 */}
-        <Text style={styles.label}>发证机关 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="如: 中国民用航空局"
-          value={licenseIssuer}
-          onChangeText={setLicenseIssuer}
-        />
-
-        {/* 发证日期 */}
-        <Text style={styles.label}>发证日期 *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="YYYY-MM-DD"
-          value={licenseIssueDate}
-          onChangeText={setLicenseIssueDate}
-          keyboardType={Platform.OS === 'ios' ? 'default' : 'default'}
-        />
-
-        {/* 有效期至 */}
-        <Text style={styles.label}>有效期至 *</Text>
+        {/* 执照有效期 */}
+        <Text style={styles.label}>执照有效期 *</Text>
         <TextInput
           style={styles.input}
           placeholder="YYYY-MM-DD"
@@ -188,24 +223,51 @@ export default function PilotRegisterScreen({navigation}: any) {
           keyboardType="number-pad"
         />
 
-        {/* 执照照片 */}
-        <Text style={styles.label}>执照照片 *</Text>
-        <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>
-          {licenseImage ? (
-            <Image source={{uri: licenseImage}} style={styles.uploadedImage} />
-          ) : (
-            <View style={styles.uploadPlaceholder}>
-              <Text style={styles.uploadIcon}>+</Text>
-              <Text style={styles.uploadText}>点击上传执照照片</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* CAAC执照照片 */}
+        <ImageUploadBlock
+          label="CAAC执照照片"
+          value={licenseImage}
+          required
+          onPick={() => uploadImage(setLicenseImage, 'CAAC执照照片')}
+        />
+
+        {/* 分割线 */}
+        <View style={styles.divider} />
+        <Text style={styles.sectionTitle}>补充材料（建议提交，提高审核通过率）</Text>
+
+        {/* 无犯罪记录证明 */}
+        <ImageUploadBlock
+          label="无犯罪记录证明"
+          value={criminalDoc}
+          onPick={() => uploadImage(setCriminalDoc, '无犯罪记录证明')}
+        />
+        <Text style={styles.label}>无犯罪记录有效期</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="YYYY-MM-DD"
+          value={criminalExpireDate}
+          onChangeText={setCriminalExpireDate}
+        />
+
+        {/* 健康体检证明 */}
+        <ImageUploadBlock
+          label="健康体检证明"
+          value={healthDoc}
+          onPick={() => uploadImage(setHealthDoc, '健康体检证明')}
+        />
+        <Text style={styles.label}>健康证明有效期</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="YYYY-MM-DD"
+          value={healthExpireDate}
+          onChangeText={setHealthExpireDate}
+        />
 
         {/* 提交按钮 */}
         <TouchableOpacity
-          style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (loading || uploading) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={loading}>
+          disabled={loading || uploading}>
           <Text style={styles.submitBtnText}>
             {loading ? '提交中...' : '提交认证申请'}
           </Text>
@@ -215,9 +277,9 @@ export default function PilotRegisterScreen({navigation}: any) {
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>认证说明</Text>
           <Text style={styles.noticeText}>
-            1. 请确保上传的执照照片清晰可辨{'\n'}
-            2. 执照必须在有效期内{'\n'}
-            3. 审核通常需要1-3个工作日{'\n'}
+            1. CAAC执照编号为必填项，请确保执照在有效期内{'\n'}
+            2. 补充无犯罪记录和健康证明可提高审核通过率{'\n'}
+            3. 审核通常需要 1-3 个工作日{'\n'}
             4. 审核通过后即可开始接单
           </Text>
         </View>
@@ -349,5 +411,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 24,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1890ff',
+    marginBottom: 8,
   },
 });

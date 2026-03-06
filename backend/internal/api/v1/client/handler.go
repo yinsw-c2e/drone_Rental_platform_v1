@@ -2,6 +2,7 @@ package client
 
 import (
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/response"
 	"wurenji-backend/internal/service"
 	"encoding/json"
 	"net/http"
@@ -36,7 +37,7 @@ func (h *Handler) RegisterIndividual(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": client})
+	response.Success(c, client)
 }
 
 // RegisterEnterprise 注册企业客户
@@ -78,7 +79,7 @@ func (h *Handler) RegisterEnterprise(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": client})
+	response.Success(c, client)
 }
 
 // GetProfile 获取当前客户档案
@@ -92,11 +93,12 @@ func (h *Handler) GetProfile(c *gin.Context) {
 
 	client, err := h.clientService.GetProfile(userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "客户档案不存在"})
+		// 未注册是正常状态，返回 data: null 而非 404
+		response.Success(c, nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": client})
+	response.Success(c, client)
 }
 
 // GetByID 根据ID获取客户
@@ -114,7 +116,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": client})
+	response.Success(c, client)
 }
 
 // UpdateProfile 更新客户档案
@@ -143,7 +145,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+	response.Success(c, nil)
 }
 
 // List 获取客户列表
@@ -160,12 +162,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":      clients,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.SuccessWithPage(c, clients, total, page, pageSize)
 }
 
 // ==================== 征信查询 ====================
@@ -205,7 +202,7 @@ func (h *Handler) RequestCreditCheck(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": check})
+	response.Success(c, check)
 }
 
 // GetCreditHistory 获取征信查询历史
@@ -231,7 +228,7 @@ func (h *Handler) GetCreditHistory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": checks})
+	response.Success(c, checks)
 }
 
 // ==================== 企业资质 ====================
@@ -291,7 +288,7 @@ func (h *Handler) SubmitEnterpriseCert(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": cert})
+	response.Success(c, cert)
 }
 
 // GetEnterpriseCerts 获取企业资质列表
@@ -315,7 +312,7 @@ func (h *Handler) GetEnterpriseCerts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": certs})
+	response.Success(c, certs)
 }
 
 // ==================== 货物申报 ====================
@@ -398,7 +395,7 @@ func (h *Handler) CreateCargoDeclaration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": result})
+	response.Success(c, result)
 }
 
 // GetCargoDeclaration 获取货物申报详情
@@ -416,7 +413,7 @@ func (h *Handler) GetCargoDeclaration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": decl})
+	response.Success(c, decl)
 }
 
 // ListCargoDeclarations 获取货物申报列表
@@ -443,12 +440,7 @@ func (h *Handler) ListCargoDeclarations(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":      declarations,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.SuccessWithPage(c, declarations, total, page, pageSize)
 }
 
 // UpdateCargoDeclaration 更新货物申报
@@ -483,7 +475,7 @@ func (h *Handler) UpdateCargoDeclaration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "更新成功"})
+	response.Success(c, nil)
 }
 
 // ==================== 下单资格检查 ====================
@@ -499,7 +491,7 @@ func (h *Handler) CheckOrderEligibility(c *gin.Context) {
 
 	client, err := h.clientService.GetProfile(userID)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		response.Success(c, gin.H{
 			"eligible": false,
 			"reason":   "客户档案不存在，请先注册",
 		})
@@ -507,7 +499,7 @@ func (h *Handler) CheckOrderEligibility(c *gin.Context) {
 	}
 
 	eligible, reason := h.clientService.CanPlaceOrder(client.ID)
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, gin.H{
 		"eligible": eligible,
 		"reason":   reason,
 	})
@@ -534,7 +526,7 @@ func (h *Handler) AdminApproveClient(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "审批通过"})
+	response.Success(c, nil)
 }
 
 // AdminRejectClient 管理员审批拒绝客户
@@ -559,7 +551,7 @@ func (h *Handler) AdminRejectClient(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "已拒绝"})
+	response.Success(c, nil)
 }
 
 // AdminApproveEnterpriseCert 管理员审批企业资质
@@ -582,7 +574,7 @@ func (h *Handler) AdminApproveEnterpriseCert(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "审批通过"})
+	response.Success(c, nil)
 }
 
 // AdminRejectEnterpriseCert 管理员拒绝企业资质
@@ -608,7 +600,7 @@ func (h *Handler) AdminRejectEnterpriseCert(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "已拒绝"})
+	response.Success(c, nil)
 }
 
 // AdminApproveCargoDeclaration 管理员审批货物申报
@@ -631,7 +623,7 @@ func (h *Handler) AdminApproveCargoDeclaration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "审批通过"})
+	response.Success(c, nil)
 }
 
 // AdminRejectCargoDeclaration 管理员拒绝货物申报
@@ -657,7 +649,7 @@ func (h *Handler) AdminRejectCargoDeclaration(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "已拒绝"})
+	response.Success(c, nil)
 }
 
 // AdminListPendingVerification 获取待审批客户列表
@@ -672,12 +664,7 @@ func (h *Handler) AdminListPendingVerification(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":      clients,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.SuccessWithPage(c, clients, total, page, pageSize)
 }
 
 // AdminListPendingCargoDeclarations 获取待审批货物申报列表
@@ -692,12 +679,7 @@ func (h *Handler) AdminListPendingCargoDeclarations(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":      declarations,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.SuccessWithPage(c, declarations, total, page, pageSize)
 }
 
 // 辅助函数

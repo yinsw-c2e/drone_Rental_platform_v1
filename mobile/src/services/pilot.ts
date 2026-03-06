@@ -92,13 +92,12 @@ export interface FlightStats {
 // ==================== 请求类型 ====================
 
 export interface RegisterPilotRequest {
-  license_type: string;
-  license_no: string;
-  license_issue_date: string;
-  license_expire_date: string;
-  license_issuer: string;
-  license_image: string;
-  service_radius_km?: number;
+  caac_license_no: string;          // CAAC执照编号
+  caac_license_type: string;        // VLOS / BVLOS / instructor
+  caac_license_expire_date?: string; // 执照有效期 YYYY-MM-DD
+  caac_license_image: string;       // 执照照片 URL
+  service_radius?: number;          // 服务半径(公里)
+  special_skills?: string[];
 }
 
 export interface UpdatePilotRequest {

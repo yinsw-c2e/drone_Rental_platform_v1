@@ -7,6 +7,18 @@ import {droneService} from '../../services/drone';
 import {Drone} from '../../types';
 
 export default function MyDronesScreen({navigation}: any) {
+  // 设置导航栏右侧按钮
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('AddDrone')}
+          style={{paddingHorizontal: 16}}>
+          <Text style={{fontSize: 24, color: '#1890ff'}}>+</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

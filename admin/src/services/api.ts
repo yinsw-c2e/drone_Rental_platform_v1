@@ -162,9 +162,58 @@ export const adminApi = {
   
   approveCertification: (id: number, approved: boolean, reason?: string) =>
     api.put(`/admin/drones/${id}/certification`, { approved, reason }),
+
+  approveUOM: (id: number, approved: boolean) =>
+    api.put(`/admin/drones/${id}/uom`, { approved }),
+
+  approveInsurance: (id: number, approved: boolean) =>
+    api.put(`/admin/drones/${id}/insurance`, { approved }),
+
+  approveAirworthiness: (id: number, approved: boolean) =>
+    api.put(`/admin/drones/${id}/airworthiness`, { approved }),
   
   updateDroneStatus: (id: number, status: string) =>
     api.put(`/admin/drones/${id}/status`, { status }),
+
+  // ========== 飞手管理 ==========
+  getPilots: (params?: {
+    page?: number;
+    page_size?: number;
+    verification_status?: string;
+  }) => api.get('/admin/pilots', { params }),
+
+  verifyPilot: (id: number, approved: boolean, note?: string) =>
+    api.put(`/admin/pilots/${id}/verify`, { approved, note }),
+
+  approvePilotCriminalCheck: (id: number, approved: boolean) =>
+    api.put(`/admin/pilots/${id}/criminal-check`, { approved }),
+
+  approvePilotHealthCheck: (id: number, approved: boolean) =>
+    api.put(`/admin/pilots/${id}/health-check`, { approved }),
+
+  // ========== 客户管理 ==========
+  getClients: (params?: {
+    page?: number;
+    page_size?: number;
+    client_type?: string; // individual / enterprise
+    verification_status?: string;     // pending / verified / rejected
+  }) => api.get('/admin/clients', { params }),
+
+  verifyClient: (id: number, approved: boolean, note?: string) =>
+    api.put(`/admin/clients/${id}/verify`, { approved, note }),
+
+  // ========== 货物申报管理 ==========
+  getCargoDeclarations: (params?: {
+    page?: number;
+    page_size?: number;
+    compliance_status?: string; // pending / approved / rejected
+  }) => api.get('/client/admin/cargo/pending', { params }),
+
+  approveCargoDeclaration: (id: number, note?: string) =>
+    api.post(`/client/admin/cargo/approve/${id}`, { note: note || '' }),
+
+  rejectCargoDeclaration: (id: number, note: string) =>
+    api.post(`/client/admin/cargo/reject/${id}`, { note }),
 
   // ========== 订单管理 ==========
   getOrders: (params?: {

@@ -13,6 +13,9 @@ import {
   Modal,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {API_BASE_URL} from '../../constants';
+
+const IMAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
 import {launchImageLibrary} from 'react-native-image-picker';
 import {droneService} from '../../services/drone';
 import api from '../../services/api';
@@ -88,7 +91,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
       if (result.assets && result.assets[0]) {
         const asset = result.assets[0];
         const formData = new FormData();
-        formData.append('file', {
+        formData.append('files', {
           uri: asset.uri,
           type: asset.type || 'image/jpeg',
           name: asset.fileName || 'cert.jpg',
@@ -99,7 +102,11 @@ export default function DroneCertificationScreen({route, navigation}: any) {
         });
         const urls = uploadRes.data?.urls;
         if (urls && urls.length > 0) {
-          setter(urls[0]);
+          // 将相对路径转为完整 URL
+          const fullUrl = urls[0].startsWith('http')
+            ? urls[0]
+            : `${IMAGE_BASE_URL}${urls[0]}`;
+          setter(fullUrl);
         }
         Alert.alert('提示', '文件上传成功');
       }

@@ -97,7 +97,7 @@ api.interceptors.response.use(
 
     // Extract meaningful error message
     const responseData = error.response?.data as any;
-    const message = responseData?.message || error.message || '网络请求失败';
+    const message = responseData?.message || responseData?.error || error.message || '网络请求失败';
     return Promise.reject(new Error(message));
   },
 );

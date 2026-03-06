@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tag, Button, Space, message, Modal, Input, Select, Card, Row, Col } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, Space, message, Modal, Input, Select, Card, Row, Col, Divider } from 'antd';
+import { SearchOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/api';
 
@@ -26,6 +26,22 @@ interface Drone {
   created_at: string;
   owner_nickname: string;
   owner_phone: string;
+  // UOM平台登记
+  uom_registration_no: string;
+  uom_verified: string;
+  uom_registration_doc: string;
+  // 保险信息
+  insurance_policy_no: string;
+  insurance_company: string;
+  insurance_coverage: number;
+  insurance_expire_date: string;
+  insurance_doc: string;
+  insurance_verified: string;
+  // 适航证书
+  airworthiness_cert_no: string;
+  airworthiness_cert_expire: string;
+  airworthiness_cert_doc: string;
+  airworthiness_verified: string;
 }
 
 const CERT_STATUS_MAP: Record<string, { text: string; color: string }> = {
@@ -39,6 +55,12 @@ const AVAIL_STATUS_MAP: Record<string, { text: string; color: string }> = {
   rented: { text: '使用中', color: 'orange' },
   maintenance: { text: '维护中', color: 'red' },
   offline: { text: '离线', color: 'default' },
+};
+
+const VERIFY_STATUS_MAP: Record<string, { text: string; color: string }> = {
+  verified: { text: '已验证', color: 'green' },
+  pending: { text: '待审核', color: 'orange' },
+  rejected: { text: '已拒绝', color: 'red' },
 };
 
 const DroneList: React.FC = () => {
@@ -55,6 +77,42 @@ const DroneList: React.FC = () => {
   // 详情弹窗
   const [detailDrone, setDetailDrone] = useState<Drone | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openDetail = async (record: Drone) => {
+    setDetailVisible(true);
+    setDetailLoading(true);
+    try {
+      const res: any = await adminApi.getDroneDetail(record.id);
+      setDetailDrone(res.data?.data || record);
+    } catch {
+      setDetailDrone(record);
+    }
+    setDetailLoading(false);
+  };
+
+  const handleApproveItem = (type: 'uom' | 'insurance' | 'airworthiness', approved: boolean) => {
+    if (!detailDrone) return;
+    const labelMap = { uom: 'UOM平台登记', insurance: '保险信息', airworthiness: '适航证书' };
+    Modal.confirm({
+      title: `确认${approved ? '通过' : '拒绝'}${labelMap[type]}审核？`,
+      okText: approved ? '通过' : '拒绝',
+      okType: approved ? 'primary' : 'danger',
+      onOk: async () => {
+        const apiFn = type === 'uom'
+          ? adminApi.approveUOM
+          : type === 'insurance'
+            ? adminApi.approveInsurance
+            : adminApi.approveAirworthiness;
+        await apiFn(detailDrone.id, approved);
+        message.success('操作成功');
+        // 刷新详情
+        const res: any = await adminApi.getDroneDetail(detailDrone.id);
+        setDetailDrone(res.data?.data || detailDrone);
+        fetchDrones(page);
+      },
+    });
+  };
 
   const fetchDrones = async (p = 1) => {
     setLoading(true);
@@ -158,7 +216,7 @@ const DroneList: React.FC = () => {
       title: '操作', width: 200, fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button size="small" onClick={() => { setDetailDrone(record); setDetailVisible(true); }}>
+          <Button size="small" onClick={() => openDetail(record)}>
             详情
           </Button>
           {record.certification_status === 'pending' && (
@@ -238,8 +296,8 @@ const DroneList: React.FC = () => {
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={null}
-        width={600}>
-        {detailDrone && (
+        width={680}>
+        {detailLoading ? <div style={{ textAlign: 'center', padding: 40 }}>加载中...</div> : detailDrone && (
           <div>
             <Row gutter={[0, 12]}>
               <Col span={24}>
@@ -260,22 +318,16 @@ const DroneList: React.FC = () => {
               <Col span={8}><strong>最远距离:</strong></Col>
               <Col span={16}>{detailDrone.max_distance ? `${detailDrone.max_distance} km` : '-'}</Col>
               <Col span={8}><strong>日租金:</strong></Col>
-              <Col span={16} style={{ color: '#f5222d', fontWeight: 600 }}>
-                ¥{(detailDrone.daily_price / 100).toFixed(0)}/天
-              </Col>
+              <Col span={16} style={{ color: '#f5222d', fontWeight: 600 }}>¥{(detailDrone.daily_price / 100).toFixed(0)}/天</Col>
               <Col span={8}><strong>时租金:</strong></Col>
-              <Col span={16}>
-                {detailDrone.hourly_price ? `¥${(detailDrone.hourly_price / 100).toFixed(0)}/小时` : '-'}
-              </Col>
+              <Col span={16}>{detailDrone.hourly_price ? `¥${(detailDrone.hourly_price / 100).toFixed(0)}/小时` : '-'}</Col>
               <Col span={8}><strong>押金:</strong></Col>
-              <Col span={16}>
-                {detailDrone.deposit ? `¥${(detailDrone.deposit / 100).toFixed(0)}` : '-'}
-              </Col>
+              <Col span={16}>{detailDrone.deposit ? `¥${(detailDrone.deposit / 100).toFixed(0)}` : '-'}</Col>
               <Col span={8}><strong>评分:</strong></Col>
               <Col span={16}>{detailDrone.rating > 0 ? detailDrone.rating.toFixed(1) : '暂无'}</Col>
               <Col span={8}><strong>订单数:</strong></Col>
               <Col span={16}>{detailDrone.order_count}</Col>
-              <Col span={8}><strong>认证状态:</strong></Col>
+              <Col span={8}><strong>平台认证状态:</strong></Col>
               <Col span={16}>
                 <Tag color={CERT_STATUS_MAP[detailDrone.certification_status]?.color || 'default'}>
                   {CERT_STATUS_MAP[detailDrone.certification_status]?.text || detailDrone.certification_status}
@@ -295,6 +347,92 @@ const DroneList: React.FC = () => {
               )}
               <Col span={8}><strong>创建时间:</strong></Col>
               <Col span={16}>{detailDrone.created_at?.slice(0, 19)}</Col>
+            </Row>
+
+            <Divider style={{ marginTop: 16 }}>UOM 平台登记</Divider>
+            <Row gutter={[0, 10]}>
+              <Col span={8}><strong>登记号:</strong></Col>
+              <Col span={16}>{detailDrone.uom_registration_no || '未提交'}</Col>
+              <Col span={8}><strong>审核状态:</strong></Col>
+              <Col span={16}>
+                <Space>
+                  <Tag color={VERIFY_STATUS_MAP[detailDrone.uom_verified]?.color || 'default'}>
+                    {VERIFY_STATUS_MAP[detailDrone.uom_verified]?.text || '待审核'}
+                  </Tag>
+                  {detailDrone.uom_registration_no && detailDrone.uom_verified !== 'verified' && (
+                    <>
+                      <Button size="small" type="primary" icon={<CheckCircleOutlined />}
+                        onClick={() => handleApproveItem('uom', true)}>通过</Button>
+                      <Button size="small" danger icon={<CloseCircleOutlined />}
+                        onClick={() => handleApproveItem('uom', false)}>拒绝</Button>
+                    </>
+                  )}
+                </Space>
+              </Col>
+              {detailDrone.uom_registration_doc && (
+                <><Col span={8}><strong>登记证明:</strong></Col>
+                <Col span={16}><a href={detailDrone.uom_registration_doc} target="_blank" rel="noreferrer">查看文件</a></Col></>
+              )}
+            </Row>
+
+            <Divider>无人机保险</Divider>
+            <Row gutter={[0, 10]}>
+              <Col span={8}><strong>保单号:</strong></Col>
+              <Col span={16}>{detailDrone.insurance_policy_no || '未提交'}</Col>
+              <Col span={8}><strong>保险公司:</strong></Col>
+              <Col span={16}>{detailDrone.insurance_company || '-'}</Col>
+              <Col span={8}><strong>保额:</strong></Col>
+              <Col span={16}>{detailDrone.insurance_coverage ? `¥${(detailDrone.insurance_coverage / 100).toFixed(0)}` : '-'}</Col>
+              <Col span={8}><strong>到期日:</strong></Col>
+              <Col span={16}>{detailDrone.insurance_expire_date ? detailDrone.insurance_expire_date.slice(0, 10) : '-'}</Col>
+              <Col span={8}><strong>审核状态:</strong></Col>
+              <Col span={16}>
+                <Space>
+                  <Tag color={VERIFY_STATUS_MAP[detailDrone.insurance_verified]?.color || 'default'}>
+                    {VERIFY_STATUS_MAP[detailDrone.insurance_verified]?.text || '待审核'}
+                  </Tag>
+                  {detailDrone.insurance_policy_no && detailDrone.insurance_verified !== 'verified' && (
+                    <>
+                      <Button size="small" type="primary" icon={<CheckCircleOutlined />}
+                        onClick={() => handleApproveItem('insurance', true)}>通过</Button>
+                      <Button size="small" danger icon={<CloseCircleOutlined />}
+                        onClick={() => handleApproveItem('insurance', false)}>拒绝</Button>
+                    </>
+                  )}
+                </Space>
+              </Col>
+              {detailDrone.insurance_doc && (
+                <><Col span={8}><strong>保单文件:</strong></Col>
+                <Col span={16}><a href={detailDrone.insurance_doc} target="_blank" rel="noreferrer">查看文件</a></Col></>
+              )}
+            </Row>
+
+            <Divider>适航证书</Divider>
+            <Row gutter={[0, 10]}>
+              <Col span={8}><strong>证书编号:</strong></Col>
+              <Col span={16}>{detailDrone.airworthiness_cert_no || '未提交'}</Col>
+              <Col span={8}><strong>有效期:</strong></Col>
+              <Col span={16}>{detailDrone.airworthiness_cert_expire ? detailDrone.airworthiness_cert_expire.slice(0, 10) : '-'}</Col>
+              <Col span={8}><strong>审核状态:</strong></Col>
+              <Col span={16}>
+                <Space>
+                  <Tag color={VERIFY_STATUS_MAP[detailDrone.airworthiness_verified]?.color || 'default'}>
+                    {VERIFY_STATUS_MAP[detailDrone.airworthiness_verified]?.text || '待审核'}
+                  </Tag>
+                  {detailDrone.airworthiness_cert_no && detailDrone.airworthiness_verified !== 'verified' && (
+                    <>
+                      <Button size="small" type="primary" icon={<CheckCircleOutlined />}
+                        onClick={() => handleApproveItem('airworthiness', true)}>通过</Button>
+                      <Button size="small" danger icon={<CloseCircleOutlined />}
+                        onClick={() => handleApproveItem('airworthiness', false)}>拒绝</Button>
+                    </>
+                  )}
+                </Space>
+              </Col>
+              {detailDrone.airworthiness_cert_doc && (
+                <><Col span={8}><strong>证书文件:</strong></Col>
+                <Col span={16}><a href={detailDrone.airworthiness_cert_doc} target="_blank" rel="noreferrer">查看文件</a></Col></>
+              )}
             </Row>
           </div>
         )}

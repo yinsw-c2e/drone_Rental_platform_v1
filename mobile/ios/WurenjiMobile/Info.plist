@@ -48,6 +48,12 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>需要获取您的位置以推荐附近的无人机服务和完成配送定位</string>
+	<key>NSCameraUsageDescription</key>
+	<string>需要使用相机拍摄货物照片、无人机认证及飞手证件照片</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>需要访问相册以上传货物照片、无人机认证及飞手证件照片</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>需要保存照片到相册</string>
 	<key>AMapApiKey</key>
 	<string>$(AMAP_IOS_KEY)</string>
 	<key>RCTNewArchEnabled</key>

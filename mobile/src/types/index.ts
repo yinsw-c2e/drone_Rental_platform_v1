@@ -89,6 +89,7 @@ export interface CargoDemand {
   distance: number;
   pickup_time: string;
   offered_price: number;
+  images: string[];
   status: string;
   publisher?: User;
 }

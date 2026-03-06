@@ -6,6 +6,10 @@ import {
 import {demandService} from '../../services/demand';
 import {AddressData} from '../../types';
 import AddressInputField from '../../components/AddressInputField';
+import ImagePickerGroup from '../../components/ImagePickerGroup';
+
+// 需要进行货物申报的类型（非普通包裹都建议申报）
+const REQUIRES_DECLARATION_TYPES = ['equipment', 'material', 'other'];
 
 export default function PublishCargoScreen({navigation}: any) {
   const [cargoType, setCargoType] = useState('package');
@@ -14,6 +18,7 @@ export default function PublishCargoScreen({navigation}: any) {
   const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
   const [offeredPrice, setOfferedPrice] = useState('');
+  const [cargoImages, setCargoImages] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const cargoTypes = [
@@ -23,7 +28,9 @@ export default function PublishCargoScreen({navigation}: any) {
     {key: 'other', label: '其他货物'},
   ];
 
-  const handleSubmit = async () => {
+  const needsDeclaration = REQUIRES_DECLARATION_TYPES.includes(cargoType);
+
+  const doPublish = async () => {
     if (!pickupAddress || !deliveryAddress) {
       Alert.alert('提示', '请填写取货和送达地址');
       return;
@@ -36,7 +43,8 @@ export default function PublishCargoScreen({navigation}: any) {
         cargo_description: cargoDescription.trim(),
         pickup_address: pickupAddress.address,
         delivery_address: deliveryAddress.address,
-        offered_price: Number(offeredPrice) * 100 || 0, // 转换为分
+        offered_price: Number(offeredPrice) * 100 || 0,
+        images: cargoImages,
         status: 'active',
       });
       Alert.alert('成功', '货运需求发布成功', [
@@ -47,6 +55,33 @@ export default function PublishCargoScreen({navigation}: any) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = () => {
+    if (!pickupAddress || !deliveryAddress) {
+      Alert.alert('提示', '请填写取货和送达地址');
+      return;
+    }
+    // 非包裹类型：弹出申报引导
+    if (needsDeclaration) {
+      Alert.alert(
+        '建议先进行货物申报',
+        '您选择的货物类型属于特殊货物，建议在发布运单前先完成货物申报。申报审核通过后可享受更安全可靠的运输服务。',
+        [
+          {
+            text: '立即申报',
+            onPress: () => navigation.navigate('CargoDeclaration'),
+          },
+          {
+            text: '跳过，直接发布',
+            style: 'destructive',
+            onPress: doPublish,
+          },
+        ],
+      );
+      return;
+    }
+    doPublish();
   };
 
   return (
@@ -64,12 +99,33 @@ export default function PublishCargoScreen({navigation}: any) {
           ))}
         </View>
 
+        {/* 当选择非包裹类型时，显示申报引导横幅 */}
+        {needsDeclaration && (
+          <TouchableOpacity
+            style={styles.declarationBanner}
+            onPress={() => navigation.navigate('CargoDeclaration')}>
+            <Text style={styles.declarationBannerIcon}>⚠️</Text>
+            <View style={styles.declarationBannerText}>
+              <Text style={styles.declarationBannerTitle}>此类货物建议先申报</Text>
+              <Text style={styles.declarationBannerDesc}>设备器材、物资材料等特殊货物需先完成货物申报，审核通过后可享潜安全可靠运输。点此前往申报 ›</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.label}>货物重量 (kg)</Text>
         <TextInput style={styles.input} placeholder="0" keyboardType="numeric" value={cargoWeight} onChangeText={setCargoWeight} />
 
         <Text style={styles.label}>货物描述</Text>
         <TextInput style={[styles.input, {height: 70}]} placeholder="描述货物信息..." value={cargoDescription}
           onChangeText={setCargoDescription} multiline textAlignVertical="top" />
+
+        <ImagePickerGroup
+          label="货物照片（可选）"
+          hint="最多可上传 4 张，支持拍照或从相册选择"
+          images={cargoImages}
+          onImagesChange={setCargoImages}
+          maxCount={4}
+        />
 
         <Text style={styles.label}>取货地址 *</Text>
         <AddressInputField
@@ -117,4 +173,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   submitBtnText: {color: '#fff', fontSize: 17, fontWeight: 'bold'},
+  declarationBanner: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    backgroundColor: '#fff7e6', borderWidth: 1, borderColor: '#ffd591',
+    borderRadius: 8, padding: 12, marginTop: 12,
+  },
+  declarationBannerIcon: {fontSize: 18, marginRight: 10, marginTop: 1},
+  declarationBannerText: {flex: 1},
+  declarationBannerTitle: {fontSize: 14, fontWeight: '600', color: '#d46b08', marginBottom: 4},
+  declarationBannerDesc: {fontSize: 12, color: '#ad6800', lineHeight: 18},
 });

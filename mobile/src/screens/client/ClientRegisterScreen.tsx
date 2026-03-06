@@ -68,7 +68,14 @@ export default function ClientRegisterScreen({navigation}: any) {
         {text: '确定', onPress: () => navigation.goBack()},
       ]);
     } catch (e: any) {
-      Alert.alert('注册失败', e.message);
+      const errMsg: string = e.response?.data?.error || e.message || '注册失败';
+      if (errMsg.includes('已存在')) {
+        Alert.alert('提示', '您已完成客户注册，无需重复注册', [
+          {text: '确定', onPress: () => navigation.goBack()},
+        ]);
+      } else {
+        Alert.alert('注册失败', errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -104,7 +111,14 @@ export default function ClientRegisterScreen({navigation}: any) {
         {text: '确定', onPress: () => navigation.goBack()},
       ]);
     } catch (e: any) {
-      Alert.alert('注册失败', e.message);
+      const errMsg: string = e.response?.data?.error || e.message || '注册失败';
+      if (errMsg.includes('已存在')) {
+        Alert.alert('提示', '您已完成客户注册，无需重复注册', [
+          {text: '确定', onPress: () => navigation.goBack()},
+        ]);
+      } else {
+        Alert.alert('注册失败', errMsg);
+      }
     } finally {
       setLoading(false);
     }

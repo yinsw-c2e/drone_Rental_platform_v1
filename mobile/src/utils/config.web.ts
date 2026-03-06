@@ -8,8 +8,8 @@
 // 从 import.meta.env 读取 Vite 环境变量
 const Config = {
   // Web 版本默认使用 cpolar 固定公网地址（backend 隧道）
-  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://dronerentalplat.vip.cpolar.cn/api/v1',
-  WS_BASE_URL: import.meta.env.VITE_WS_BASE_URL || 'wss://dronerentalplat.vip.cpolar.cn/ws',
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://dronerentalplat.cpolar.top/api/v1',
+  WS_BASE_URL: import.meta.env.VITE_WS_BASE_URL || 'wss://dronerentalplat.cpolar.top/ws',
   API_TIMEOUT: import.meta.env.VITE_API_TIMEOUT || '15000',
   AMAP_ANDROID_KEY: import.meta.env.VITE_AMAP_ANDROID_KEY || '',
   AMAP_IOS_KEY: import.meta.env.VITE_AMAP_IOS_KEY || '',

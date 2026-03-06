@@ -54,7 +54,7 @@ func (r *ClientRepo) Delete(id int64) error {
 
 // ==================== 列表查询 ====================
 
-func (r *ClientRepo) List(page, pageSize int, clientType, status string) ([]model.Client, int64, error) {
+func (r *ClientRepo) List(page, pageSize int, clientType, verificationStatus string) ([]model.Client, int64, error) {
 	var clients []model.Client
 	var total int64
 
@@ -62,8 +62,8 @@ func (r *ClientRepo) List(page, pageSize int, clientType, status string) ([]mode
 	if clientType != "" {
 		query = query.Where("client_type = ?", clientType)
 	}
-	if status != "" {
-		query = query.Where("status = ?", status)
+	if verificationStatus != "" {
+		query = query.Where("verification_status = ?", verificationStatus)
 	}
 
 	if err := query.Count(&total).Error; err != nil {

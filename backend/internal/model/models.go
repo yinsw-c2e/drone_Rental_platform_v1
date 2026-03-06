@@ -649,7 +649,7 @@ func (ClientEnterpriseCert) TableName() string {
 type CargoDeclaration struct {
 	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	ClientID            int64          `gorm:"index;not null" json:"client_id"`
-	OrderID             int64          `gorm:"index" json:"order_id"` // 关联订单
+	OrderID             *int64         `gorm:"index" json:"order_id"` // 关联订单，可为空
 	DeclarationNo       string         `gorm:"type:varchar(50);uniqueIndex" json:"declaration_no"`
 	CargoCategory       string         `gorm:"type:varchar(50);not null" json:"cargo_category"`    // normal(普通货物), valuable(贵重物品), fragile(易碎品), hazardous(危险品), perishable(生鲜), medical(医疗用品)
 	CargoName           string         `gorm:"type:varchar(200);not null" json:"cargo_name"`

@@ -170,9 +170,9 @@ export const createCargoDeclaration = async (data: CreateCargoDeclarationRequest
 export const listCargoDeclarations = async (params?: {
   page?: number;
   page_size?: number;
-}): Promise<{data: CargoDeclaration[]; total: number}> => {
+}): Promise<{list: CargoDeclaration[]; total: number}> => {
   const res: any = await api.get('/client/cargo/declarations', {params});
-  return res;
+  return {list: res.data?.list || [], total: res.data?.total || 0};
 };
 
 // 获取货物申报详情
