@@ -34,12 +34,12 @@ const NEXT_ACTION: Record<string, {label: string; nextStatus: string; confirmMsg
 };
 
 export default function PilotOrderExecutionScreen({route, navigation}: any) {
-  const {taskId, taskNo, orderId: initialOrderId} = route.params || {};
+  const {taskId} = route.params || {};
   const [order, setOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async () => {
     try {
       const data = await getOrderByTaskId(taskId);
       setOrder(data);
@@ -48,12 +48,12 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
 
   useFocusEffect(
     useCallback(() => {
       loadOrder();
-    }, [taskId]),
+    }, [loadOrder]),
   );
 
   const handleNextStep = () => {
@@ -189,6 +189,23 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
           })}
         </View>
 
+        {/* 飞行入口 */}
+        <View style={styles.stepsCard}>
+          <Text style={styles.sectionTitle}>飞行数据</Text>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => navigation.navigate('FlightMonitoring', {orderId: order.id})}>
+            <Text style={styles.linkText}>飞行监控</Text>
+            <Text style={styles.linkArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.linkRow, {borderBottomWidth: 0}]}
+            onPress={() => navigation.navigate('TrajectoryRecord', {orderId: order.id})}>
+            <Text style={styles.linkText}>轨迹记录</Text>
+            <Text style={styles.linkArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 操作按钮 */}
         {!isCompleted && nextAction && (
           <TouchableOpacity
@@ -248,6 +265,16 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4,
   },
   sectionTitle: {fontSize: 15, fontWeight: '700', color: '#333', marginBottom: 16},
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  linkText: {fontSize: 14, color: '#333'},
+  linkArrow: {fontSize: 18, color: '#1890ff'},
   stepRow: {flexDirection: 'row', marginBottom: 0},
   stepLeft: {alignItems: 'center', width: 36},
   stepCircle: {

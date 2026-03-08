@@ -3,12 +3,18 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"time"
 
 	"go.uber.org/zap"
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/repository"
+)
+
+const (
+	maxSegmentGapSeconds = 120.0
+	maxSegmentSpeedMPS   = 60.0
 )
 
 type PilotService struct {
@@ -27,12 +33,12 @@ func NewPilotService(pilotRepo *repository.PilotRepo, userRepo *repository.UserR
 
 // RegisterPilotReq 飞手注册请求
 type RegisterPilotReq struct {
-	CAACLicenseNo   string     `json:"caac_license_no" binding:"required"`
-	CAACLicenseType string     `json:"caac_license_type" binding:"required"` // VLOS, BVLOS, instructor
+	CAACLicenseNo         string     `json:"caac_license_no" binding:"required"`
+	CAACLicenseType       string     `json:"caac_license_type" binding:"required"` // VLOS, BVLOS, instructor
 	CAACLicenseExpireDate *time.Time `json:"caac_license_expire_date"`
-	CAACLicenseImage string    `json:"caac_license_image" binding:"required"`
-	ServiceRadius   float64    `json:"service_radius"`
-	SpecialSkills   []string   `json:"special_skills"`
+	CAACLicenseImage      string     `json:"caac_license_image" binding:"required"`
+	ServiceRadius         float64    `json:"service_radius"`
+	SpecialSkills         []string   `json:"special_skills"`
 }
 
 // Register 注册飞手档案
@@ -313,20 +319,207 @@ func (s *PilotService) AddFlightLog(log *model.PilotFlightLog) error {
 
 // GetFlightLogs 获取飞行记录
 func (s *PilotService) GetFlightLogs(pilotID int64, page, pageSize int) ([]model.PilotFlightLog, int64, error) {
-	return s.pilotRepo.GetFlightLogsByPilotID(pilotID, page, pageSize)
+	logs, total, err := s.pilotRepo.GetFlightLogsByPilotID(pilotID, page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	if total > 0 {
+		return logs, total, nil
+	}
+
+	autoLogs, err := s.buildAutoFlightLogs(pilotID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(autoLogs) == 0 {
+		return logs, total, nil
+	}
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+
+	start := (page - 1) * pageSize
+	if start >= len(autoLogs) {
+		return []model.PilotFlightLog{}, int64(len(autoLogs)), nil
+	}
+	end := start + pageSize
+	if end > len(autoLogs) {
+		end = len(autoLogs)
+	}
+	return autoLogs[start:end], int64(len(autoLogs)), nil
 }
 
 // GetFlightStats 获取飞行统计
 func (s *PilotService) GetFlightStats(pilotID int64) (map[string]interface{}, error) {
-	totalHours, totalDistance, totalFlights, err := s.pilotRepo.GetFlightStatsByPilotID(pilotID)
+	autoLogs, err := s.buildAutoFlightLogs(pilotID)
 	if err != nil {
 		return nil, err
 	}
+	if len(autoLogs) > 0 {
+		totalFlights := len(autoLogs)
+		totalMinutes := 0.0
+		totalDistance := 0.0
+		maxAltitude := 0.0
+		for _, log := range autoLogs {
+			totalMinutes += log.FlightDuration
+			totalDistance += log.FlightDistance
+			if log.MaxAltitude > maxAltitude {
+				maxAltitude = log.MaxAltitude
+			}
+		}
+		totalHours := totalMinutes / 60.0
+		avgDuration := 0.0
+		if totalFlights > 0 {
+			avgDuration = totalMinutes / float64(totalFlights)
+		}
+		return map[string]interface{}{
+			"total_flights":         totalFlights,
+			"total_hours":           totalHours,
+			"total_distance":        totalDistance,
+			"avg_duration":          avgDuration,
+			"max_altitude":          maxAltitude,
+			"total_flight_hours":    totalHours,
+			"total_flight_distance": totalDistance,
+		}, nil
+	}
+
+	totalHours, totalDistance, totalFlights, maxAltitude, err := s.pilotRepo.GetFlightStatsByPilotID(pilotID)
+	if err != nil {
+		return nil, err
+	}
+	avgDuration := 0.0
+	if totalFlights > 0 {
+		avgDuration = (totalHours * 60) / float64(totalFlights)
+	}
 	return map[string]interface{}{
+		"total_flights":         totalFlights,
+		"total_hours":           totalHours,
+		"total_distance":        totalDistance,
+		"avg_duration":          avgDuration,
+		"max_altitude":          maxAltitude,
 		"total_flight_hours":    totalHours,
 		"total_flight_distance": totalDistance,
-		"total_flights":         totalFlights,
 	}, nil
+}
+
+func (s *PilotService) buildAutoFlightLogs(pilotID int64) ([]model.PilotFlightLog, error) {
+	seeds, err := s.pilotRepo.ListCompletedOrderFlightSeedsByPilotID(pilotID)
+	if err != nil {
+		return nil, err
+	}
+	if len(seeds) == 0 {
+		return []model.PilotFlightLog{}, nil
+	}
+
+	logs := make([]model.PilotFlightLog, 0, len(seeds))
+	for _, seed := range seeds {
+		positions, err := s.pilotRepo.ListFlightPositionsByOrderID(seed.OrderID)
+		if err != nil {
+			return nil, err
+		}
+		durationSec, distanceMeters, maxAlt := calcFlightMetricsFromPositions(positions)
+
+		// 订单端显式起降时间作为兜底，仅在同时存在时才使用，避免把“已完成到结算”的长间隔算入飞行时长。
+		if durationSec == 0 && seed.FlightStartAt != nil && seed.FlightEndAt != nil && seed.FlightEndAt.After(*seed.FlightStartAt) {
+			durationSec = int64(seed.FlightEndAt.Sub(*seed.FlightStartAt).Seconds())
+		}
+
+		task, err := s.pilotRepo.FindDispatchTaskForOrder(
+			pilotID,
+			seed.OrderID,
+			seed.DispatchTaskID,
+			seed.ServiceAddress,
+			seed.OrderCreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		distanceKM := distanceMeters / 1000.0
+		if task != nil && task.FlightDistance > 0 {
+			distanceKM = task.FlightDistance
+		}
+
+		startAddress := seed.ServiceAddress
+		endAddress := seed.DestAddress
+		if task != nil {
+			if task.PickupAddress != "" {
+				startAddress = task.PickupAddress
+			}
+			if task.DeliveryAddress != "" {
+				endAddress = task.DeliveryAddress
+			}
+		}
+
+		flightDate := seed.OrderUpdatedAt
+		if seed.FlightEndAt != nil {
+			flightDate = *seed.FlightEndAt
+		} else if seed.FlightStartAt != nil {
+			flightDate = *seed.FlightStartAt
+		}
+
+		logs = append(logs, model.PilotFlightLog{
+			ID:             -seed.OrderID,
+			PilotID:        pilotID,
+			OrderID:        seed.OrderID,
+			FlightDate:     flightDate,
+			FlightDuration: float64(durationSec) / 60.0,
+			FlightDistance: distanceKM,
+			StartAddress:   startAddress,
+			EndAddress:     endAddress,
+			MaxAltitude:    float64(maxAlt),
+			FlightType:     "cargo",
+			CreatedAt:      seed.OrderUpdatedAt,
+			IncidentReport: "由订单执行与飞行监控数据自动生成",
+		})
+	}
+
+	return logs, nil
+}
+
+func calcFlightMetricsFromPositions(positions []model.FlightPosition) (durationSec int64, distanceMeters float64, maxAltitude int) {
+	if len(positions) == 0 {
+		return 0, 0, 0
+	}
+
+	for _, p := range positions {
+		if p.Altitude > maxAltitude {
+			maxAltitude = p.Altitude
+		}
+	}
+
+	for i := 1; i < len(positions); i++ {
+		prev := positions[i-1]
+		cur := positions[i]
+		dt := cur.RecordedAt.Sub(prev.RecordedAt).Seconds()
+		if dt <= 0 || dt > maxSegmentGapSeconds {
+			continue
+		}
+		dist := haversineMeters(prev.Latitude, prev.Longitude, cur.Latitude, cur.Longitude)
+		if dt > 0 && (dist/dt) > maxSegmentSpeedMPS {
+			continue
+		}
+		durationSec += int64(dt)
+		distanceMeters += dist
+	}
+
+	return durationSec, distanceMeters, maxAltitude
+}
+
+func haversineMeters(lat1, lng1, lat2, lng2 float64) float64 {
+	const earthRadius = 6371000.0
+	toRad := math.Pi / 180.0
+	dLat := (lat2 - lat1) * toRad
+	dLng := (lng2 - lng1) * toRad
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*toRad)*math.Cos(lat2*toRad)*
+			math.Sin(dLng/2)*math.Sin(dLng/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return earthRadius * c
 }
 
 // ==================== 飞手-无人机绑定 ====================

@@ -140,6 +140,23 @@ export interface AddFlightLogRequest {
   notes?: string;
 }
 
+const normalizeFlightLog = (raw: any): PilotFlightLog => ({
+  id: Number(raw?.id || 0),
+  pilot_id: Number(raw?.pilot_id || 0),
+  drone_id: Number(raw?.drone_id || 0),
+  order_id: Number(raw?.order_id || 0),
+  flight_date: raw?.flight_date || '',
+  flight_duration: Number(raw?.flight_duration || 0),
+  flight_distance: Number(raw?.flight_distance || 0),
+  takeoff_location: raw?.takeoff_location || raw?.start_address || '',
+  landing_location: raw?.landing_location || raw?.end_address || '',
+  max_altitude: Number(raw?.max_altitude || 0),
+  weather_condition: raw?.weather_condition || '',
+  flight_purpose: raw?.flight_purpose || raw?.flight_type || 'cargo_delivery',
+  notes: raw?.notes || raw?.incident_report || '',
+  created_at: raw?.created_at || '',
+});
+
 export interface BindDroneRequest {
   drone_id: number;
   binding_type: string;
@@ -238,19 +255,53 @@ export const getFlightLogs = async (params?: {
   page_size?: number;
 }): Promise<{data: PilotFlightLog[]; total: number}> => {
   const res: any = await api.get('/pilot/flight-logs', {params});
-  return res;
+  const payload = res?.data || {};
+  const list = Array.isArray(payload?.list)
+    ? payload.list
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : [];
+  return {
+    data: list.map(normalizeFlightLog),
+    total: Number(payload?.total || list.length),
+  };
 };
 
 // 添加飞行记录
 export const addFlightLog = async (data: AddFlightLogRequest): Promise<PilotFlightLog> => {
-  const res: any = await api.post('/pilot/flight-log', data);
-  return res.data;
+  const payload = {
+    drone_id: data.drone_id,
+    flight_date: data.flight_date,
+    flight_duration: data.flight_duration,
+    flight_distance: data.flight_distance,
+    start_address: data.takeoff_location,
+    end_address: data.landing_location,
+    max_altitude: data.max_altitude,
+    weather_condition: data.weather_condition,
+    flight_type: data.flight_purpose,
+    incident_report: data.notes,
+  };
+  const res: any = await api.post('/pilot/flight-log', payload);
+  return normalizeFlightLog(res?.data || {});
 };
 
 // 获取飞行统计
 export const getFlightStats = async (): Promise<FlightStats> => {
   const res: any = await api.get('/pilot/flight-stats');
-  return res.data;
+  const data = res?.data || {};
+  const totalFlights = Number(data.total_flights || 0);
+  const totalHours = Number(data.total_hours ?? data.total_flight_hours ?? 0);
+  const totalDistance = Number(data.total_distance ?? data.total_flight_distance ?? 0);
+  const avgDuration =
+    Number(data.avg_duration ?? (totalFlights > 0 ? (totalHours * 60) / totalFlights : 0));
+  const maxAltitude = Number(data.max_altitude || 0);
+  return {
+    total_flights: totalFlights,
+    total_hours: totalHours,
+    total_distance: totalDistance,
+    avg_duration: avgDuration,
+    max_altitude: maxAltitude,
+  };
 };
 
 // ==================== 无人机绑定 ====================

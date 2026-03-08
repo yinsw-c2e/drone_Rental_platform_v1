@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Alert,
   RefreshControl,
   Switch,
-  Image,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -19,6 +18,7 @@ import {
   Pilot,
   FlightStats,
 } from '../../services/pilot';
+import {getMyActiveOrder, getOrderByTaskId, listPilotTasks} from '../../services/dispatch';
 
 const STATUS_MAP: Record<string, {label: string; color: string}> = {
   pending: {label: '待审核', color: '#faad14'},
@@ -83,6 +83,38 @@ export default function PilotProfileScreen({navigation}: any) {
     }
   };
 
+  const handleEnterFlightMonitoring = async () => {
+    try {
+      const activeOrder = await getMyActiveOrder();
+      if (activeOrder?.id) {
+        navigation.navigate('FlightMonitoring', {orderId: activeOrder.id});
+        return;
+      }
+
+      // 无进行中订单时，回退到最近一条可关联订单，避免“无入口”。
+      const pilotTasksRes = await listPilotTasks({page: 1, page_size: 20});
+      const latestTask = (pilotTasksRes.data || []).find((t: any) => Number(t?.task_id) > 0);
+      if (latestTask?.task_id) {
+        const order = await getOrderByTaskId(Number(latestTask.task_id));
+        if (order?.id) {
+          navigation.navigate('FlightMonitoring', {orderId: order.id});
+          return;
+        }
+      }
+
+      Alert.alert(
+        '提示',
+        '当前没有可监控的执行订单，请先从接单任务进入。',
+        [
+          {text: '取消', style: 'cancel'},
+          {text: '去接单任务', onPress: () => navigation.navigate('PilotTaskList')},
+        ],
+      );
+    } catch (e: any) {
+      Alert.alert('错误', e?.message || '获取执行订单失败');
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -110,6 +142,10 @@ export default function PilotProfileScreen({navigation}: any) {
 
   const verificationStatus = STATUS_MAP[pilot.verification_status] || STATUS_MAP.pending;
   const availabilityStatus = AVAILABILITY_STATUS_MAP[pilot.availability_status] || AVAILABILITY_STATUS_MAP.offline;
+  const totalFlights = flightStats?.total_flights || 0;
+  const totalHours = flightStats?.total_hours || 0;
+  const totalDistance = flightStats?.total_distance || 0;
+  const timeText = totalHours < 1 ? `${Math.round(totalHours * 60)}m` : `${totalHours.toFixed(1)}h`;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -171,18 +207,18 @@ export default function PilotProfileScreen({navigation}: any) {
           <Text style={styles.cardTitle}>飞行统计</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{flightStats?.total_flights || 0}</Text>
+              <Text style={styles.statsValue}>{totalFlights}</Text>
               <Text style={styles.statsLabel}>总飞行次数</Text>
             </View>
             <View style={styles.statsItem}>
               <Text style={styles.statsValue}>
-                {(flightStats?.total_hours || 0).toFixed(1)}h
+                {timeText}
               </Text>
               <Text style={styles.statsLabel}>总飞行时长</Text>
             </View>
             <View style={styles.statsItem}>
               <Text style={styles.statsValue}>
-                {((flightStats?.total_distance || 0) / 1000).toFixed(1)}km
+                {(totalDistance / 1000).toFixed(1)}km
               </Text>
               <Text style={styles.statsLabel}>总飞行距离</Text>
             </View>
@@ -259,7 +295,7 @@ export default function PilotProfileScreen({navigation}: any) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionItem}
-            onPress={() => navigation.navigate('FlightMonitoring', {orderId: undefined})}>
+            onPress={handleEnterFlightMonitoring}>
             <Text style={styles.actionText}>飞行监控</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>

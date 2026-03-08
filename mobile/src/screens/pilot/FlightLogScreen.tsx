@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -41,7 +41,7 @@ const PURPOSE_OPTIONS = [
   {label: '其他', value: 'other'},
 ];
 
-export default function FlightLogScreen({navigation}: any) {
+export default function FlightLogScreen() {
   const [logs, setLogs] = useState<PilotFlightLog[]>([]);
   const [stats, setStats] = useState<FlightStats | null>(null);
   const [boundDrones, setBoundDrones] = useState<PilotDroneBinding[]>([]);
@@ -65,13 +65,13 @@ export default function FlightLogScreen({navigation}: any) {
   const [flightPurpose, setFlightPurpose] = useState('cargo_delivery');
   const [notes, setNotes] = useState('');
 
-  const loadData = async (isRefresh = false) => {
+  const loadData = useCallback(async (isRefresh = false, targetPage?: number) => {
     try {
-      const currentPage = isRefresh ? 1 : page;
+      const currentPage = isRefresh ? 1 : (targetPage ?? 1);
       const [logsRes, statsData, dronesData] = await Promise.all([
         getFlightLogs({page: currentPage, page_size: 20}),
-        currentPage === 1 ? getFlightStats() : Promise.resolve(stats),
-        currentPage === 1 ? getBoundDrones() : Promise.resolve(boundDrones),
+        currentPage === 1 ? getFlightStats() : Promise.resolve(null),
+        currentPage === 1 ? getBoundDrones() : Promise.resolve(null),
       ]);
 
       const newLogs = logsRes.data || [];
@@ -84,8 +84,8 @@ export default function FlightLogScreen({navigation}: any) {
       setHasMore(newLogs.length === 20);
       
       if (currentPage === 1) {
-        setStats(statsData);
-        setBoundDrones(dronesData || []);
+        setStats((statsData as FlightStats) || null);
+        setBoundDrones((dronesData as PilotDroneBinding[]) || []);
       }
     } catch (e: any) {
       Alert.alert('错误', e.message);
@@ -94,12 +94,12 @@ export default function FlightLogScreen({navigation}: any) {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData(true);
-    }, []),
+    }, [loadData]),
   );
 
   const onRefresh = () => {
@@ -110,8 +110,9 @@ export default function FlightLogScreen({navigation}: any) {
   const loadMore = () => {
     if (!hasMore || loadingMore) return;
     setLoadingMore(true);
-    setPage(prev => prev + 1);
-    loadData(false);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadData(false, nextPage);
   };
 
   const resetForm = () => {
@@ -211,6 +212,13 @@ export default function FlightLogScreen({navigation}: any) {
     return `${(meters / 1000).toFixed(2)}公里`;
   };
 
+  const formatTotalHours = (hours: number): string => {
+    if (hours < 1) {
+      return `${Math.round(hours * 60)}m`;
+    }
+    return `${hours.toFixed(1)}h`;
+  };
+
   const renderLogItem = ({item}: {item: PilotFlightLog}) => (
     <View style={styles.logCard}>
       <View style={styles.logHeader}>
@@ -261,12 +269,12 @@ export default function FlightLogScreen({navigation}: any) {
             <Text style={styles.statsValue}>{stats?.total_flights || 0}</Text>
             <Text style={styles.statsLabel}>总飞行次数</Text>
           </View>
-          <View style={styles.statsItem}>
-            <Text style={styles.statsValue}>
-              {(stats?.total_hours || 0).toFixed(1)}h
-            </Text>
-            <Text style={styles.statsLabel}>总飞行时长</Text>
-          </View>
+            <View style={styles.statsItem}>
+              <Text style={styles.statsValue}>
+                {formatTotalHours(stats?.total_hours || 0)}
+              </Text>
+              <Text style={styles.statsLabel}>总飞行时长</Text>
+            </View>
           <View style={styles.statsItem}>
             <Text style={styles.statsValue}>
               {((stats?.total_distance || 0) / 1000).toFixed(1)}km

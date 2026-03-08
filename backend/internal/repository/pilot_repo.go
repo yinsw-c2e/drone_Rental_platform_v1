@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -215,18 +216,114 @@ func (r *PilotRepo) GetFlightLogsByPilotID(pilotID int64, page, pageSize int) ([
 	return logs, total, err
 }
 
+type CompletedOrderFlightSeed struct {
+	OrderID        int64      `gorm:"column:order_id"`
+	OrderNo        string     `gorm:"column:order_no"`
+	ServiceAddress string     `gorm:"column:service_address"`
+	DestAddress    string     `gorm:"column:dest_address"`
+	DispatchTaskID int64      `gorm:"column:dispatch_task_id"`
+	FlightStartAt  *time.Time `gorm:"column:flight_start_time"`
+	FlightEndAt    *time.Time `gorm:"column:flight_end_time"`
+	OrderCreatedAt time.Time  `gorm:"column:order_created_at"`
+	OrderUpdatedAt time.Time  `gorm:"column:order_updated_at"`
+}
+
+// ListCompletedOrderFlightSeedsByPilotID 获取飞手已完成订单(用于自动飞行记录)
+func (r *PilotRepo) ListCompletedOrderFlightSeedsByPilotID(pilotID int64) ([]CompletedOrderFlightSeed, error) {
+	var rows []CompletedOrderFlightSeed
+	err := r.db.Raw(`
+		SELECT
+			o.id AS order_id,
+			o.order_no,
+			o.service_address,
+			o.dest_address,
+			COALESCE(o.dispatch_task_id, 0) AS dispatch_task_id,
+			o.flight_start_time,
+			o.flight_end_time,
+			o.created_at AS order_created_at,
+			o.updated_at AS order_updated_at
+		FROM orders o
+		WHERE o.deleted_at IS NULL
+			AND o.pilot_id = ?
+			AND o.status IN ('completed', 'delivered')
+		ORDER BY o.updated_at DESC
+	`, pilotID).Scan(&rows).Error
+	return rows, err
+}
+
+// ListFlightPositionsByOrderID 获取订单监控点位(按时间升序)
+func (r *PilotRepo) ListFlightPositionsByOrderID(orderID int64) ([]model.FlightPosition, error) {
+	var rows []model.FlightPosition
+	err := r.db.Model(&model.FlightPosition{}).
+		Where("order_id = ?", orderID).
+		Order("recorded_at ASC").
+		Find(&rows).Error
+	return rows, err
+}
+
+// FindDispatchTaskForOrder 查找订单对应的派单任务(优先显式关联, 其次按地址+飞手接受记录匹配)
+func (r *PilotRepo) FindDispatchTaskForOrder(
+	pilotID int64,
+	orderID int64,
+	dispatchTaskID int64,
+	pickupAddress string,
+	orderCreatedAt time.Time,
+) (*model.DispatchTask, error) {
+	var task model.DispatchTask
+	if dispatchTaskID > 0 {
+		err := r.db.Where("id = ?", dispatchTaskID).First(&task).Error
+		if err == nil {
+			return &task, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	err := r.db.Where("order_id = ?", orderID).Order("id DESC").First(&task).Error
+	if err == nil {
+		return &task, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if pickupAddress == "" {
+		return nil, nil
+	}
+
+	err = r.db.Raw(`
+		SELECT dt.*
+		FROM dispatch_tasks dt
+		JOIN dispatch_candidates dc ON dc.task_id = dt.id
+		WHERE dc.pilot_id = ?
+			AND dc.status = 'accepted'
+			AND dt.pickup_address = ?
+		ORDER BY ABS(TIMESTAMPDIFF(SECOND, dt.created_at, ?)) ASC, dt.id DESC
+		LIMIT 1
+	`, pilotID, pickupAddress, orderCreatedAt).Scan(&task).Error
+	if err != nil {
+		return nil, err
+	}
+	if task.ID == 0 {
+		return nil, nil
+	}
+	return &task, nil
+}
+
 // GetFlightStatsByPilotID 获取飞手飞行统计
-func (r *PilotRepo) GetFlightStatsByPilotID(pilotID int64) (totalHours float64, totalDistance float64, totalFlights int64, err error) {
+func (r *PilotRepo) GetFlightStatsByPilotID(pilotID int64) (totalHours float64, totalDistance float64, totalFlights int64, maxAltitude float64, err error) {
 	var result struct {
 		TotalHours    float64
 		TotalDistance float64
 		TotalFlights  int64
+		MaxAltitude   float64
 	}
 	err = r.db.Model(&model.PilotFlightLog{}).
-		Select("COALESCE(SUM(flight_duration)/60, 0) as total_hours, COALESCE(SUM(flight_distance), 0) as total_distance, COUNT(*) as total_flights").
+		Select("COALESCE(SUM(flight_duration)/60, 0) as total_hours, COALESCE(SUM(flight_distance), 0) as total_distance, COUNT(*) as total_flights, COALESCE(MAX(max_altitude), 0) as max_altitude").
 		Where("pilot_id = ?", pilotID).
 		Scan(&result).Error
-	return result.TotalHours, result.TotalDistance, result.TotalFlights, err
+	return result.TotalHours, result.TotalDistance, result.TotalFlights, result.MaxAltitude, err
 }
 
 // ==================== 飞手-无人机绑定 ====================

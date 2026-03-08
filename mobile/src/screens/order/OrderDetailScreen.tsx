@@ -392,7 +392,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
         {renderTimeline()}
 
         {/* Flight actions for in-progress / dispatch execution orders */}
-        {(['in_progress', 'confirmed', 'airspace_applying', 'airspace_approved', 'loading', 'in_transit', 'delivered'].includes(order.status)) && (
+        {(['in_progress', 'confirmed', 'airspace_applying', 'airspace_approved', 'loading', 'in_transit', 'delivered', 'completed'].includes(order.status)) && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>飞行管理</Text>
             <TouchableOpacity

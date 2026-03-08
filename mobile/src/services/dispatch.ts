@@ -179,6 +179,12 @@ export const getOrderByTaskId = async (taskId: number): Promise<any | null> => {
   return res?.data || null;
 };
 
+// 获取飞手当前执行中的订单
+export const getMyActiveOrder = async (): Promise<any | null> => {
+  const res: any = await api.get('/dispatch/order/active');
+  return res?.data || null;
+};
+
 // 更新飞手执行订单状态
 export const updateExecutionStatus = async (orderId: number, status: string): Promise<void> => {
   await api.post(`/dispatch/order/${orderId}/status`, {status});
@@ -197,5 +203,6 @@ export default {
   acceptTask,
   rejectTask,
   getOrderByTaskId,
+  getMyActiveOrder,
   updateExecutionStatus,
 };
