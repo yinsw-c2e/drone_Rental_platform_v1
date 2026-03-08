@@ -35,13 +35,22 @@ export interface DispatchCandidate {
   task_id: number;
   pilot_id: number;
   drone_id: number;
-  match_score: number;
-  distance_km: number;
-  estimated_price: number;
+  owner_id: number;
+  total_score: number;      // 综合得分(0-100)
+  distance_score: number;
+  load_score: number;
+  qualification_score: number;
+  credit_score: number;
+  price_score: number;
+  time_score: number;
+  rating_score: number;
+  distance: number;         // 距离(km)
+  estimated_time: number;  // 预计完成时间(分钟)
+  quoted_price: number;    // 报价(分)
   status: string;
-  response_deadline: string;
-  responded_at: string;
-  reject_reason: string;
+  notified_at?: string;
+  responded_at?: string;
+  response_note?: string;
   created_at: string;
   pilot?: any;
   drone?: any;
@@ -62,7 +71,7 @@ export interface DispatchLog {
 export interface CreateDispatchTaskRequest {
   order_id?: number;
   task_type: string;
-  priority?: string;
+  priority?: number;
   pickup_address: string;
   pickup_latitude: number;
   pickup_longitude: number;
@@ -96,9 +105,9 @@ export const listClientTasks = async (params?: {
   page?: number;
   page_size?: number;
   status?: string;
-}): Promise<{data: DispatchTask[]; total: number}> => {
+}): Promise<{list: DispatchTask[]; total: number}> => {
   const res: any = await api.get('/dispatch/tasks/client', {params});
-  return res;
+  return {list: res.data?.list || [], total: res.data?.total || 0};
 };
 
 // 取消任务
@@ -109,13 +118,28 @@ export const cancelDispatchTask = async (id: number): Promise<void> => {
 // 获取候选人
 export const getTaskCandidates = async (taskId: number): Promise<DispatchCandidate[]> => {
   const res: any = await api.get(`/dispatch/task/${taskId}/candidates`);
-  return res.data;
+  const list: DispatchCandidate[] = res.data || [];
+  // 按 pilot_id 去重，保留总分最高的一条
+  const map = new Map<number, DispatchCandidate>();
+  for (const c of list) {
+    const existing = map.get(c.pilot_id);
+    if (!existing || (c.total_score ?? 0) > (existing.total_score ?? 0)) {
+      map.set(c.pilot_id, c);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => (b.total_score ?? 0) - (a.total_score ?? 0));
 };
 
 // 获取任务日志
 export const getTaskLogs = async (taskId: number): Promise<DispatchLog[]> => {
   const res: any = await api.get(`/dispatch/task/${taskId}/logs`);
-  return res.data;
+  return res.data || [];
+};
+
+// 手动触发匹配
+export const triggerMatch = async (taskId: number): Promise<DispatchCandidate[]> => {
+  const res: any = await api.post(`/dispatch/task/${taskId}/match`);
+  return res.data?.candidates || [];
 };
 
 // ==================== 飞手端接口 ====================
@@ -124,10 +148,11 @@ export const getTaskLogs = async (taskId: number): Promise<DispatchLog[]> => {
 export const listPilotTasks = async (params?: {
   page?: number;
   page_size?: number;
-  status?: string;
-}): Promise<{data: DispatchCandidate[]; total: number}> => {
+}): Promise<{data: any[]; total: number}> => {
   const res: any = await api.get('/dispatch/tasks/pilot', {params});
-  return res;
+  // 拦截器返回整个 {code,message,data} 对象，SuccessWithPage 的 data = {list:[], total:n}
+  const list = res?.data?.list || res?.list || [];
+  return {data: Array.isArray(list) ? list : [], total: res?.data?.total || res?.total || 0};
 };
 
 // 获取待处理任务
@@ -137,13 +162,26 @@ export const getPendingTask = async (): Promise<DispatchCandidate | null> => {
 };
 
 // 接受任务
-export const acceptTask = async (candidateId: number): Promise<void> => {
-  await api.post(`/dispatch/candidate/${candidateId}/accept`);
+// 返回 {message, order_id}
+export const acceptTask = async (candidateId: number): Promise<{order_id?: number}> => {
+  const res: any = await api.post(`/dispatch/candidate/${candidateId}/accept`);
+  return res?.data || {};
 };
 
 // 拒绝任务
 export const rejectTask = async (candidateId: number, reason?: string): Promise<void> => {
   await api.post(`/dispatch/candidate/${candidateId}/reject`, {reason});
+};
+
+// 根据派单任务ID获取关联订单
+export const getOrderByTaskId = async (taskId: number): Promise<any | null> => {
+  const res: any = await api.get(`/dispatch/task/${taskId}/order`);
+  return res?.data || null;
+};
+
+// 更新飞手执行订单状态
+export const updateExecutionStatus = async (orderId: number, status: string): Promise<void> => {
+  await api.post(`/dispatch/order/${orderId}/status`, {status});
 };
 
 export default {
@@ -153,8 +191,11 @@ export default {
   cancelDispatchTask,
   getTaskCandidates,
   getTaskLogs,
+  triggerMatch,
   listPilotTasks,
   getPendingTask,
   acceptTask,
   rejectTask,
+  getOrderByTaskId,
+  updateExecutionStatus,
 };

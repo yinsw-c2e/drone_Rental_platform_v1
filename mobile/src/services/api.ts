@@ -37,10 +37,14 @@ function onTokenRefreshed(newToken: string) {
 api.interceptors.response.use(
   response => {
     const data = response.data;
-    if (data.code !== 0) {
-      return Promise.reject(new Error(data.message || '请求失败'));
+    // 只对有 code 字段的业务响应做校验（flight 等直接返回对象的接口无 code 字段，直接放行）
+    if (data !== null && typeof data === 'object' && 'code' in data) {
+      if (data.code !== 0) {
+        return Promise.reject(new Error(data.message || '请求失败'));
+      }
+      return data;
     }
-    return data;
+    return response;
   },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {_retry?: boolean};

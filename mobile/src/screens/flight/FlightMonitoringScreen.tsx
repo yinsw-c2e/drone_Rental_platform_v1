@@ -17,6 +17,7 @@ import {
   getActiveAlerts,
   acknowledgeAlert,
   resolveAlert,
+  simulateFlight,
   FlightPosition,
   FlightAlert,
 } from '../../services/flight';
@@ -46,6 +47,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [simulating, setSimulating] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = async () => {
@@ -115,6 +117,34 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
         },
       },
     ]);
+  };
+
+  const handleSimulateFlight = async () => {
+    if (!orderId) return;
+    Alert.alert(
+      '模拟飞行',
+      '将导加模拟飞行数据，共 20 步，每 3 秒更新一次位置。\n注：订单必须处于“运输中”状态。',
+      [
+        {text: '取消', style: 'cancel'},
+        {
+          text: '开始模拟',
+          onPress: async () => {
+            try {
+              setSimulating(true);
+              const result = await simulateFlight(orderId);
+              Alert.alert(
+                '模拟已启动',
+                result.message + '\n\n订单状态会在模拟完成后自动变为“已送达”',
+              );
+            } catch (e: any) {
+              Alert.alert('模拟失败', e.message || '请确保订单处于运输中状态');
+            } finally {
+              setSimulating(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const getBatteryColor = (level: number): string => {
@@ -352,6 +382,22 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
             <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>多点任务</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 开发模拟按钮（仅__DEV__环境显示） */}
+        {__DEV__ && (
+          <View style={styles.devSimulateSection}>
+            <Text style={styles.devSectionTitle}>🛠 开发工具</Text>
+            <TouchableOpacity
+              style={[styles.simulateBtn, simulating && styles.simulateBtnDisabled]}
+              onPress={handleSimulateFlight}
+              disabled={simulating}>
+              <Text style={styles.simulateBtnText}>
+                {simulating ? '模拟飞行启动中...' : '🚀 模拟飞行（取货点→送货点）'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.devHint}>共 20 步 · 每 3 秒更新 · 完成后订单自动变为“已送达”</Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -471,4 +517,24 @@ const styles = StyleSheet.create({
   actionBtnSecondary: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#1890ff'},
   actionBtnText: {fontSize: 16, color: '#fff', fontWeight: '600'},
   actionBtnTextSecondary: {color: '#1890ff'},
+  // 开发模拟区域
+  devSimulateSection: {
+    margin: 16,
+    marginBottom: 24,
+    backgroundColor: '#fffbe6',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#ffe58f',
+  },
+  devSectionTitle: {fontSize: 13, color: '#ad6800', fontWeight: '600', marginBottom: 10},
+  simulateBtn: {
+    backgroundColor: '#fa8c16',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  simulateBtnDisabled: {backgroundColor: '#ffd591'},
+  simulateBtnText: {fontSize: 15, color: '#fff', fontWeight: '600'},
+  devHint: {fontSize: 12, color: '#ad6800', marginTop: 8, textAlign: 'center'},
 });

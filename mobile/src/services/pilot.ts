@@ -174,7 +174,7 @@ export const updatePilotLocation = async (data: UpdateLocationRequest): Promise<
 
 // 更新接单状态
 export const updatePilotAvailability = async (isAvailable: boolean): Promise<void> => {
-  await api.put('/pilot/availability', {is_available: isAvailable});
+  await api.put('/pilot/availability', {status: isAvailable ? 'online' : 'offline'});
 };
 
 // 获取飞手列表

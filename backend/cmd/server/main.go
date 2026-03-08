@@ -14,25 +14,25 @@ import (
 
 	"wurenji-backend/internal/api/middleware"
 	v1 "wurenji-backend/internal/api/v1"
-	"wurenji-backend/internal/api/v1/admin"
-	"wurenji-backend/internal/api/v1/auth"
 	addresshandler "wurenji-backend/internal/api/v1/address"
+	"wurenji-backend/internal/api/v1/admin"
+	airspacehandler "wurenji-backend/internal/api/v1/airspace"
+	analyticshandler "wurenji-backend/internal/api/v1/analytics"
+	"wurenji-backend/internal/api/v1/auth"
 	clienthandler "wurenji-backend/internal/api/v1/client"
+	credithandler "wurenji-backend/internal/api/v1/credit"
 	"wurenji-backend/internal/api/v1/demand"
 	dispatchhandler "wurenji-backend/internal/api/v1/dispatch"
 	"wurenji-backend/internal/api/v1/drone"
 	flighthandler "wurenji-backend/internal/api/v1/flight"
-	airspacehandler "wurenji-backend/internal/api/v1/airspace"
-	settlementhandler "wurenji-backend/internal/api/v1/settlement"
-	credithandler "wurenji-backend/internal/api/v1/credit"
 	insurancehandler "wurenji-backend/internal/api/v1/insurance"
-	analyticshandler "wurenji-backend/internal/api/v1/analytics"
 	locationhandler "wurenji-backend/internal/api/v1/location"
 	"wurenji-backend/internal/api/v1/message"
 	"wurenji-backend/internal/api/v1/order"
 	paymenthandler "wurenji-backend/internal/api/v1/payment"
 	pilothandler "wurenji-backend/internal/api/v1/pilot"
 	"wurenji-backend/internal/api/v1/review"
+	settlementhandler "wurenji-backend/internal/api/v1/settlement"
 	"wurenji-backend/internal/api/v1/user"
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
@@ -186,7 +186,7 @@ func main() {
 	addressService := service.NewAddressService(addressRepo)
 	pilotService := service.NewPilotService(pilotRepo, userRepo, zapLogger)
 	clientService := service.NewClientService(clientRepo, userRepo)
-	dispatchService := service.NewDispatchService(dispatchRepo, pilotRepo, droneRepo, clientRepo, zapLogger)
+	dispatchService := service.NewDispatchService(dispatchRepo, pilotRepo, droneRepo, clientRepo, orderRepo, zapLogger)
 	flightService := service.NewFlightService(flightRepo, orderRepo, zapLogger)
 	airspaceService := service.NewAirspaceService(airspaceRepo, pilotRepo, droneRepo, orderRepo, zapLogger)
 	settlementService := service.NewSettlementService(settlementRepo, orderRepo, zapLogger)
@@ -199,26 +199,26 @@ func main() {
 
 	// Init handlers
 	handlers := &v1.Handlers{
-		Auth:     auth.NewHandler(authService, wechatOAuth, qqOAuth),
-		User:     user.NewHandler(userService, uploadService),
-		Drone:    drone.NewHandler(droneService, uploadService),
-		Order:    order.NewHandler(orderService),
-		Demand:   demand.NewHandler(demandService, matchingService),
-		Payment:  paymenthandler.NewHandler(paymentService),
-		Message:  message.NewHandler(messageService),
-		Review:   review.NewHandler(reviewService),
-		Admin:    admin.NewHandler(userService, droneService, orderService, paymentService, pilotService, clientService),
-		Location: locationhandler.NewHandler(amapService),
-		Address:  addresshandler.NewHandler(addressService),
-		Pilot:    pilothandler.NewHandler(pilotService, uploadService),
-		Client:   clienthandler.NewHandler(clientService),
-		Dispatch: dispatchhandler.NewHandler(dispatchService, clientService, pilotService),
-		Flight:   flighthandler.NewHandler(flightService, pilotService),
-		Airspace: airspacehandler.NewHandler(airspaceService),
+		Auth:       auth.NewHandler(authService, wechatOAuth, qqOAuth),
+		User:       user.NewHandler(userService, uploadService),
+		Drone:      drone.NewHandler(droneService, uploadService),
+		Order:      order.NewHandler(orderService),
+		Demand:     demand.NewHandler(demandService, matchingService),
+		Payment:    paymenthandler.NewHandler(paymentService),
+		Message:    message.NewHandler(messageService),
+		Review:     review.NewHandler(reviewService),
+		Admin:      admin.NewHandler(userService, droneService, orderService, paymentService, pilotService, clientService),
+		Location:   locationhandler.NewHandler(amapService),
+		Address:    addresshandler.NewHandler(addressService),
+		Pilot:      pilothandler.NewHandler(pilotService, uploadService),
+		Client:     clienthandler.NewHandler(clientService),
+		Dispatch:   dispatchhandler.NewHandler(dispatchService, clientService, pilotService, orderRepo),
+		Flight:     flighthandler.NewHandler(flightService, pilotService),
+		Airspace:   airspacehandler.NewHandler(airspaceService),
 		Settlement: settlementhandler.NewHandler(settlementService),
-		Credit:   credithandler.NewHandler(creditService),
-		Insurance: insurancehandler.NewHandler(insuranceService),
-		Analytics: analyticshandler.NewHandler(analyticsService),
+		Credit:     credithandler.NewHandler(creditService),
+		Insurance:  insurancehandler.NewHandler(insuranceService),
+		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
 
 	// Setup Gin
@@ -251,11 +251,11 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 设置连接池参数
 	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
 	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
-	
+
 	// 显式设置连接字符集
 	_, err = sqlDB.Exec("SET NAMES utf8mb4")
 	if err != nil {

@@ -3,7 +3,7 @@ export interface User {
   phone: string;
   nickname: string;
   avatar_url: string;
-  user_type: 'drone_owner' | 'renter' | 'cargo_owner' | 'admin';
+  user_type: 'drone_owner' | 'renter' | 'cargo_owner' | 'admin' | 'pilot';
   id_verified: 'pending' | 'approved' | 'rejected';
   credit_score: number;
   status: string;

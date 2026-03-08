@@ -19,6 +19,15 @@ func NewFlightRepo(db *gorm.DB) *FlightRepo {
 	return &FlightRepo{db: db}
 }
 
+// GetDispatchTask 根据 ID 查询 dispatch_task（模拟飞行用）
+func (r *FlightRepo) GetDispatchTask(taskID int64) (*model.DispatchTask, error) {
+	var task model.DispatchTask
+	if err := r.db.First(&task, taskID).Error; err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
 // ==================== 飞行位置相关 ====================
 
 // RecordPosition 记录飞行位置
@@ -688,12 +697,12 @@ func (r *FlightRepo) ArriveAtStop(id int64) error {
 func (r *FlightRepo) CompleteStop(id int64, photos model.JSON, signature, confirmedBy string) error {
 	now := time.Now()
 	return r.db.Model(&model.MultiPointTaskStop{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"status":               "completed",
-		"actual_departure":     now,
-		"confirmation_photos":  photos,
+		"status":                 "completed",
+		"actual_departure":       now,
+		"confirmation_photos":    photos,
 		"confirmation_signature": signature,
-		"confirmed_at":         now,
-		"confirmed_by":         confirmedBy,
+		"confirmed_at":           now,
+		"confirmed_by":           confirmedBy,
 	}).Error
 }
 

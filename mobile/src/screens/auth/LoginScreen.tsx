@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,40 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  FlatList,
 } from 'react-native';
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
 import {API_BASE_URL, WS_BASE_URL, APP_CONFIG} from '../../constants';
+
+// ============ 快速登录账号数据 ============
+const QUICK_LOGIN_ACCOUNTS = {
+  business: [
+    {label: '业主1 (13800000002)', phone: '13800000002', password: 'password123', role: '业主1'},
+    {label: '业主2 (13800000003)', phone: '13800000003', password: 'password123', role: '业主2'},
+    {label: '业主6 (13800000006)', phone: '13800000006', password: 'password123', role: '业主6'},
+    {label: '业主7 (13800000007)', phone: '13800000007', password: 'password123', role: '业主7'},
+  ],
+  pilot: [
+    {label: '张飞手 (13900000013)', phone: '13900000013', password: 'password123', role: '飞手·张'},
+    {label: '李飞手 (13900000014)', phone: '13900000014', password: 'password123', role: '飞手·李'},
+    {label: '王飞手 (13900000015)', phone: '13900000015', password: 'password123', role: '飞手·王'},
+    {label: '赵飞手 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手·赵'},
+    {label: '陈飞手 (13900000017)', phone: '13900000017', password: 'password123', role: '飞手·陈'},
+  ],
+  renter: [
+    {label: '租客1 (13800000004)', phone: '13800000004', password: 'password123', role: '租客1'},
+    {label: '租客2 (13800000005)', phone: '13800000005', password: 'password123', role: '租客2'},
+  ],
+  admin: [
+    {label: '管理员 (13800000001)', phone: '13800000001', password: 'password123', role: '管理员'},
+  ],
+};
+
+type AccountItem = {label: string; phone: string; password: string; role: string};
+type DropdownKey = 'business' | 'pilot' | 'renter' | 'admin';
 
 export default function LoginScreen({navigation}: any) {
   const dispatch = useDispatch();
@@ -25,6 +54,10 @@ export default function LoginScreen({navigation}: any) {
   const [countdown, setCountdown] = useState(0);
   const [debugError, setDebugError] = useState<string>(''); // 调试错误信息
   const [showConfig, setShowConfig] = useState(false); // 配置信息展开/折叠
+
+  // 下拉框状态
+  const [dropdown, setDropdown] = useState<{key: DropdownKey; visible: boolean} | null>(null);
+  const [selected, setSelected] = useState<{[k in DropdownKey]?: AccountItem}>({});
 
   const handleWeChatLogin = () => {
     // 微信SDK需要原生模块支持，这里提示需要配置
@@ -228,28 +261,83 @@ export default function LoginScreen({navigation}: any) {
 
         <View style={styles.devSection}>
           <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
-          <View style={styles.devButtons}>
+
+          {([
+            {key: 'business' as DropdownKey, label: '🏠 业主', color: '#1890ff'},
+            {key: 'pilot' as DropdownKey, label: '✈️ 飞手', color: '#52c41a'},
+            {key: 'renter' as DropdownKey, label: '📦 租客', color: '#fa8c16'},
+            {key: 'admin' as DropdownKey, label: '⚙️ 管理员', color: '#722ed1'},
+          ]).map(({key, label, color}) => {
+            const acct = selected[key];
+            const accounts = QUICK_LOGIN_ACCOUNTS[key];
+            return (
+              <View key={key} style={styles.devRow}>
+                {/* 下拉选择器 */}
+                <TouchableOpacity
+                  style={styles.devDropdown}
+                  onPress={() => setDropdown({key, visible: true})}>
+                  <Text style={[styles.devDropdownLabel, {color}]}>{label}</Text>
+                  <Text style={styles.devDropdownValue} numberOfLines={1}>
+                    {acct ? acct.label : `选择${label.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27FF}]|\s/gu, '')}账号`}
+                  </Text>
+                  <Text style={styles.devDropdownArrow}>▾</Text>
+                </TouchableOpacity>
+                {/* 一键登录按钮 */}
+                <TouchableOpacity
+                  style={[styles.devLoginBtn, {backgroundColor: acct ? color : '#d9d9d9'}]}
+                  onPress={() => acct && quickLogin(acct.phone, acct.password, acct.role)}
+                  disabled={!acct}>
+                  <Text style={styles.devLoginBtnText}>登录</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+
+          {/* 下拉弹窗 */}
+          <Modal
+            visible={!!dropdown?.visible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setDropdown(null)}>
             <TouchableOpacity
-              style={styles.devBtn}
-              onPress={() => quickLogin('13800000001', 'password123', '机主1')}>
-              <Text style={styles.devBtnText}>机主1</Text>
+              style={styles.modalMask}
+              activeOpacity={1}
+              onPress={() => setDropdown(null)}>
+              <View style={styles.modalBox}>
+                <Text style={styles.modalTitle}>
+                  {dropdown ? {
+                    business: '🏠 选择业主账号',
+                    pilot: '✈️ 选择飞手账号',
+                    renter: '📦 选择租客账号',
+                    admin: '⚙️ 选择管理员账号',
+                  }[dropdown.key] : ''}
+                </Text>
+                <FlatList
+                  data={dropdown ? QUICK_LOGIN_ACCOUNTS[dropdown.key] : []}
+                  keyExtractor={item => item.phone}
+                  renderItem={({item}) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.modalItem,
+                        selected[dropdown!.key]?.phone === item.phone && styles.modalItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelected(prev => ({...prev, [dropdown!.key]: item}));
+                        setDropdown(null);
+                      }}>
+                      <Text style={[
+                        styles.modalItemText,
+                        selected[dropdown!.key]?.phone === item.phone && styles.modalItemTextActive,
+                      ]}>{item.label}</Text>
+                      {selected[dropdown!.key]?.phone === item.phone && (
+                        <Text style={styles.modalItemCheck}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.devBtn}
-              onPress={() => quickLogin('13800000002', 'password123', '机主2')}>
-              <Text style={styles.devBtnText}>机主2</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.devBtn}
-              onPress={() => quickLogin('13800000003', 'password123', '租客1')}>
-              <Text style={styles.devBtnText}>租客1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.devBtn}
-              onPress={() => quickLogin('13800000004', 'password123', '租客2')}>
-              <Text style={styles.devBtnText}>租客2</Text>
-            </TouchableOpacity>
-          </View>
+          </Modal>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -281,37 +369,109 @@ const styles = StyleSheet.create({
   switchBtn: {marginTop: 16, alignItems: 'center'},
   switchBtnText: {color: '#1890ff', fontSize: 14},
   devSection: {
-    marginTop: 40,
-    paddingTop: 20,
+    marginTop: 32,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#e8e8e8',
   },
   devTitle: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 13,
+    color: '#bbb',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  devButtons: {
+  devRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
   },
-  devBtn: {
-    width: '48%',
-    height: 44,
-    backgroundColor: '#f5f5f5',
+  devDropdown: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#fafafa',
+  },
+  devDropdownLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 6,
+    minWidth: 44,
+  },
+  devDropdownValue: {
+    flex: 1,
+    fontSize: 12,
+    color: '#666',
+  },
+  devDropdownArrow: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 4,
+  },
+  devLoginBtn: {
+    height: 40,
+    paddingHorizontal: 14,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#d9d9d9',
   },
-  devBtnText: {
-    color: '#666',
+  devLoginBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // Modal
+  modalMask: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalBox: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    width: '100%',
+    maxHeight: 340,
+    overflow: 'hidden',
+  },
+  modalTitle: {
     fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  modalItemActive: {
+    backgroundColor: '#e6f7ff',
+  },
+  modalItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  modalItemTextActive: {
+    color: '#1890ff',
     fontWeight: '500',
+  },
+  modalItemCheck: {
+    fontSize: 16,
+    color: '#1890ff',
   },
   thirdPartySection: {
     marginTop: 24,

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"wurenji-backend/internal/model"
 
 	"gorm.io/gorm"
@@ -49,6 +50,33 @@ func (r *OrderRepo) Update(order *model.Order) error {
 
 func (r *OrderRepo) UpdateStatus(id int64, status string) error {
 	return r.db.Model(&model.Order{}).Where("id = ?", id).Update("status", status).Error
+}
+
+func (r *OrderRepo) UpdateStatusWithFields(orderID int64, pilotID int64, status string, extra map[string]interface{}) error {
+	// 验证订单属于该飞手
+	var order model.Order
+	if err := r.db.Where("id = ? AND pilot_id = ?", orderID, pilotID).First(&order).Error; err != nil {
+		return fmt.Errorf("订单不存在或无权操作")
+	}
+	updates := map[string]interface{}{"status": status}
+	for k, v := range extra {
+		updates[k] = v
+	}
+	return r.db.Model(&model.Order{}).Where("id = ?", orderID).Updates(updates).Error
+}
+
+func (r *OrderRepo) ListByPilot(pilotID int64, status string, page, pageSize int) ([]model.Order, int64, error) {
+	var orders []model.Order
+	var total int64
+	query := r.db.Model(&model.Order{}).Where("pilot_id = ?", pilotID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	} else {
+		query = query.Where("status NOT IN (?)", []string{"completed", "cancelled"})
+	}
+	query.Count(&total)
+	err := query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&orders).Error
+	return orders, total, err
 }
 
 func (r *OrderRepo) ListByUser(userID int64, role string, status string, page, pageSize int) ([]model.Order, int64, error) {

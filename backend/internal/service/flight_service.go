@@ -25,16 +25,16 @@ type FlightService struct {
 
 // FlightServiceConfig 服务配置
 type FlightServiceConfig struct {
-	LowBatteryWarning       int     // 低电量预警阈值(%)
-	LowBatteryCritical      int     // 低电量紧急阈值(%)
-	SignalLostTimeout       int     // 信号丢失超时(秒)
-	DeviationWarningDist    int     // 偏航预警距离(米)
-	DeviationCriticalDist   int     // 偏航紧急距离(米)
-	MaxAltitudeWarning      int     // 最大高度预警(米)
-	MaxSpeedWarning         int     // 最大速度预警(米/秒)
-	PositionReportInterval  int     // 位置上报间隔(秒)
-	GeofenceAlertDistance   int     // 围栏预警距离(米)
-	TrajectorySimpTolerance int     // 轨迹简化容差(米)
+	LowBatteryWarning       int // 低电量预警阈值(%)
+	LowBatteryCritical      int // 低电量紧急阈值(%)
+	SignalLostTimeout       int // 信号丢失超时(秒)
+	DeviationWarningDist    int // 偏航预警距离(米)
+	DeviationCriticalDist   int // 偏航紧急距离(米)
+	MaxAltitudeWarning      int // 最大高度预警(米)
+	MaxSpeedWarning         int // 最大速度预警(米/秒)
+	PositionReportInterval  int // 位置上报间隔(秒)
+	GeofenceAlertDistance   int // 围栏预警距离(米)
+	TrajectorySimpTolerance int // 轨迹简化容差(米)
 }
 
 func NewFlightService(flightRepo *repository.FlightRepo, orderRepo *repository.OrderRepo, logger *zap.Logger) *FlightService {
@@ -77,21 +77,21 @@ func (s *FlightService) loadConfigFromDB() {
 
 // ReportPositionRequest 位置上报请求
 type ReportPositionRequest struct {
-	OrderID       int64   `json:"order_id"`
-	DroneID       int64   `json:"drone_id"`
-	PilotID       int64   `json:"pilot_id"`
-	Latitude      float64 `json:"latitude"`
-	Longitude     float64 `json:"longitude"`
-	Altitude      int     `json:"altitude"`
-	Speed         int     `json:"speed"`          // 米/秒x100
-	Heading       int     `json:"heading"`        // 度
-	VerticalSpeed int     `json:"vertical_speed"` // 米/秒x100
-	BatteryLevel  int     `json:"battery_level"`
-	SignalStrength int    `json:"signal_strength"`
-	GPSSatellites int     `json:"gps_satellites"`
-	Temperature   *int    `json:"temperature"`
-	WindSpeed     *int    `json:"wind_speed"`
-	WindDirection *int    `json:"wind_direction"`
+	OrderID        int64   `json:"order_id"`
+	DroneID        int64   `json:"drone_id"`
+	PilotID        int64   `json:"pilot_id"`
+	Latitude       float64 `json:"latitude"`
+	Longitude      float64 `json:"longitude"`
+	Altitude       int     `json:"altitude"`
+	Speed          int     `json:"speed"`          // 米/秒x100
+	Heading        int     `json:"heading"`        // 度
+	VerticalSpeed  int     `json:"vertical_speed"` // 米/秒x100
+	BatteryLevel   int     `json:"battery_level"`
+	SignalStrength int     `json:"signal_strength"`
+	GPSSatellites  int     `json:"gps_satellites"`
+	Temperature    *int    `json:"temperature"`
+	WindSpeed      *int    `json:"wind_speed"`
+	WindDirection  *int    `json:"wind_direction"`
 }
 
 // ReportPosition 上报飞行位置
@@ -224,7 +224,7 @@ func (s *FlightService) checkGeofences(pos *model.FlightPosition) []model.Flight
 
 	for _, fence := range fences {
 		isInside := s.isInsideGeofence(pos.Latitude, pos.Longitude, pos.Altitude, &fence)
-		
+
 		// 禁飞区/限飞区内部触发告警
 		if isInside && (fence.FenceType == "no_fly" || fence.FenceType == "restricted") {
 			level := "warning"
@@ -348,7 +348,7 @@ func (s *FlightService) StartTrajectoryRecording(orderID, droneID, pilotID int64
 		StartLatitude:   startLat,
 		StartLongitude:  startLng,
 		StartAddress:    startAddr,
-		EndLatitude:     startLat,  // 初始值
+		EndLatitude:     startLat, // 初始值
 		EndLongitude:    startLng,
 		RecordingStatus: "recording",
 		StartedAt:       time.Now(),
@@ -560,24 +560,24 @@ func (s *FlightService) CreateRouteFromTrajectory(trajectoryID, ownerID int64, n
 	waypointsJSON, _ := json.Marshal(waypointsData)
 
 	route := &model.SavedRoute{
-		OwnerID:            ownerID,
-		PilotID:            traj.PilotID,
-		SourceTrajectoryID: trajectoryID,
-		Name:               name,
-		Description:        desc,
-		StartLatitude:      traj.StartLatitude,
-		StartLongitude:     traj.StartLongitude,
-		StartAddress:       traj.StartAddress,
-		EndLatitude:        traj.EndLatitude,
-		EndLongitude:       traj.EndLongitude,
-		EndAddress:         traj.EndAddress,
-		TotalDistance:      traj.TotalDistance,
-		EstimatedDuration:  traj.TotalDuration,
-		WaypointCount:      traj.WaypointCount,
+		OwnerID:             ownerID,
+		PilotID:             traj.PilotID,
+		SourceTrajectoryID:  trajectoryID,
+		Name:                name,
+		Description:         desc,
+		StartLatitude:       traj.StartLatitude,
+		StartLongitude:      traj.StartLongitude,
+		StartAddress:        traj.StartAddress,
+		EndLatitude:         traj.EndLatitude,
+		EndLongitude:        traj.EndLongitude,
+		EndAddress:          traj.EndAddress,
+		TotalDistance:       traj.TotalDistance,
+		EstimatedDuration:   traj.TotalDuration,
+		WaypointCount:       traj.WaypointCount,
 		RecommendedAltitude: traj.AvgAltitude,
-		Waypoints:          model.JSON(waypointsJSON),
-		Visibility:         visibility,
-		Status:             "active",
+		Waypoints:           model.JSON(waypointsJSON),
+		Visibility:          visibility,
+		Status:              "active",
 	}
 
 	if err := s.flightRepo.CreateSavedRoute(route); err != nil {
@@ -637,9 +637,9 @@ func (s *FlightService) RateRoute(routeID int64, rating float64) error {
 
 // CreateMultiPointTaskRequest 创建多点任务请求
 type CreateMultiPointTaskRequest struct {
-	OrderID  int64                     `json:"order_id"`
-	TaskType string                    `json:"task_type"` // pickup, delivery, mixed
-	Stops    []MultiPointStopRequest   `json:"stops"`
+	OrderID  int64                   `json:"order_id"`
+	TaskType string                  `json:"task_type"` // pickup, delivery, mixed
+	Stops    []MultiPointStopRequest `json:"stops"`
 }
 
 type MultiPointStopRequest struct {
@@ -928,4 +928,49 @@ func perpendicularDistance(lat, lng, lat1, lng1, lat2, lng2 float64) float64 {
 	nearLng := lng1 + t*dy
 
 	return haversineDistance(lat, lng, nearLat, nearLng)
+}
+
+// ==================== 开发模拟辅助方法 ====================
+
+// GetOrderForSimulate 获取订单（模拟飞行用）
+func (s *FlightService) GetOrderForSimulate(orderID int64) (*model.Order, error) {
+	return s.orderRepo.GetByID(orderID)
+}
+
+// GetDispatchCoords 从订单关联的 dispatch_task 获取取送货坐标
+func (s *FlightService) GetDispatchCoords(order *model.Order) (startLat, startLng, endLat, endLng float64, err error) {
+	if order.RelatedID == 0 {
+		err = errors.New("订单无关联派单任务")
+		return
+	}
+	var task *model.DispatchTask
+	task, err = s.flightRepo.GetDispatchTask(order.RelatedID)
+	if err != nil {
+		err = fmt.Errorf("查询 dispatch_task 失败: %w", err)
+		return
+	}
+	startLat = task.PickupLatitude
+	startLng = task.PickupLongitude
+	endLat = task.DeliveryLatitude
+	endLng = task.DeliveryLongitude
+	if startLat == 0 && startLng == 0 {
+		err = errors.New("取货坐标未设置")
+	}
+	return
+}
+
+// SaveSimulatePosition 保存模拟飞行位置点
+func (s *FlightService) SaveSimulatePosition(pos *model.FlightPosition) {
+	if err := s.flightRepo.RecordPosition(pos); err != nil {
+		s.logger.Error("模拟飞行位置保存失败", zap.Error(err))
+	}
+}
+
+// FinishSimulate 模拟飞行完成，更新订单状态为 delivered
+func (s *FlightService) FinishSimulate(orderID int64) {
+	if err := s.orderRepo.UpdateStatus(orderID, "delivered"); err != nil {
+		s.logger.Error("模拟飞行完成后更新订单状态失败", zap.Int64("order_id", orderID), zap.Error(err))
+	} else {
+		s.logger.Info("模拟飞行完成，订单状态已更新为 delivered", zap.Int64("order_id", orderID))
+	}
 }

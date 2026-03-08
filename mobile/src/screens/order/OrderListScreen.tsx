@@ -1,8 +1,10 @@
 import React, {useEffect, useState} from 'react';
 import {View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
+import {useSelector} from 'react-redux';
 import {orderService} from '../../services/order';
 import {Order} from '../../types';
 import {ORDER_STATUS} from '../../constants';
+import {RootState} from '../../store/store';
 
 const TABS = [
   {key: '', label: '全部'},
@@ -23,6 +25,8 @@ export default function OrderListScreen({navigation}: any) {
   const [activeTab, setActiveTab] = useState('');
   const [activeRole, setActiveRole] = useState('all');
   const [loading, setLoading] = useState(false);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const isPilot = user?.user_type === 'pilot';
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -81,6 +85,29 @@ export default function OrderListScreen({navigation}: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* 派单任务入口（业主）或接单任务入口（飞手） */}
+      {isPilot ? (
+        <TouchableOpacity
+          style={[styles.dispatchBanner, {backgroundColor: '#f6ffed', borderBottomColor: '#b7eb8f'}]}
+          onPress={() => navigation.navigate('PilotTaskList')}>
+          <View style={{flex: 1}}>
+            <Text style={[styles.dispatchBannerTitle, {color: '#52c41a'}]}>✈️ 待接单任务</Text>
+            <Text style={styles.dispatchBannerSub}>查看分配给我的运输任务，确认接单或拒绝</Text>
+          </View>
+          <Text style={[styles.dispatchBannerArrow, {color: '#52c41a'}]}>&#8250;</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.dispatchBanner}
+          onPress={() => navigation.navigate('DispatchTaskList')}>
+          <View style={{flex: 1}}>
+            <Text style={styles.dispatchBannerTitle}>📦 派单任务</Text>
+            <Text style={styles.dispatchBannerSub}>查看您的货物运输任务与匹配状态</Text>
+          </View>
+          <Text style={styles.dispatchBannerArrow}>&#8250;</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.roleTabs}>
         {ROLE_TABS.map(tab => (
           <TouchableOpacity
@@ -145,4 +172,12 @@ const styles = StyleSheet.create({
   amount: {fontSize: 16, color: '#f5222d', fontWeight: 'bold'},
   time: {fontSize: 12, color: '#999'},
   empty: {textAlign: 'center', color: '#999', marginTop: 60, fontSize: 16},
+  dispatchBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#e6f7ff', paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#91d5ff',
+  },
+  dispatchBannerTitle: {fontSize: 15, fontWeight: '600', color: '#1890ff', marginBottom: 2},
+  dispatchBannerSub: {fontSize: 12, color: '#666'},
+  dispatchBannerArrow: {fontSize: 22, color: '#1890ff', marginLeft: 8},
 });

@@ -49,7 +49,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
   const loadData = async () => {
     try {
       const res = await listClientTasks({page: 1, page_size: 50});
-      setTasks(res.data || []);
+      setTasks(res.list || []);
     } catch (e: any) {
       Alert.alert('错误', e.message);
     } finally {

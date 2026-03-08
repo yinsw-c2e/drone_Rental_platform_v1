@@ -21,6 +21,8 @@ import {
   CreateApplicationRequest,
 } from '../../services/airspace';
 import {getPilotProfile} from '../../services/pilot';
+import AddressInputField from '../../components/AddressInputField';
+import {AddressData} from '../../types';
 
 const STATUS_MAP: Record<string, {label: string; color: string}> = {
   draft: {label: '草稿', color: '#999'},
@@ -51,12 +53,8 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   // Form state
   const [planName, setPlanName] = useState('');
   const [purpose, setPurpose] = useState('cargo_delivery');
-  const [departureAddress, setDepartureAddress] = useState('');
-  const [departureLatStr, setDepartureLatStr] = useState('');
-  const [departureLngStr, setDepartureLngStr] = useState('');
-  const [arrivalAddress, setArrivalAddress] = useState('');
-  const [arrivalLatStr, setArrivalLatStr] = useState('');
-  const [arrivalLngStr, setArrivalLngStr] = useState('');
+  const [departureAddr, setDepartureAddr] = useState<AddressData | null>(null);
+  const [arrivalAddr, setArrivalAddr] = useState<AddressData | null>(null);
   const [maxAltitudeStr, setMaxAltitudeStr] = useState('120');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -100,18 +98,10 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
 
   const handleCreate = async () => {
     if (!planName.trim()) return Alert.alert('提示', '请输入飞行计划名称');
-    if (!departureAddress.trim()) return Alert.alert('提示', '请输入起飞地址');
-    if (!arrivalAddress.trim()) return Alert.alert('提示', '请输入降落地址');
+    if (!departureAddr) return Alert.alert('提示', '请选择起飞地址');
+    if (!arrivalAddr) return Alert.alert('提示', '请选择降落地址');
     if (!startTime.trim()) return Alert.alert('提示', '请输入计划起飞时间');
     if (!endTime.trim()) return Alert.alert('提示', '请输入计划结束时间');
-
-    const depLat = parseFloat(departureLatStr);
-    const depLng = parseFloat(departureLngStr);
-    const arrLat = parseFloat(arrivalLatStr);
-    const arrLng = parseFloat(arrivalLngStr);
-
-    if (isNaN(depLat) || isNaN(depLng)) return Alert.alert('提示', '请输入正确的起飞点坐标');
-    if (isNaN(arrLat) || isNaN(arrLng)) return Alert.alert('提示', '请输入正确的降落点坐标');
 
     setSubmitting(true);
     try {
@@ -121,12 +111,12 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
         order_id: orderId,
         flight_plan_name: planName,
         flight_purpose: purpose,
-        departure_latitude: depLat,
-        departure_longitude: depLng,
-        departure_address: departureAddress,
-        arrival_latitude: arrLat,
-        arrival_longitude: arrLng,
-        arrival_address: arrivalAddress,
+        departure_latitude: departureAddr.latitude || 0,
+        departure_longitude: departureAddr.longitude || 0,
+        departure_address: departureAddr.address || departureAddr.name || '',
+        arrival_latitude: arrivalAddr.latitude || 0,
+        arrival_longitude: arrivalAddr.longitude || 0,
+        arrival_address: arrivalAddr.address || arrivalAddr.name || '',
         max_altitude: parseInt(maxAltitudeStr, 10) || 120,
         planned_start_time: startTime,
         planned_end_time: endTime,
@@ -184,12 +174,8 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   const resetForm = () => {
     setPlanName('');
     setPurpose('cargo_delivery');
-    setDepartureAddress('');
-    setDepartureLatStr('');
-    setDepartureLngStr('');
-    setArrivalAddress('');
-    setArrivalLatStr('');
-    setArrivalLngStr('');
+    setDepartureAddr(null);
+    setArrivalAddr(null);
     setMaxAltitudeStr('120');
     setStartTime('');
     setEndTime('');
@@ -274,31 +260,21 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
 
           <Text style={styles.sectionTitle}>起飞点</Text>
           <Text style={styles.label}>地址 *</Text>
-          <TextInput style={styles.input} placeholder="起飞地址" value={departureAddress} onChangeText={setDepartureAddress} />
-          <View style={styles.coordRow}>
-            <View style={styles.coordInput}>
-              <Text style={styles.label}>纬度</Text>
-              <TextInput style={styles.input} placeholder="30.5723" keyboardType="decimal-pad" value={departureLatStr} onChangeText={setDepartureLatStr} />
-            </View>
-            <View style={styles.coordInput}>
-              <Text style={styles.label}>经度</Text>
-              <TextInput style={styles.input} placeholder="104.0665" keyboardType="decimal-pad" value={departureLngStr} onChangeText={setDepartureLngStr} />
-            </View>
-          </View>
+          <AddressInputField
+            value={departureAddr}
+            placeholder="点击选择起飞地址"
+            onSelect={setDepartureAddr}
+            style={styles.addrField}
+          />
 
           <Text style={styles.sectionTitle}>降落点</Text>
           <Text style={styles.label}>地址 *</Text>
-          <TextInput style={styles.input} placeholder="降落地址" value={arrivalAddress} onChangeText={setArrivalAddress} />
-          <View style={styles.coordRow}>
-            <View style={styles.coordInput}>
-              <Text style={styles.label}>纬度</Text>
-              <TextInput style={styles.input} placeholder="30.5723" keyboardType="decimal-pad" value={arrivalLatStr} onChangeText={setArrivalLatStr} />
-            </View>
-            <View style={styles.coordInput}>
-              <Text style={styles.label}>经度</Text>
-              <TextInput style={styles.input} placeholder="104.0665" keyboardType="decimal-pad" value={arrivalLngStr} onChangeText={setArrivalLngStr} />
-            </View>
-          </View>
+          <AddressInputField
+            value={arrivalAddr}
+            placeholder="点击选择降落地址"
+            onSelect={setArrivalAddr}
+            style={styles.addrField}
+          />
 
           <Text style={styles.sectionTitle}>飞行参数</Text>
           <Text style={styles.label}>最大飞行高度(米)</Text>
@@ -392,6 +368,11 @@ const styles = StyleSheet.create({
   optionChipActive: {backgroundColor: '#e6f7ff', borderColor: '#1890ff'},
   optionChipText: {fontSize: 13, color: '#666'},
   optionChipTextActive: {color: '#1890ff'},
+  addrField: {
+    borderWidth: 1, borderColor: '#d9d9d9', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 14, backgroundColor: '#fff',
+    justifyContent: 'center', minHeight: 46,
+  },
   coordRow: {flexDirection: 'row', gap: 12},
   coordInput: {flex: 1},
   formButtons: {flexDirection: 'row', gap: 12, marginTop: 24},

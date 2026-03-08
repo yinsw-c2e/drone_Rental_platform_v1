@@ -143,12 +143,12 @@ export interface CreateMultiPointTaskRequest {
 
 // 位置上报
 export const reportPosition = async (data: ReportPositionRequest): Promise<void> => {
-  await api.post('/flight/position/report', data);
+  await api.post('/flight/position', data);
 };
 
 // 获取最新位置
 export const getLatestPosition = async (orderId: number): Promise<FlightPosition> => {
-  const res: any = await api.get(`/flight/position/latest/${orderId}`);
+  const res: any = await api.get(`/flight/position/${orderId}/latest`);
   return res.data;
 };
 
@@ -157,7 +157,7 @@ export const getPositionHistory = async (orderId: number, params?: {
   start_time?: string;
   end_time?: string;
 }): Promise<FlightPosition[]> => {
-  const res: any = await api.get(`/flight/position/history/${orderId}`, {params});
+  const res: any = await api.get(`/flight/position/${orderId}/history`, {params});
   return res.data;
 };
 
@@ -169,12 +169,12 @@ export const getAlerts = async (orderId: number): Promise<FlightAlert[]> => {
 };
 
 export const getActiveAlerts = async (orderId: number): Promise<FlightAlert[]> => {
-  const res: any = await api.get(`/flight/alerts/active/${orderId}`);
+  const res: any = await api.get(`/flight/alerts/${orderId}/active`);
   return res.data;
 };
 
 export const acknowledgeAlert = async (alertId: number): Promise<void> => {
-  await api.post(`/flight/alert/${alertId}/ack`);
+  await api.post(`/flight/alert/${alertId}/acknowledge`);
 };
 
 export const resolveAlert = async (alertId: number): Promise<void> => {
@@ -265,6 +265,19 @@ export const getFlightStats = async (): Promise<any> => {
   return res.data;
 };
 
+// 模拟飞行（仅开发环境使用）
+export const simulateFlight = async (orderId: number): Promise<{
+  message: string;
+  order_id: number;
+  start_lat: number;
+  start_lng: number;
+  end_lat: number;
+  end_lng: number;
+}> => {
+  const res: any = await api.post(`/flight/simulate/${orderId}`);
+  return res.data;
+};
+
 export default {
   reportPosition,
   getLatestPosition,
@@ -287,4 +300,5 @@ export default {
   arriveAtStop,
   completeStop,
   getFlightStats,
+  simulateFlight,
 };

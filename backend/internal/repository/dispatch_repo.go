@@ -24,7 +24,7 @@ func (r *DispatchRepo) CreateTask(task *model.DispatchTask) error {
 
 func (r *DispatchRepo) GetTaskByID(id int64) (*model.DispatchTask, error) {
 	var task model.DispatchTask
-	err := r.db.Preload("Client").Preload("Pilot").Preload("Drone").First(&task, id).Error
+	err := r.db.First(&task, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +59,11 @@ func (r *DispatchRepo) ListPendingTasks(limit int) ([]model.DispatchTask, error)
 	query := r.db.Where("status IN ?", []string{"pending", "matching"}).
 		Where("(dispatch_deadline IS NULL OR dispatch_deadline > ?)", time.Now()).
 		Order("priority DESC, created_at ASC")
-	
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
-	
+
 	err := query.Find(&tasks).Error
 	return tasks, err
 }
@@ -82,7 +82,7 @@ func (r *DispatchRepo) ListTasksByClient(clientID int64, page, pageSize int, sta
 	}
 
 	offset := (page - 1) * pageSize
-	if err := query.Preload("Pilot").Preload("Drone").Offset(offset).Limit(pageSize).
+	if err := query.Offset(offset).Limit(pageSize).
 		Order("created_at DESC").Find(&tasks).Error; err != nil {
 		return nil, 0, err
 	}
@@ -104,7 +104,7 @@ func (r *DispatchRepo) ListTasksByPilot(pilotID int64, page, pageSize int, statu
 	}
 
 	offset := (page - 1) * pageSize
-	if err := query.Preload("Client").Preload("Drone").Offset(offset).Limit(pageSize).
+	if err := query.Offset(offset).Limit(pageSize).
 		Order("created_at DESC").Find(&tasks).Error; err != nil {
 		return nil, 0, err
 	}
@@ -133,6 +133,11 @@ func (r *DispatchRepo) BatchCreateCandidates(candidates []model.DispatchCandidat
 	return r.db.Create(&candidates).Error
 }
 
+// DeletePendingCandidatesByTask 删除该任务中 pending/notified 状态的候选人（重新匹配前清除旧数据，防止重复）
+func (r *DispatchRepo) DeletePendingCandidatesByTask(taskID int64) {
+	r.db.Where("task_id = ? AND status IN ?", taskID, []string{"pending", "notified"}).Delete(&model.DispatchCandidate{})
+}
+
 func (r *DispatchRepo) GetCandidateByID(id int64) (*model.DispatchCandidate, error) {
 	var candidate model.DispatchCandidate
 	err := r.db.Preload("Pilot").Preload("Drone").First(&candidate, id).Error
@@ -145,7 +150,6 @@ func (r *DispatchRepo) GetCandidateByID(id int64) (*model.DispatchCandidate, err
 func (r *DispatchRepo) GetCandidatesByTask(taskID int64) ([]model.DispatchCandidate, error) {
 	var candidates []model.DispatchCandidate
 	err := r.db.Where("task_id = ?", taskID).
-		Preload("Pilot").Preload("Drone").
 		Order("total_score DESC").Find(&candidates).Error
 	return candidates, err
 }
@@ -181,11 +185,67 @@ func (r *DispatchRepo) DeleteCandidatesByTask(taskID int64) error {
 func (r *DispatchRepo) GetPendingCandidateByPilot(pilotID int64) (*model.DispatchCandidate, error) {
 	var candidate model.DispatchCandidate
 	err := r.db.Where("pilot_id = ? AND status IN ?", pilotID, []string{"pending", "notified"}).
-		Preload("Task").First(&candidate).Error
+		First(&candidate).Error
 	if err != nil {
 		return nil, err
 	}
 	return &candidate, nil
+}
+
+// ListCandidatesByPilot 获取飞手的候选任务列表（含任务信息）
+func (r *DispatchRepo) ListCandidatesByPilot(pilotID int64, page, pageSize int) ([]map[string]interface{}, int64, error) {
+	var total int64
+	if err := r.db.Model(&model.DispatchCandidate{}).Where("pilot_id = ?", pilotID).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	rows, err := r.db.Raw(`
+		SELECT
+			dc.id, dc.task_id, dc.pilot_id, dc.drone_id, dc.owner_id,
+			dc.total_score, dc.distance, dc.quoted_price,
+			dc.status, dc.notified_at, dc.responded_at, dc.response_note,
+			dc.created_at,
+			dt.task_no, dt.task_type, dt.cargo_weight, dt.cargo_category,
+			dt.pickup_address, dt.delivery_address,
+			dt.pickup_latitude as pickup_lat, dt.pickup_longitude as pickup_lng,
+			dt.delivery_latitude as delivery_lat, dt.delivery_longitude as delivery_lng,
+			dt.required_pickup_time as expected_pickup_time,
+			dt.dispatch_deadline, dt.status as task_status,
+			dt.priority
+		FROM dispatch_candidates dc
+		JOIN dispatch_tasks dt ON dc.task_id = dt.id
+		WHERE dc.pilot_id = ?
+		ORDER BY dc.created_at DESC
+		LIMIT ? OFFSET ?`, pilotID, pageSize, offset).Rows()
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var result []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		result = append(result, row)
+	}
+	return result, total, nil
 }
 
 // ==================== 查找可用飞手和无人机 ====================
@@ -228,7 +288,7 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 		AND ` + distanceExpr + ` < ?
 	`
 
-	args := []interface{}{lat, lng, lat, lat, lng, lat, minLoad, lat, lng, lat, radiusKM}
+	args := []interface{}{lat, lng, lat, minLoad, lat, lng, lat, radiusKM}
 
 	if licenseType != "" {
 		query += " AND p.caac_license_type = ?"
@@ -313,50 +373,50 @@ func (r *DispatchRepo) GenerateTaskNo() string {
 
 func (r *DispatchRepo) GetTaskStatsByClient(clientID int64) (map[string]int64, error) {
 	stats := make(map[string]int64)
-	
+
 	var results []struct {
 		Status string
 		Count  int64
 	}
-	
+
 	err := r.db.Model(&model.DispatchTask{}).
 		Select("status, count(*) as count").
 		Where("client_id = ?", clientID).
 		Group("status").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, r := range results {
 		stats[r.Status] = r.Count
 	}
-	
+
 	return stats, nil
 }
 
 func (r *DispatchRepo) GetTaskStatsByPilot(pilotID int64) (map[string]int64, error) {
 	stats := make(map[string]int64)
-	
+
 	var results []struct {
 		Status string
 		Count  int64
 	}
-	
+
 	err := r.db.Model(&model.DispatchTask{}).
 		Select("status, count(*) as count").
 		Where("assigned_pilot_id = ?", pilotID).
 		Group("status").
 		Scan(&results).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, r := range results {
 		stats[r.Status] = r.Count
 	}
-	
+
 	return stats, nil
 }

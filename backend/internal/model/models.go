@@ -30,53 +30,53 @@ func (User) TableName() string {
 }
 
 type Drone struct {
-	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	OwnerID             int64          `gorm:"index;not null" json:"owner_id"`
-	Brand               string         `gorm:"type:varchar(100)" json:"brand"`
-	Model               string         `gorm:"type:varchar(100)" json:"model"`
-	SerialNumber        string         `gorm:"type:varchar(100);uniqueIndex" json:"serial_number"`
-	MaxLoad             float64        `gorm:"type:decimal(10,2)" json:"max_load"`
-	MaxFlightTime       int            `json:"max_flight_time"`
-	MaxDistance         float64        `gorm:"type:decimal(10,2)" json:"max_distance"`
-	Features            JSON           `gorm:"type:json" json:"features"`
-	Images              JSON           `gorm:"type:json" json:"images"`
-	CertificationStatus string         `gorm:"type:varchar(20);default:pending" json:"certification_status"`
-	CertificationDocs   JSON           `gorm:"type:json" json:"certification_docs"`
-	DailyPrice          int64          `json:"daily_price"`
-	HourlyPrice         int64          `json:"hourly_price"`
-	Deposit             int64          `json:"deposit"`
-	Latitude            float64        `gorm:"type:decimal(10,7)" json:"latitude"`
-	Longitude           float64        `gorm:"type:decimal(10,7)" json:"longitude"`
-	Address             string         `gorm:"type:varchar(255)" json:"address"`
-	City                string         `gorm:"type:varchar(50);index" json:"city"`
-	AvailabilityStatus  string         `gorm:"type:varchar(20);default:available" json:"availability_status"` // available, rented, maintenance, offline
-	Rating              float64        `gorm:"type:decimal(3,2);default:0" json:"rating"`
-	OrderCount          int            `gorm:"default:0" json:"order_count"`
-	Description         string         `gorm:"type:text" json:"description"`
+	ID                  int64   `gorm:"primaryKey;autoIncrement" json:"id"`
+	OwnerID             int64   `gorm:"index;not null" json:"owner_id"`
+	Brand               string  `gorm:"type:varchar(100)" json:"brand"`
+	Model               string  `gorm:"type:varchar(100)" json:"model"`
+	SerialNumber        string  `gorm:"type:varchar(100);uniqueIndex" json:"serial_number"`
+	MaxLoad             float64 `gorm:"type:decimal(10,2)" json:"max_load"`
+	MaxFlightTime       int     `json:"max_flight_time"`
+	MaxDistance         float64 `gorm:"type:decimal(10,2)" json:"max_distance"`
+	Features            JSON    `gorm:"type:json" json:"features"`
+	Images              JSON    `gorm:"type:json" json:"images"`
+	CertificationStatus string  `gorm:"type:varchar(20);default:pending" json:"certification_status"`
+	CertificationDocs   JSON    `gorm:"type:json" json:"certification_docs"`
+	DailyPrice          int64   `json:"daily_price"`
+	HourlyPrice         int64   `json:"hourly_price"`
+	Deposit             int64   `json:"deposit"`
+	Latitude            float64 `gorm:"type:decimal(10,7)" json:"latitude"`
+	Longitude           float64 `gorm:"type:decimal(10,7)" json:"longitude"`
+	Address             string  `gorm:"type:varchar(255)" json:"address"`
+	City                string  `gorm:"type:varchar(50);index" json:"city"`
+	AvailabilityStatus  string  `gorm:"type:varchar(20);default:available" json:"availability_status"` // available, rented, maintenance, offline
+	Rating              float64 `gorm:"type:decimal(3,2);default:0" json:"rating"`
+	OrderCount          int     `gorm:"default:0" json:"order_count"`
+	Description         string  `gorm:"type:text" json:"description"`
 
 	// ==================== UOM平台登记信息 ====================
-	UOMRegistrationNo   string     `gorm:"type:varchar(100);index" json:"uom_registration_no"`  // UOM平台登记号
-	UOMVerified         string     `gorm:"type:varchar(20);default:pending" json:"uom_verified"` // pending, verified, rejected
-	UOMVerifiedAt       *time.Time `json:"uom_verified_at"`
-	UOMRegistrationDoc  string     `gorm:"type:varchar(500)" json:"uom_registration_doc"` // UOM登记证明文件
+	UOMRegistrationNo  string     `gorm:"type:varchar(100);index" json:"uom_registration_no"`   // UOM平台登记号
+	UOMVerified        string     `gorm:"type:varchar(20);default:pending" json:"uom_verified"` // pending, verified, rejected
+	UOMVerifiedAt      *time.Time `json:"uom_verified_at"`
+	UOMRegistrationDoc string     `gorm:"type:varchar(500)" json:"uom_registration_doc"` // UOM登记证明文件
 
 	// ==================== 保险信息 ====================
-	InsurancePolicyNo   string     `gorm:"type:varchar(100)" json:"insurance_policy_no"`   // 保险单号
-	InsuranceCompany    string     `gorm:"type:varchar(100)" json:"insurance_company"`     // 保险公司
-	InsuranceCoverage   int64      `json:"insurance_coverage"`                             // 保额(分)，要求≥500万
-	InsuranceExpireDate *time.Time `json:"insurance_expire_date"`                          // 保险到期日
-	InsuranceDoc        string     `gorm:"type:varchar(500)" json:"insurance_doc"`         // 保险单文件
+	InsurancePolicyNo   string     `gorm:"type:varchar(100)" json:"insurance_policy_no"`               // 保险单号
+	InsuranceCompany    string     `gorm:"type:varchar(100)" json:"insurance_company"`                 // 保险公司
+	InsuranceCoverage   int64      `json:"insurance_coverage"`                                         // 保额(分)，要求≥500万
+	InsuranceExpireDate *time.Time `json:"insurance_expire_date"`                                      // 保险到期日
+	InsuranceDoc        string     `gorm:"type:varchar(500)" json:"insurance_doc"`                     // 保险单文件
 	InsuranceVerified   string     `gorm:"type:varchar(20);default:pending" json:"insurance_verified"` // pending, verified, rejected
 
 	// ==================== 适航证书 ====================
-	AirworthinessCertNo     string     `gorm:"type:varchar(100)" json:"airworthiness_cert_no"`     // 适航证书编号
-	AirworthinessCertExpire *time.Time `json:"airworthiness_cert_expire"`                         // 适航证书有效期
-	AirworthinessCertDoc    string     `gorm:"type:varchar(500)" json:"airworthiness_cert_doc"`   // 适航证书文件
+	AirworthinessCertNo     string     `gorm:"type:varchar(100)" json:"airworthiness_cert_no"`                 // 适航证书编号
+	AirworthinessCertExpire *time.Time `json:"airworthiness_cert_expire"`                                      // 适航证书有效期
+	AirworthinessCertDoc    string     `gorm:"type:varchar(500)" json:"airworthiness_cert_doc"`                // 适航证书文件
 	AirworthinessVerified   string     `gorm:"type:varchar(20);default:pending" json:"airworthiness_verified"` // pending, verified, rejected
 
 	// ==================== 维护记录 ====================
-	LastMaintenanceDate *time.Time `json:"last_maintenance_date"`          // 最近维护日期
-	NextMaintenanceDate *time.Time `json:"next_maintenance_date"`          // 下次维护日期
+	LastMaintenanceDate *time.Time `json:"last_maintenance_date"`                // 最近维护日期
+	NextMaintenanceDate *time.Time `json:"next_maintenance_date"`                // 下次维护日期
 	MaintenanceRecords  JSON       `gorm:"type:json" json:"maintenance_records"` // 维护记录历史
 
 	CreatedAt time.Time      `json:"created_at"`
@@ -339,8 +339,8 @@ func (AdminLog) TableName() string {
 type UserAddress struct {
 	ID        int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID    int64          `gorm:"index;not null" json:"user_id"`
-	Label     string         `gorm:"type:varchar(20)" json:"label"`   // 家/公司/自定义标签
-	Name      string         `gorm:"type:varchar(100)" json:"name"`   // POI名称
+	Label     string         `gorm:"type:varchar(20)" json:"label"` // 家/公司/自定义标签
+	Name      string         `gorm:"type:varchar(100)" json:"name"` // POI名称
 	Address   string         `gorm:"type:varchar(255);not null" json:"address"`
 	Province  string         `gorm:"type:varchar(50)" json:"province"`
 	City      string         `gorm:"type:varchar(50)" json:"city"`
@@ -369,21 +369,21 @@ type Pilot struct {
 	CAACLicenseImage      string         `gorm:"type:varchar(500)" json:"caac_license_image"`
 	CriminalCheckStatus   string         `gorm:"type:varchar(20);default:pending" json:"criminal_check_status"` // pending, approved, rejected
 	CriminalCheckDoc      string         `gorm:"type:varchar(500)" json:"criminal_check_doc"`
-	CriminalCheckExpire   *time.Time     `json:"criminal_check_expire"` // 无犯罪记录有效期
-	HealthCheckStatus     string         `gorm:"type:varchar(20);default:pending" json:"health_check_status"`   // pending, approved, rejected
+	CriminalCheckExpire   *time.Time     `json:"criminal_check_expire"`                                       // 无犯罪记录有效期
+	HealthCheckStatus     string         `gorm:"type:varchar(20);default:pending" json:"health_check_status"` // pending, approved, rejected
 	HealthCheckDoc        string         `gorm:"type:varchar(500)" json:"health_check_doc"`
 	HealthCheckExpire     *time.Time     `json:"health_check_expire"` // 健康证明有效期
 	TotalFlightHours      float64        `gorm:"type:decimal(10,2);default:0" json:"total_flight_hours"`
 	TotalOrders           int            `gorm:"default:0" json:"total_orders"`
 	CompletedOrders       int            `gorm:"default:0" json:"completed_orders"`
 	ServiceRating         float64        `gorm:"type:decimal(3,2);default:5.0" json:"service_rating"`
-	CreditScore           int            `gorm:"default:500" json:"credit_score"` // 飞手信用分，满分1000
+	CreditScore           int            `gorm:"default:500" json:"credit_score"`                             // 飞手信用分，满分1000
 	AvailabilityStatus    string         `gorm:"type:varchar(20);default:offline" json:"availability_status"` // online, busy, offline
 	CurrentLatitude       float64        `gorm:"type:decimal(10,7)" json:"current_latitude"`
 	CurrentLongitude      float64        `gorm:"type:decimal(10,7)" json:"current_longitude"`
 	CurrentCity           string         `gorm:"type:varchar(50);index" json:"current_city"`
-	ServiceRadius         float64        `gorm:"type:decimal(10,2);default:50" json:"service_radius"` // 服务范围(公里)
-	SpecialSkills         JSON           `gorm:"type:json" json:"special_skills"`                     // 特殊技能: 夜航、山区、应急等
+	ServiceRadius         float64        `gorm:"type:decimal(10,2);default:50" json:"service_radius"`         // 服务范围(公里)
+	SpecialSkills         JSON           `gorm:"type:json" json:"special_skills"`                             // 特殊技能: 夜航、山区、应急等
 	VerificationStatus    string         `gorm:"type:varchar(20);default:pending" json:"verification_status"` // pending, verified, rejected
 	VerificationNote      string         `gorm:"type:text" json:"verification_note"`
 	VerifiedAt            *time.Time     `json:"verified_at"`
@@ -400,22 +400,22 @@ func (Pilot) TableName() string {
 
 // PilotCertification 飞手资质证书
 type PilotCertification struct {
-	ID              int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	PilotID         int64          `gorm:"index;not null" json:"pilot_id"`
-	CertType        string         `gorm:"type:varchar(50);not null" json:"cert_type"` // caac_license, training, emergency, special_operation
-	CertName        string         `gorm:"type:varchar(100)" json:"cert_name"`
-	CertNo          string         `gorm:"type:varchar(100)" json:"cert_no"`
-	IssuingAuthority string        `gorm:"type:varchar(100)" json:"issuing_authority"` // 发证机构
-	IssueDate       *time.Time     `json:"issue_date"`
-	ExpireDate      *time.Time     `json:"expire_date"`
-	CertImage       string         `gorm:"type:varchar(500)" json:"cert_image"`
-	Status          string         `gorm:"type:varchar(20);default:pending" json:"status"` // pending, approved, rejected, expired
-	ReviewNote      string         `gorm:"type:text" json:"review_note"`
-	ReviewedAt      *time.Time     `json:"reviewed_at"`
-	ReviewedBy      int64          `json:"reviewed_by"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	ID               int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	PilotID          int64          `gorm:"index;not null" json:"pilot_id"`
+	CertType         string         `gorm:"type:varchar(50);not null" json:"cert_type"` // caac_license, training, emergency, special_operation
+	CertName         string         `gorm:"type:varchar(100)" json:"cert_name"`
+	CertNo           string         `gorm:"type:varchar(100)" json:"cert_no"`
+	IssuingAuthority string         `gorm:"type:varchar(100)" json:"issuing_authority"` // 发证机构
+	IssueDate        *time.Time     `json:"issue_date"`
+	ExpireDate       *time.Time     `json:"expire_date"`
+	CertImage        string         `gorm:"type:varchar(500)" json:"cert_image"`
+	Status           string         `gorm:"type:varchar(20);default:pending" json:"status"` // pending, approved, rejected, expired
+	ReviewNote       string         `gorm:"type:text" json:"review_note"`
+	ReviewedAt       *time.Time     `json:"reviewed_at"`
+	ReviewedBy       int64          `json:"reviewed_by"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
 
 	Pilot *Pilot `gorm:"foreignKey:PilotID" json:"pilot,omitempty"`
 }
@@ -426,27 +426,27 @@ func (PilotCertification) TableName() string {
 
 // PilotFlightLog 飞手飞行记录
 type PilotFlightLog struct {
-	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	PilotID         int64     `gorm:"index;not null" json:"pilot_id"`
-	OrderID         int64     `gorm:"index" json:"order_id"` // 关联订单，可为空(非平台飞行)
-	DroneID         int64     `gorm:"index" json:"drone_id"`
-	FlightDate      time.Time `json:"flight_date"`
-	FlightDuration  float64   `gorm:"type:decimal(10,2)" json:"flight_duration"` // 飞行时长(分钟)
-	FlightDistance  float64   `gorm:"type:decimal(10,2)" json:"flight_distance"` // 飞行距离(公里)
-	StartLatitude   float64   `gorm:"type:decimal(10,7)" json:"start_latitude"`
-	StartLongitude  float64   `gorm:"type:decimal(10,7)" json:"start_longitude"`
-	StartAddress    string    `gorm:"type:varchar(255)" json:"start_address"`
-	EndLatitude     float64   `gorm:"type:decimal(10,7)" json:"end_latitude"`
-	EndLongitude    float64   `gorm:"type:decimal(10,7)" json:"end_longitude"`
-	EndAddress      string    `gorm:"type:varchar(255)" json:"end_address"`
-	MaxAltitude     float64   `gorm:"type:decimal(10,2)" json:"max_altitude"`     // 最高飞行高度(米)
-	MaxSpeed        float64   `gorm:"type:decimal(10,2)" json:"max_speed"`        // 最高速度(m/s)
-	CargoWeight     float64   `gorm:"type:decimal(10,2)" json:"cargo_weight"`     // 载货重量(kg)
-	WeatherCondition string   `gorm:"type:varchar(50)" json:"weather_condition"` // 天气状况
-	FlightType      string    `gorm:"type:varchar(30)" json:"flight_type"`        // cargo(货运), training(训练), test(测试)
-	IncidentReport  string    `gorm:"type:text" json:"incident_report"`           // 异常情况记录
-	TrackData       JSON      `gorm:"type:json" json:"track_data"`                // 飞行轨迹数据
-	CreatedAt       time.Time `json:"created_at"`
+	ID               int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	PilotID          int64     `gorm:"index;not null" json:"pilot_id"`
+	OrderID          int64     `gorm:"index" json:"order_id"` // 关联订单，可为空(非平台飞行)
+	DroneID          int64     `gorm:"index" json:"drone_id"`
+	FlightDate       time.Time `json:"flight_date"`
+	FlightDuration   float64   `gorm:"type:decimal(10,2)" json:"flight_duration"` // 飞行时长(分钟)
+	FlightDistance   float64   `gorm:"type:decimal(10,2)" json:"flight_distance"` // 飞行距离(公里)
+	StartLatitude    float64   `gorm:"type:decimal(10,7)" json:"start_latitude"`
+	StartLongitude   float64   `gorm:"type:decimal(10,7)" json:"start_longitude"`
+	StartAddress     string    `gorm:"type:varchar(255)" json:"start_address"`
+	EndLatitude      float64   `gorm:"type:decimal(10,7)" json:"end_latitude"`
+	EndLongitude     float64   `gorm:"type:decimal(10,7)" json:"end_longitude"`
+	EndAddress       string    `gorm:"type:varchar(255)" json:"end_address"`
+	MaxAltitude      float64   `gorm:"type:decimal(10,2)" json:"max_altitude"`    // 最高飞行高度(米)
+	MaxSpeed         float64   `gorm:"type:decimal(10,2)" json:"max_speed"`       // 最高速度(m/s)
+	CargoWeight      float64   `gorm:"type:decimal(10,2)" json:"cargo_weight"`    // 载货重量(kg)
+	WeatherCondition string    `gorm:"type:varchar(50)" json:"weather_condition"` // 天气状况
+	FlightType       string    `gorm:"type:varchar(30)" json:"flight_type"`       // cargo(货运), training(训练), test(测试)
+	IncidentReport   string    `gorm:"type:text" json:"incident_report"`          // 异常情况记录
+	TrackData        JSON      `gorm:"type:json" json:"track_data"`               // 飞行轨迹数据
+	CreatedAt        time.Time `json:"created_at"`
 
 	Pilot *Pilot `gorm:"foreignKey:PilotID" json:"pilot,omitempty"`
 	Drone *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
@@ -462,8 +462,8 @@ type PilotDroneBinding struct {
 	ID            int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	PilotID       int64          `gorm:"index;not null" json:"pilot_id"`
 	DroneID       int64          `gorm:"index;not null" json:"drone_id"`
-	OwnerID       int64          `gorm:"index;not null" json:"owner_id"` // 机主ID
-	BindingType   string         `gorm:"type:varchar(20)" json:"binding_type"` // permanent(长期), temporary(临时)
+	OwnerID       int64          `gorm:"index;not null" json:"owner_id"`                // 机主ID
+	BindingType   string         `gorm:"type:varchar(20)" json:"binding_type"`          // permanent(长期), temporary(临时)
 	Status        string         `gorm:"type:varchar(20);default:active" json:"status"` // active, expired, revoked
 	EffectiveFrom time.Time      `json:"effective_from"`
 	EffectiveTo   *time.Time     `json:"effective_to"` // 临时绑定的截止时间
@@ -484,20 +484,20 @@ func (PilotDroneBinding) TableName() string {
 
 // DroneMaintenanceLog 无人机维护记录
 type DroneMaintenanceLog struct {
-	ID                  int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	DroneID             int64     `gorm:"index;not null" json:"drone_id"`
-	MaintenanceType     string    `gorm:"type:varchar(50)" json:"maintenance_type"` // routine(常规), repair(维修), upgrade(升级)
-	MaintenanceDate     time.Time `json:"maintenance_date"`
-	MaintenanceContent  string    `gorm:"type:text" json:"maintenance_content"`
-	MaintenanceCost     int64     `json:"maintenance_cost"` // 维护费用(分)
-	TechnicianName      string    `gorm:"type:varchar(100)" json:"technician_name"`
-	TechnicianCert      string    `gorm:"type:varchar(100)" json:"technician_cert"`
-	PartsReplaced       JSON      `gorm:"type:json" json:"parts_replaced"`
-	BeforeImages        JSON      `gorm:"type:json" json:"before_images"`
-	AfterImages         JSON      `gorm:"type:json" json:"after_images"`
-	ReportDoc           string    `gorm:"type:varchar(500)" json:"report_doc"`
+	ID                  int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	DroneID             int64      `gorm:"index;not null" json:"drone_id"`
+	MaintenanceType     string     `gorm:"type:varchar(50)" json:"maintenance_type"` // routine(常规), repair(维修), upgrade(升级)
+	MaintenanceDate     time.Time  `json:"maintenance_date"`
+	MaintenanceContent  string     `gorm:"type:text" json:"maintenance_content"`
+	MaintenanceCost     int64      `json:"maintenance_cost"` // 维护费用(分)
+	TechnicianName      string     `gorm:"type:varchar(100)" json:"technician_name"`
+	TechnicianCert      string     `gorm:"type:varchar(100)" json:"technician_cert"`
+	PartsReplaced       JSON       `gorm:"type:json" json:"parts_replaced"`
+	BeforeImages        JSON       `gorm:"type:json" json:"before_images"`
+	AfterImages         JSON       `gorm:"type:json" json:"after_images"`
+	ReportDoc           string     `gorm:"type:varchar(500)" json:"report_doc"`
 	NextMaintenanceDate *time.Time `json:"next_maintenance_date"`
-	CreatedAt           time.Time `json:"created_at"`
+	CreatedAt           time.Time  `json:"created_at"`
 
 	Drone *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
 }
@@ -535,54 +535,54 @@ func (DroneInsuranceRecord) TableName() string {
 
 // Client 业主档案 - 整合renter和cargo_owner角色
 type Client struct {
-	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID              int64          `gorm:"uniqueIndex;not null" json:"user_id"`
-	ClientType          string         `gorm:"type:varchar(20);default:individual" json:"client_type"` // individual(个人), enterprise(企业)
-	CompanyName         string         `gorm:"type:varchar(200)" json:"company_name"`                  // 企业名称
-	BusinessLicenseNo   string         `gorm:"type:varchar(100);index" json:"business_license_no"`     // 统一社会信用代码
-	BusinessLicenseDoc  string         `gorm:"type:varchar(500)" json:"business_license_doc"`          // 营业执照照片
-	LegalRepresentative string         `gorm:"type:varchar(50)" json:"legal_representative"`           // 法定代表人
-	ContactPerson       string         `gorm:"type:varchar(50)" json:"contact_person"`                 // 联系人
-	ContactPhone        string         `gorm:"type:varchar(20)" json:"contact_phone"`                  // 联系电话
-	ContactEmail        string         `gorm:"type:varchar(100)" json:"contact_email"`                 // 联系邮箱
+	ID                  int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID              int64  `gorm:"uniqueIndex;not null" json:"user_id"`
+	ClientType          string `gorm:"type:varchar(20);default:individual" json:"client_type"` // individual(个人), enterprise(企业)
+	CompanyName         string `gorm:"type:varchar(200)" json:"company_name"`                  // 企业名称
+	BusinessLicenseNo   string `gorm:"type:varchar(100);index" json:"business_license_no"`     // 统一社会信用代码
+	BusinessLicenseDoc  string `gorm:"type:varchar(500)" json:"business_license_doc"`          // 营业执照照片
+	LegalRepresentative string `gorm:"type:varchar(50)" json:"legal_representative"`           // 法定代表人
+	ContactPerson       string `gorm:"type:varchar(50)" json:"contact_person"`                 // 联系人
+	ContactPhone        string `gorm:"type:varchar(20)" json:"contact_phone"`                  // 联系电话
+	ContactEmail        string `gorm:"type:varchar(100)" json:"contact_email"`                 // 联系邮箱
 
 	// ==================== 征信信息 ====================
-	CreditProvider      string     `gorm:"type:varchar(50)" json:"credit_provider"`  // 征信来源: baihang(百行征信), sesame(芝麻信用)
-	CreditScore         int        `gorm:"default:600" json:"credit_score"`          // 外部征信分
+	CreditProvider      string     `gorm:"type:varchar(50)" json:"credit_provider"`                     // 征信来源: baihang(百行征信), sesame(芝麻信用)
+	CreditScore         int        `gorm:"default:600" json:"credit_score"`                             // 外部征信分
 	CreditCheckStatus   string     `gorm:"type:varchar(20);default:pending" json:"credit_check_status"` // pending, approved, rejected
 	CreditCheckTime     *time.Time `json:"credit_check_time"`
 	CreditReportDoc     string     `gorm:"type:varchar(500)" json:"credit_report_doc"` // 征信报告
 	PlatformCreditScore int        `gorm:"default:600" json:"platform_credit_score"`   // 平台内部信用分(满分1000)
 
 	// ==================== 企业资质 ====================
-	EnterpriseVerified      string     `gorm:"type:varchar(20);default:pending" json:"enterprise_verified"` // pending, verified, rejected
-	EnterpriseVerifiedAt    *time.Time `json:"enterprise_verified_at"`
-	EnterpriseVerifyNote    string     `gorm:"type:text" json:"enterprise_verify_note"`
-	IndustryCategory        string     `gorm:"type:varchar(100)" json:"industry_category"`                 // 行业类别
-	RegistrationCapital     int64      `json:"registration_capital"`                                       // 注册资本(分)
-	OperatingYears          int        `json:"operating_years"`                                            // 经营年限
-	SpecialQualifications   JSON       `gorm:"type:json" json:"special_qualifications"`                    // 特殊资质(如:危化品运输许可等)
+	EnterpriseVerified    string     `gorm:"type:varchar(20);default:pending" json:"enterprise_verified"` // pending, verified, rejected
+	EnterpriseVerifiedAt  *time.Time `json:"enterprise_verified_at"`
+	EnterpriseVerifyNote  string     `gorm:"type:text" json:"enterprise_verify_note"`
+	IndustryCategory      string     `gorm:"type:varchar(100)" json:"industry_category"` // 行业类别
+	RegistrationCapital   int64      `json:"registration_capital"`                       // 注册资本(分)
+	OperatingYears        int        `json:"operating_years"`                            // 经营年限
+	SpecialQualifications JSON       `gorm:"type:json" json:"special_qualifications"`    // 特殊资质(如:危化品运输许可等)
 
 	// ==================== 服务偏好 ====================
-	PreferredCargoTypes     JSON       `gorm:"type:json" json:"preferred_cargo_types"`    // 常用货物类型
-	PreferredRoutes         JSON       `gorm:"type:json" json:"preferred_routes"`         // 常用路线
-	DefaultPickupAddress    string     `gorm:"type:varchar(255)" json:"default_pickup_address"`
-	DefaultDeliveryAddress  string     `gorm:"type:varchar(255)" json:"default_delivery_address"`
+	PreferredCargoTypes    JSON   `gorm:"type:json" json:"preferred_cargo_types"` // 常用货物类型
+	PreferredRoutes        JSON   `gorm:"type:json" json:"preferred_routes"`      // 常用路线
+	DefaultPickupAddress   string `gorm:"type:varchar(255)" json:"default_pickup_address"`
+	DefaultDeliveryAddress string `gorm:"type:varchar(255)" json:"default_delivery_address"`
 
 	// ==================== 统计信息 ====================
-	TotalOrders       int     `gorm:"default:0" json:"total_orders"`
-	CompletedOrders   int     `gorm:"default:0" json:"completed_orders"`
-	CancelledOrders   int     `gorm:"default:0" json:"cancelled_orders"`
-	TotalSpending     int64   `gorm:"default:0" json:"total_spending"` // 总消费金额(分)
-	AverageRating     float64 `gorm:"type:decimal(3,2);default:5.0" json:"average_rating"` // 被评平均分
+	TotalOrders     int     `gorm:"default:0" json:"total_orders"`
+	CompletedOrders int     `gorm:"default:0" json:"completed_orders"`
+	CancelledOrders int     `gorm:"default:0" json:"cancelled_orders"`
+	TotalSpending   int64   `gorm:"default:0" json:"total_spending"`                     // 总消费金额(分)
+	AverageRating   float64 `gorm:"type:decimal(3,2);default:5.0" json:"average_rating"` // 被评平均分
 
 	// ==================== 状态信息 ====================
-	VerificationStatus string     `gorm:"type:varchar(20);default:pending" json:"verification_status"` // pending, verified, rejected
-	VerificationNote   string     `gorm:"type:text" json:"verification_note"`
-	VerifiedAt         *time.Time `json:"verified_at"`
-	Status             string     `gorm:"type:varchar(20);default:active" json:"status"` // active, suspended, banned
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	VerificationStatus string         `gorm:"type:varchar(20);default:pending" json:"verification_status"` // pending, verified, rejected
+	VerificationNote   string         `gorm:"type:text" json:"verification_note"`
+	VerifiedAt         *time.Time     `json:"verified_at"`
+	Status             string         `gorm:"type:varchar(20);default:active" json:"status"` // active, suspended, banned
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -594,23 +594,23 @@ func (Client) TableName() string {
 
 // ClientCreditCheck 客户征信查询记录
 type ClientCreditCheck struct {
-	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	ClientID        int64     `gorm:"index;not null" json:"client_id"`
-	CheckProvider   string    `gorm:"type:varchar(50)" json:"check_provider"` // baihang, sesame, internal
-	CheckType       string    `gorm:"type:varchar(30)" json:"check_type"`     // pre_order(订单前查询), periodic(定期查询), manual(人工查询)
-	RequestID       string    `gorm:"type:varchar(100)" json:"request_id"`    // 查询请求ID
-	CreditScore     int       `json:"credit_score"`
-	CreditLevel     string    `gorm:"type:varchar(20)" json:"credit_level"`   // excellent, good, fair, poor
-	RiskLevel       string    `gorm:"type:varchar(20)" json:"risk_level"`     // low, medium, high
-	Overdue         bool      `gorm:"default:false" json:"overdue"`           // 是否有逾期记录
-	OverdueAmount   int64     `json:"overdue_amount"`                         // 逾期金额(分)
-	OverdueCount    int       `json:"overdue_count"`                          // 逾期次数
-	ReportSummary   JSON      `gorm:"type:json" json:"report_summary"`        // 报告摘要
-	RawResponse     JSON      `gorm:"type:json" json:"raw_response"`          // 原始响应数据
-	Status          string    `gorm:"type:varchar(20)" json:"status"`         // pending, success, failed
-	ErrorMessage    string    `gorm:"type:text" json:"error_message"`
-	CostAmount      int64     `json:"cost_amount"`                            // 查询费用(分)
-	CreatedAt       time.Time `json:"created_at"`
+	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ClientID      int64     `gorm:"index;not null" json:"client_id"`
+	CheckProvider string    `gorm:"type:varchar(50)" json:"check_provider"` // baihang, sesame, internal
+	CheckType     string    `gorm:"type:varchar(30)" json:"check_type"`     // pre_order(订单前查询), periodic(定期查询), manual(人工查询)
+	RequestID     string    `gorm:"type:varchar(100)" json:"request_id"`    // 查询请求ID
+	CreditScore   int       `json:"credit_score"`
+	CreditLevel   string    `gorm:"type:varchar(20)" json:"credit_level"` // excellent, good, fair, poor
+	RiskLevel     string    `gorm:"type:varchar(20)" json:"risk_level"`   // low, medium, high
+	Overdue       bool      `gorm:"default:false" json:"overdue"`         // 是否有逾期记录
+	OverdueAmount int64     `json:"overdue_amount"`                       // 逾期金额(分)
+	OverdueCount  int       `json:"overdue_count"`                        // 逾期次数
+	ReportSummary JSON      `gorm:"type:json" json:"report_summary"`      // 报告摘要
+	RawResponse   JSON      `gorm:"type:json" json:"raw_response"`        // 原始响应数据
+	Status        string    `gorm:"type:varchar(20)" json:"status"`       // pending, success, failed
+	ErrorMessage  string    `gorm:"type:text" json:"error_message"`
+	CostAmount    int64     `json:"cost_amount"` // 查询费用(分)
+	CreatedAt     time.Time `json:"created_at"`
 
 	Client *Client `gorm:"foreignKey:ClientID" json:"client,omitempty"`
 }
@@ -647,42 +647,42 @@ func (ClientEnterpriseCert) TableName() string {
 
 // CargoDeclaration 货物申报单
 type CargoDeclaration struct {
-	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	ClientID            int64          `gorm:"index;not null" json:"client_id"`
-	OrderID             *int64         `gorm:"index" json:"order_id"` // 关联订单，可为空
-	DeclarationNo       string         `gorm:"type:varchar(50);uniqueIndex" json:"declaration_no"`
-	CargoCategory       string         `gorm:"type:varchar(50);not null" json:"cargo_category"`    // normal(普通货物), valuable(贵重物品), fragile(易碎品), hazardous(危险品), perishable(生鲜), medical(医疗用品)
-	CargoName           string         `gorm:"type:varchar(200);not null" json:"cargo_name"`
-	CargoDescription    string         `gorm:"type:text" json:"cargo_description"`
-	Quantity            int            `gorm:"default:1" json:"quantity"`
-	TotalWeight         float64        `gorm:"type:decimal(10,2)" json:"total_weight"`             // 总重量(kg)
-	Length              float64        `gorm:"type:decimal(10,2)" json:"length"`                   // 长(cm)
-	Width               float64        `gorm:"type:decimal(10,2)" json:"width"`                    // 宽(cm)
-	Height              float64        `gorm:"type:decimal(10,2)" json:"height"`                   // 高(cm)
-	DeclaredValue       int64          `json:"declared_value"`                                     // 申报价值(分)
+	ID               int64   `gorm:"primaryKey;autoIncrement" json:"id"`
+	ClientID         int64   `gorm:"index;not null" json:"client_id"`
+	OrderID          *int64  `gorm:"index" json:"order_id"` // 关联订单，可为空
+	DeclarationNo    string  `gorm:"type:varchar(50);uniqueIndex" json:"declaration_no"`
+	CargoCategory    string  `gorm:"type:varchar(50);not null" json:"cargo_category"` // normal(普通货物), valuable(贵重物品), fragile(易碎品), hazardous(危险品), perishable(生鲜), medical(医疗用品)
+	CargoName        string  `gorm:"type:varchar(200);not null" json:"cargo_name"`
+	CargoDescription string  `gorm:"type:text" json:"cargo_description"`
+	Quantity         int     `gorm:"default:1" json:"quantity"`
+	TotalWeight      float64 `gorm:"type:decimal(10,2)" json:"total_weight"` // 总重量(kg)
+	Length           float64 `gorm:"type:decimal(10,2)" json:"length"`       // 长(cm)
+	Width            float64 `gorm:"type:decimal(10,2)" json:"width"`        // 宽(cm)
+	Height           float64 `gorm:"type:decimal(10,2)" json:"height"`       // 高(cm)
+	DeclaredValue    int64   `json:"declared_value"`                         // 申报价值(分)
 
 	// ==================== 特殊货物信息 ====================
-	IsHazardous         bool           `gorm:"default:false" json:"is_hazardous"`                  // 是否危险品
-	HazardClass         string         `gorm:"type:varchar(20)" json:"hazard_class"`               // 危险品类别
-	UNNumber            string         `gorm:"type:varchar(20)" json:"un_number"`                  // UN编号
-	HazmatPermitNo      string         `gorm:"type:varchar(100)" json:"hazmat_permit_no"`          // 危化品运输许可证号
-	IsTemperatureControl bool          `gorm:"default:false" json:"is_temperature_control"`        // 是否需要温控
-	TemperatureMin      float64        `gorm:"type:decimal(5,2)" json:"temperature_min"`           // 最低温度要求
-	TemperatureMax      float64        `gorm:"type:decimal(5,2)" json:"temperature_max"`           // 最高温度要求
-	IsMoistureSensitive bool           `gorm:"default:false" json:"is_moisture_sensitive"`         // 是否怕潮
-	RequiresInsurance   bool           `gorm:"default:false" json:"requires_insurance"`            // 是否需要保价
-	InsuranceAmount     int64          `json:"insurance_amount"`                                   // 保价金额(分)
+	IsHazardous          bool    `gorm:"default:false" json:"is_hazardous"`           // 是否危险品
+	HazardClass          string  `gorm:"type:varchar(20)" json:"hazard_class"`        // 危险品类别
+	UNNumber             string  `gorm:"type:varchar(20)" json:"un_number"`           // UN编号
+	HazmatPermitNo       string  `gorm:"type:varchar(100)" json:"hazmat_permit_no"`   // 危化品运输许可证号
+	IsTemperatureControl bool    `gorm:"default:false" json:"is_temperature_control"` // 是否需要温控
+	TemperatureMin       float64 `gorm:"type:decimal(5,2)" json:"temperature_min"`    // 最低温度要求
+	TemperatureMax       float64 `gorm:"type:decimal(5,2)" json:"temperature_max"`    // 最高温度要求
+	IsMoistureSensitive  bool    `gorm:"default:false" json:"is_moisture_sensitive"`  // 是否怕潮
+	RequiresInsurance    bool    `gorm:"default:false" json:"requires_insurance"`     // 是否需要保价
+	InsuranceAmount      int64   `json:"insurance_amount"`                            // 保价金额(分)
 
 	// ==================== 合规检查 ====================
-	ComplianceStatus    string         `gorm:"type:varchar(20);default:pending" json:"compliance_status"` // pending, approved, rejected
-	ComplianceNote      string         `gorm:"type:text" json:"compliance_note"`
-	ComplianceCheckedAt *time.Time     `json:"compliance_checked_at"`
-	ComplianceCheckedBy int64          `json:"compliance_checked_by"`
+	ComplianceStatus    string     `gorm:"type:varchar(20);default:pending" json:"compliance_status"` // pending, approved, rejected
+	ComplianceNote      string     `gorm:"type:text" json:"compliance_note"`
+	ComplianceCheckedAt *time.Time `json:"compliance_checked_at"`
+	ComplianceCheckedBy int64      `json:"compliance_checked_by"`
 
 	// ==================== 附件 ====================
-	CargoImages         JSON           `gorm:"type:json" json:"cargo_images"`         // 货物照片
-	PackingImages       JSON           `gorm:"type:json" json:"packing_images"`       // 包装照片
-	SupportingDocs      JSON           `gorm:"type:json" json:"supporting_docs"`      // 证明文件(如危化品证明、检疫证明等)
+	CargoImages    JSON `gorm:"type:json" json:"cargo_images"`    // 货物照片
+	PackingImages  JSON `gorm:"type:json" json:"packing_images"`  // 包装照片
+	SupportingDocs JSON `gorm:"type:json" json:"supporting_docs"` // 证明文件(如危化品证明、检疫证明等)
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
@@ -700,63 +700,63 @@ func (CargoDeclaration) TableName() string {
 
 // DispatchTask 派单任务
 type DispatchTask struct {
-	ID               int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	TaskNo           string         `gorm:"type:varchar(50);uniqueIndex;not null" json:"task_no"`
-	OrderID          int64          `gorm:"index" json:"order_id"`      // 关联订单
-	CargoDemandID    int64          `gorm:"index" json:"cargo_demand_id"` // 关联货运需求
-	ClientID         int64          `gorm:"index;not null" json:"client_id"`
-	TaskType         string         `gorm:"type:varchar(30);not null" json:"task_type"` // instant(即时), scheduled(预约), batch(批量)
-	Priority         int            `gorm:"default:5" json:"priority"`  // 1-10, 10最高优先级
-	Status           string         `gorm:"type:varchar(30);default:pending" json:"status"` // pending, matching, dispatching, assigned, cancelled, expired
+	ID            int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	TaskNo        string `gorm:"type:varchar(50);uniqueIndex;not null" json:"task_no"`
+	OrderID       int64  `gorm:"index" json:"order_id"`        // 关联订单
+	CargoDemandID int64  `gorm:"index" json:"cargo_demand_id"` // 关联货运需求
+	ClientID      int64  `gorm:"index;not null" json:"client_id"`
+	TaskType      string `gorm:"type:varchar(30);not null" json:"task_type"`     // instant(即时), scheduled(预约), batch(批量)
+	Priority      int    `gorm:"default:5" json:"priority"`                      // 1-10, 10最高优先级
+	Status        string `gorm:"type:varchar(30);default:pending" json:"status"` // pending, matching, dispatching, assigned, cancelled, expired
 
 	// ==================== 货物信息 ====================
-	CargoWeight      float64        `gorm:"type:decimal(10,2)" json:"cargo_weight"`       // 货物重量(kg)
-	CargoVolume      float64        `gorm:"type:decimal(10,2)" json:"cargo_volume"`       // 货物体积(立方厘米)
-	CargoCategory    string         `gorm:"type:varchar(50)" json:"cargo_category"`       // 货物类别
-	IsHazardous      bool           `gorm:"default:false" json:"is_hazardous"`
-	RequiresSpecial  JSON           `gorm:"type:json" json:"requires_special"`            // 特殊要求: 温控、防震等
+	CargoWeight     float64 `gorm:"type:decimal(10,2)" json:"cargo_weight"` // 货物重量(kg)
+	CargoVolume     float64 `gorm:"type:decimal(10,2)" json:"cargo_volume"` // 货物体积(立方厘米)
+	CargoCategory   string  `gorm:"type:varchar(50)" json:"cargo_category"` // 货物类别
+	IsHazardous     bool    `gorm:"default:false" json:"is_hazardous"`
+	RequiresSpecial JSON    `gorm:"type:json" json:"requires_special"` // 特殊要求: 温控、防震等
 
 	// ==================== 位置信息 ====================
-	PickupLatitude   float64        `gorm:"type:decimal(10,7)" json:"pickup_latitude"`
-	PickupLongitude  float64        `gorm:"type:decimal(10,7)" json:"pickup_longitude"`
-	PickupAddress    string         `gorm:"type:varchar(255)" json:"pickup_address"`
-	DeliveryLatitude float64        `gorm:"type:decimal(10,7)" json:"delivery_latitude"`
-	DeliveryLongitude float64       `gorm:"type:decimal(10,7)" json:"delivery_longitude"`
-	DeliveryAddress  string         `gorm:"type:varchar(255)" json:"delivery_address"`
-	FlightDistance   float64        `gorm:"type:decimal(10,2)" json:"flight_distance"`    // 飞行距离(km)
+	PickupLatitude    float64 `gorm:"type:decimal(10,7)" json:"pickup_latitude"`
+	PickupLongitude   float64 `gorm:"type:decimal(10,7)" json:"pickup_longitude"`
+	PickupAddress     string  `gorm:"type:varchar(255)" json:"pickup_address"`
+	DeliveryLatitude  float64 `gorm:"type:decimal(10,7)" json:"delivery_latitude"`
+	DeliveryLongitude float64 `gorm:"type:decimal(10,7)" json:"delivery_longitude"`
+	DeliveryAddress   string  `gorm:"type:varchar(255)" json:"delivery_address"`
+	FlightDistance    float64 `gorm:"type:decimal(10,2)" json:"flight_distance"` // 飞行距离(km)
 
 	// ==================== 时间约束 ====================
-	RequiredPickupTime   *time.Time `json:"required_pickup_time"`     // 要求取货时间
-	RequiredDeliveryTime *time.Time `json:"required_delivery_time"`   // 要求送达时间
-	TimeWindowStart      *time.Time `json:"time_window_start"`        // 时间窗口开始
-	TimeWindowEnd        *time.Time `json:"time_window_end"`          // 时间窗口结束
-	DispatchDeadline     *time.Time `json:"dispatch_deadline"`        // 派单截止时间
+	RequiredPickupTime   *time.Time `json:"required_pickup_time"`   // 要求取货时间
+	RequiredDeliveryTime *time.Time `json:"required_delivery_time"` // 要求送达时间
+	TimeWindowStart      *time.Time `json:"time_window_start"`      // 时间窗口开始
+	TimeWindowEnd        *time.Time `json:"time_window_end"`        // 时间窗口结束
+	DispatchDeadline     *time.Time `json:"dispatch_deadline"`      // 派单截止时间
 
 	// ==================== 预算约束 ====================
-	BudgetMin        int64          `json:"budget_min"`               // 最低预算(分)
-	BudgetMax        int64          `json:"budget_max"`               // 最高预算(分)
-	OfferedPrice     int64          `json:"offered_price"`            // 业主出价(分)
+	BudgetMin    int64 `json:"budget_min"`    // 最低预算(分)
+	BudgetMax    int64 `json:"budget_max"`    // 最高预算(分)
+	OfferedPrice int64 `json:"offered_price"` // 业主出价(分)
 
 	// ==================== 匹配要求 ====================
-	RequiredLicenseType string       `gorm:"type:varchar(30)" json:"required_license_type"` // 要求的执照类型: VLOS, BVLOS
-	MinPilotRating      float64      `gorm:"type:decimal(3,2)" json:"min_pilot_rating"`     // 飞手最低评分
-	MinDroneRating      float64      `gorm:"type:decimal(3,2)" json:"min_drone_rating"`     // 无人机最低评分
-	MinCreditScore      int          `json:"min_credit_score"`         // 最低信用分
+	RequiredLicenseType string  `gorm:"type:varchar(30)" json:"required_license_type"` // 要求的执照类型: VLOS, BVLOS
+	MinPilotRating      float64 `gorm:"type:decimal(3,2)" json:"min_pilot_rating"`     // 飞手最低评分
+	MinDroneRating      float64 `gorm:"type:decimal(3,2)" json:"min_drone_rating"`     // 无人机最低评分
+	MinCreditScore      int     `json:"min_credit_score"`                              // 最低信用分
 
 	// ==================== 派单结果 ====================
-	AssignedPilotID  int64          `gorm:"index" json:"assigned_pilot_id"`
-	AssignedDroneID  int64          `gorm:"index" json:"assigned_drone_id"`
-	AssignedOwnerID  int64          `gorm:"index" json:"assigned_owner_id"`  // 机主ID
-	AssignedAt       *time.Time     `json:"assigned_at"`
-	FinalPrice       int64          `json:"final_price"`              // 最终成交价(分)
-	MatchScore       int            `json:"match_score"`              // 匹配得分
-	MatchDetails     JSON           `gorm:"type:json" json:"match_details"` // 匹配详情
+	AssignedPilotID *int64     `gorm:"index" json:"assigned_pilot_id"`
+	AssignedDroneID *int64     `gorm:"index" json:"assigned_drone_id"`
+	AssignedOwnerID *int64     `gorm:"index" json:"assigned_owner_id"` // 机主ID
+	AssignedAt      *time.Time `json:"assigned_at"`
+	FinalPrice      int64      `json:"final_price"`                    // 最终成交价(分)
+	MatchScore      int        `json:"match_score"`                    // 匹配得分
+	MatchDetails    JSON       `gorm:"type:json" json:"match_details"` // 匹配详情
 
 	// ==================== 匹配尝试统计 ====================
-	MatchAttempts    int            `gorm:"default:0" json:"match_attempts"`   // 匹配尝试次数
-	MaxAttempts      int            `gorm:"default:3" json:"max_attempts"`     // 最大尝试次数
-	LastMatchTime    *time.Time     `json:"last_match_time"`
-	FailReason       string         `gorm:"type:text" json:"fail_reason"`      // 失败原因
+	MatchAttempts int        `gorm:"default:0" json:"match_attempts"` // 匹配尝试次数
+	MaxAttempts   int        `gorm:"default:3" json:"max_attempts"`   // 最大尝试次数
+	LastMatchTime *time.Time `json:"last_match_time"`
+	FailReason    string     `gorm:"type:text" json:"fail_reason"` // 失败原因
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
@@ -773,34 +773,34 @@ func (DispatchTask) TableName() string {
 
 // DispatchCandidate 派单候选人
 type DispatchCandidate struct {
-	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	TaskID          int64     `gorm:"index;not null" json:"task_id"`
-	PilotID         int64     `gorm:"index;not null" json:"pilot_id"`
-	DroneID         int64     `gorm:"index;not null" json:"drone_id"`
-	OwnerID         int64     `gorm:"index;not null" json:"owner_id"`
+	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	TaskID  int64 `gorm:"index;not null" json:"task_id"`
+	PilotID int64 `gorm:"index;not null" json:"pilot_id"`
+	DroneID int64 `gorm:"index;not null" json:"drone_id"`
+	OwnerID int64 `gorm:"index;not null" json:"owner_id"`
 
 	// ==================== 综合评分 ====================
-	TotalScore      int       `json:"total_score"`          // 综合得分(0-100)
+	TotalScore int `json:"total_score"` // 综合得分(0-100)
 
 	// ==================== 各维度得分 ====================
-	DistanceScore   int       `json:"distance_score"`       // 距离得分(0-25)
-	LoadScore       int       `json:"load_score"`           // 载荷匹配得分(0-15)
-	QualificationScore int    `json:"qualification_score"`  // 资质匹配得分(0-20)
-	CreditScore     int       `json:"credit_score"`         // 信用得分(0-15)
-	PriceScore      int       `json:"price_score"`          // 价格得分(0-10)
-	TimeScore       int       `json:"time_score"`           // 时间匹配得分(0-10)
-	RatingScore     int       `json:"rating_score"`         // 服务评分得分(0-5)
+	DistanceScore      int `json:"distance_score"`      // 距离得分(0-25)
+	LoadScore          int `json:"load_score"`          // 载荷匹配得分(0-15)
+	QualificationScore int `json:"qualification_score"` // 资质匹配得分(0-20)
+	CreditScore        int `json:"credit_score"`        // 信用得分(0-15)
+	PriceScore         int `json:"price_score"`         // 价格得分(0-10)
+	TimeScore          int `json:"time_score"`          // 时间匹配得分(0-10)
+	RatingScore        int `json:"rating_score"`        // 服务评分得分(0-5)
 
 	// ==================== 详细数据 ====================
-	Distance        float64   `gorm:"type:decimal(10,2)" json:"distance"`        // 距离(km)
-	EstimatedTime   int       `json:"estimated_time"`       // 预计完成时间(分钟)
-	QuotedPrice     int64     `json:"quoted_price"`         // 报价(分)
+	Distance      float64 `gorm:"type:decimal(10,2)" json:"distance"` // 距离(km)
+	EstimatedTime int     `json:"estimated_time"`                     // 预计完成时间(分钟)
+	QuotedPrice   int64   `json:"quoted_price"`                       // 报价(分)
 
 	// ==================== 状态 ====================
-	Status          string    `gorm:"type:varchar(20);default:pending" json:"status"` // pending, notified, accepted, rejected, timeout
-	NotifiedAt      *time.Time `json:"notified_at"`
-	RespondedAt     *time.Time `json:"responded_at"`
-	ResponseNote    string    `gorm:"type:text" json:"response_note"`
+	Status       string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, notified, accepted, rejected, timeout
+	NotifiedAt   *time.Time `json:"notified_at"`
+	RespondedAt  *time.Time `json:"responded_at"`
+	ResponseNote string     `gorm:"type:text" json:"response_note"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -816,12 +816,12 @@ func (DispatchCandidate) TableName() string {
 
 // DispatchConfig 派单配置
 type DispatchConfig struct {
-	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	ConfigKey       string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"config_key"`
-	ConfigValue     string    `gorm:"type:text" json:"config_value"`
-	ConfigType      string    `gorm:"type:varchar(20)" json:"config_type"` // int, float, string, json
-	Description     string    `gorm:"type:varchar(255)" json:"description"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ConfigKey   string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"config_key"`
+	ConfigValue string    `gorm:"type:text" json:"config_value"`
+	ConfigType  string    `gorm:"type:varchar(20)" json:"config_type"` // int, float, string, json
+	Description string    `gorm:"type:varchar(255)" json:"description"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (DispatchConfig) TableName() string {
@@ -830,13 +830,13 @@ func (DispatchConfig) TableName() string {
 
 // DispatchLog 派单日志
 type DispatchLog struct {
-	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	TaskID      int64     `gorm:"index;not null" json:"task_id"`
-	Action      string    `gorm:"type:varchar(50)" json:"action"` // created, matching_started, candidate_found, notified, accepted, rejected, assigned, cancelled
-	ActorType   string    `gorm:"type:varchar(20)" json:"actor_type"` // system, pilot, client, admin
-	ActorID     int64     `json:"actor_id"`
-	Details     JSON      `gorm:"type:json" json:"details"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	TaskID    int64     `gorm:"index;not null" json:"task_id"`
+	Action    string    `gorm:"type:varchar(50)" json:"action"`     // created, matching_started, candidate_found, notified, accepted, rejected, assigned, cancelled
+	ActorType string    `gorm:"type:varchar(20)" json:"actor_type"` // system, pilot, client, admin
+	ActorID   int64     `json:"actor_id"`
+	Details   JSON      `gorm:"type:json" json:"details"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func (DispatchLog) TableName() string {
@@ -847,15 +847,15 @@ func (DispatchLog) TableName() string {
 
 // FlightPosition 飞行实时位置记录
 type FlightPosition struct {
-	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID   int64     `gorm:"index;not null" json:"order_id"`
-	DroneID   int64     `gorm:"index;not null" json:"drone_id"`
-	PilotID   int64     `json:"pilot_id"`
+	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID int64 `gorm:"index;not null" json:"order_id"`
+	DroneID int64 `gorm:"index;not null" json:"drone_id"`
+	PilotID int64 `json:"pilot_id"`
 
 	// 位置信息
-	Latitude  float64   `gorm:"type:decimal(10,7);not null" json:"latitude"`
-	Longitude float64   `gorm:"type:decimal(10,7);not null" json:"longitude"`
-	Altitude  int       `gorm:"default:0" json:"altitude"` // 高度(米)
+	Latitude  float64 `gorm:"type:decimal(10,7);not null" json:"latitude"`
+	Longitude float64 `gorm:"type:decimal(10,7);not null" json:"longitude"`
+	Altitude  int     `gorm:"default:0" json:"altitude"` // 高度(米)
 
 	// 飞行状态
 	Speed         int `gorm:"default:0" json:"speed"`          // 速度(米/秒x100)
@@ -885,10 +885,10 @@ func (FlightPosition) TableName() string {
 
 // FlightAlert 飞行告警记录
 type FlightAlert struct {
-	ID       int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID  int64  `gorm:"index;not null" json:"order_id"`
-	DroneID  int64  `gorm:"index;not null" json:"drone_id"`
-	PilotID  int64  `json:"pilot_id"`
+	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID int64 `gorm:"index;not null" json:"order_id"`
+	DroneID int64 `gorm:"index;not null" json:"drone_id"`
+	PilotID int64 `json:"pilot_id"`
 
 	AlertType  string `gorm:"type:varchar(50);not null" json:"alert_type"`  // low_battery, geofence, deviation, signal_lost, altitude, speed, weather
 	AlertLevel string `gorm:"type:varchar(20);not null" json:"alert_level"` // info, warning, critical
@@ -956,8 +956,8 @@ type Geofence struct {
 	ViolationAction string `gorm:"type:varchar(30);default:alert" json:"violation_action"` // alert, block, force_land
 	AlertDistance   int    `gorm:"default:100" json:"alert_distance"`
 
-	Description string `gorm:"type:text" json:"description"`
-	Status      string `gorm:"type:varchar(20);default:active" json:"status"`
+	Description string    `gorm:"type:text" json:"description"`
+	Status      string    `gorm:"type:varchar(20);default:active" json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -968,11 +968,11 @@ func (Geofence) TableName() string {
 
 // GeofenceViolation 围栏违规记录
 type GeofenceViolation struct {
-	ID            int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID       int64  `gorm:"index;not null" json:"order_id"`
-	DroneID       int64  `gorm:"index;not null" json:"drone_id"`
-	GeofenceID    int64  `gorm:"index;not null" json:"geofence_id"`
-	FlightAlertID int64  `json:"flight_alert_id"`
+	ID            int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID       int64 `gorm:"index;not null" json:"order_id"`
+	DroneID       int64 `gorm:"index;not null" json:"drone_id"`
+	GeofenceID    int64 `gorm:"index;not null" json:"geofence_id"`
+	FlightAlertID int64 `json:"flight_alert_id"`
 
 	ViolationType string `gorm:"type:varchar(30);not null" json:"violation_type"` // entered, exited, altitude
 
@@ -998,10 +998,10 @@ func (GeofenceViolation) TableName() string {
 
 // FlightTrajectory 飞行轨迹
 type FlightTrajectory struct {
-	ID            int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID       int64  `gorm:"index" json:"order_id"`
-	DroneID       int64  `gorm:"index;not null" json:"drone_id"`
-	PilotID       int64  `gorm:"index" json:"pilot_id"`
+	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID int64 `gorm:"index" json:"order_id"`
+	DroneID int64 `gorm:"index;not null" json:"drone_id"`
+	PilotID int64 `gorm:"index" json:"pilot_id"`
 
 	TrajectoryNo string `gorm:"type:varchar(30);uniqueIndex;not null" json:"trajectory_no"`
 	Name         string `gorm:"type:varchar(100)" json:"name"`
@@ -1050,9 +1050,9 @@ func (FlightTrajectory) TableName() string {
 
 // FlightWaypoint 飞行航点
 type FlightWaypoint struct {
-	ID           int64   `gorm:"primaryKey;autoIncrement" json:"id"`
-	TrajectoryID int64   `gorm:"index;not null" json:"trajectory_id"`
-	SequenceNo   int     `gorm:"not null" json:"sequence_no"`
+	ID           int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	TrajectoryID int64 `gorm:"index;not null" json:"trajectory_id"`
+	SequenceNo   int   `gorm:"not null" json:"sequence_no"`
 
 	// 位置
 	Latitude  float64 `gorm:"type:decimal(10,7);not null" json:"latitude"`
@@ -1082,10 +1082,10 @@ func (FlightWaypoint) TableName() string {
 
 // SavedRoute 保存的路线模板
 type SavedRoute struct {
-	ID                 int64   `gorm:"primaryKey;autoIncrement" json:"id"`
-	OwnerID            int64   `gorm:"index;not null" json:"owner_id"`
-	PilotID            int64   `gorm:"index" json:"pilot_id"`
-	SourceTrajectoryID int64   `json:"source_trajectory_id"`
+	ID                 int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OwnerID            int64 `gorm:"index;not null" json:"owner_id"`
+	PilotID            int64 `gorm:"index" json:"pilot_id"`
+	SourceTrajectoryID int64 `json:"source_trajectory_id"`
 
 	RouteNo     string `gorm:"type:varchar(30);uniqueIndex;not null" json:"route_no"`
 	Name        string `gorm:"type:varchar(100);not null" json:"name"`
@@ -1132,7 +1132,7 @@ type SavedRoute struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
-	Owner *User `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Owner *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	Pilot *Pilot `gorm:"foreignKey:PilotID" json:"pilot,omitempty"`
 }
 
@@ -1144,8 +1144,8 @@ func (SavedRoute) TableName() string {
 
 // MultiPointTask 多点任务
 type MultiPointTask struct {
-	ID      int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID int64  `gorm:"index;not null" json:"order_id"`
+	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID int64 `gorm:"index;not null" json:"order_id"`
 
 	TaskNo   string `gorm:"type:varchar(30);uniqueIndex;not null" json:"task_no"`
 	TaskType string `gorm:"type:varchar(20);not null" json:"task_type"` // pickup, delivery, mixed
@@ -1208,10 +1208,10 @@ type MultiPointTaskStop struct {
 	DwellDuration   int        `gorm:"default:0" json:"dwell_duration"` // 停留时长(秒)
 
 	// 确认信息
-	ConfirmationPhotos    JSON   `gorm:"type:json" json:"confirmation_photos"`
-	ConfirmationSignature string `gorm:"type:varchar(500)" json:"confirmation_signature"`
+	ConfirmationPhotos    JSON       `gorm:"type:json" json:"confirmation_photos"`
+	ConfirmationSignature string     `gorm:"type:varchar(500)" json:"confirmation_signature"`
 	ConfirmedAt           *time.Time `json:"confirmed_at"`
-	ConfirmedBy           string `gorm:"type:varchar(50)" json:"confirmed_by"`
+	ConfirmedBy           string     `gorm:"type:varchar(50)" json:"confirmed_by"`
 
 	// 状态
 	Status     string `gorm:"type:varchar(20);default:pending" json:"status"` // pending, arrived, in_progress, completed, skipped
@@ -1253,9 +1253,9 @@ type AirspaceApplication struct {
 	DroneID int64 `gorm:"index" json:"drone_id"`
 
 	// 飞行计划
-	FlightPlanName string  `gorm:"type:varchar(200);not null" json:"flight_plan_name"`
-	FlightPurpose  string  `gorm:"type:varchar(50);not null" json:"flight_purpose"` // cargo_delivery, agriculture, mapping, inspection, training, emergency, other
-	FlightType     string  `gorm:"type:varchar(30);default:VLOS" json:"flight_type"` // VLOS(视距内), BVLOS(超视距), EVLOS(扩展视距)
+	FlightPlanName string `gorm:"type:varchar(200);not null" json:"flight_plan_name"`
+	FlightPurpose  string `gorm:"type:varchar(50);not null" json:"flight_purpose"`  // cargo_delivery, agriculture, mapping, inspection, training, emergency, other
+	FlightType     string `gorm:"type:varchar(30);default:VLOS" json:"flight_type"` // VLOS(视距内), BVLOS(超视距), EVLOS(扩展视距)
 
 	// 航线规划
 	DepartureLatitude  float64 `gorm:"type:decimal(10,7);not null" json:"departure_latitude"`
@@ -1264,16 +1264,16 @@ type AirspaceApplication struct {
 	ArrivalLatitude    float64 `gorm:"type:decimal(10,7);not null" json:"arrival_latitude"`
 	ArrivalLongitude   float64 `gorm:"type:decimal(10,7);not null" json:"arrival_longitude"`
 	ArrivalAddress     string  `gorm:"type:varchar(255)" json:"arrival_address"`
-	Waypoints          JSON    `gorm:"type:json" json:"waypoints"` // 航线途经点 [{lat,lng,alt}]
+	Waypoints          JSON    `gorm:"type:json" json:"waypoints"`   // 航线途经点 [{lat,lng,alt}]
 	FlightArea         JSON    `gorm:"type:json" json:"flight_area"` // 飞行区域多边形
 
 	// 飞行参数
-	PlannedAltitude    int     `gorm:"not null" json:"planned_altitude"`        // 计划飞行高度(米)
-	MaxAltitude        int     `gorm:"not null" json:"max_altitude"`            // 最大飞行高度(米)
-	PlannedSpeed       float64 `gorm:"type:decimal(6,2)" json:"planned_speed"`  // 计划飞行速度(m/s)
-	EstimatedDistance  float64 `gorm:"type:decimal(10,2)" json:"estimated_distance"` // 预计距离(米)
-	EstimatedDuration  int     `json:"estimated_duration"`                       // 预计时长(秒)
-	CargoWeight        float64 `gorm:"type:decimal(10,2)" json:"cargo_weight"`  // 载货重量(kg)
+	PlannedAltitude   int     `gorm:"not null" json:"planned_altitude"`             // 计划飞行高度(米)
+	MaxAltitude       int     `gorm:"not null" json:"max_altitude"`                 // 最大飞行高度(米)
+	PlannedSpeed      float64 `gorm:"type:decimal(6,2)" json:"planned_speed"`       // 计划飞行速度(m/s)
+	EstimatedDistance float64 `gorm:"type:decimal(10,2)" json:"estimated_distance"` // 预计距离(米)
+	EstimatedDuration int     `json:"estimated_duration"`                           // 预计时长(秒)
+	CargoWeight       float64 `gorm:"type:decimal(10,2)" json:"cargo_weight"`       // 载货重量(kg)
 
 	// 时间窗口
 	PlannedStartTime time.Time `gorm:"not null" json:"planned_start_time"`
@@ -1290,16 +1290,16 @@ type AirspaceApplication struct {
 	ReviewedBy    int64      `json:"reviewed_by"`
 	ReviewedAt    *time.Time `json:"reviewed_at"`
 	ReviewNotes   string     `gorm:"type:text" json:"review_notes"`
-	RejectionCode string    `gorm:"type:varchar(50)" json:"rejection_code"`
+	RejectionCode string     `gorm:"type:varchar(50)" json:"rejection_code"`
 
 	// 合规检查结果
-	ComplianceCheckID  int64  `json:"compliance_check_id"`
-	CompliancePassed   bool   `gorm:"default:false" json:"compliance_passed"`
-	ComplianceNotes    string `gorm:"type:text" json:"compliance_notes"`
+	ComplianceCheckID int64  `json:"compliance_check_id"`
+	CompliancePassed  bool   `gorm:"default:false" json:"compliance_passed"`
+	ComplianceNotes   string `gorm:"type:text" json:"compliance_notes"`
 
 	// 附件
-	FlightPlanDoc   string `gorm:"type:varchar(500)" json:"flight_plan_doc"`
-	SupportingDocs  JSON   `gorm:"type:json" json:"supporting_docs"`
+	FlightPlanDoc  string `gorm:"type:varchar(500)" json:"flight_plan_doc"`
+	SupportingDocs JSON   `gorm:"type:json" json:"supporting_docs"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -1324,7 +1324,7 @@ type NoFlyZone struct {
 	GeometryType    string   `gorm:"type:varchar(20);not null" json:"geometry_type"` // circle, polygon
 	CenterLatitude  *float64 `gorm:"type:decimal(10,7)" json:"center_latitude"`
 	CenterLongitude *float64 `gorm:"type:decimal(10,7)" json:"center_longitude"`
-	Radius          *int     `json:"radius"` // 半径(米), 适用于circle
+	Radius          *int     `json:"radius"`                       // 半径(米), 适用于circle
 	Coordinates     JSON     `gorm:"type:json" json:"coordinates"` // 多边形顶点坐标
 
 	// 高度限制
@@ -1337,17 +1337,17 @@ type NoFlyZone struct {
 	IsPermanent   bool       `gorm:"default:false" json:"is_permanent"`
 
 	// 来源信息
-	Source       string `gorm:"type:varchar(50);default:caac" json:"source"` // caac, military, local_gov, platform
-	ExternalID   string `gorm:"type:varchar(100)" json:"external_id"`
-	Authority    string `gorm:"type:varchar(200)" json:"authority"` // 管理机构
+	Source     string `gorm:"type:varchar(50);default:caac" json:"source"` // caac, military, local_gov, platform
+	ExternalID string `gorm:"type:varchar(100)" json:"external_id"`
+	Authority  string `gorm:"type:varchar(200)" json:"authority"` // 管理机构
 
 	// 限制规则
-	RestrictionLevel string `gorm:"type:varchar(30);default:no_fly" json:"restriction_level"` // no_fly, restricted, caution
-	AllowedWithPermit bool  `gorm:"default:false" json:"allowed_with_permit"`
+	RestrictionLevel  string `gorm:"type:varchar(30);default:no_fly" json:"restriction_level"` // no_fly, restricted, caution
+	AllowedWithPermit bool   `gorm:"default:false" json:"allowed_with_permit"`
 	PermitAuthority   string `gorm:"type:varchar(200)" json:"permit_authority"`
 
-	Description string `gorm:"type:text" json:"description"`
-	Status      string `gorm:"type:varchar(20);default:active" json:"status"` // active, inactive, expired
+	Description string    `gorm:"type:text" json:"description"`
+	Status      string    `gorm:"type:varchar(20);default:active" json:"status"` // active, inactive, expired
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -1358,14 +1358,14 @@ func (NoFlyZone) TableName() string {
 
 // ComplianceCheck 合规性检查记录
 type ComplianceCheck struct {
-	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID int64 `gorm:"index" json:"order_id"`
-	PilotID int64 `gorm:"index;not null" json:"pilot_id"`
-	DroneID int64 `gorm:"index;not null" json:"drone_id"`
+	ID                    int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID               int64 `gorm:"index" json:"order_id"`
+	PilotID               int64 `gorm:"index;not null" json:"pilot_id"`
+	DroneID               int64 `gorm:"index;not null" json:"drone_id"`
 	AirspaceApplicationID int64 `gorm:"index" json:"airspace_application_id"`
 
 	// 检查触发
-	TriggerType string `gorm:"type:varchar(30);not null" json:"trigger_type"` // pre_flight, airspace_apply, periodic, manual
+	TriggerType string `gorm:"type:varchar(30);not null" json:"trigger_type"`     // pre_flight, airspace_apply, periodic, manual
 	CheckedBy   string `gorm:"type:varchar(30);default:system" json:"checked_by"` // system, admin
 
 	// 总体结果
@@ -1376,13 +1376,13 @@ type ComplianceCheck struct {
 	WarningItems  int    `gorm:"default:0" json:"warning_items"`
 
 	// 各项检查结果摘要
-	PilotCompliance  string `gorm:"type:varchar(20)" json:"pilot_compliance"`  // passed, failed, warning
-	DroneCompliance  string `gorm:"type:varchar(20)" json:"drone_compliance"`
-	CargoCompliance  string `gorm:"type:varchar(20)" json:"cargo_compliance"`
+	PilotCompliance    string `gorm:"type:varchar(20)" json:"pilot_compliance"` // passed, failed, warning
+	DroneCompliance    string `gorm:"type:varchar(20)" json:"drone_compliance"`
+	CargoCompliance    string `gorm:"type:varchar(20)" json:"cargo_compliance"`
 	AirspaceCompliance string `gorm:"type:varchar(20)" json:"airspace_compliance"`
 	WeatherCompliance  string `gorm:"type:varchar(20)" json:"weather_compliance"`
 
-	Notes     string `gorm:"type:text" json:"notes"`
+	Notes     string     `gorm:"type:text" json:"notes"`
 	ExpiresAt *time.Time `json:"expires_at"` // 检查结果有效期
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -1399,8 +1399,8 @@ func (ComplianceCheck) TableName() string {
 
 // ComplianceCheckItem 合规性检查明细项
 type ComplianceCheckItem struct {
-	ID                int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	ComplianceCheckID int64  `gorm:"index;not null" json:"compliance_check_id"`
+	ID                int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+	ComplianceCheckID int64 `gorm:"index;not null" json:"compliance_check_id"`
 
 	// 检查项定义
 	Category    string `gorm:"type:varchar(30);not null" json:"category"`    // pilot, drone, cargo, airspace, weather
@@ -1409,15 +1409,15 @@ type ComplianceCheckItem struct {
 	Description string `gorm:"type:varchar(255)" json:"description"`
 
 	// 检查结果
-	Result       string `gorm:"type:varchar(20);not null" json:"result"` // passed, failed, warning, skipped
-	Severity     string `gorm:"type:varchar(20);default:error" json:"severity"` // error, warning, info
+	Result        string `gorm:"type:varchar(20);not null" json:"result"`        // passed, failed, warning, skipped
+	Severity      string `gorm:"type:varchar(20);default:error" json:"severity"` // error, warning, info
 	ExpectedValue string `gorm:"type:varchar(255)" json:"expected_value"`
 	ActualValue   string `gorm:"type:varchar(255)" json:"actual_value"`
 	Message       string `gorm:"type:text" json:"message"` // 检查结果说明
 
 	// 元数据
-	IsRequired bool `gorm:"default:true" json:"is_required"`  // 是否为必须通过项
-	IsBlocking bool `gorm:"default:true" json:"is_blocking"`  // 失败是否阻断
+	IsRequired bool `gorm:"default:true" json:"is_required"` // 是否为必须通过项
+	IsBlocking bool `gorm:"default:true" json:"is_blocking"` // 失败是否阻断
 
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -1432,56 +1432,56 @@ func (ComplianceCheckItem) TableName() string {
 
 // OrderSettlement 订单结算记录
 type OrderSettlement struct {
-	ID                int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	SettlementNo      string         `gorm:"type:varchar(50);uniqueIndex;not null" json:"settlement_no"`
-	OrderID           int64          `gorm:"uniqueIndex;not null" json:"order_id"`
-	OrderNo           string         `gorm:"type:varchar(30)" json:"order_no"`
+	ID           int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	SettlementNo string `gorm:"type:varchar(50);uniqueIndex;not null" json:"settlement_no"`
+	OrderID      int64  `gorm:"uniqueIndex;not null" json:"order_id"`
+	OrderNo      string `gorm:"type:varchar(30)" json:"order_no"`
 
 	// ==================== 金额明细 ====================
-	TotalAmount       int64  `json:"total_amount"`       // 订单总额(分)
-	BaseFee           int64  `json:"base_fee"`           // 基础服务费(分)
-	MileageFee        int64  `json:"mileage_fee"`        // 里程费(分)
-	DurationFee       int64  `json:"duration_fee"`       // 时长费(分)
-	WeightFee         int64  `json:"weight_fee"`         // 重量费(分)
-	DifficultyFee     int64  `json:"difficulty_fee"`     // 难度附加费(分)
-	InsuranceFee      int64  `json:"insurance_fee"`      // 保险费(分)
-	SurgePricing      int64  `json:"surge_pricing"`      // 溢价/折扣(分, 正为溢价负为折扣)
-	CouponDiscount    int64  `json:"coupon_discount"`    // 优惠券折扣(分)
-	FinalAmount       int64  `json:"final_amount"`       // 最终支付金额(分)
+	TotalAmount    int64 `json:"total_amount"`    // 订单总额(分)
+	BaseFee        int64 `json:"base_fee"`        // 基础服务费(分)
+	MileageFee     int64 `json:"mileage_fee"`     // 里程费(分)
+	DurationFee    int64 `json:"duration_fee"`    // 时长费(分)
+	WeightFee      int64 `json:"weight_fee"`      // 重量费(分)
+	DifficultyFee  int64 `json:"difficulty_fee"`  // 难度附加费(分)
+	InsuranceFee   int64 `json:"insurance_fee"`   // 保险费(分)
+	SurgePricing   int64 `json:"surge_pricing"`   // 溢价/折扣(分, 正为溢价负为折扣)
+	CouponDiscount int64 `json:"coupon_discount"` // 优惠券折扣(分)
+	FinalAmount    int64 `json:"final_amount"`    // 最终支付金额(分)
 
 	// ==================== 分账明细 ====================
-	PlatformFeeRate   float64 `gorm:"type:decimal(5,4)" json:"platform_fee_rate"`  // 平台费率
-	PlatformFee       int64   `json:"platform_fee"`       // 平台服务费(分)
-	PilotFeeRate      float64 `gorm:"type:decimal(5,4)" json:"pilot_fee_rate"`     // 飞手分成比例
-	PilotFee          int64   `json:"pilot_fee"`          // 飞手劳务费(分)
-	OwnerFeeRate      float64 `gorm:"type:decimal(5,4)" json:"owner_fee_rate"`     // 机主分成比例
-	OwnerFee          int64   `json:"owner_fee"`          // 机主设备费(分)
-	InsuranceDeduction int64  `json:"insurance_deduction"` // 保险费代扣(分)
+	PlatformFeeRate    float64 `gorm:"type:decimal(5,4)" json:"platform_fee_rate"` // 平台费率
+	PlatformFee        int64   `json:"platform_fee"`                               // 平台服务费(分)
+	PilotFeeRate       float64 `gorm:"type:decimal(5,4)" json:"pilot_fee_rate"`    // 飞手分成比例
+	PilotFee           int64   `json:"pilot_fee"`                                  // 飞手劳务费(分)
+	OwnerFeeRate       float64 `gorm:"type:decimal(5,4)" json:"owner_fee_rate"`    // 机主分成比例
+	OwnerFee           int64   `json:"owner_fee"`                                  // 机主设备费(分)
+	InsuranceDeduction int64   `json:"insurance_deduction"`                        // 保险费代扣(分)
 
 	// ==================== 参与方 ====================
-	PilotUserID       int64  `gorm:"index" json:"pilot_user_id"`
-	OwnerUserID       int64  `gorm:"index" json:"owner_user_id"`
-	PayerUserID       int64  `gorm:"index" json:"payer_user_id"` // 付款方(业主)
+	PilotUserID int64 `gorm:"index" json:"pilot_user_id"`
+	OwnerUserID int64 `gorm:"index" json:"owner_user_id"`
+	PayerUserID int64 `gorm:"index" json:"payer_user_id"` // 付款方(业主)
 
 	// ==================== 定价参数 ====================
-	FlightDistance    float64 `gorm:"type:decimal(10,2)" json:"flight_distance"`   // 飞行距离(km)
-	FlightDuration   float64 `gorm:"type:decimal(10,2)" json:"flight_duration"`   // 飞行时长(分钟)
-	CargoWeight      float64 `gorm:"type:decimal(10,2)" json:"cargo_weight"`      // 货物重量(kg)
+	FlightDistance   float64 `gorm:"type:decimal(10,2)" json:"flight_distance"`              // 飞行距离(km)
+	FlightDuration   float64 `gorm:"type:decimal(10,2)" json:"flight_duration"`              // 飞行时长(分钟)
+	CargoWeight      float64 `gorm:"type:decimal(10,2)" json:"cargo_weight"`                 // 货物重量(kg)
 	DifficultyFactor float64 `gorm:"type:decimal(3,1);default:1.0" json:"difficulty_factor"` // 难度系数(1.0-2.0)
-	CargoValue       int64   `json:"cargo_value"`                  // 货物申报价值(分)
-	InsuranceRate    float64 `gorm:"type:decimal(5,4)" json:"insurance_rate"` // 保险费率
+	CargoValue       int64   `json:"cargo_value"`                                            // 货物申报价值(分)
+	InsuranceRate    float64 `gorm:"type:decimal(5,4)" json:"insurance_rate"`                // 保险费率
 
 	// ==================== 状态管理 ====================
-	Status            string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, calculated, confirmed, settled, disputed
-	CalculatedAt      *time.Time `json:"calculated_at"`
-	ConfirmedAt       *time.Time `json:"confirmed_at"`
-	SettledAt         *time.Time `json:"settled_at"`
-	SettledBy         string     `gorm:"type:varchar(20)" json:"settled_by"` // system, admin
-	Notes             string     `gorm:"type:text" json:"notes"`
+	Status       string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, calculated, confirmed, settled, disputed
+	CalculatedAt *time.Time `json:"calculated_at"`
+	ConfirmedAt  *time.Time `json:"confirmed_at"`
+	SettledAt    *time.Time `json:"settled_at"`
+	SettledBy    string     `gorm:"type:varchar(20)" json:"settled_by"` // system, admin
+	Notes        string     `gorm:"type:text" json:"notes"`
 
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 }
@@ -1492,17 +1492,17 @@ func (OrderSettlement) TableName() string {
 
 // UserWallet 用户钱包
 type UserWallet struct {
-	ID                int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID            int64          `gorm:"uniqueIndex;not null" json:"user_id"`
-	WalletType        string         `gorm:"type:varchar(20);default:general" json:"wallet_type"` // general, pilot, owner
-	AvailableBalance  int64          `gorm:"default:0" json:"available_balance"`   // 可用余额(分)
-	FrozenBalance     int64          `gorm:"default:0" json:"frozen_balance"`      // 冻结余额(分)
-	TotalIncome       int64          `gorm:"default:0" json:"total_income"`        // 累计收入(分)
-	TotalWithdrawn    int64          `gorm:"default:0" json:"total_withdrawn"`     // 累计提现(分)
-	TotalFrozen       int64          `gorm:"default:0" json:"total_frozen"`        // 累计冻结(分)
-	Status            string         `gorm:"type:varchar(20);default:active" json:"status"` // active, frozen, closed
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
+	ID               int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID           int64     `gorm:"uniqueIndex;not null" json:"user_id"`
+	WalletType       string    `gorm:"type:varchar(20);default:general" json:"wallet_type"` // general, pilot, owner
+	AvailableBalance int64     `gorm:"default:0" json:"available_balance"`                  // 可用余额(分)
+	FrozenBalance    int64     `gorm:"default:0" json:"frozen_balance"`                     // 冻结余额(分)
+	TotalIncome      int64     `gorm:"default:0" json:"total_income"`                       // 累计收入(分)
+	TotalWithdrawn   int64     `gorm:"default:0" json:"total_withdrawn"`                    // 累计提现(分)
+	TotalFrozen      int64     `gorm:"default:0" json:"total_frozen"`                       // 累计冻结(分)
+	Status           string    `gorm:"type:varchar(20);default:active" json:"status"`       // active, frozen, closed
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -1513,18 +1513,18 @@ func (UserWallet) TableName() string {
 
 // WalletTransaction 钱包流水记录
 type WalletTransaction struct {
-	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	TransactionNo   string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"transaction_no"`
-	WalletID        int64     `gorm:"index;not null" json:"wallet_id"`
-	UserID          int64     `gorm:"index;not null" json:"user_id"`
-	Type            string    `gorm:"type:varchar(30);not null" json:"type"` // income, withdraw, freeze, unfreeze, deduct, refund
-	Amount          int64     `json:"amount"`          // 交易金额(分, 正为收入负为支出)
-	BalanceBefore   int64     `json:"balance_before"`  // 交易前余额(分)
-	BalanceAfter    int64     `json:"balance_after"`   // 交易后余额(分)
-	RelatedOrderID  int64     `gorm:"index" json:"related_order_id"`
-	RelatedSettlementID int64 `gorm:"index" json:"related_settlement_id"`
-	Description     string    `gorm:"type:varchar(255)" json:"description"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID                  int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	TransactionNo       string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"transaction_no"`
+	WalletID            int64     `gorm:"index;not null" json:"wallet_id"`
+	UserID              int64     `gorm:"index;not null" json:"user_id"`
+	Type                string    `gorm:"type:varchar(30);not null" json:"type"` // income, withdraw, freeze, unfreeze, deduct, refund
+	Amount              int64     `json:"amount"`                                // 交易金额(分, 正为收入负为支出)
+	BalanceBefore       int64     `json:"balance_before"`                        // 交易前余额(分)
+	BalanceAfter        int64     `json:"balance_after"`                         // 交易后余额(分)
+	RelatedOrderID      int64     `gorm:"index" json:"related_order_id"`
+	RelatedSettlementID int64     `gorm:"index" json:"related_settlement_id"`
+	Description         string    `gorm:"type:varchar(255)" json:"description"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 func (WalletTransaction) TableName() string {
@@ -1533,34 +1533,34 @@ func (WalletTransaction) TableName() string {
 
 // WithdrawalRecord 提现记录
 type WithdrawalRecord struct {
-	ID                int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	WithdrawalNo      string     `gorm:"type:varchar(50);uniqueIndex;not null" json:"withdrawal_no"`
-	UserID            int64      `gorm:"index;not null" json:"user_id"`
-	WalletID          int64      `gorm:"index;not null" json:"wallet_id"`
-	Amount            int64      `json:"amount"`            // 提现金额(分)
-	ServiceFee        int64      `json:"service_fee"`       // 手续费(分)
-	ActualAmount      int64      `json:"actual_amount"`     // 实际到账(分)
+	ID           int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	WithdrawalNo string `gorm:"type:varchar(50);uniqueIndex;not null" json:"withdrawal_no"`
+	UserID       int64  `gorm:"index;not null" json:"user_id"`
+	WalletID     int64  `gorm:"index;not null" json:"wallet_id"`
+	Amount       int64  `json:"amount"`        // 提现金额(分)
+	ServiceFee   int64  `json:"service_fee"`   // 手续费(分)
+	ActualAmount int64  `json:"actual_amount"` // 实际到账(分)
 
 	// 收款方式
-	WithdrawMethod    string `gorm:"type:varchar(20);not null" json:"withdraw_method"` // bank_card, alipay, wechat
-	BankName          string `gorm:"type:varchar(50)" json:"bank_name"`
-	BankBranch        string `gorm:"type:varchar(100)" json:"bank_branch"`
-	AccountNo         string `gorm:"type:varchar(255)" json:"account_no"` // 加密存储
-	AccountName       string `gorm:"type:varchar(50)" json:"account_name"`
-	AlipayAccount     string `gorm:"type:varchar(100)" json:"alipay_account"`
-	WechatAccount     string `gorm:"type:varchar(100)" json:"wechat_account"`
+	WithdrawMethod string `gorm:"type:varchar(20);not null" json:"withdraw_method"` // bank_card, alipay, wechat
+	BankName       string `gorm:"type:varchar(50)" json:"bank_name"`
+	BankBranch     string `gorm:"type:varchar(100)" json:"bank_branch"`
+	AccountNo      string `gorm:"type:varchar(255)" json:"account_no"` // 加密存储
+	AccountName    string `gorm:"type:varchar(50)" json:"account_name"`
+	AlipayAccount  string `gorm:"type:varchar(100)" json:"alipay_account"`
+	WechatAccount  string `gorm:"type:varchar(100)" json:"wechat_account"`
 
 	// 状态
-	Status            string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, processing, completed, rejected, failed
-	ReviewedBy        int64      `json:"reviewed_by"`
-	ReviewedAt        *time.Time `json:"reviewed_at"`
-	ReviewNotes       string     `gorm:"type:varchar(255)" json:"review_notes"`
-	CompletedAt       *time.Time `json:"completed_at"`
-	ThirdPartyNo      string     `gorm:"type:varchar(100)" json:"third_party_no"` // 第三方转账流水号
-	FailReason        string     `gorm:"type:varchar(255)" json:"fail_reason"`
+	Status       string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, processing, completed, rejected, failed
+	ReviewedBy   int64      `json:"reviewed_by"`
+	ReviewedAt   *time.Time `json:"reviewed_at"`
+	ReviewNotes  string     `gorm:"type:varchar(255)" json:"review_notes"`
+	CompletedAt  *time.Time `json:"completed_at"`
+	ThirdPartyNo string     `gorm:"type:varchar(100)" json:"third_party_no"` // 第三方转账流水号
+	FailReason   string     `gorm:"type:varchar(255)" json:"fail_reason"`
 
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -1571,15 +1571,15 @@ func (WithdrawalRecord) TableName() string {
 
 // PricingConfig 定价配置
 type PricingConfig struct {
-	ID              int64   `gorm:"primaryKey;autoIncrement" json:"id"`
-	ConfigKey       string  `gorm:"type:varchar(50);uniqueIndex;not null" json:"config_key"`
-	ConfigValue     float64 `gorm:"type:decimal(10,4)" json:"config_value"`
-	Unit            string  `gorm:"type:varchar(20)" json:"unit"`
-	Description     string  `gorm:"type:varchar(255)" json:"description"`
-	Category        string  `gorm:"type:varchar(30)" json:"category"` // base, mileage, duration, weight, difficulty, insurance, split, surge
-	IsActive        bool    `gorm:"default:true" json:"is_active"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ConfigKey   string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"config_key"`
+	ConfigValue float64   `gorm:"type:decimal(10,4)" json:"config_value"`
+	Unit        string    `gorm:"type:varchar(20)" json:"unit"`
+	Description string    `gorm:"type:varchar(255)" json:"description"`
+	Category    string    `gorm:"type:varchar(30)" json:"category"` // base, mileage, duration, weight, difficulty, insurance, split, surge
+	IsActive    bool      `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (PricingConfig) TableName() string {
@@ -1592,13 +1592,13 @@ func (PricingConfig) TableName() string {
 
 // CreditScore 用户信用分 (1000分制)
 type CreditScore struct {
-	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID         int64  `gorm:"uniqueIndex;not null" json:"user_id"`
-	UserType       string `gorm:"type:varchar(20);not null" json:"user_type"` // pilot, owner, client
+	ID       int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID   int64  `gorm:"uniqueIndex;not null" json:"user_id"`
+	UserType string `gorm:"type:varchar(20);not null" json:"user_type"` // pilot, owner, client
 
 	// ==================== 总分 ====================
-	TotalScore     int    `gorm:"default:600" json:"total_score"`  // 总信用分 0-1000
-	ScoreLevel     string `gorm:"type:varchar(20);default:normal" json:"score_level"` // excellent(>=800), good(>=700), normal(>=600), poor(>=400), bad(<400)
+	TotalScore int    `gorm:"default:600" json:"total_score"`                     // 总信用分 0-1000
+	ScoreLevel string `gorm:"type:varchar(20);default:normal" json:"score_level"` // excellent(>=800), good(>=700), normal(>=600), poor(>=400), bad(<400)
 
 	// ==================== 飞手维度 (pilot) ====================
 	PilotQualification int `gorm:"default:0" json:"pilot_qualification"` // 基础资质分 0-200
@@ -1607,40 +1607,40 @@ type CreditScore struct {
 	PilotActivity      int `gorm:"default:0" json:"pilot_activity"`      // 活跃度分 0-200
 
 	// ==================== 机主维度 (owner) ====================
-	OwnerCompliance    int `gorm:"default:0" json:"owner_compliance"`    // 设备合规分 0-250
-	OwnerService       int `gorm:"default:0" json:"owner_service"`       // 服务质量分 0-300
-	OwnerFulfillment   int `gorm:"default:0" json:"owner_fulfillment"`   // 履约能力分 0-250
-	OwnerAttitude      int `gorm:"default:0" json:"owner_attitude"`      // 合作态度分 0-200
+	OwnerCompliance  int `gorm:"default:0" json:"owner_compliance"`  // 设备合规分 0-250
+	OwnerService     int `gorm:"default:0" json:"owner_service"`     // 服务质量分 0-300
+	OwnerFulfillment int `gorm:"default:0" json:"owner_fulfillment"` // 履约能力分 0-250
+	OwnerAttitude    int `gorm:"default:0" json:"owner_attitude"`    // 合作态度分 0-200
 
 	// ==================== 业主/客户维度 (client) ====================
-	ClientIdentity     int `gorm:"default:0" json:"client_identity"`     // 身份认证分 0-200
-	ClientPayment      int `gorm:"default:0" json:"client_payment"`      // 支付能力分 0-300
-	ClientAttitude     int `gorm:"default:0" json:"client_attitude"`     // 合作态度分 0-300
+	ClientIdentity     int `gorm:"default:0" json:"client_identity"`      // 身份认证分 0-200
+	ClientPayment      int `gorm:"default:0" json:"client_payment"`       // 支付能力分 0-300
+	ClientAttitude     int `gorm:"default:0" json:"client_attitude"`      // 合作态度分 0-300
 	ClientOrderQuality int `gorm:"default:0" json:"client_order_quality"` // 订单质量分 0-200
 
 	// ==================== 统计数据 ====================
-	TotalOrders        int     `gorm:"default:0" json:"total_orders"`        // 总订单数
-	CompletedOrders    int     `gorm:"default:0" json:"completed_orders"`    // 完成订单数
-	CancelledOrders    int     `gorm:"default:0" json:"cancelled_orders"`    // 取消订单数
-	DisputeOrders      int     `gorm:"default:0" json:"dispute_orders"`      // 纠纷订单数
-	AverageRating      float64 `gorm:"type:decimal(3,2);default:5.00" json:"average_rating"` // 平均评分
-	TotalReviews       int     `gorm:"default:0" json:"total_reviews"`       // 评价总数
-	PositiveReviews    int     `gorm:"default:0" json:"positive_reviews"`    // 好评数
-	NegativeReviews    int     `gorm:"default:0" json:"negative_reviews"`    // 差评数
-	ViolationCount     int     `gorm:"default:0" json:"violation_count"`     // 违规次数
-	LastViolationAt    *time.Time `json:"last_violation_at"`
+	TotalOrders     int        `gorm:"default:0" json:"total_orders"`                        // 总订单数
+	CompletedOrders int        `gorm:"default:0" json:"completed_orders"`                    // 完成订单数
+	CancelledOrders int        `gorm:"default:0" json:"cancelled_orders"`                    // 取消订单数
+	DisputeOrders   int        `gorm:"default:0" json:"dispute_orders"`                      // 纠纷订单数
+	AverageRating   float64    `gorm:"type:decimal(3,2);default:5.00" json:"average_rating"` // 平均评分
+	TotalReviews    int        `gorm:"default:0" json:"total_reviews"`                       // 评价总数
+	PositiveReviews int        `gorm:"default:0" json:"positive_reviews"`                    // 好评数
+	NegativeReviews int        `gorm:"default:0" json:"negative_reviews"`                    // 差评数
+	ViolationCount  int        `gorm:"default:0" json:"violation_count"`                     // 违规次数
+	LastViolationAt *time.Time `json:"last_violation_at"`
 
 	// ==================== 状态 ====================
-	IsFrozen           bool       `gorm:"default:false" json:"is_frozen"`      // 是否冻结
-	FrozenReason       string     `gorm:"type:varchar(255)" json:"frozen_reason"`
-	FrozenAt           *time.Time `json:"frozen_at"`
-	IsBlacklisted      bool       `gorm:"default:false" json:"is_blacklisted"` // 是否黑名单
-	BlacklistedReason  string     `gorm:"type:varchar(255)" json:"blacklisted_reason"`
-	BlacklistedAt      *time.Time `json:"blacklisted_at"`
+	IsFrozen          bool       `gorm:"default:false" json:"is_frozen"` // 是否冻结
+	FrozenReason      string     `gorm:"type:varchar(255)" json:"frozen_reason"`
+	FrozenAt          *time.Time `json:"frozen_at"`
+	IsBlacklisted     bool       `gorm:"default:false" json:"is_blacklisted"` // 是否黑名单
+	BlacklistedReason string     `gorm:"type:varchar(255)" json:"blacklisted_reason"`
+	BlacklistedAt     *time.Time `json:"blacklisted_at"`
 
-	LastCalculatedAt   *time.Time `json:"last_calculated_at"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	LastCalculatedAt *time.Time `json:"last_calculated_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -1651,20 +1651,20 @@ func (CreditScore) TableName() string {
 
 // CreditScoreLog 信用分变动日志
 type CreditScoreLog struct {
-	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID        int64     `gorm:"index;not null" json:"user_id"`
-	ChangeType    string    `gorm:"type:varchar(30);not null" json:"change_type"` // order_complete, review_received, violation, bonus, penalty, recalculate
-	ChangeReason  string    `gorm:"type:varchar(255)" json:"change_reason"`
-	Dimension     string    `gorm:"type:varchar(30)" json:"dimension"`   // qualification, service, safety, activity, compliance, fulfillment, attitude, identity, payment, order_quality
-	ScoreBefore   int       `json:"score_before"`
-	ScoreAfter    int       `json:"score_after"`
-	ScoreChange   int       `json:"score_change"`   // 正为增加，负为减少
-	RelatedOrderID int64    `gorm:"index" json:"related_order_id"`
-	RelatedReviewID int64   `gorm:"index" json:"related_review_id"`
-	OperatorID    int64     `json:"operator_id"`    // 0表示系统自动
-	OperatorType  string    `gorm:"type:varchar(20)" json:"operator_type"` // system, admin, auto
-	Notes         string    `gorm:"type:text" json:"notes"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID          int64     `gorm:"index;not null" json:"user_id"`
+	ChangeType      string    `gorm:"type:varchar(30);not null" json:"change_type"` // order_complete, review_received, violation, bonus, penalty, recalculate
+	ChangeReason    string    `gorm:"type:varchar(255)" json:"change_reason"`
+	Dimension       string    `gorm:"type:varchar(30)" json:"dimension"` // qualification, service, safety, activity, compliance, fulfillment, attitude, identity, payment, order_quality
+	ScoreBefore     int       `json:"score_before"`
+	ScoreAfter      int       `json:"score_after"`
+	ScoreChange     int       `json:"score_change"` // 正为增加，负为减少
+	RelatedOrderID  int64     `gorm:"index" json:"related_order_id"`
+	RelatedReviewID int64     `gorm:"index" json:"related_review_id"`
+	OperatorID      int64     `json:"operator_id"`                           // 0表示系统自动
+	OperatorType    string    `gorm:"type:varchar(20)" json:"operator_type"` // system, admin, auto
+	Notes           string    `gorm:"type:text" json:"notes"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 func (CreditScoreLog) TableName() string {
@@ -1673,34 +1673,34 @@ func (CreditScoreLog) TableName() string {
 
 // RiskControl 风控记录
 type RiskControl struct {
-	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	RiskNo         string `gorm:"type:varchar(50);uniqueIndex;not null" json:"risk_no"`
-	UserID         int64  `gorm:"index;not null" json:"user_id"`
-	UserType       string `gorm:"type:varchar(20)" json:"user_type"`
-	OrderID        int64  `gorm:"index" json:"order_id"`
+	ID       int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	RiskNo   string `gorm:"type:varchar(50);uniqueIndex;not null" json:"risk_no"`
+	UserID   int64  `gorm:"index;not null" json:"user_id"`
+	UserType string `gorm:"type:varchar(20)" json:"user_type"`
+	OrderID  int64  `gorm:"index" json:"order_id"`
 
 	// 风控类型
-	RiskPhase      string `gorm:"type:varchar(20);not null" json:"risk_phase"` // pre(事前), during(事中), post(事后)
-	RiskType       string `gorm:"type:varchar(30);not null" json:"risk_type"`  // identity_fraud, payment_risk, behavior_abnormal, dispute, violation, blacklist
-	RiskLevel      string `gorm:"type:varchar(20);default:low" json:"risk_level"` // low, medium, high, critical
-	RiskScore      int    `gorm:"default:0" json:"risk_score"`     // 风险评分 0-100
+	RiskPhase string `gorm:"type:varchar(20);not null" json:"risk_phase"`    // pre(事前), during(事中), post(事后)
+	RiskType  string `gorm:"type:varchar(30);not null" json:"risk_type"`     // identity_fraud, payment_risk, behavior_abnormal, dispute, violation, blacklist
+	RiskLevel string `gorm:"type:varchar(20);default:low" json:"risk_level"` // low, medium, high, critical
+	RiskScore int    `gorm:"default:0" json:"risk_score"`                    // 风险评分 0-100
 
 	// 风控详情
-	TriggerRule    string `gorm:"type:varchar(100)" json:"trigger_rule"`  // 触发规则
-	TriggerData    string `gorm:"type:text" json:"trigger_data"`         // 触发数据(JSON)
-	Description    string `gorm:"type:text" json:"description"`
+	TriggerRule string `gorm:"type:varchar(100)" json:"trigger_rule"` // 触发规则
+	TriggerData string `gorm:"type:text" json:"trigger_data"`         // 触发数据(JSON)
+	Description string `gorm:"type:text" json:"description"`
 
 	// 处理状态
-	Status         string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, reviewing, resolved, dismissed
-	Action         string     `gorm:"type:varchar(30)" json:"action"` // none, warn, freeze, blacklist, block_order, require_deposit
-	ActionDetail   string     `gorm:"type:text" json:"action_detail"`
-	ReviewedBy     int64      `json:"reviewed_by"`
-	ReviewedAt     *time.Time `json:"reviewed_at"`
-	ReviewNotes    string     `gorm:"type:text" json:"review_notes"`
-	ResolvedAt     *time.Time `json:"resolved_at"`
+	Status       string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, reviewing, resolved, dismissed
+	Action       string     `gorm:"type:varchar(30)" json:"action"`                 // none, warn, freeze, blacklist, block_order, require_deposit
+	ActionDetail string     `gorm:"type:text" json:"action_detail"`
+	ReviewedBy   int64      `json:"reviewed_by"`
+	ReviewedAt   *time.Time `json:"reviewed_at"`
+	ReviewNotes  string     `gorm:"type:text" json:"review_notes"`
+	ResolvedAt   *time.Time `json:"resolved_at"`
 
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	User  *User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
@@ -1712,40 +1712,40 @@ func (RiskControl) TableName() string {
 
 // Violation 违规记录
 type Violation struct {
-	ID              int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	ViolationNo     string `gorm:"type:varchar(50);uniqueIndex;not null" json:"violation_no"`
-	UserID          int64  `gorm:"index;not null" json:"user_id"`
-	UserType        string `gorm:"type:varchar(20)" json:"user_type"`
-	OrderID         int64  `gorm:"index" json:"order_id"`
+	ID          int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	ViolationNo string `gorm:"type:varchar(50);uniqueIndex;not null" json:"violation_no"`
+	UserID      int64  `gorm:"index;not null" json:"user_id"`
+	UserType    string `gorm:"type:varchar(20)" json:"user_type"`
+	OrderID     int64  `gorm:"index" json:"order_id"`
 
 	// 违规类型
-	ViolationType   string `gorm:"type:varchar(30);not null" json:"violation_type"` // cancel_abuse, no_show, delay, damage, fraud, unsafe_flight, policy_violation
-	ViolationLevel  string `gorm:"type:varchar(20);default:minor" json:"violation_level"` // minor(轻微), moderate(中等), serious(严重), critical(重大)
-	Description     string `gorm:"type:text" json:"description"`
-	Evidence        string `gorm:"type:text" json:"evidence"` // 证据(JSON: 图片/视频/日志)
+	ViolationType  string `gorm:"type:varchar(30);not null" json:"violation_type"`       // cancel_abuse, no_show, delay, damage, fraud, unsafe_flight, policy_violation
+	ViolationLevel string `gorm:"type:varchar(20);default:minor" json:"violation_level"` // minor(轻微), moderate(中等), serious(严重), critical(重大)
+	Description    string `gorm:"type:text" json:"description"`
+	Evidence       string `gorm:"type:text" json:"evidence"` // 证据(JSON: 图片/视频/日志)
 
 	// 处罚
-	Penalty         string `gorm:"type:varchar(30)" json:"penalty"` // warning, score_deduct, freeze_temp, freeze_perm, blacklist
-	PenaltyDetail   string `gorm:"type:text" json:"penalty_detail"`
-	ScoreDeduction  int    `gorm:"default:0" json:"score_deduction"`  // 扣除信用分
-	FreezeDays      int    `gorm:"default:0" json:"freeze_days"`      // 冻结天数
-	FineAmount      int64  `gorm:"default:0" json:"fine_amount"`      // 罚款金额(分)
+	Penalty        string `gorm:"type:varchar(30)" json:"penalty"` // warning, score_deduct, freeze_temp, freeze_perm, blacklist
+	PenaltyDetail  string `gorm:"type:text" json:"penalty_detail"`
+	ScoreDeduction int    `gorm:"default:0" json:"score_deduction"` // 扣除信用分
+	FreezeDays     int    `gorm:"default:0" json:"freeze_days"`     // 冻结天数
+	FineAmount     int64  `gorm:"default:0" json:"fine_amount"`     // 罚款金额(分)
 
 	// 申诉
-	AppealStatus    string     `gorm:"type:varchar(20);default:none" json:"appeal_status"` // none, pending, approved, rejected
-	AppealContent   string     `gorm:"type:text" json:"appeal_content"`
-	AppealAt        *time.Time `json:"appeal_at"`
-	AppealReviewedBy int64     `json:"appeal_reviewed_by"`
+	AppealStatus     string     `gorm:"type:varchar(20);default:none" json:"appeal_status"` // none, pending, approved, rejected
+	AppealContent    string     `gorm:"type:text" json:"appeal_content"`
+	AppealAt         *time.Time `json:"appeal_at"`
+	AppealReviewedBy int64      `json:"appeal_reviewed_by"`
 	AppealReviewedAt *time.Time `json:"appeal_reviewed_at"`
-	AppealResult    string     `gorm:"type:text" json:"appeal_result"`
+	AppealResult     string     `gorm:"type:text" json:"appeal_result"`
 
 	// 状态
-	Status          string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, confirmed, appealing, revoked
-	ConfirmedBy     int64      `json:"confirmed_by"`
-	ConfirmedAt     *time.Time `json:"confirmed_at"`
+	Status      string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, confirmed, appealing, revoked
+	ConfirmedBy int64      `json:"confirmed_by"`
+	ConfirmedAt *time.Time `json:"confirmed_at"`
 
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	User  *User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
@@ -1757,21 +1757,21 @@ func (Violation) TableName() string {
 
 // Blacklist 黑名单
 type Blacklist struct {
-	ID             int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID         int64      `gorm:"uniqueIndex;not null" json:"user_id"`
-	UserType       string     `gorm:"type:varchar(20)" json:"user_type"`
-	BlacklistType  string     `gorm:"type:varchar(20);default:permanent" json:"blacklist_type"` // temporary, permanent
-	Reason         string     `gorm:"type:text;not null" json:"reason"`
-	RelatedViolationID int64  `gorm:"index" json:"related_violation_id"`
-	ExpireAt       *time.Time `json:"expire_at"` // 临时黑名单到期时间
-	AddedBy        int64      `json:"added_by"`
-	AddedAt        time.Time  `json:"added_at"`
-	RemovedBy      int64      `json:"removed_by"`
-	RemovedAt      *time.Time `json:"removed_at"`
-	RemovedReason  string     `gorm:"type:varchar(255)" json:"removed_reason"`
-	IsActive       bool       `gorm:"default:true" json:"is_active"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID                 int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID             int64      `gorm:"uniqueIndex;not null" json:"user_id"`
+	UserType           string     `gorm:"type:varchar(20)" json:"user_type"`
+	BlacklistType      string     `gorm:"type:varchar(20);default:permanent" json:"blacklist_type"` // temporary, permanent
+	Reason             string     `gorm:"type:text;not null" json:"reason"`
+	RelatedViolationID int64      `gorm:"index" json:"related_violation_id"`
+	ExpireAt           *time.Time `json:"expire_at"` // 临时黑名单到期时间
+	AddedBy            int64      `json:"added_by"`
+	AddedAt            time.Time  `json:"added_at"`
+	RemovedBy          int64      `json:"removed_by"`
+	RemovedAt          *time.Time `json:"removed_at"`
+	RemovedReason      string     `gorm:"type:varchar(255)" json:"removed_reason"`
+	IsActive           bool       `gorm:"default:true" json:"is_active"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -1782,29 +1782,29 @@ func (Blacklist) TableName() string {
 
 // Deposit 保证金
 type Deposit struct {
-	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	DepositNo      string `gorm:"type:varchar(50);uniqueIndex;not null" json:"deposit_no"`
-	UserID         int64  `gorm:"index;not null" json:"user_id"`
-	UserType       string `gorm:"type:varchar(20)" json:"user_type"` // pilot, owner, client
+	ID        int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	DepositNo string `gorm:"type:varchar(50);uniqueIndex;not null" json:"deposit_no"`
+	UserID    int64  `gorm:"index;not null" json:"user_id"`
+	UserType  string `gorm:"type:varchar(20)" json:"user_type"` // pilot, owner, client
 
 	// 金额
-	RequiredAmount int64  `json:"required_amount"`  // 应缴金额(分)
-	PaidAmount     int64  `json:"paid_amount"`      // 已缴金额(分)
-	FrozenAmount   int64  `json:"frozen_amount"`    // 冻结金额(分, 用于赔付)
-	RefundedAmount int64  `json:"refunded_amount"`  // 已退还金额(分)
+	RequiredAmount int64 `json:"required_amount"` // 应缴金额(分)
+	PaidAmount     int64 `json:"paid_amount"`     // 已缴金额(分)
+	FrozenAmount   int64 `json:"frozen_amount"`   // 冻结金额(分, 用于赔付)
+	RefundedAmount int64 `json:"refunded_amount"` // 已退还金额(分)
 
 	// 状态
-	Status         string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, paid, partial, frozen, refunding, refunded
-	PaidAt         *time.Time `json:"paid_at"`
-	RefundedAt     *time.Time `json:"refunded_at"`
-	PaymentID      int64      `json:"payment_id"` // 关联支付记录
+	Status     string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, paid, partial, frozen, refunding, refunded
+	PaidAt     *time.Time `json:"paid_at"`
+	RefundedAt *time.Time `json:"refunded_at"`
+	PaymentID  int64      `json:"payment_id"` // 关联支付记录
 
 	// 原因
-	RequireReason  string `gorm:"type:varchar(255)" json:"require_reason"` // 要求缴纳原因
-	RefundReason   string `gorm:"type:varchar(255)" json:"refund_reason"`
+	RequireReason string `gorm:"type:varchar(255)" json:"require_reason"` // 要求缴纳原因
+	RefundReason  string `gorm:"type:varchar(255)" json:"refund_reason"`
 
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -1819,57 +1819,57 @@ func (Deposit) TableName() string {
 
 // InsurancePolicy 保险保单
 type InsurancePolicy struct {
-	ID             int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	PolicyNo       string         `gorm:"type:varchar(50);uniqueIndex;not null" json:"policy_no"` // 保单号
-	
+	ID       int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	PolicyNo string `gorm:"type:varchar(50);uniqueIndex;not null" json:"policy_no"` // 保单号
+
 	// ==================== 保单类型 ====================
-	PolicyType     string `gorm:"type:varchar(30);not null" json:"policy_type"` // liability(第三者责任险), cargo(货物险), hull(机身险), accident(飞手意外险)
+	PolicyType     string `gorm:"type:varchar(30);not null" json:"policy_type"`              // liability(第三者责任险), cargo(货物险), hull(机身险), accident(飞手意外险)
 	PolicyCategory string `gorm:"type:varchar(20);default:mandatory" json:"policy_category"` // mandatory(强制), optional(可选)
-	
+
 	// ==================== 投保人信息 ====================
-	HolderID       int64  `gorm:"index;not null" json:"holder_id"`       // 投保人ID (用户ID)
-	HolderType     string `gorm:"type:varchar(20);not null" json:"holder_type"` // pilot, owner, client
-	HolderName     string `gorm:"type:varchar(50)" json:"holder_name"`   // 投保人姓名
-	HolderIDCard   string `gorm:"type:varchar(50)" json:"holder_id_card"` // 投保人身份证号(加密)
-	HolderPhone    string `gorm:"type:varchar(20)" json:"holder_phone"`  // 投保人电话
-	
+	HolderID     int64  `gorm:"index;not null" json:"holder_id"`              // 投保人ID (用户ID)
+	HolderType   string `gorm:"type:varchar(20);not null" json:"holder_type"` // pilot, owner, client
+	HolderName   string `gorm:"type:varchar(50)" json:"holder_name"`          // 投保人姓名
+	HolderIDCard string `gorm:"type:varchar(50)" json:"holder_id_card"`       // 投保人身份证号(加密)
+	HolderPhone  string `gorm:"type:varchar(20)" json:"holder_phone"`         // 投保人电话
+
 	// ==================== 被保险标的 ====================
-	InsuredType    string `gorm:"type:varchar(20)" json:"insured_type"`  // drone, cargo, person
-	InsuredID      int64  `gorm:"index" json:"insured_id"`               // 被保险标的ID (无人机ID/订单ID等)
-	InsuredName    string `gorm:"type:varchar(100)" json:"insured_name"` // 被保险标的名称
-	InsuredValue   int64  `json:"insured_value"`                         // 标的价值(分)
-	
+	InsuredType  string `gorm:"type:varchar(20)" json:"insured_type"`  // drone, cargo, person
+	InsuredID    int64  `gorm:"index" json:"insured_id"`               // 被保险标的ID (无人机ID/订单ID等)
+	InsuredName  string `gorm:"type:varchar(100)" json:"insured_name"` // 被保险标的名称
+	InsuredValue int64  `json:"insured_value"`                         // 标的价值(分)
+
 	// ==================== 保险金额与费用 ====================
-	CoverageAmount int64   `json:"coverage_amount"`              // 保险金额/保额(分)
-	DeductibleAmount int64 `json:"deductible_amount"`            // 免赔额(分)
-	PremiumRate    float64 `gorm:"type:decimal(8,6)" json:"premium_rate"` // 费率
-	Premium        int64   `json:"premium"`                      // 保费(分)
-	
+	CoverageAmount   int64   `json:"coverage_amount"`                       // 保险金额/保额(分)
+	DeductibleAmount int64   `json:"deductible_amount"`                     // 免赔额(分)
+	PremiumRate      float64 `gorm:"type:decimal(8,6)" json:"premium_rate"` // 费率
+	Premium          int64   `json:"premium"`                               // 保费(分)
+
 	// ==================== 保险公司信息 ====================
-	InsurerCode    string `gorm:"type:varchar(20)" json:"insurer_code"` // 保险公司代码
-	InsurerName    string `gorm:"type:varchar(100)" json:"insurer_name"` // 保险公司名称
+	InsurerCode      string `gorm:"type:varchar(20)" json:"insurer_code"`       // 保险公司代码
+	InsurerName      string `gorm:"type:varchar(100)" json:"insurer_name"`      // 保险公司名称
 	InsuranceProduct string `gorm:"type:varchar(100)" json:"insurance_product"` // 保险产品名称
-	
+
 	// ==================== 保险期限 ====================
-	EffectiveFrom  time.Time  `json:"effective_from"`   // 保险起期
-	EffectiveTo    time.Time  `json:"effective_to"`     // 保险止期
-	InsuranceDays  int        `json:"insurance_days"`   // 保险天数
-	
+	EffectiveFrom time.Time `json:"effective_from"` // 保险起期
+	EffectiveTo   time.Time `json:"effective_to"`   // 保险止期
+	InsuranceDays int       `json:"insurance_days"` // 保险天数
+
 	// ==================== 状态管理 ====================
-	Status         string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, active, expired, cancelled, claimed
-	PaymentStatus  string     `gorm:"type:varchar(20);default:unpaid" json:"payment_status"` // unpaid, paid, refunded
-	PaymentID      int64      `json:"payment_id"`       // 支付记录ID
-	PaidAt         *time.Time `json:"paid_at"`
-	
+	Status        string     `gorm:"type:varchar(20);default:pending" json:"status"`        // pending, active, expired, cancelled, claimed
+	PaymentStatus string     `gorm:"type:varchar(20);default:unpaid" json:"payment_status"` // unpaid, paid, refunded
+	PaymentID     int64      `json:"payment_id"`                                            // 支付记录ID
+	PaidAt        *time.Time `json:"paid_at"`
+
 	// ==================== 附加信息 ====================
-	CoverageScope  string `gorm:"type:text" json:"coverage_scope"`  // 保障范围(JSON)
-	Exclusions     string `gorm:"type:text" json:"exclusions"`      // 免责条款(JSON)
-	SpecialTerms   string `gorm:"type:text" json:"special_terms"`   // 特别约定
-	Attachments    string `gorm:"type:text" json:"attachments"`     // 附件(JSON: 电子保单等)
-	
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	CoverageScope string `gorm:"type:text" json:"coverage_scope"` // 保障范围(JSON)
+	Exclusions    string `gorm:"type:text" json:"exclusions"`     // 免责条款(JSON)
+	SpecialTerms  string `gorm:"type:text" json:"special_terms"`  // 特别约定
+	Attachments   string `gorm:"type:text" json:"attachments"`    // 附件(JSON: 电子保单等)
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (InsurancePolicy) TableName() string {
@@ -1878,54 +1878,54 @@ func (InsurancePolicy) TableName() string {
 
 // InsuranceClaim 保险理赔
 type InsuranceClaim struct {
-	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	ClaimNo        string `gorm:"type:varchar(50);uniqueIndex;not null" json:"claim_no"` // 理赔单号
-	
+	ID      int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	ClaimNo string `gorm:"type:varchar(50);uniqueIndex;not null" json:"claim_no"` // 理赔单号
+
 	// ==================== 关联信息 ====================
-	PolicyID       int64  `gorm:"index;not null" json:"policy_id"`   // 关联保单ID
-	PolicyNo       string `gorm:"type:varchar(50)" json:"policy_no"` // 保单号
-	OrderID        int64  `gorm:"index" json:"order_id"`             // 关联订单ID
-	
+	PolicyID int64  `gorm:"index;not null" json:"policy_id"`   // 关联保单ID
+	PolicyNo string `gorm:"type:varchar(50)" json:"policy_no"` // 保单号
+	OrderID  int64  `gorm:"index" json:"order_id"`             // 关联订单ID
+
 	// ==================== 报案人信息 ====================
-	ClaimantID     int64  `gorm:"index;not null" json:"claimant_id"` // 报案人ID
-	ClaimantName   string `gorm:"type:varchar(50)" json:"claimant_name"`
-	ClaimantPhone  string `gorm:"type:varchar(20)" json:"claimant_phone"`
-	
+	ClaimantID    int64  `gorm:"index;not null" json:"claimant_id"` // 报案人ID
+	ClaimantName  string `gorm:"type:varchar(50)" json:"claimant_name"`
+	ClaimantPhone string `gorm:"type:varchar(20)" json:"claimant_phone"`
+
 	// ==================== 事故信息 ====================
-	IncidentType   string     `gorm:"type:varchar(30);not null" json:"incident_type"` // crash(坠机), collision(碰撞), cargo_damage(货损), cargo_loss(货物丢失), personal_injury(人身伤害), third_party(第三方损失)
-	IncidentTime   time.Time  `json:"incident_time"`   // 事故发生时间
-	IncidentLocation string   `gorm:"type:varchar(255)" json:"incident_location"` // 事故地点
-	IncidentLat    float64    `gorm:"type:decimal(10,6)" json:"incident_lat"`
-	IncidentLng    float64    `gorm:"type:decimal(10,6)" json:"incident_lng"`
-	IncidentDescription string `gorm:"type:text" json:"incident_description"` // 事故描述
-	
+	IncidentType        string    `gorm:"type:varchar(30);not null" json:"incident_type"` // crash(坠机), collision(碰撞), cargo_damage(货损), cargo_loss(货物丢失), personal_injury(人身伤害), third_party(第三方损失)
+	IncidentTime        time.Time `json:"incident_time"`                                  // 事故发生时间
+	IncidentLocation    string    `gorm:"type:varchar(255)" json:"incident_location"`     // 事故地点
+	IncidentLat         float64   `gorm:"type:decimal(10,6)" json:"incident_lat"`
+	IncidentLng         float64   `gorm:"type:decimal(10,6)" json:"incident_lng"`
+	IncidentDescription string    `gorm:"type:text" json:"incident_description"` // 事故描述
+
 	// ==================== 损失信息 ====================
-	LossType       string `gorm:"type:varchar(30)" json:"loss_type"`   // property(财产), personal(人身), both(两者)
-	EstimatedLoss  int64  `json:"estimated_loss"`     // 预估损失(分)
-	ActualLoss     int64  `json:"actual_loss"`        // 实际损失(分)
-	
+	LossType      string `gorm:"type:varchar(30)" json:"loss_type"` // property(财产), personal(人身), both(两者)
+	EstimatedLoss int64  `json:"estimated_loss"`                    // 预估损失(分)
+	ActualLoss    int64  `json:"actual_loss"`                       // 实际损失(分)
+
 	// ==================== 理赔金额 ====================
-	ClaimAmount    int64  `json:"claim_amount"`       // 索赔金额(分)
-	ApprovedAmount int64  `json:"approved_amount"`    // 核定金额(分)
-	DeductedAmount int64  `json:"deducted_amount"`    // 免赔额扣除(分)
-	PaidAmount     int64  `json:"paid_amount"`        // 实际赔付(分)
-	
+	ClaimAmount    int64 `json:"claim_amount"`    // 索赔金额(分)
+	ApprovedAmount int64 `json:"approved_amount"` // 核定金额(分)
+	DeductedAmount int64 `json:"deducted_amount"` // 免赔额扣除(分)
+	PaidAmount     int64 `json:"paid_amount"`     // 实际赔付(分)
+
 	// ==================== 证据材料 ====================
-	EvidenceFiles  string `gorm:"type:text" json:"evidence_files"`   // 证据文件(JSON: 图片/视频)
-	PoliceReport   string `gorm:"type:varchar(255)" json:"police_report"` // 交警/公安报案回执
+	EvidenceFiles  string `gorm:"type:text" json:"evidence_files"`         // 证据文件(JSON: 图片/视频)
+	PoliceReport   string `gorm:"type:varchar(255)" json:"police_report"`  // 交警/公安报案回执
 	MedicalReport  string `gorm:"type:varchar(255)" json:"medical_report"` // 医疗证明
-	RepairQuote    string `gorm:"type:varchar(255)" json:"repair_quote"` // 维修报价单
-	OtherDocuments string `gorm:"type:text" json:"other_documents"` // 其他证明材料(JSON)
-	
+	RepairQuote    string `gorm:"type:varchar(255)" json:"repair_quote"`   // 维修报价单
+	OtherDocuments string `gorm:"type:text" json:"other_documents"`        // 其他证明材料(JSON)
+
 	// ==================== 责任认定 ====================
-	LiabilityRatio float64 `gorm:"type:decimal(5,2)" json:"liability_ratio"` // 责任比例 0-100%
-	LiabilityParty string  `gorm:"type:varchar(30)" json:"liability_party"`  // pilot, owner, client, third_party, force_majeure
-	LiabilityReason string `gorm:"type:text" json:"liability_reason"`       // 责任认定理由
-	
+	LiabilityRatio  float64 `gorm:"type:decimal(5,2)" json:"liability_ratio"` // 责任比例 0-100%
+	LiabilityParty  string  `gorm:"type:varchar(30)" json:"liability_party"`  // pilot, owner, client, third_party, force_majeure
+	LiabilityReason string  `gorm:"type:text" json:"liability_reason"`        // 责任认定理由
+
 	// ==================== 流程状态 ====================
-	Status         string     `gorm:"type:varchar(20);default:reported" json:"status"` // reported(已报案), investigating(调查中), liability_determined(责任认定), approved(核赔通过), rejected(拒赔), paid(已赔付), closed(已结案), disputed(争议中)
-	CurrentStep    string     `gorm:"type:varchar(30)" json:"current_step"` // report, evidence, liability, approve, pay, close
-	
+	Status      string `gorm:"type:varchar(20);default:reported" json:"status"` // reported(已报案), investigating(调查中), liability_determined(责任认定), approved(核赔通过), rejected(拒赔), paid(已赔付), closed(已结案), disputed(争议中)
+	CurrentStep string `gorm:"type:varchar(30)" json:"current_step"`            // report, evidence, liability, approve, pay, close
+
 	// ==================== 时间节点 ====================
 	ReportedAt     time.Time  `json:"reported_at"`     // 报案时间
 	InvestigatedAt *time.Time `json:"investigated_at"` // 调查完成时间
@@ -1933,21 +1933,21 @@ type InsuranceClaim struct {
 	ApprovedAt     *time.Time `json:"approved_at"`     // 核赔时间
 	PaidAt         *time.Time `json:"paid_at"`         // 赔付时间
 	ClosedAt       *time.Time `json:"closed_at"`       // 结案时间
-	
+
 	// ==================== 处理人员 ====================
-	InvestigatorID int64  `json:"investigator_id"`  // 调查员ID
-	AdjusterID     int64  `json:"adjuster_id"`      // 核赔员ID
-	ApproverID     int64  `json:"approver_id"`      // 审批人ID
-	
+	InvestigatorID int64 `json:"investigator_id"` // 调查员ID
+	AdjusterID     int64 `json:"adjuster_id"`     // 核赔员ID
+	ApproverID     int64 `json:"approver_id"`     // 审批人ID
+
 	// ==================== 备注 ====================
 	InvestigationNotes string `gorm:"type:text" json:"investigation_notes"` // 调查备注
 	AdjustmentNotes    string `gorm:"type:text" json:"adjustment_notes"`    // 核赔备注
 	RejectReason       string `gorm:"type:text" json:"reject_reason"`       // 拒赔原因
-	
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
-	
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+
 	Policy *InsurancePolicy `gorm:"foreignKey:PolicyID" json:"policy,omitempty"`
 	Order  *Order           `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 }
@@ -1958,16 +1958,16 @@ func (InsuranceClaim) TableName() string {
 
 // ClaimTimeline 理赔时间线
 type ClaimTimeline struct {
-	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	ClaimID     int64     `gorm:"index;not null" json:"claim_id"`
-	Action      string    `gorm:"type:varchar(50);not null" json:"action"` // report, upload_evidence, investigate, determine_liability, approve, reject, pay, appeal, close
-	Description string    `gorm:"type:varchar(255)" json:"description"`
-	OperatorID  int64     `json:"operator_id"`
-	OperatorType string   `gorm:"type:varchar(20)" json:"operator_type"` // system, user, adjuster, admin
-	OperatorName string   `gorm:"type:varchar(50)" json:"operator_name"`
-	Attachments string    `gorm:"type:text" json:"attachments"` // 附件(JSON)
-	Remark      string    `gorm:"type:text" json:"remark"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ClaimID      int64     `gorm:"index;not null" json:"claim_id"`
+	Action       string    `gorm:"type:varchar(50);not null" json:"action"` // report, upload_evidence, investigate, determine_liability, approve, reject, pay, appeal, close
+	Description  string    `gorm:"type:varchar(255)" json:"description"`
+	OperatorID   int64     `json:"operator_id"`
+	OperatorType string    `gorm:"type:varchar(20)" json:"operator_type"` // system, user, adjuster, admin
+	OperatorName string    `gorm:"type:varchar(50)" json:"operator_name"`
+	Attachments  string    `gorm:"type:text" json:"attachments"` // 附件(JSON)
+	Remark       string    `gorm:"type:text" json:"remark"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func (ClaimTimeline) TableName() string {
@@ -1976,32 +1976,32 @@ func (ClaimTimeline) TableName() string {
 
 // InsuranceProduct 保险产品配置
 type InsuranceProduct struct {
-	ID              int64   `gorm:"primaryKey;autoIncrement" json:"id"`
-	ProductCode     string  `gorm:"type:varchar(30);uniqueIndex;not null" json:"product_code"`
-	ProductName     string  `gorm:"type:varchar(100);not null" json:"product_name"`
-	PolicyType      string  `gorm:"type:varchar(30);not null" json:"policy_type"` // liability, cargo, hull, accident
-	InsurerCode     string  `gorm:"type:varchar(20)" json:"insurer_code"`
-	InsurerName     string  `gorm:"type:varchar(100)" json:"insurer_name"`
-	
+	ID          int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProductCode string `gorm:"type:varchar(30);uniqueIndex;not null" json:"product_code"`
+	ProductName string `gorm:"type:varchar(100);not null" json:"product_name"`
+	PolicyType  string `gorm:"type:varchar(30);not null" json:"policy_type"` // liability, cargo, hull, accident
+	InsurerCode string `gorm:"type:varchar(20)" json:"insurer_code"`
+	InsurerName string `gorm:"type:varchar(100)" json:"insurer_name"`
+
 	// 费率配置
 	BasePremiumRate float64 `gorm:"type:decimal(8,6)" json:"base_premium_rate"` // 基础费率
-	MinPremium      int64   `json:"min_premium"`          // 最低保费(分)
-	MaxCoverage     int64   `json:"max_coverage"`         // 最高保额(分)
-	MinCoverage     int64   `json:"min_coverage"`         // 最低保额(分)
-	DeductibleRate  float64 `gorm:"type:decimal(5,4)" json:"deductible_rate"` // 免赔率
-	MinDeductible   int64   `json:"min_deductible"`       // 最低免赔额(分)
-	
+	MinPremium      int64   `json:"min_premium"`                                // 最低保费(分)
+	MaxCoverage     int64   `json:"max_coverage"`                               // 最高保额(分)
+	MinCoverage     int64   `json:"min_coverage"`                               // 最低保额(分)
+	DeductibleRate  float64 `gorm:"type:decimal(5,4)" json:"deductible_rate"`   // 免赔率
+	MinDeductible   int64   `json:"min_deductible"`                             // 最低免赔额(分)
+
 	// 保障配置
-	CoverageScope   string  `gorm:"type:text" json:"coverage_scope"`  // 保障范围(JSON)
-	Exclusions      string  `gorm:"type:text" json:"exclusions"`      // 免责条款(JSON)
-	
+	CoverageScope string `gorm:"type:text" json:"coverage_scope"` // 保障范围(JSON)
+	Exclusions    string `gorm:"type:text" json:"exclusions"`     // 免责条款(JSON)
+
 	// 状态
-	IsMandatory     bool    `gorm:"default:false" json:"is_mandatory"` // 是否强制
-	IsActive        bool    `gorm:"default:true" json:"is_active"`
-	SortOrder       int     `gorm:"default:0" json:"sort_order"`
-	
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	IsMandatory bool `gorm:"default:false" json:"is_mandatory"` // 是否强制
+	IsActive    bool `gorm:"default:true" json:"is_active"`
+	SortOrder   int  `gorm:"default:0" json:"sort_order"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (InsuranceProduct) TableName() string {
@@ -2014,55 +2014,55 @@ func (InsuranceProduct) TableName() string {
 
 // DailyStatistics 每日统计数据
 type DailyStatistics struct {
-	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	StatDate      time.Time `gorm:"type:date;uniqueIndex;not null" json:"stat_date"` // 统计日期
-	
+	ID       int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	StatDate time.Time `gorm:"type:date;uniqueIndex;not null" json:"stat_date"` // 统计日期
+
 	// ==================== 订单统计 ====================
-	TotalOrders      int   `gorm:"default:0" json:"total_orders"`       // 总订单数
-	NewOrders        int   `gorm:"default:0" json:"new_orders"`         // 新建订单数
-	CompletedOrders  int   `gorm:"default:0" json:"completed_orders"`   // 完成订单数
-	CancelledOrders  int   `gorm:"default:0" json:"cancelled_orders"`   // 取消订单数
-	InProgressOrders int   `gorm:"default:0" json:"in_progress_orders"` // 进行中订单数
-	CompletionRate   float64 `gorm:"type:decimal(5,2);default:0" json:"completion_rate"` // 完成率(%)
+	TotalOrders      int     `gorm:"default:0" json:"total_orders"`                        // 总订单数
+	NewOrders        int     `gorm:"default:0" json:"new_orders"`                          // 新建订单数
+	CompletedOrders  int     `gorm:"default:0" json:"completed_orders"`                    // 完成订单数
+	CancelledOrders  int     `gorm:"default:0" json:"cancelled_orders"`                    // 取消订单数
+	InProgressOrders int     `gorm:"default:0" json:"in_progress_orders"`                  // 进行中订单数
+	CompletionRate   float64 `gorm:"type:decimal(5,2);default:0" json:"completion_rate"`   // 完成率(%)
 	CancellationRate float64 `gorm:"type:decimal(5,2);default:0" json:"cancellation_rate"` // 取消率(%)
-	
+
 	// ==================== 收入统计 ====================
-	TotalRevenue     int64 `gorm:"default:0" json:"total_revenue"`      // 总收入(分)
-	PlatformFee      int64 `gorm:"default:0" json:"platform_fee"`       // 平台服务费(分)
-	PilotIncome      int64 `gorm:"default:0" json:"pilot_income"`       // 飞手收入(分)
-	OwnerIncome      int64 `gorm:"default:0" json:"owner_income"`       // 机主收入(分)
-	InsuranceFee     int64 `gorm:"default:0" json:"insurance_fee"`      // 保险费(分)
-	AvgOrderAmount   int64 `gorm:"default:0" json:"avg_order_amount"`   // 平均订单金额(分)
-	
+	TotalRevenue   int64 `gorm:"default:0" json:"total_revenue"`    // 总收入(分)
+	PlatformFee    int64 `gorm:"default:0" json:"platform_fee"`     // 平台服务费(分)
+	PilotIncome    int64 `gorm:"default:0" json:"pilot_income"`     // 飞手收入(分)
+	OwnerIncome    int64 `gorm:"default:0" json:"owner_income"`     // 机主收入(分)
+	InsuranceFee   int64 `gorm:"default:0" json:"insurance_fee"`    // 保险费(分)
+	AvgOrderAmount int64 `gorm:"default:0" json:"avg_order_amount"` // 平均订单金额(分)
+
 	// ==================== 用户统计 ====================
-	TotalUsers       int   `gorm:"default:0" json:"total_users"`        // 总用户数
-	NewUsers         int   `gorm:"default:0" json:"new_users"`          // 新增用户数
-	ActiveUsers      int   `gorm:"default:0" json:"active_users"`       // 活跃用户数
-	NewPilots        int   `gorm:"default:0" json:"new_pilots"`         // 新增飞手数
-	NewOwners        int   `gorm:"default:0" json:"new_owners"`         // 新增机主数
-	NewClients       int   `gorm:"default:0" json:"new_clients"`        // 新增业主数
-	OnlinePilots     int   `gorm:"default:0" json:"online_pilots"`      // 在线飞手数
-	
+	TotalUsers   int `gorm:"default:0" json:"total_users"`   // 总用户数
+	NewUsers     int `gorm:"default:0" json:"new_users"`     // 新增用户数
+	ActiveUsers  int `gorm:"default:0" json:"active_users"`  // 活跃用户数
+	NewPilots    int `gorm:"default:0" json:"new_pilots"`    // 新增飞手数
+	NewOwners    int `gorm:"default:0" json:"new_owners"`    // 新增机主数
+	NewClients   int `gorm:"default:0" json:"new_clients"`   // 新增业主数
+	OnlinePilots int `gorm:"default:0" json:"online_pilots"` // 在线飞手数
+
 	// ==================== 运力统计 ====================
-	TotalDrones      int   `gorm:"default:0" json:"total_drones"`       // 总无人机数
-	AvailableDrones  int   `gorm:"default:0" json:"available_drones"`   // 可用无人机数
-	BusyDrones       int   `gorm:"default:0" json:"busy_drones"`        // 忙碌无人机数
-	TotalPilots      int   `gorm:"default:0" json:"total_pilots"`       // 总飞手数
-	AvailablePilots  int   `gorm:"default:0" json:"available_pilots"`   // 可接单飞手数
-	
+	TotalDrones     int `gorm:"default:0" json:"total_drones"`     // 总无人机数
+	AvailableDrones int `gorm:"default:0" json:"available_drones"` // 可用无人机数
+	BusyDrones      int `gorm:"default:0" json:"busy_drones"`      // 忙碌无人机数
+	TotalPilots     int `gorm:"default:0" json:"total_pilots"`     // 总飞手数
+	AvailablePilots int `gorm:"default:0" json:"available_pilots"` // 可接单飞手数
+
 	// ==================== 飞行统计 ====================
-	TotalFlights     int     `gorm:"default:0" json:"total_flights"`       // 总飞行次数
+	TotalFlights     int     `gorm:"default:0" json:"total_flights"`                         // 总飞行次数
 	TotalFlightHours float64 `gorm:"type:decimal(10,2);default:0" json:"total_flight_hours"` // 总飞行时长(小时)
-	TotalDistance    float64 `gorm:"type:decimal(10,2);default:0" json:"total_distance"` // 总飞行距离(公里)
+	TotalDistance    float64 `gorm:"type:decimal(10,2);default:0" json:"total_distance"`     // 总飞行距离(公里)
 	TotalCargoWeight float64 `gorm:"type:decimal(10,2);default:0" json:"total_cargo_weight"` // 总货运重量(公斤)
-	AvgFlightTime    float64 `gorm:"type:decimal(10,2);default:0" json:"avg_flight_time"` // 平均飞行时长(分钟)
-	
+	AvgFlightTime    float64 `gorm:"type:decimal(10,2);default:0" json:"avg_flight_time"`    // 平均飞行时长(分钟)
+
 	// ==================== 风控统计 ====================
-	AlertsTriggered  int   `gorm:"default:0" json:"alerts_triggered"`   // 触发告警数
-	ViolationsCount  int   `gorm:"default:0" json:"violations_count"`   // 违规数
-	ClaimsCount      int   `gorm:"default:0" json:"claims_count"`       // 理赔数
-	DisputesCount    int   `gorm:"default:0" json:"disputes_count"`     // 纠纷数
-	
+	AlertsTriggered int `gorm:"default:0" json:"alerts_triggered"` // 触发告警数
+	ViolationsCount int `gorm:"default:0" json:"violations_count"` // 违规数
+	ClaimsCount     int `gorm:"default:0" json:"claims_count"`     // 理赔数
+	DisputesCount   int `gorm:"default:0" json:"disputes_count"`   // 纠纷数
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -2073,26 +2073,26 @@ func (DailyStatistics) TableName() string {
 
 // HourlyMetrics 小时级别实时指标
 type HourlyMetrics struct {
-	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	MetricTime    time.Time `gorm:"index;not null" json:"metric_time"`   // 指标时间(整点)
-	
+	ID         int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MetricTime time.Time `gorm:"index;not null" json:"metric_time"` // 指标时间(整点)
+
 	// 订单指标
-	NewOrders        int   `gorm:"default:0" json:"new_orders"`
-	CompletedOrders  int   `gorm:"default:0" json:"completed_orders"`
-	CancelledOrders  int   `gorm:"default:0" json:"cancelled_orders"`
-	
+	NewOrders       int `gorm:"default:0" json:"new_orders"`
+	CompletedOrders int `gorm:"default:0" json:"completed_orders"`
+	CancelledOrders int `gorm:"default:0" json:"cancelled_orders"`
+
 	// 收入指标
-	Revenue          int64 `gorm:"default:0" json:"revenue"`
-	
+	Revenue int64 `gorm:"default:0" json:"revenue"`
+
 	// 运力指标
-	OnlinePilots     int   `gorm:"default:0" json:"online_pilots"`
-	AvailableDrones  int   `gorm:"default:0" json:"available_drones"`
-	ActiveFlights    int   `gorm:"default:0" json:"active_flights"`
-	
+	OnlinePilots    int `gorm:"default:0" json:"online_pilots"`
+	AvailableDrones int `gorm:"default:0" json:"available_drones"`
+	ActiveFlights   int `gorm:"default:0" json:"active_flights"`
+
 	// 用户指标
-	ActiveUsers      int   `gorm:"default:0" json:"active_users"`
-	NewUsers         int   `gorm:"default:0" json:"new_users"`
-	
+	ActiveUsers int `gorm:"default:0" json:"active_users"`
+	NewUsers    int `gorm:"default:0" json:"new_users"`
+
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -2102,24 +2102,24 @@ func (HourlyMetrics) TableName() string {
 
 // RegionStatistics 区域统计数据
 type RegionStatistics struct {
-	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	StatDate      time.Time `gorm:"type:date;index;not null" json:"stat_date"`
-	RegionCode    string    `gorm:"type:varchar(20);index;not null" json:"region_code"` // 区域编码(省/市)
-	RegionName    string    `gorm:"type:varchar(50)" json:"region_name"`
-	RegionLevel   string    `gorm:"type:varchar(20)" json:"region_level"` // province, city, district
-	
+	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	StatDate    time.Time `gorm:"type:date;index;not null" json:"stat_date"`
+	RegionCode  string    `gorm:"type:varchar(20);index;not null" json:"region_code"` // 区域编码(省/市)
+	RegionName  string    `gorm:"type:varchar(50)" json:"region_name"`
+	RegionLevel string    `gorm:"type:varchar(20)" json:"region_level"` // province, city, district
+
 	// 订单统计
 	TotalOrders     int   `gorm:"default:0" json:"total_orders"`
 	CompletedOrders int   `gorm:"default:0" json:"completed_orders"`
 	Revenue         int64 `gorm:"default:0" json:"revenue"`
-	
+
 	// 运力统计
-	TotalDrones     int   `gorm:"default:0" json:"total_drones"`
-	TotalPilots     int   `gorm:"default:0" json:"total_pilots"`
-	
+	TotalDrones int `gorm:"default:0" json:"total_drones"`
+	TotalPilots int `gorm:"default:0" json:"total_pilots"`
+
 	// 用户统计
-	TotalClients    int   `gorm:"default:0" json:"total_clients"`
-	
+	TotalClients int `gorm:"default:0" json:"total_clients"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -2130,41 +2130,41 @@ func (RegionStatistics) TableName() string {
 
 // AnalyticsReport 分析报表
 type AnalyticsReport struct {
-	ID            int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	ReportNo      string         `gorm:"type:varchar(50);uniqueIndex;not null" json:"report_no"`
-	ReportType    string         `gorm:"type:varchar(20);not null" json:"report_type"` // daily, weekly, monthly, quarterly, yearly, custom
-	ReportName    string         `gorm:"type:varchar(100);not null" json:"report_name"`
-	
+	ID         int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	ReportNo   string `gorm:"type:varchar(50);uniqueIndex;not null" json:"report_no"`
+	ReportType string `gorm:"type:varchar(20);not null" json:"report_type"` // daily, weekly, monthly, quarterly, yearly, custom
+	ReportName string `gorm:"type:varchar(100);not null" json:"report_name"`
+
 	// 报表周期
-	PeriodStart   time.Time      `json:"period_start"`
-	PeriodEnd     time.Time      `json:"period_end"`
-	
+	PeriodStart time.Time `json:"period_start"`
+	PeriodEnd   time.Time `json:"period_end"`
+
 	// 报表内容
-	Summary       string         `gorm:"type:text" json:"summary"`        // 概要(JSON)
-	OrderAnalysis string         `gorm:"type:text" json:"order_analysis"` // 订单分析(JSON)
-	RevenueAnalysis string       `gorm:"type:text" json:"revenue_analysis"` // 收入分析(JSON)
-	UserAnalysis  string         `gorm:"type:text" json:"user_analysis"`  // 用户分析(JSON)
-	FlightAnalysis string        `gorm:"type:text" json:"flight_analysis"` // 飞行分析(JSON)
-	RiskAnalysis  string         `gorm:"type:text" json:"risk_analysis"`  // 风控分析(JSON)
-	RegionAnalysis string        `gorm:"type:text" json:"region_analysis"` // 区域分析(JSON)
-	TrendAnalysis string         `gorm:"type:text" json:"trend_analysis"` // 趋势分析(JSON)
-	Recommendations string       `gorm:"type:text" json:"recommendations"` // 建议(JSON)
-	
+	Summary         string `gorm:"type:text" json:"summary"`          // 概要(JSON)
+	OrderAnalysis   string `gorm:"type:text" json:"order_analysis"`   // 订单分析(JSON)
+	RevenueAnalysis string `gorm:"type:text" json:"revenue_analysis"` // 收入分析(JSON)
+	UserAnalysis    string `gorm:"type:text" json:"user_analysis"`    // 用户分析(JSON)
+	FlightAnalysis  string `gorm:"type:text" json:"flight_analysis"`  // 飞行分析(JSON)
+	RiskAnalysis    string `gorm:"type:text" json:"risk_analysis"`    // 风控分析(JSON)
+	RegionAnalysis  string `gorm:"type:text" json:"region_analysis"`  // 区域分析(JSON)
+	TrendAnalysis   string `gorm:"type:text" json:"trend_analysis"`   // 趋势分析(JSON)
+	Recommendations string `gorm:"type:text" json:"recommendations"`  // 建议(JSON)
+
 	// 对比数据
 	PreviousPeriodComparison string `gorm:"type:text" json:"previous_period_comparison"` // 环比(JSON)
-	YearOverYearComparison   string `gorm:"type:text" json:"year_over_year_comparison"` // 同比(JSON)
-	
+	YearOverYearComparison   string `gorm:"type:text" json:"year_over_year_comparison"`  // 同比(JSON)
+
 	// 附件
-	Attachments   string         `gorm:"type:text" json:"attachments"` // 附件(JSON: PDF/Excel导出)
-	
+	Attachments string `gorm:"type:text" json:"attachments"` // 附件(JSON: PDF/Excel导出)
+
 	// 状态
-	Status        string         `gorm:"type:varchar(20);default:generating" json:"status"` // generating, completed, failed
-	GeneratedBy   string         `gorm:"type:varchar(20);default:system" json:"generated_by"` // system, admin
-	GeneratedAt   *time.Time     `json:"generated_at"`
-	
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	Status      string     `gorm:"type:varchar(20);default:generating" json:"status"`   // generating, completed, failed
+	GeneratedBy string     `gorm:"type:varchar(20);default:system" json:"generated_by"` // system, admin
+	GeneratedAt *time.Time `json:"generated_at"`
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (AnalyticsReport) TableName() string {
@@ -2173,19 +2173,19 @@ func (AnalyticsReport) TableName() string {
 
 // HeatmapData 热力图数据
 type HeatmapData struct {
-	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	DataType      string    `gorm:"type:varchar(30);index;not null" json:"data_type"` // order_density, drone_distribution, pilot_distribution, demand_hotspot
-	StatDate      time.Time `gorm:"type:date;index;not null" json:"stat_date"`
-	
+	ID       int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	DataType string    `gorm:"type:varchar(30);index;not null" json:"data_type"` // order_density, drone_distribution, pilot_distribution, demand_hotspot
+	StatDate time.Time `gorm:"type:date;index;not null" json:"stat_date"`
+
 	// 位置信息
-	Latitude      float64   `gorm:"type:decimal(10,7);not null" json:"latitude"`
-	Longitude     float64   `gorm:"type:decimal(10,7);not null" json:"longitude"`
-	GridKey       string    `gorm:"type:varchar(30);index" json:"grid_key"` // 网格编号
-	
+	Latitude  float64 `gorm:"type:decimal(10,7);not null" json:"latitude"`
+	Longitude float64 `gorm:"type:decimal(10,7);not null" json:"longitude"`
+	GridKey   string  `gorm:"type:varchar(30);index" json:"grid_key"` // 网格编号
+
 	// 数值
-	Value         int       `gorm:"default:0" json:"value"` // 热度值
-	Count         int       `gorm:"default:0" json:"count"` // 数量
-	
+	Value int `gorm:"default:0" json:"value"` // 热度值
+	Count int `gorm:"default:0" json:"count"` // 数量
+
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -2195,13 +2195,12 @@ func (HeatmapData) TableName() string {
 
 // RealtimeDashboard 实时看板数据缓存
 type RealtimeDashboard struct {
-	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	MetricKey     string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"metric_key"`
-	MetricValue   string    `gorm:"type:text" json:"metric_value"` // JSON格式的指标值
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	MetricKey   string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"metric_key"`
+	MetricValue string    `gorm:"type:text" json:"metric_value"` // JSON格式的指标值
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func (RealtimeDashboard) TableName() string {
 	return "realtime_dashboard"
 }
-

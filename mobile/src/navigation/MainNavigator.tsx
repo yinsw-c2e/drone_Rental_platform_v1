@@ -64,7 +64,9 @@ import ClientProfileScreen from '../screens/client/ClientProfileScreen';
 import CargoDeclarationScreen from '../screens/client/CargoDeclarationScreen';
 import CreateDispatchTaskScreen from '../screens/dispatch/CreateDispatchTaskScreen';
 import DispatchTaskListScreen from '../screens/dispatch/DispatchTaskListScreen';
+import DispatchTaskDetailScreen from '../screens/dispatch/DispatchTaskDetailScreen';
 import PilotTaskListScreen from '../screens/dispatch/PilotTaskListScreen';
+import PilotOrderExecutionScreen from '../screens/dispatch/PilotOrderExecutionScreen';
 import FlightMonitoringScreen from '../screens/flight/FlightMonitoringScreen';
 import TrajectoryScreen from '../screens/flight/TrajectoryScreen';
 import MultiPointTaskScreen from '../screens/flight/MultiPointTaskScreen';
@@ -127,6 +129,14 @@ function OrderStack() {
       <Stack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域申请'}} />
       <Stack.Screen name="ComplianceCheck" component={ComplianceCheckScreen} options={{title: '合规检查'}} />
       <Stack.Screen name="NoFlyZone" component={NoFlyZoneScreen} options={{title: '禁飞区'}} />
+      <Stack.Screen name="AddressPicker" component={AddressPickerScreen} options={{title: '选择地址'}} />
+      <Stack.Screen name="AddressSearch" component={AddressSearchScreen} options={{headerShown: false}} />
+      <Stack.Screen name="MapPicker" component={MapPickerScreen} options={{title: '地图选点'}} />
+      <Stack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '派单任务'}} />
+      <Stack.Screen name="DispatchTaskDetail" component={DispatchTaskDetailScreen} options={{title: '任务详情'}} />
+      <Stack.Screen name="CreateDispatchTask" component={CreateDispatchTaskScreen} options={{title: '创建派单'}} />
+      <Stack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '接单任务'}} />
+      <Stack.Screen name="PilotOrderExecution" component={PilotOrderExecutionScreen} options={{title: '任务执行'}} />
     </Stack.Navigator>
   );
 }
@@ -178,7 +188,9 @@ function ProfileStack() {
       <Stack.Screen name="CargoDeclaration" component={CargoDeclarationScreen} options={{title: '货物申报'}} />
       <Stack.Screen name="CreateDispatchTask" component={CreateDispatchTaskScreen} options={{title: '创建派单'}} />
       <Stack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '派单任务'}} />
+      <Stack.Screen name="DispatchTaskDetail" component={DispatchTaskDetailScreen} options={{title: '任务详情'}} />
       <Stack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '接单任务'}} />
+      <Stack.Screen name="PilotOrderExecution" component={PilotOrderExecutionScreen} options={{title: '任务执行'}} />
       <Stack.Screen name="FlightMonitoring" component={FlightMonitoringScreen} options={{title: '飞行监控'}} />
       <Stack.Screen name="TrajectoryRecord" component={TrajectoryScreen} options={{title: '轨迹记录'}} />
       <Stack.Screen name="MultiPointTask" component={MultiPointTaskScreen} options={{title: '多点任务'}} />

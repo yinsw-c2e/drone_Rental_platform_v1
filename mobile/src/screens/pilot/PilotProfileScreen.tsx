@@ -27,6 +27,7 @@ const STATUS_MAP: Record<string, {label: string; color: string}> = {
 };
 
 const AVAILABILITY_STATUS_MAP: Record<string, {label: string; color: string}> = {
+  online: {label: '接单中', color: '#52c41a'},
   available: {label: '接单中', color: '#52c41a'},
   busy: {label: '忙碌中', color: '#faad14'},
   offline: {label: '离线', color: '#999'},
@@ -47,7 +48,12 @@ export default function PilotProfileScreen({navigation}: any) {
       ]);
       setPilot(profileData);
       setFlightStats(statsData);
-      setIsAvailable(profileData.is_available);
+      // availability_status: 'online'/'available' = 接单中
+      setIsAvailable(
+        profileData.availability_status === 'online' ||
+        profileData.availability_status === 'available' ||
+        profileData.is_available === true
+      );
     } catch (e: any) {
       Alert.alert('错误', e.message);
     } finally {
