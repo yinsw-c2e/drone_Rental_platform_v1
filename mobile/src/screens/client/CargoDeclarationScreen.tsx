@@ -13,7 +13,6 @@ import {
   ScrollView,
   Image,
   Platform,
-  ActionSheetIOS,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -27,6 +26,11 @@ import {
   CargoDeclaration,
   CreateCargoDeclarationRequest,
 } from '../../services/client';
+
+let ActionSheetIOS: any;
+if (Platform.OS === 'ios') {
+  ActionSheetIOS = require('react-native').ActionSheetIOS;
+}
 
 const CARGO_CATEGORIES = [
   {label: '普通货物', value: 'normal'},
@@ -75,10 +79,10 @@ export default function CargoDeclarationScreen({navigation}: any) {
       };
       source === 'camera' ? launchCamera(opts, callback) : launchImageLibrary(opts, callback);
     };
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && ActionSheetIOS) {
       ActionSheetIOS.showActionSheetWithOptions(
         {options: ['拍照', '从相册选择', '取消'], cancelButtonIndex: 2},
-        i => { if (i === 0) pick('camera'); else if (i === 1) pick('library'); },
+        (i: number) => { if (i === 0) pick('camera'); else if (i === 1) pick('library'); },
       );
     } else {
       Alert.alert('添加图片', '选择图片来源', [

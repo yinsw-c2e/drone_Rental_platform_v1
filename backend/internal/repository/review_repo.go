@@ -42,6 +42,22 @@ func (r *ReviewRepo) ExistsByOrderAndReviewer(orderID, reviewerID int64) (bool, 
 	return count > 0, err
 }
 
+func (r *ReviewRepo) ListByReviewer(reviewerID int64, page, pageSize int) ([]model.Review, int64, error) {
+	var reviews []model.Review
+	var total int64
+
+	query := r.db.Model(&model.Review{}).Where("reviewer_id = ?", reviewerID)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.
+		Order("created_at DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&reviews).Error
+	return reviews, total, err
+}
+
 func (r *ReviewRepo) GetAverageRating(targetType string, targetID int64) (float64, error) {
 	var avg float64
 	err := r.db.Model(&model.Review{}).

@@ -1,9 +1,14 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Alert,
-  Platform, ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import {launchCamera, launchImageLibrary, ImagePickerResponse} from 'react-native-image-picker';
+
+let ActionSheetIOS: any;
+if (Platform.OS === 'ios') {
+  ActionSheetIOS = require('react-native').ActionSheetIOS;
+}
 
 interface ImagePickerProps {
   images: string[];
@@ -23,10 +28,10 @@ export default function ImagePickerGroup({
 
   const handleAdd = () => {
     const options = ['拍照', '从相册选择', '取消'];
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && ActionSheetIOS) {
       ActionSheetIOS.showActionSheetWithOptions(
         {options, cancelButtonIndex: 2},
-        (index) => {
+        (index: number) => {
           if (index === 0) pickImage('camera');
           else if (index === 1) pickImage('library');
         },

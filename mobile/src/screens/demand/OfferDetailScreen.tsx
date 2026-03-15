@@ -1,215 +1,285 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {useSelector} from 'react-redux';
-import {demandService} from '../../services/demand';
-import {RentalOffer} from '../../types';
+
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
+import {SupplyDetail} from '../../types';
+import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {
+  formatSupplyPricing,
+  getSupplySceneLabel,
+  summarizeFlexibleValue,
+  summarizeServiceArea,
+} from '../../utils/supplyMeta';
+
+function SceneTag({label}: {label: string}) {
+  return (
+    <View style={styles.sceneTag}>
+      <Text style={styles.sceneTagText}>{label}</Text>
+    </View>
+  );
+}
 
 export default function OfferDetailScreen({route, navigation}: any) {
   const {id} = route.params;
-  const [offer, setOffer] = useState<RentalOffer | null>(null);
+  const {user, roleSummary} = useSelector((state: RootState) => state.auth);
+
+  const [supply, setSupply] = useState<SupplyDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  
-  // 判断是否是自己的供给
-  const isMyOffer = offer?.owner_id === currentUser?.id;
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  useEffect(() => {
-    fetchOffer();
-  }, [id]);
+  const effectiveRoleSummary = useMemo(
+    () => getEffectiveRoleSummary(roleSummary, user),
+    [roleSummary, user],
+  );
 
-  const fetchOffer = async () => {
+  const fetchSupply = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await demandService.getOffer(id);
-      setOffer(res.data);
-    } catch (e) {
-      Alert.alert('错误', '获取供给详情失败');
+      const res = await supplyService.getById(id);
+      setSupply(res.data);
+    } catch (error: any) {
+      Alert.alert('获取失败', error.message || '获取供给详情失败');
+      setSupply(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const formatPrice = () => {
-    if (!offer?.price) return '价格面议';
-    const priceInYuan = (offer.price / 100).toFixed(0);
-    return offer.price_type === 'hourly'
-      ? `¥${priceInYuan}/小时`
-      : `¥${priceInYuan}/天`;
-  };
+  useEffect(() => {
+    fetchSupply();
+  }, [fetchSupply]);
 
-  const handleUpdateStatus = async (newStatus: string) => {
-    const statusTexts: Record<string, string> = {
-      active: '恢复供给',
+  const isMySupply = supply?.owner_user_id === user?.id;
+  const canCreateDirectOrder =
+    !isMySupply && effectiveRoleSummary.has_client_role && supply?.status === 'active' && supply.accepts_direct_order;
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!supply) {
+      return;
+    }
+    const actionTextMap: Record<string, string> = {
+      active: '恢复上架',
       paused: '暂停供给',
       closed: '关闭供给',
     };
-    
-    Alert.alert(
-      '确认操作',
-      `确认${statusTexts[newStatus]}？`,
-      [
-        {text: '取消', style: 'cancel'},
-        {
-          text: '确认',
-          onPress: async () => {
-            try {
-              await demandService.updateOffer(id, {status: newStatus});
-              Alert.alert('成功', `${statusTexts[newStatus]}成功`);
-              fetchOffer(); // 重新加载
-            } catch (e) {
-              Alert.alert('错误', '操作失败');
-            }
-          },
+
+    Alert.alert('确认操作', `确认${actionTextMap[status] || '更新供给状态'}？`, [
+      {text: '取消', style: 'cancel'},
+      {
+        text: '确认',
+        onPress: async () => {
+          setUpdatingStatus(true);
+          try {
+            await supplyService.updateStatus(supply.id, status);
+            await fetchSupply();
+          } catch (error: any) {
+            Alert.alert('操作失败', error.message || '请稍后重试');
+          } finally {
+            setUpdatingStatus(false);
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 100}} color="#1890ff" />
+        <ActivityIndicator style={styles.loading} color="#0f5cab" />
       </SafeAreaView>
     );
   }
 
-  if (!offer) {
+  if (!supply) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🚁</Text>
-          <Text style={styles.emptyText}>供给信息不存在</Text>
+        <View style={styles.emptyWrap}>
+          <ObjectCard>
+            <EmptyState
+              icon="🛩️"
+              title="供给信息不存在"
+              description="这条供给可能已下架，或当前账号无权查看。"
+              actionText="返回市场"
+              onAction={() => navigation.goBack()}
+            />
+          </ObjectCard>
         </View>
       </SafeAreaView>
     );
   }
+
+  const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
+  const droneLabel = supply.drone ? `${supply.drone.brand} ${supply.drone.model}` : '未关联设备';
+  const serviceAreaText = summarizeServiceArea(supply.service_area_snapshot);
+  const timeSlotText = summarizeFlexibleValue(supply.available_time_slots, '未设置服务时间段');
+  const pricingRuleText = summarizeFlexibleValue(supply.pricing_rule, '按基础价格执行');
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scroll}>
-        <View style={styles.header}>
-          <View style={styles.iconBox}>
-            <Text style={{fontSize: 48}}>🚁</Text>
-          </View>
-          <Text style={styles.title}>{offer.title}</Text>
-          <Text style={styles.price}>{formatPrice()}</Text>
-          {offer.status !== 'active' && (
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>
-                {offer.status === 'closed' ? '已关闭' : '不可用'}
-              </Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <ObjectCard style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View style={styles.heroTags}>
+              <SourceTag source="supply" />
+              <StatusBadge label="" meta={getObjectStatusMeta('supply', supply.status)} />
             </View>
-          )}
-        </View>
+            <Text style={styles.supplyNo}>{supply.supply_no}</Text>
+          </View>
+          <Text style={styles.title}>{supply.title}</Text>
+          <Text style={styles.price}>{formatSupplyPricing(supply.base_price_amount, supply.pricing_unit)}</Text>
+          <Text style={styles.heroDesc}>这是一条新版供给对象。客户在这里确认能力和范围后，再发起直达下单。</Text>
+        </ObjectCard>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>服务信息</Text>
+        <ObjectCard>
+          <Text style={styles.sectionTitle}>能力信息</Text>
+          <View style={styles.sceneRow}>
+            {(supply.cargo_scenes || []).length > 0 ? (
+              supply.cargo_scenes.map(scene => <SceneTag key={scene} label={getSupplySceneLabel(scene)} />)
+            ) : (
+              <SceneTag label="未标注场景" />
+            )}
+          </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>服务类型</Text>
-            <Text style={styles.infoValue}>{offer.service_type || '租赁'}</Text>
+            <Text style={styles.infoValue}>重载吊运</Text>
           </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>设备摘要</Text>
+            <Text style={styles.infoValue}>{droneLabel}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>起飞重量</Text>
+            <Text style={styles.infoValue}>{supply.mtow_kg || 0} kg</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>最大吊重</Text>
+            <Text style={styles.infoValue}>{supply.max_payload_kg || 0} kg</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>最大航程</Text>
+            <Text style={styles.infoValue}>{supply.max_range_km || 0} km</Text>
+          </View>
+        </ObjectCard>
 
-          {offer.drone && (
+        <ObjectCard>
+          <Text style={styles.sectionTitle}>覆盖范围</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>服务区域</Text>
+            <Text style={styles.infoValue}>{serviceAreaText}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>服务时段</Text>
+            <Text style={styles.infoValue}>{timeSlotText}</Text>
+          </View>
+          {supply.drone?.city ? (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>无人机状态</Text>
-              <View style={[styles.droneStatusBadge, {
-                backgroundColor: offer.drone.availability_status === 'available' ? '#52c41a' : 
-                                offer.drone.availability_status === 'rented' ? '#fa8c16' : '#999'
-              }]}>
-                <Text style={styles.droneStatusText}>
-                  {offer.drone.availability_status === 'available' ? '空闲可租' :
-                   offer.drone.availability_status === 'rented' ? '使用中，可预约' : '维护中'}
-                </Text>
-              </View>
+              <Text style={styles.infoLabel}>设备所在城市</Text>
+              <Text style={styles.infoValue}>{supply.drone.city}</Text>
             </View>
-          )}
+          ) : null}
+        </ObjectCard>
 
+        <ObjectCard>
+          <Text style={styles.sectionTitle}>价格与规则</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>详细地址</Text>
-            <Text style={styles.infoValue}>{offer.address || '未设置'}</Text>
+            <Text style={styles.infoLabel}>基础价格</Text>
+            <Text style={styles.infoValue}>{formatSupplyPricing(supply.base_price_amount, supply.pricing_unit)}</Text>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>服务描述</Text>
-          <Text style={styles.description}>{offer.description || '暂无描述'}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>机主信息</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>昵称</Text>
-            <Text style={styles.infoValue}>{offer.owner?.nickname || '未知'}</Text>
+            <Text style={styles.infoLabel}>计价规则</Text>
+            <Text style={styles.infoValue}>{pricingRuleText}</Text>
           </View>
-        </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>直达下单</Text>
+            <Text style={styles.infoValue}>{supply.accepts_direct_order ? '支持' : '暂不支持'}</Text>
+          </View>
+        </ObjectCard>
+
+        <ObjectCard>
+          <Text style={styles.sectionTitle}>机主与说明</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>机主</Text>
+            <Text style={styles.infoValue}>{ownerLabel}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>发布时间</Text>
+            <Text style={styles.infoValue}>{supply.created_at?.slice(0, 10) || '-'}</Text>
+          </View>
+          <Text style={styles.description}>{supply.description || '当前供给暂未补充更详细的说明。'}</Text>
+        </ObjectCard>
+
+        {!supply.accepts_direct_order ? (
+          <ObjectCard highlightColor="#ffd591">
+            <Text style={styles.sectionTitle}>下单提醒</Text>
+            <Text style={styles.noticeText}>这条供给当前不接受客户直达下单。你可以联系机主沟通需求，或返回市场继续浏览其他供给。</Text>
+          </ObjectCard>
+        ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
-        {!isMyOffer && offer.status === 'active' && (
-          <TouchableOpacity
-            style={styles.rentBtn}
-            onPress={() => {
-              if (offer.drone?.availability_status === 'rented') {
-                Alert.alert('提示', '无人机当前使用中，请联系机主预约');
-                return;
-              }
-              // 跳转到创建订单页面，传递 drone 对象
-              if (!offer.drone) {
-                Alert.alert('错误', '无人机信息缺失');
-                return;
-              }
-              navigation.navigate('CreateOrder', {
-                drone: offer.drone,
-              });
-            }}>
-            <Text style={styles.rentBtnText}>立即租赁</Text>
-          </TouchableOpacity>
-        )}
-        
-        {isMyOffer && (
+        {isMySupply ? (
           <>
-            {offer.status === 'active' && (
+            <TouchableOpacity style={[styles.secondaryBtn, styles.footerBtn]} onPress={() => navigation.navigate('MyOffers')}>
+              <Text style={styles.secondaryBtnText}>我的供给</Text>
+            </TouchableOpacity>
+            {supply.status === 'active' ? (
               <TouchableOpacity
-                style={[styles.actionBtn, styles.pauseBtn]}
-                onPress={() => handleUpdateStatus('paused')}>
-                <Text style={styles.actionBtnText}>暂停供给</Text>
+                style={[styles.primaryBtn, styles.footerBtn, updatingStatus && styles.disabledBtn]}
+                onPress={() => handleUpdateStatus('paused')}
+                disabled={updatingStatus}>
+                <Text style={styles.primaryBtnText}>{updatingStatus ? '处理中...' : '暂停供给'}</Text>
               </TouchableOpacity>
-            )}
-            {offer.status === 'paused' && (
+            ) : (
               <TouchableOpacity
-                style={[styles.actionBtn, styles.resumeBtn]}
-                onPress={() => handleUpdateStatus('active')}>
-                <Text style={styles.actionBtnText}>恢复供给</Text>
-              </TouchableOpacity>
-            )}
-            {offer.status !== 'closed' && (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.closeBtn]}
-                onPress={() => handleUpdateStatus('closed')}>
-                <Text style={styles.actionBtnText}>关闭供给</Text>
+                style={[styles.primaryBtn, styles.footerBtn, updatingStatus && styles.disabledBtn]}
+                onPress={() => handleUpdateStatus('active')}
+                disabled={updatingStatus}>
+                <Text style={styles.primaryBtnText}>{updatingStatus ? '处理中...' : '恢复上架'}</Text>
               </TouchableOpacity>
             )}
           </>
-        )}
-        
-        {!isMyOffer && (
-          <TouchableOpacity
-            style={[styles.contactBtn, offer.status === 'active' && styles.contactBtnSecondary]}
-            onPress={() => {
-              if (offer.owner?.id) {
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, styles.footerBtn]}
+              onPress={() => {
+                if (!supply.owner?.id) {
+                  Alert.alert('暂不可联系', '机主信息暂不完整。');
+                  return;
+                }
                 navigation.navigate('Messages', {
                   screen: 'Chat',
-                  params: {peerId: offer.owner.id, peerName: offer.owner.nickname},
+                  params: {
+                    peerId: supply.owner.id,
+                    peerName: supply.owner.nickname,
+                  },
                 });
-              }
-            }}>
-            <Text style={[styles.contactBtnText, offer.status === 'active' && styles.contactBtnTextSecondary]}>
-              联系机主
-            </Text>
-          </TouchableOpacity>
+              }}>
+              <Text style={styles.secondaryBtnText}>联系机主</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryBtn, styles.footerBtn, !canCreateDirectOrder && styles.disabledBtn]}
+              onPress={() => navigation.navigate('SupplyDirectOrderConfirm', {supply})}
+              disabled={!canCreateDirectOrder}>
+              <Text style={styles.primaryBtnText}>{canCreateDirectOrder ? '发起直达下单' : '当前不可直达下单'}</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
     </SafeAreaView>
@@ -217,62 +287,57 @@ export default function OfferDetailScreen({route, navigation}: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  scroll: {flex: 1},
-  header: {
-    backgroundColor: '#fff', padding: 24, alignItems: 'center',
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
-  },
-  iconBox: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: '#e6f7ff',
-    justifyContent: 'center', alignItems: 'center', marginBottom: 16,
-  },
-  title: {fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center'},
-  price: {fontSize: 24, color: '#f5222d', fontWeight: 'bold', marginTop: 8},
-  statusBadge: {
-    backgroundColor: '#ff4d4f', paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: 12, marginTop: 8,
-  },
-  statusText: {color: '#fff', fontSize: 12, fontWeight: '500'},
-  section: {
-    backgroundColor: '#fff', marginTop: 10, padding: 16,
-    borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f0f0f0',
-  },
-  sectionTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12},
-  infoRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
-  },
-  infoLabel: {fontSize: 14, color: '#666'},
-  infoValue: {fontSize: 14, color: '#333', fontWeight: '500'},
-  description: {fontSize: 14, color: '#666', lineHeight: 22},
+  container: {flex: 1, backgroundColor: '#eef3f8'},
+  content: {padding: 14, paddingBottom: 96, gap: 12},
+  loading: {paddingTop: 120},
+  emptyWrap: {padding: 14, paddingTop: 48},
+  heroCard: {backgroundColor: '#0f5cab'},
+  heroTop: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12},
+  heroTags: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center'},
+  supplyNo: {fontSize: 12, color: '#d6e4ff', fontWeight: '700'},
+  title: {marginTop: 14, fontSize: 26, lineHeight: 32, color: '#ffffff', fontWeight: '800'},
+  price: {marginTop: 10, fontSize: 18, color: '#fff7e6', fontWeight: '800'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d6e4ff'},
+  sectionTitle: {fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 10},
+  sceneRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10},
+  sceneTag: {backgroundColor: '#eff6ff', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6},
+  sceneTagText: {fontSize: 12, color: '#2563eb', fontWeight: '600'},
+  infoRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 8},
+  infoLabel: {fontSize: 13, color: '#64748b'},
+  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: '#0f172a', fontWeight: '600'},
+  description: {marginTop: 10, fontSize: 13, lineHeight: 22, color: '#334155'},
+  noticeText: {fontSize: 13, lineHeight: 21, color: '#b45309'},
   footer: {
-    backgroundColor: '#fff', padding: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0',
-    flexDirection: 'row', gap: 10,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    flexDirection: 'row',
+    gap: 10,
   },
-  rentBtn: {
-    flex: 1, backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+  footerBtn: {flex: 1},
+  secondaryBtn: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
   },
-  rentBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  contactBtn: {
-    flex: 1, backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+  secondaryBtnText: {fontSize: 15, color: '#1d4ed8', fontWeight: '700'},
+  primaryBtn: {
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#1677ff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  contactBtnSecondary: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#1890ff',
-  },
-  contactBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  contactBtnTextSecondary: {color: '#1890ff'},
-  droneStatusBadge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4},
-  droneStatusText: {color: '#fff', fontSize: 12, fontWeight: '500'},
-  actionBtn: {
-    flex: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center',
-    marginHorizontal: 4,
-  },
-  pauseBtn: {backgroundColor: '#fa8c16'},
-  resumeBtn: {backgroundColor: '#52c41a'},
-  closeBtn: {backgroundColor: '#999'},
-  actionBtnText: {color: '#fff', fontSize: 14, fontWeight: '600'},
-  empty: {alignItems: 'center', paddingTop: 100},
-  emptyIcon: {fontSize: 48, marginBottom: 12},
-  emptyText: {fontSize: 16, color: '#999'},
+  primaryBtnText: {fontSize: 15, color: '#fff', fontWeight: '700'},
+  disabledBtn: {opacity: 0.5},
 });

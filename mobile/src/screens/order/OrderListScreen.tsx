@@ -1,440 +1,225 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
   FlatList,
-  StyleSheet,
-  TouchableOpacity,
+  RefreshControl,
   SafeAreaView,
-  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {useSelector} from 'react-redux';
 import {useFocusEffect} from '@react-navigation/native';
-import {orderService} from '../../services/order';
-import {Order} from '../../types';
-import {ORDER_STATUS} from '../../constants';
+import {useSelector} from 'react-redux';
+
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {orderV2Service} from '../../services/orderV2';
 import {RootState} from '../../store/store';
-import {
-  acceptTask,
-  getOrderByTaskId,
-  listClientTasks,
-  listPilotTasks,
-  rejectTask,
-  DispatchTask,
-} from '../../services/dispatch';
+import {RoleSummary, V2OrderSummary} from '../../types';
+import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 
-type Bucket = 'pending' | 'in_progress' | 'completed';
-type TabKey = 'all' | Bucket;
+type RoleFilter = 'all' | 'client' | 'owner' | 'pilot';
+type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
 
-type PilotTaskItem = {
-  id: number;
-  task_id: number;
-  task_no?: string;
-  order_no?: string;
-  status: string;
-  task_type?: string;
-  pickup_address?: string;
-  delivery_address?: string;
-  quoted_price?: number;
-  total_score?: number;
-  created_at?: string;
-  deadline?: string;
-  order_id?: number;
-  related_order_status?: string;
-  related_order_no?: string;
+type OrderListItem = {
+  order: V2OrderSummary;
+  roles: RoleFilter[];
 };
 
-type UnifiedItem =
-  | {
-      kind: 'order';
-      key: string;
-      bucket: Bucket;
-      sortTime: number;
-      data: Order;
-      sourceTags: ('order' | 'pilot_task' | 'client_task')[];
-    }
-  | {
-      kind: 'pilot_task';
-      key: string;
-      bucket: Bucket;
-      sortTime: number;
-      data: PilotTaskItem;
-    }
-  | {
-      kind: 'client_task';
-      key: string;
-      bucket: Bucket;
-      sortTime: number;
-      data: DispatchTask;
-    };
-
-type ListEntry =
-  | {
-      kind: 'section_header';
-      key: string;
-      bucket: Bucket;
-      count: number;
-    }
-  | {
-      kind: 'item';
-      key: string;
-      data: UnifiedItem;
-    };
-
-type PendingVisual = {
-  label: string;
-  borderColor: string;
-  bgColor: string;
-  badgeBg: string;
-  badgeTextColor: string;
-  hint?: string;
-};
-
-type SourceTag = 'order' | 'pilot_task' | 'client_task';
-
-const SOURCE_TAG_META: Record<SourceTag, {label: string; bg: string; color: string}> = {
-  order: {label: '订单', bg: '#e6f7ff', color: '#1890ff'},
-  pilot_task: {label: '飞手任务', bg: '#fff7e6', color: '#fa8c16'},
-  client_task: {label: '派单任务', bg: '#f6ffed', color: '#52c41a'},
-};
-
-const TABS: {key: TabKey; label: string}[] = [
+const STATUS_TABS: {key: StatusFilter; label: string}[] = [
   {key: 'all', label: '全部'},
   {key: 'pending', label: '待处理'},
   {key: 'in_progress', label: '进行中'},
   {key: 'completed', label: '已完成'},
 ];
 
-const ROLE_TABS = [
-  {key: 'all', label: '全部'},
-  {key: 'renter', label: '我租的'},
-  {key: 'owner', label: '我出租的'},
-];
-
-const BUCKET_LABEL: Record<Bucket, string> = {
-  pending: '待处理',
-  in_progress: '进行中',
-  completed: '已完成',
+const roleLabelMap: Record<Exclude<RoleFilter, 'all'>, string> = {
+  client: '业主订单',
+  owner: '机主订单',
+  pilot: '飞手执行',
 };
 
-const isIgnorableTaskError = (error: any): boolean => {
-  const msg = String(error?.message || '');
-  return msg.includes('请先注册成为飞手') || msg.includes('请先注册成为业主');
+const formatAmount = (amount?: number | null) => `¥${((amount || 0) / 100).toFixed(2)}`;
+
+const formatDateRange = (start?: string, end?: string) => {
+  if (!start && !end) {
+    return '未设置执行时间';
+  }
+  const values = [start, end]
+    .filter(Boolean)
+    .map(value => {
+      const date = new Date(String(value));
+      if (Number.isNaN(date.getTime())) {
+        return String(value);
+      }
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hour = String(date.getHours()).padStart(2, '0');
+      const minute = String(date.getMinutes()).padStart(2, '0');
+      return `${month}-${day} ${hour}:${minute}`;
+    });
+  return values.join(' - ');
 };
 
-const ORDER_STATUS_RANK: Record<string, number> = {
-  created: 10,
-  accepted: 20,
-  paid: 30,
-  in_progress: 40,
-  confirmed: 45,
-  cancelled: 80,
-  rejected: 80,
-  refunded: 85,
-  delivered: 90,
-  completed: 90,
+const summarizeParty = (party: V2OrderSummary['provider'] | V2OrderSummary['client'] | V2OrderSummary['executor'], fallbackLabel: string) => {
+  if (!party) {
+    return fallbackLabel;
+  }
+  if (party.nickname) {
+    return party.nickname;
+  }
+  if (party.user_id) {
+    return `${fallbackLabel} #${party.user_id}`;
+  }
+  return fallbackLabel;
 };
 
-const parseTimeSafe = (date?: string): number => {
-  if (!date) return 0;
-  const value = new Date(date).getTime();
-  return Number.isFinite(value) ? value : 0;
-};
-
-const chooseBetterOrderSnapshot = (current: Order, next: Order): Order => {
-  const currentRank = ORDER_STATUS_RANK[current.status] ?? 0;
-  const nextRank = ORDER_STATUS_RANK[next.status] ?? 0;
-  if (nextRank !== currentRank) return nextRank > currentRank ? next : current;
-
-  const currentTs = parseTimeSafe((current as any).updated_at || current.created_at);
-  const nextTs = parseTimeSafe((next as any).updated_at || next.created_at);
-  if (nextTs !== currentTs) return nextTs > currentTs ? next : current;
-
-  return next;
-};
-
-const parsePositiveInt = (value: unknown): number => {
-  const num = typeof value === 'number' ? value : Number(value);
-  return Number.isInteger(num) && num > 0 ? num : 0;
-};
-
-const normalizeOrderNo = (value: unknown): string => {
-  const text = String(value || '').trim();
-  return text ? text.toUpperCase() : '';
-};
-
-const addSourceTag = (item: UnifiedItem, tag: SourceTag): UnifiedItem => {
-  if (item.kind !== 'order') return item;
-  if (item.sourceTags.includes(tag)) return item;
-  return {
-    ...item,
-    sourceTags: [...item.sourceTags, tag],
-  };
-};
-
-const getOrderBucket = (status: string): Bucket | null => {
-  if (status === 'created' || status === 'accepted' || status === 'paid') return 'pending';
+const getStatusBucket = (status?: string): StatusFilter => {
+  const normalized = String(status || '').toLowerCase();
   if (
-    status === 'in_progress' ||
-    status === 'confirmed' ||
-    status === 'airspace_applying' ||
-    status === 'airspace_approved' ||
-    status === 'loading' ||
-    status === 'in_transit'
+    [
+      'pending_provider_confirmation',
+      'pending_payment',
+      'pending_dispatch',
+      'assigned',
+      'confirmed',
+      'created',
+      'accepted',
+      'paid',
+    ].includes(normalized)
+  ) {
+    return 'pending';
+  }
+  if (
+    [
+      'airspace_applying',
+      'airspace_approved',
+      'loading',
+      'in_transit',
+    ].includes(normalized)
   ) {
     return 'in_progress';
   }
-  if (status === 'completed' || status === 'delivered') return 'completed';
-  return null;
+  return 'completed';
 };
 
-const getPilotEffectiveStatus = (task: PilotTaskItem): string =>
-  String(task.related_order_status || task.status || '').toLowerCase();
-
-const getPilotTaskBucket = (task: PilotTaskItem): Bucket | null => {
-  const status = getPilotEffectiveStatus(task);
-  if (status === 'notified' || status === 'pending' || status === 'created' || status === 'paid') return 'pending';
-  if (
-    status === 'accepted' ||
-    status === 'confirmed' ||
-    status === 'in_progress' ||
-    status === 'airspace_applying' ||
-    status === 'airspace_approved' ||
-    status === 'loading' ||
-    status === 'in_transit'
-  ) {
-    return 'in_progress';
+const buildRoleTabs = (summary: RoleSummary): {key: RoleFilter; label: string}[] => {
+  const tabs: {key: RoleFilter; label: string}[] = [{key: 'all', label: '全部'}];
+  if (summary.has_client_role) {
+    tabs.push({key: 'client', label: roleLabelMap.client});
   }
-  if (status === 'completed' || status === 'delivered') return 'completed';
-  return null;
+  if (summary.has_owner_role) {
+    tabs.push({key: 'owner', label: roleLabelMap.owner});
+  }
+  if (summary.has_pilot_role) {
+    tabs.push({key: 'pilot', label: roleLabelMap.pilot});
+  }
+  return tabs;
 };
 
-const getClientTaskBucket = (status: string): Bucket | null => {
-  if (status === 'pending' || status === 'matching' || status === 'dispatching' || status === 'assigned') return 'pending';
-  if (status === 'accepted' || status === 'in_progress') return 'in_progress';
-  if (status === 'completed') return 'completed';
-  return null;
+const getRouteRoleFilter = (value: any): RoleFilter => {
+  const key = String(value || 'all') as RoleFilter;
+  if (key === 'client' || key === 'owner' || key === 'pilot' || key === 'all') {
+    return key;
+  }
+  return 'all';
 };
 
-export default function OrderListScreen({navigation}: any) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [pilotTasks, setPilotTasks] = useState<PilotTaskItem[]>([]);
-  const [clientTasks, setClientTasks] = useState<DispatchTask[]>([]);
-  const [activeTab, setActiveTab] = useState<TabKey>('all');
-  const [activeRole, setActiveRole] = useState('all');
-  const [loading, setLoading] = useState(false);
-  const [actingTaskId, setActingTaskId] = useState<number | null>(null);
+const getRouteStatusFilter = (value: any): StatusFilter => {
+  const key = String(value || 'all') as StatusFilter;
+  if (key === 'pending' || key === 'in_progress' || key === 'completed' || key === 'all') {
+    return key;
+  }
+  return 'all';
+};
+
+const getExactStatusLabel = (status?: string) => {
+  if (!status) {
+    return '';
+  }
+  return getObjectStatusMeta('order', status).label;
+};
+
+export default function OrderListScreen({navigation, route}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
-  const isPilot = user?.user_type === 'pilot';
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
 
-  const toTime = (date?: string): number => {
-    if (!date) return 0;
-    const value = new Date(date).getTime();
-    return Number.isFinite(value) ? value : 0;
-  };
+  const roleTabs = useMemo(() => buildRoleTabs(effectiveRoleSummary), [effectiveRoleSummary]);
+  const [activeRole, setActiveRole] = useState<RoleFilter>(getRouteRoleFilter(route?.params?.roleFilter));
+  const [activeStatus, setActiveStatus] = useState<StatusFilter>(getRouteStatusFilter(route?.params?.statusFilter));
+  const [exactStatusFilter, setExactStatusFilter] = useState<string>(String(route?.params?.serverStatus || ''));
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [items, setItems] = useState<OrderListItem[]>([]);
 
-  const getPriorityWeight = (priority: unknown): number => {
-    if (priority === 'critical' || priority === 10 || priority === '10') return 3;
-    if (priority === 'urgent' || priority === 8 || priority === '8') return 2;
-    return 1;
-  };
+  useEffect(() => {
+    const nextRole = getRouteRoleFilter(route?.params?.roleFilter);
+    const nextStatus = getRouteStatusFilter(route?.params?.statusFilter);
+    const nextExactStatus = String(route?.params?.serverStatus || '');
+    setActiveRole(nextRole);
+    setActiveStatus(nextStatus);
+    setExactStatusFilter(nextExactStatus);
+  }, [route?.params?.roleFilter, route?.params?.serverStatus, route?.params?.statusFilter]);
 
-  const getDeadlineHint = (deadline?: string): string | undefined => {
-    const ts = toTime(deadline);
-    if (!ts) return undefined;
-    const diff = ts - Date.now();
-    if (diff <= 0) return '已超时';
-    const hours = Math.ceil(diff / (60 * 60 * 1000));
-    if (hours <= 24) return `剩余${hours}小时`;
-    const d = new Date(ts);
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hour = String(d.getHours()).padStart(2, '0');
-    const minute = String(d.getMinutes()).padStart(2, '0');
-    return `截止${month}-${day} ${hour}:${minute}`;
-  };
-
-  const getPendingVisual = (item: UnifiedItem): PendingVisual | null => {
-    if (item.bucket !== 'pending') return null;
-
-    if (item.kind === 'pilot_task') {
-      const hint = getDeadlineHint(item.data.deadline);
-      return {
-        label: '优先接单',
-        borderColor: '#ff9c6e',
-        bgColor: '#fffaf5',
-        badgeBg: '#fff1f0',
-        badgeTextColor: '#d4380d',
-        hint,
-      };
+  useEffect(() => {
+    if (roleTabs.some(tab => tab.key === activeRole)) {
+      return;
     }
-
-    if (item.kind === 'client_task') {
-      const rawDeadline = (item.data as any).dispatch_deadline || item.data.deadline;
-      const hint = getDeadlineHint(rawDeadline);
-      const priorityWeight = getPriorityWeight(item.data.priority);
-      const deadlineTs = toTime(rawDeadline);
-      const nearDeadline = deadlineTs > 0 && deadlineTs - Date.now() <= 2 * 60 * 60 * 1000;
-      const overdue = deadlineTs > 0 && deadlineTs <= Date.now();
-      if (overdue || nearDeadline || priorityWeight >= 3) {
-        return {
-          label: '紧急任务',
-          borderColor: '#ff7875',
-          bgColor: '#fff5f5',
-          badgeBg: '#fff1f0',
-          badgeTextColor: '#cf1322',
-          hint,
-        };
-      }
-      if (priorityWeight >= 2) {
-        return {
-          label: '高优先',
-          borderColor: '#ffa940',
-          bgColor: '#fffaf0',
-          badgeBg: '#fff7e6',
-          badgeTextColor: '#d46b08',
-          hint,
-        };
-      }
-      return {
-        label: '待派发',
-        borderColor: '#ffd666',
-        bgColor: '#fffef5',
-        badgeBg: '#fffbe6',
-        badgeTextColor: '#ad6800',
-        hint,
-      };
-    }
-
-    const isNewOrder = item.data.status === 'created' || item.data.status === 'accepted';
-    return {
-      label: isNewOrder ? '待确认订单' : '待支付订单',
-      borderColor: '#91caff',
-      bgColor: '#f8fbff',
-      badgeBg: '#e6f4ff',
-      badgeTextColor: '#0958d9',
-      hint: undefined,
-    };
-  };
+    setActiveRole(roleTabs[0]?.key || 'all');
+  }, [activeRole, roleTabs]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      let fetchedOrders: Order[] = [];
+      const rolesToLoad: Array<Exclude<RoleFilter, 'all'>> =
+        activeRole === 'all'
+          ? roleTabs.filter(tab => tab.key !== 'all').map(tab => tab.key as Exclude<RoleFilter, 'all'>)
+          : [activeRole as Exclude<RoleFilter, 'all'>];
 
-      if (activeRole === 'all') {
-        // 查询作为租客和机主的所有订单
-        const [renterRes, ownerRes] = await Promise.all([
-          orderService.list({role: 'renter', page: 1, page_size: 50}),
-          orderService.list({role: 'owner', page: 1, page_size: 50}),
-        ]);
-        const allOrders = [
-          ...(renterRes.data.list || []),
-          ...(ownerRes.data.list || []),
-        ];
-        
-        // 去重（避免同一订单ID重复）
-        const orderMap = new Map<number, Order>();
-        allOrders.forEach(order => {
-          const existing = orderMap.get(order.id);
+      const responses = await Promise.all(
+        rolesToLoad.map(async role => {
+          const res = await orderV2Service.list({
+            role,
+            status: exactStatusFilter || undefined,
+            page: 1,
+            page_size: 100,
+          });
+          return {role, orders: res.data?.items || []};
+        }),
+      );
+
+      const merged = new Map<number, OrderListItem>();
+      responses.forEach(({role, orders}) => {
+        orders.forEach(order => {
+          const existing = merged.get(order.id);
           if (!existing) {
-            orderMap.set(order.id, order);
+            merged.set(order.id, {order, roles: [role]});
             return;
           }
-          orderMap.set(order.id, chooseBetterOrderSnapshot(existing, order));
+          const nextRoles = existing.roles.includes(role) ? existing.roles : [...existing.roles, role];
+          const betterOrder = new Date(order.updated_at || order.created_at).getTime() >= new Date(existing.order.updated_at || existing.order.created_at).getTime()
+            ? order
+            : existing.order;
+          merged.set(order.id, {order: betterOrder, roles: nextRoles});
         });
-        fetchedOrders = Array.from(orderMap.values());
+      });
 
-        // 按创建时间排序
-        fetchedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      } else {
-        // 按角色查询
-        const res = await orderService.list({role: activeRole, page: 1, page_size: 50});
-        fetchedOrders = res.data.list || [];
-      }
-
-      setOrders(fetchedOrders);
-
-      // 角色筛选非“全部”时，仅展示订单，避免任务和角色维度混淆
-      if (activeRole !== 'all') {
-        setPilotTasks([]);
-        setClientTasks([]);
-      } else {
-        if (isPilot) {
-          try {
-            const pilotRes = await listPilotTasks({page: 1, page_size: 50});
-            const rawTasks = (pilotRes.data || []) as PilotTaskItem[];
-            const normalizedTasks = await Promise.all(
-              rawTasks.map(async raw => {
-                const task: PilotTaskItem = {...raw};
-                const linkedOrderId =
-                  parsePositiveInt((raw as any).order_id) || parsePositiveInt((raw as any).related_order_id);
-                if (linkedOrderId > 0) {
-                  task.order_id = linkedOrderId;
-                }
-
-                const inlineOrderStatus =
-                  (raw as any).related_order_status || (raw as any).order_status || (raw as any).order?.status;
-                if (inlineOrderStatus) {
-                  task.related_order_status = String(inlineOrderStatus);
-                }
-                const inlineOrderNo =
-                  (raw as any).related_order_no || (raw as any).order_no || (raw as any).order?.order_no;
-                if (inlineOrderNo) {
-                  task.related_order_no = String(inlineOrderNo);
-                }
-
-                // 如果飞手任务本身没有带关联订单状态，补查一次真实订单状态，避免“列表进行中、详情已完成”。
-                const shouldLookupOrder =
-                  task.task_id > 0 &&
-                  task.status !== 'notified' &&
-                  task.status !== 'pending' &&
-                  task.status !== 'rejected' &&
-                  task.status !== 'expired';
-                if (shouldLookupOrder) {
-                  try {
-                    const linkedOrder = await getOrderByTaskId(task.task_id);
-                    const id = parsePositiveInt(linkedOrder?.id);
-                    if (id > 0) task.order_id = id;
-                    if (linkedOrder?.status) task.related_order_status = String(linkedOrder.status);
-                    if (linkedOrder?.order_no) task.related_order_no = String(linkedOrder.order_no);
-                  } catch {
-                    // 忽略单条任务补查失败，不影响列表主流程
-                  }
-                }
-                return task;
-              }),
-            );
-            setPilotTasks(normalizedTasks);
-          } catch (error) {
-            if (!isIgnorableTaskError(error)) {
-              console.error('获取飞手任务失败:', error);
-            }
-            setPilotTasks([]);
-          }
-          setClientTasks([]);
-        } else {
-          try {
-            const clientRes = await listClientTasks({page: 1, page_size: 50});
-            setClientTasks(clientRes.list || []);
-          } catch (error) {
-            if (!isIgnorableTaskError(error)) {
-              console.error('获取派单任务失败:', error);
-            }
-            setClientTasks([]);
-          }
-          setPilotTasks([]);
-        }
-      }
-    } catch (e) {
-      console.error(e);
+      const list = Array.from(merged.values()).sort(
+        (a, b) => new Date(b.order.updated_at || b.order.created_at).getTime() - new Date(a.order.updated_at || a.order.created_at).getTime(),
+      );
+      setItems(list);
+    } catch (error) {
+      console.warn('获取订单列表失败:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    setLoading(false);
-  }, [activeRole, isPilot]);
-
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  }, [activeRole, exactStatusFilter, roleTabs]);
 
   useFocusEffect(
     useCallback(() => {
@@ -442,636 +227,319 @@ export default function OrderListScreen({navigation}: any) {
     }, [fetchOrders]),
   );
 
-  const handleAcceptPilotTask = (task: PilotTaskItem) => {
-    if (task.status !== 'notified') return;
-    Alert.alert('确认接单', '确定要接受此任务吗？', [
-      {text: '取消', style: 'cancel'},
-      {
-        text: '确认',
-        onPress: async () => {
-          if (actingTaskId === task.id) return;
-          setActingTaskId(task.id);
-          try {
-            await acceptTask(task.id);
-            await fetchOrders();
-            Alert.alert('接单成功', '任务已进入进行中');
-          } catch (error: any) {
-            Alert.alert('操作失败', error?.message || '请稍后重试');
-          } finally {
-            setActingTaskId(null);
-          }
-        },
-      },
-    ]);
-  };
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchOrders();
+  }, [fetchOrders]);
 
-  const handleRejectPilotTask = (task: PilotTaskItem) => {
-    if (task.status !== 'notified') return;
-    Alert.alert('拒绝任务', '确定拒绝此任务吗？', [
-      {text: '取消', style: 'cancel'},
-      {
-        text: '确认拒绝',
-        style: 'destructive',
-        onPress: async () => {
-          if (actingTaskId === task.id) return;
-          setActingTaskId(task.id);
-          try {
-            await rejectTask(task.id);
-            await fetchOrders();
-          } catch (error: any) {
-            Alert.alert('操作失败', error?.message || '请稍后重试');
-          } finally {
-            setActingTaskId(null);
-          }
-        },
-      },
-    ]);
-  };
-
-  const items = useMemo<UnifiedItem[]>(() => {
-    const merged: UnifiedItem[] = [];
-    const orderIndexById = new Map<number, number>();
-    const orderIndexByNo = new Map<string, number>();
-
-    for (const order of orders) {
-      const bucket = getOrderBucket(order.status);
-      if (!bucket) continue;
-      const normalizedNo = normalizeOrderNo(order.order_no);
-      const index = merged.length;
-      orderIndexById.set(order.id, index);
-      if (normalizedNo) orderIndexByNo.set(normalizedNo, index);
-      merged.push({
-        kind: 'order',
-        key: `order-${order.id}`,
-        bucket,
-        sortTime: toTime(order.created_at),
-        data: order,
-        sourceTags: ['order'],
-      });
-    }
-
-    for (const task of pilotTasks) {
-      const bucket = getPilotTaskBucket(task);
-      if (!bucket) continue;
-      const linkedOrderId =
-        parsePositiveInt(task.order_id) || parsePositiveInt((task as any).related_order_id);
-      const linkedOrderNo = normalizeOrderNo(task.related_order_no || task.order_no);
-      const linkedOrderIndex =
-        (linkedOrderId > 0 ? orderIndexById.get(linkedOrderId) : undefined) ??
-        (linkedOrderNo ? orderIndexByNo.get(linkedOrderNo) : undefined);
-      if (typeof linkedOrderIndex === 'number') {
-        merged[linkedOrderIndex] = addSourceTag(merged[linkedOrderIndex], 'pilot_task');
-        continue;
-      }
-      merged.push({
-        kind: 'pilot_task',
-        key: `pilot-${task.id}`,
-        bucket,
-        sortTime: toTime(task.created_at),
-        data: task,
-      });
-    }
-
-    for (const task of clientTasks) {
-      const bucket = getClientTaskBucket(task.status);
-      if (!bucket) continue;
-      const linkedOrderId = (task as any).related_order_id || task.order_id;
-      const linkedOrderNo = normalizeOrderNo((task as any).order_no);
-      const linkedOrderIndex =
-        (typeof linkedOrderId === 'number' && linkedOrderId > 0 ? orderIndexById.get(linkedOrderId) : undefined) ??
-        (linkedOrderNo ? orderIndexByNo.get(linkedOrderNo) : undefined);
-      if (typeof linkedOrderIndex === 'number') {
-        merged[linkedOrderIndex] = addSourceTag(merged[linkedOrderIndex], 'client_task');
-        continue;
-      }
-      merged.push({
-        kind: 'client_task',
-        key: `client-${task.id}`,
-        bucket,
-        sortTime: toTime(task.created_at),
-        data: task,
-      });
-    }
-
-    const bucketRank: Record<Bucket, number> = {
-      pending: 0,
-      in_progress: 1,
-      completed: 2,
-    };
-
-    merged.sort((a, b) => {
-      if (a.bucket !== b.bucket) {
-        return bucketRank[a.bucket] - bucketRank[b.bucket];
-      }
-
-      if (a.bucket === 'pending') {
-        const aUrgency = a.kind === 'client_task' ? getPriorityWeight(a.data.priority) : a.kind === 'pilot_task' ? 2 : 1;
-        const bUrgency = b.kind === 'client_task' ? getPriorityWeight(b.data.priority) : b.kind === 'pilot_task' ? 2 : 1;
-        if (aUrgency !== bUrgency) return bUrgency - aUrgency;
-
-        const aDeadline = a.kind === 'client_task' ? toTime((a.data as any).dispatch_deadline || (a.data as any).deadline) : toTime((a.data as any).deadline);
-        const bDeadline = b.kind === 'client_task' ? toTime((b.data as any).dispatch_deadline || (b.data as any).deadline) : toTime((b.data as any).deadline);
-        if (aDeadline > 0 && bDeadline > 0 && aDeadline !== bDeadline) return aDeadline - bDeadline;
-      }
-
-      return b.sortTime - a.sortTime;
-    });
-
-    return merged;
-  }, [orders, pilotTasks, clientTasks]);
-
-  const stats = useMemo(() => {
-    const pending = items.filter(i => i.bucket === 'pending').length;
-    const inProgress = items.filter(i => i.bucket === 'in_progress').length;
-    const completed = items.filter(i => i.bucket === 'completed').length;
-    return {pending, inProgress, completed};
-  }, [items]);
-
-  const tabCounts = useMemo<Record<TabKey, number>>(
-    () => ({
-      all: items.length,
-      pending: stats.pending,
-      in_progress: stats.inProgress,
-      completed: stats.completed,
-    }),
-    [items.length, stats.completed, stats.inProgress, stats.pending],
+  const filteredItems = useMemo(
+    () => items.filter(item => activeStatus === 'all' || getStatusBucket(item.order.status) === activeStatus),
+    [activeStatus, items],
   );
 
-  const filteredItems = useMemo(() => {
-    if (activeTab === 'all') return items;
-    return items.filter(item => item.bucket === activeTab);
-  }, [items, activeTab]);
-
-  const displayItems = useMemo<ListEntry[]>(() => {
-    if (activeTab !== 'all') {
-      return filteredItems.map(item => ({
-        kind: 'item',
-        key: item.key,
-        data: item,
-      }));
-    }
-
-    const grouped: ListEntry[] = [];
-    const buckets: Bucket[] = ['pending', 'in_progress', 'completed'];
-    for (const bucket of buckets) {
-      const group = filteredItems.filter(item => item.bucket === bucket);
-      if (group.length === 0) continue;
-      grouped.push({
-        kind: 'section_header',
-        key: `header-${bucket}`,
-        bucket,
-        count: group.length,
-      });
-      grouped.push(
-        ...group.map(item => ({
-          kind: 'item' as const,
-          key: item.key,
-          data: item,
-        })),
-      );
-    }
-    return grouped;
-  }, [activeTab, filteredItems]);
-
-  const renderOrderCard = (
-    item: Order,
-    sourceTags: SourceTag[],
-    pendingVisual?: PendingVisual | null,
-  ) => (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        pendingVisual && styles.priorityCard,
-        pendingVisual && {borderColor: pendingVisual.borderColor, backgroundColor: pendingVisual.bgColor},
-      ]}
-      onPress={() => navigation.navigate('OrderDetail', {id: item.id})}>
-      <View style={styles.cardHeader}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Text style={styles.orderNo}>{item.order_no}</Text>
-          {sourceTags.map(tag => {
-            const meta = SOURCE_TAG_META[tag];
-            return (
-              <View key={`${item.id}-${tag}`} style={[styles.typeBadge, {backgroundColor: meta.bg}]}>
-                <Text style={[styles.typeBadgeText, {color: meta.color}]}>{meta.label}</Text>
-              </View>
-            );
-          })}
-        </View>
-        <Text style={[styles.status, {color: item.status === 'completed' ? '#52c41a' : '#1890ff'}]}>
-          {ORDER_STATUS[item.status as keyof typeof ORDER_STATUS] || item.status}
-        </Text>
-      </View>
-      {pendingVisual && (
-        <View style={[styles.priorityTag, {backgroundColor: pendingVisual.badgeBg}]}>
-          <Text style={[styles.priorityTagText, {color: pendingVisual.badgeTextColor}]}>{pendingVisual.label}</Text>
-          {pendingVisual.hint ? (
-            <Text style={[styles.priorityTagHint, {color: pendingVisual.badgeTextColor}]}>· {pendingVisual.hint}</Text>
-          ) : null}
-        </View>
-      )}
-      <Text style={styles.title}>{item.title}</Text>
-      <View style={styles.cardFooter}>
-        <Text style={styles.amount}>{(item.total_amount / 100).toFixed(2)} 元</Text>
-        <Text style={styles.time}>{item.created_at?.slice(0, 10)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderPilotTaskCard = (item: PilotTaskItem, pendingVisual?: PendingVisual | null) => {
-    const statusMap: Record<string, {label: string; color: string}> = {
-      notified: {label: '请确认接单', color: '#ff7a00'},
-      pending: {label: '待响应', color: '#faad14'},
-      accepted: {label: '已接单', color: '#52c41a'},
-      confirmed: {label: '已确认接单', color: '#1890ff'},
-      airspace_applying: {label: '申请空域中', color: '#1890ff'},
-      airspace_approved: {label: '空域已批准', color: '#1890ff'},
-      loading: {label: '装货中', color: '#1890ff'},
-      in_transit: {label: '运输中', color: '#1890ff'},
-      delivered: {label: '已送达', color: '#52c41a'},
-      completed: {label: '已完成', color: '#52c41a'},
-      rejected: {label: '已拒绝', color: '#ff4d4f'},
-      expired: {label: '已过期', color: '#8c8c8c'},
-    };
-    const effectiveStatus = getPilotEffectiveStatus(item);
-    const status = statusMap[effectiveStatus] || statusMap[item.status] || {label: item.status, color: '#666'};
-    const canAct = item.status === 'notified';
-    const isActing = actingTaskId === item.id;
-    const amount = Number(item.quoted_price || 0);
-    const displayNo = item.related_order_no || item.order_no || item.task_no || `任务#${item.task_id}`;
-    const showTaskNoMeta =
-      Boolean(item.task_no) && Boolean(item.related_order_no || item.order_no) && item.task_no !== (item.related_order_no || item.order_no);
+  const renderItem = ({item}: {item: OrderListItem}) => {
+    const sourceKind = item.order.order_source === 'supply_direct' ? 'supply' : 'demand';
+    const roleHints = item.roles.filter(role => role !== 'all').map(role => roleLabelMap[role as Exclude<RoleFilter, 'all'>]);
 
     return (
-      <View
-        style={[
-          styles.card,
-          canAct && styles.pendingCard,
-          pendingVisual && styles.priorityCard,
-          pendingVisual && {borderColor: pendingVisual.borderColor, backgroundColor: pendingVisual.bgColor},
-        ]}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            if (item.task_id > 0) {
-              navigation.navigate('PilotOrderExecution', {taskId: item.task_id, taskNo: item.task_no});
-            }
-          }}>
-          <View style={styles.cardHeader}>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              <Text style={styles.orderNo}>{displayNo}</Text>
-              <View style={[styles.typeBadge, {backgroundColor: '#fff7e6'}]}>
-                <Text style={[styles.typeBadgeText, {color: '#fa8c16'}]}>飞手任务</Text>
-              </View>
-            </View>
-            <Text style={[styles.status, {color: status.color}]}>{status.label}</Text>
-          </View>
-          {showTaskNoMeta && <Text style={styles.taskMeta}>任务号: {item.task_no}</Text>}
-          {pendingVisual && (
-            <View style={[styles.priorityTag, {backgroundColor: pendingVisual.badgeBg}]}>
-              <Text style={[styles.priorityTagText, {color: pendingVisual.badgeTextColor}]}>
-                {pendingVisual.label}
-              </Text>
-              {pendingVisual.hint ? (
-                <Text style={[styles.priorityTagHint, {color: pendingVisual.badgeTextColor}]}>
-                  · {pendingVisual.hint}
-                </Text>
-              ) : null}
-            </View>
-          )}
-          <Text style={styles.title} numberOfLines={2}>
-            派单货运: {item.pickup_address || '待确认'} {'->'} {item.delivery_address || '待确认'}
-          </Text>
-          <View style={styles.cardFooter}>
-            <Text style={styles.amount}>{amount > 0 ? `${(amount / 100).toFixed(2)} 元` : '待定'}</Text>
-            <Text style={styles.time}>{item.created_at?.slice(0, 10)}</Text>
-          </View>
-        </TouchableOpacity>
-        {canAct && (
-          <View style={styles.inlineActionRow}>
-            <TouchableOpacity
-              disabled={isActing}
-              style={[styles.rejectBtn, isActing && styles.actionBtnDisabled]}
-              onPress={() => handleRejectPilotTask(item)}>
-              <Text style={[styles.rejectBtnText, isActing && styles.actionBtnTextDisabled]}>
-                {isActing ? '处理中...' : '拒绝'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              disabled={isActing}
-              style={[styles.acceptBtn, isActing && styles.actionBtnDisabled]}
-              onPress={() => handleAcceptPilotTask(item)}>
-              <Text style={styles.acceptBtnText}>{isActing ? '处理中...' : '接受任务'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  const renderClientTaskCard = (item: DispatchTask, pendingVisual?: PendingVisual | null) => {
-    const statusMap: Record<string, {label: string; color: string}> = {
-      pending: {label: '待派单', color: '#faad14'},
-      matching: {label: '匹配中', color: '#1890ff'},
-      dispatching: {label: '派单中', color: '#1890ff'},
-      assigned: {label: '已分配', color: '#52c41a'},
-      accepted: {label: '已接受', color: '#52c41a'},
-      in_progress: {label: '执行中', color: '#1890ff'},
-      completed: {label: '已完成', color: '#52c41a'},
-    };
-    const status = statusMap[item.status] || {label: item.status, color: '#666'};
-    const amount = Number(item.max_budget || item.offered_price || 0);
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          pendingVisual && styles.priorityCard,
-          pendingVisual && {borderColor: pendingVisual.borderColor, backgroundColor: pendingVisual.bgColor},
-        ]}
-        onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
+      <ObjectCard style={styles.card} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
         <View style={styles.cardHeader}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Text style={styles.orderNo}>{item.task_no || `任务#${item.id}`}</Text>
-            <View style={[styles.typeBadge, {backgroundColor: '#f6ffed'}]}>
-              <Text style={[styles.typeBadgeText, {color: '#52c41a'}]}>派单任务</Text>
-            </View>
+          <View style={styles.cardHeaderLeft}>
+            <SourceTag source={sourceKind} />
+            <StatusBadge label="" meta={getObjectStatusMeta('order', item.order.status)} />
           </View>
-          <Text style={[styles.status, {color: status.color}]}>{status.label}</Text>
+          <Text style={styles.code}>{item.order.order_no}</Text>
         </View>
-        {pendingVisual && (
-          <View style={[styles.priorityTag, {backgroundColor: pendingVisual.badgeBg}]}>
-            <Text style={[styles.priorityTagText, {color: pendingVisual.badgeTextColor}]}>
-              {pendingVisual.label}
-            </Text>
-            {pendingVisual.hint ? (
-              <Text style={[styles.priorityTagHint, {color: pendingVisual.badgeTextColor}]}>
-                · {pendingVisual.hint}
-              </Text>
-            ) : null}
-          </View>
-        )}
-        <Text style={styles.title} numberOfLines={2}>
-          {item.pickup_address || '待确认'} {'->'} {item.delivery_address || '待确认'}
+
+        <Text style={styles.title}>{item.order.title}</Text>
+        <Text style={styles.address} numberOfLines={2}>
+          {item.order.service_address || '未设置起点'}
+          {item.order.dest_address ? ` -> ${item.order.dest_address}` : ''}
         </Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.amount}>{amount > 0 ? `${(amount / 100).toFixed(2)} 元` : '系统定价'}</Text>
-          <Text style={styles.time}>{item.created_at?.slice(0, 10)}</Text>
+
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>承接方：{summarizeParty(item.order.provider, '未分配机主')}</Text>
+          <Text style={styles.metaText}>执行方：{summarizeParty(item.order.executor, item.order.execution_mode === 'self_execute' ? '机主自执行' : '待派单')}</Text>
         </View>
-      </TouchableOpacity>
-    );
-  };
 
-  const renderUnifiedItem = (item: UnifiedItem) => {
-    const pendingVisual = getPendingVisual(item);
-    if (item.kind === 'order') return renderOrderCard(item.data, item.sourceTags, pendingVisual);
-    if (item.kind === 'pilot_task') return renderPilotTaskCard(item.data, pendingVisual);
-    return renderClientTaskCard(item.data, pendingVisual);
-  };
-
-  const renderListItem = ({item}: {item: ListEntry}) => {
-    if (item.kind === 'section_header') {
-      return (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderTitle}>{BUCKET_LABEL[item.bucket]}</Text>
-          <Text style={styles.sectionHeaderCount}>{item.count}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>客户：{summarizeParty(item.order.client, '客户')}</Text>
+          <Text style={styles.metaText}>{formatDateRange(item.order.start_time, item.order.end_time)}</Text>
         </View>
-      );
-    }
-    return renderUnifiedItem(item.data);
-  };
 
-  const renderEmptyState = () => {
-    const roleText = activeRole === 'renter' ? '我租的' : activeRole === 'owner' ? '我出租的' : '全部';
-    const statusText = TABS.find(tab => tab.key === activeTab)?.label || '全部';
-    const title =
-      activeRole === 'all'
-        ? `${statusText}暂无内容`
-        : `${roleText}视角下暂无${activeTab === 'all' ? '订单' : statusText}`;
-    const desc =
-      activeRole === 'all'
-        ? '可下拉刷新，或等待新任务/订单进入列表。'
-        : '当前角色筛选只展示订单，如需查看任务请切回“全部”。';
+        {roleHints.length > 0 ? (
+          <View style={styles.roleHintRow}>
+            {roleHints.map(label => (
+              <View key={label} style={styles.roleHintChip}>
+                <Text style={styles.roleHintText}>{label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
-    return (
-      <View style={styles.emptyWrap}>
-        <Text style={styles.emptyTitle}>{title}</Text>
-        <Text style={styles.emptyDesc}>{desc}</Text>
-        {activeRole !== 'all' && (
-          <TouchableOpacity style={styles.emptyActionBtn} onPress={() => setActiveRole('all')}>
-            <Text style={styles.emptyActionBtnText}>切换到全部</Text>
+        <View style={styles.footer}>
+          <Text style={styles.amount}>{formatAmount(item.order.total_amount)}</Text>
+          <TouchableOpacity style={styles.detailBtn} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
+            <Text style={styles.detailBtnText}>查看订单</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      </ObjectCard>
     );
   };
+
+  const emptyAction = activeRole === 'owner'
+    ? {text: '去需求市场', onPress: () => navigation.navigate('DemandList', {mode: 'owner'})}
+    : activeRole === 'pilot'
+      ? {text: '看派单任务', onPress: () => navigation.navigate('PilotTaskList')}
+      : {text: '去供给市场', onPress: () => navigation.navigate('OfferList')};
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.roleTabs}>
-        {ROLE_TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.roleTab, activeRole === tab.key && styles.roleTabActive]}
-            onPress={() => setActiveRole(tab.key)}>
-            <Text style={[styles.roleTabText, activeRole === tab.key && styles.roleTabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.summaryBar}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.summaryChip, activeTab === tab.key && styles.summaryChipActive]}
-            onPress={() => setActiveTab(tab.key)}>
-            <Text style={[styles.summaryLabel, activeTab === tab.key && styles.summaryLabelActive]}>
-              {tab.label} {tabCounts[tab.key]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       <FlatList
-        data={displayItems}
-        keyExtractor={item => item.key}
-        renderItem={renderListItem}
-        refreshing={loading}
-        onRefresh={fetchOrders}
-        contentContainerStyle={{padding: 12}}
-        ListEmptyComponent={renderEmptyState()}
+        data={filteredItems}
+        keyExtractor={item => String(item.order.id)}
+        renderItem={renderItem}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f5cab']} />}
+        contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.hero}>
+              <Text style={styles.heroEyebrow}>我的订单</Text>
+              <Text style={styles.heroTitle}>这里只看订单对象</Text>
+              <Text style={styles.heroDesc}>
+                订单列表已经和派单任务、飞手候选彻底拆开。来源、承接方、执行方和当前状态都在同一张卡里表达。
+              </Text>
+            </View>
+
+            <ObjectCard style={styles.filterCard}>
+              <Text style={styles.filterTitle}>身份视角</Text>
+              <View style={styles.filterRow}>
+                {roleTabs.map(tab => (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[styles.filterChip, activeRole === tab.key && styles.filterChipActive]}
+                    onPress={() => setActiveRole(tab.key)}>
+                    <Text style={[styles.filterChipText, activeRole === tab.key && styles.filterChipTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.filterTitle, {marginTop: 16}]}>状态分组</Text>
+              <View style={styles.filterRow}>
+                {STATUS_TABS.map(tab => (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[styles.filterChip, activeStatus === tab.key && styles.filterChipActive]}
+                    onPress={() => {
+                      setActiveStatus(tab.key);
+                      setExactStatusFilter('');
+                    }}>
+                    <Text style={[styles.filterChipText, activeStatus === tab.key && styles.filterChipTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {exactStatusFilter ? (
+                <View style={styles.exactStatusHint}>
+                  <Text style={styles.exactStatusHintText}>当前精确筛选：{getExactStatusLabel(exactStatusFilter)}</Text>
+                  <TouchableOpacity onPress={() => setExactStatusFilter('')}>
+                    <Text style={styles.exactStatusClear}>清除</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </ObjectCard>
+          </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.loading} color="#0f5cab" />
+          ) : (
+            <ObjectCard>
+              <EmptyState
+                icon="📦"
+                title="当前没有匹配订单"
+                description="订单页已经只保留成交后的订单对象。需求、供给、派单任务请去对应页面查看。"
+                actionText={emptyAction.text}
+                onAction={emptyAction.onPress}
+              />
+            </ObjectCard>
+          )
+        }
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  summaryBar: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  summaryChip: {
+  container: {
     flex: 1,
-    marginHorizontal: 3,
-    paddingVertical: 8,
-    borderRadius: 14,
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#eef3f8',
   },
-  summaryChipActive: {
-    backgroundColor: '#e6f7ff',
+  content: {
+    padding: 14,
+    paddingBottom: 28,
   },
-  summaryLabel: {
+  hero: {
+    backgroundColor: '#114178',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 12,
+  },
+  heroEyebrow: {
     fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
+    color: '#d6e4ff',
+    fontWeight: '700',
   },
-  summaryLabelActive: {
-    color: '#1890ff',
+  heroTitle: {
+    marginTop: 8,
+    fontSize: 28,
+    lineHeight: 34,
+    color: '#fff',
+    fontWeight: '800',
   },
-  roleTabs: {
-    flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 8,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+  heroDesc: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#d6e4ff',
   },
-  roleTab: {flex: 1, paddingVertical: 10, alignItems: 'center'},
-  roleTabActive: {borderBottomWidth: 2, borderBottomColor: '#52c41a'},
-  roleTabText: {fontSize: 13, color: '#666'},
-  roleTabTextActive: {color: '#52c41a', fontWeight: 'bold'},
-  sectionHeader: {
+  filterCard: {
+    marginBottom: 12,
+  },
+  filterTitle: {
+    fontSize: 14,
+    color: '#262626',
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+  },
+  filterChipActive: {
+    borderColor: '#114178',
+    backgroundColor: '#e6f4ff',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#595959',
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#114178',
+  },
+  exactStatusHint: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  exactStatusHintText: {
+    fontSize: 12,
+    color: '#595959',
+    fontWeight: '600',
+  },
+  exactStatusClear: {
+    fontSize: 12,
+    color: '#114178',
+    fontWeight: '700',
+  },
+  loading: {
+    paddingVertical: 48,
+  },
+  card: {
+    marginBottom: 12,
+  },
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 4,
-    paddingHorizontal: 4,
   },
-  sectionHeaderTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#333',
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
   },
-  sectionHeaderCount: {
+  code: {
     fontSize: 12,
-    color: '#999',
+    color: '#8c8c8c',
+    fontWeight: '600',
   },
-  card: {
-    backgroundColor: '#fff', borderRadius: 8, padding: 16, marginBottom: 12,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-  },
-  priorityCard: {
-    borderWidth: 1,
-    borderLeftWidth: 4,
-  },
-  cardHeader: {flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8},
-  priorityTag: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  priorityTagText: {
-    fontSize: 11,
+  title: {
+    marginTop: 14,
+    fontSize: 17,
+    lineHeight: 24,
+    color: '#1f1f1f',
     fontWeight: '700',
   },
-  priorityTagHint: {
-    fontSize: 11,
-    marginLeft: 4,
-  },
-  typeBadge: {
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  orderNo: {fontSize: 12, color: '#999'},
-  taskMeta: {fontSize: 11, color: '#bfbfbf', marginBottom: 6},
-  status: {fontSize: 14, fontWeight: 'bold'},
-  title: {fontSize: 16, color: '#333', marginBottom: 8},
-  cardFooter: {flexDirection: 'row', justifyContent: 'space-between'},
-  amount: {fontSize: 16, color: '#f5222d', fontWeight: 'bold'},
-  time: {fontSize: 12, color: '#999'},
-  emptyWrap: {
-    marginTop: 64,
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptyDesc: {
+  address: {
+    marginTop: 8,
     fontSize: 13,
-    color: '#999',
-    textAlign: 'center',
     lineHeight: 20,
+    color: '#595959',
   },
-  emptyActionBtn: {
-    marginTop: 16,
-    backgroundColor: '#e6f7ff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  emptyActionBtnText: {
-    color: '#1890ff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  pendingCard: {
-    borderWidth: 1,
-    borderColor: '#ffd591',
-    backgroundColor: '#fffdf7',
-  },
-  inlineActionRow: {
+  metaRow: {
+    marginTop: 10,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  metaText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#595959',
+  },
+  roleHintRow: {
     marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  rejectBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ff4d4f',
-    borderRadius: 8,
-    paddingVertical: 10,
-    marginRight: 8,
+  roleHintChip: {
+    borderRadius: 999,
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  roleHintText: {
+    fontSize: 11,
+    color: '#595959',
+    fontWeight: '700',
+  },
+  footer: {
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
-  rejectBtnText: {
-    color: '#ff4d4f',
-    fontSize: 14,
-    fontWeight: '600',
+  amount: {
+    fontSize: 22,
+    color: '#cf1322',
+    fontWeight: '800',
   },
-  actionBtnDisabled: {
-    opacity: 0.6,
-  },
-  actionBtnTextDisabled: {
-    color: '#bfbfbf',
-  },
-  acceptBtn: {
-    flex: 1,
-    borderRadius: 8,
-    backgroundColor: '#1890ff',
+  detailBtn: {
+    borderRadius: 999,
+    backgroundColor: '#114178',
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    alignItems: 'center',
   },
-  acceptBtnText: {
+  detailBtnText: {
+    fontSize: 12,
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

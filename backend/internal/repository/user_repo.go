@@ -14,6 +14,10 @@ func NewUserRepo(db *gorm.DB) *UserRepo {
 	return &UserRepo{db: db}
 }
 
+func (r *UserRepo) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *UserRepo) Create(user *model.User) error {
 	return r.db.Create(user).Error
 }
@@ -77,7 +81,7 @@ func (r *UserRepo) GetByIDs(ids []int64) (map[int64]*model.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 转换为 map 方便查找
 	userMap := make(map[int64]*model.User, len(users))
 	for i := range users {
@@ -90,4 +94,3 @@ func (r *UserRepo) GetByIDs(ids []int64) (map[int64]*model.User, error) {
 func (r *UserRepo) UpdateUserType(userID int64, userType string) error {
 	return r.db.Model(&model.User{}).Where("id = ?", userID).Update("user_type", userType).Error
 }
-

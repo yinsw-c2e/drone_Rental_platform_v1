@@ -24,7 +24,7 @@ func (j *JSON) Scan(value interface{}) error {
 	var bytes []byte
 	switch v := value.(type) {
 	case []byte:
-		bytes = v
+		bytes = append([]byte(nil), v...)
 	case string:
 		bytes = []byte(v)
 	default:

@@ -8,6 +8,9 @@ interface Order {
   id: number;
   order_no: string;
   order_type: string;
+  order_source?: string;
+  demand_id?: number;
+  source_supply_id?: number;
   title: string;
   service_type: string;
   total_amount: number;
@@ -15,6 +18,11 @@ interface Order {
   owner_amount: number;
   deposit_amount: number;
   status: string;
+  execution_mode?: string;
+  needs_dispatch?: boolean;
+  provider_user_id?: number;
+  executor_pilot_user_id?: number;
+  provider_confirmed_at?: string;
   created_at: string;
   updated_at: string;
   start_time: string;
@@ -26,20 +34,39 @@ interface Order {
 }
 
 const STATUS_MAP: Record<string, { text: string; color: string }> = {
-  created: { text: '待接单', color: 'default' },
-  accepted: { text: '已接单', color: 'blue' },
+  created: { text: '已创建', color: 'default' },
+  pending_provider_confirmation: { text: '待机主确认', color: 'orange' },
+  provider_rejected: { text: '机主已拒绝', color: 'red' },
+  pending_payment: { text: '待支付', color: 'gold' },
   paid: { text: '已支付', color: 'orange' },
+  pending_dispatch: { text: '待派单', color: 'cyan' },
+  assigned: { text: '已分配执行', color: 'blue' },
+  preparing: { text: '准备中', color: 'processing' },
+  accepted: { text: '已接单', color: 'blue' },
   in_progress: { text: '进行中', color: 'processing' },
+  delivered: { text: '已送达', color: 'lime' },
   completed: { text: '已完成', color: 'green' },
   cancelled: { text: '已取消', color: 'red' },
   rejected: { text: '已拒绝', color: 'red' },
   refunded: { text: '已退款', color: 'purple' },
+  refunding: { text: '退款中', color: 'purple' },
 };
 
 const TYPE_MAP: Record<string, string> = {
   rental: '租赁',
   rental_offer: '供给租赁',
   cargo: '货运',
+};
+
+const ORDER_SOURCE_MAP: Record<string, string> = {
+  demand_market: '需求转单',
+  supply_direct: '供给直达',
+};
+
+const EXECUTION_MODE_MAP: Record<string, string> = {
+  self_execute: '自执行',
+  bound_pilot: '绑定飞手',
+  dispatch_pool: '正式派单',
 };
 
 const SERVICE_TYPE_MAP: Record<string, string> = {
@@ -114,12 +141,30 @@ const OrderList: React.FC = () => {
       title: '类型', dataIndex: 'order_type', width: 90,
       render: (v: string) => <Tag>{TYPE_MAP[v] || v}</Tag>,
     },
+    {
+      title: '来源',
+      dataIndex: 'order_source',
+      width: 110,
+      render: (v?: string) => <Tag color="geekblue">{ORDER_SOURCE_MAP[v || ''] || v || '-'}</Tag>,
+    },
     { title: '标题', dataIndex: 'title', width: 200, ellipsis: true },
-    { title: '出租方', width: 100, render: (_, r) => r.owner?.nickname || '-' },
-    { title: '承租方', width: 100, render: (_, r) => r.renter?.nickname || '-' },
+    { title: '承接方', width: 120, render: (_, r) => r.owner?.nickname || (r.provider_user_id ? `用户 ${r.provider_user_id}` : '-') },
+    { title: '客户', width: 120, render: (_, r) => r.renter?.nickname || '-' },
+    {
+      title: '执行模式',
+      dataIndex: 'execution_mode',
+      width: 110,
+      render: (v?: string) => EXECUTION_MODE_MAP[v || ''] || v || '-',
+    },
+    {
+      title: '待派单',
+      dataIndex: 'needs_dispatch',
+      width: 90,
+      render: (v?: boolean) => v ? <Tag color="cyan">是</Tag> : <Tag>否</Tag>,
+    },
     {
       title: '总金额', dataIndex: 'total_amount', width: 100,
-      render: (v: number) => <span style={{ fontWeight: 600 }}>{`¥${(v / 100).toFixed(0)}`}</span>,
+      render: (v: number) => <span style={{ fontWeight: 600 }}>{`¥${(v / 100).toFixed(2)}`}</span>,
     },
     {
       title: '平台佣金', dataIndex: 'platform_commission', width: 100,
@@ -202,7 +247,7 @@ const OrderList: React.FC = () => {
         dataSource={filteredOrders}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1300 }}
+        scroll={{ x: 1650 }}
         pagination={{ current: page, total, pageSize: 20, onChange: setPage, showTotal: t => `共 ${t} 条` }}
       />
 
@@ -229,10 +274,16 @@ const OrderList: React.FC = () => {
               <Col span={16}>{detailOrder.order_no}</Col>
               <Col span={8}><strong>订单类型:</strong></Col>
               <Col span={16}>{TYPE_MAP[detailOrder.order_type] || detailOrder.order_type}</Col>
+              <Col span={8}><strong>订单来源:</strong></Col>
+              <Col span={16}>{ORDER_SOURCE_MAP[detailOrder.order_source || ''] || detailOrder.order_source || '-'}</Col>
               <Col span={8}><strong>标题:</strong></Col>
               <Col span={16}>{detailOrder.title}</Col>
               <Col span={8}><strong>服务类型:</strong></Col>
               <Col span={16}>{SERVICE_TYPE_MAP[detailOrder.service_type] || detailOrder.service_type || '-'}</Col>
+              <Col span={8}><strong>执行模式:</strong></Col>
+              <Col span={16}>{EXECUTION_MODE_MAP[detailOrder.execution_mode || ''] || detailOrder.execution_mode || '-'}</Col>
+              <Col span={8}><strong>待派单:</strong></Col>
+              <Col span={16}>{detailOrder.needs_dispatch ? '是' : '否'}</Col>
               <Col span={8}><strong>服务地址:</strong></Col>
               <Col span={16}>{detailOrder.service_address || '-'}</Col>
               <Col span={8}><strong>开始时间:</strong></Col>
@@ -255,12 +306,12 @@ const OrderList: React.FC = () => {
               <Col span={16}>¥{((detailOrder.owner_amount || 0) / 100).toFixed(2)}</Col>
 
               <Col span={24}><h4 style={{ margin: '12px 0 8px' }}>参与方信息</h4></Col>
-              <Col span={8}><strong>出租方:</strong></Col>
+              <Col span={8}><strong>承接方:</strong></Col>
               <Col span={16}>
                 {detailOrder.owner?.nickname || '-'}
                 {detailOrder.owner?.phone ? ` (${detailOrder.owner.phone})` : ''}
               </Col>
-              <Col span={8}><strong>承租方:</strong></Col>
+              <Col span={8}><strong>客户:</strong></Col>
               <Col span={16}>
                 {detailOrder.renter?.nickname || '-'}
                 {detailOrder.renter?.phone ? ` (${detailOrder.renter.phone})` : ''}

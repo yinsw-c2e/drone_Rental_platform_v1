@@ -83,6 +83,30 @@ func (h *Handler) Reject(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+func (h *Handler) ProviderConfirm(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err := h.orderService.ProviderConfirmOrder(id, userID); err != nil {
+		response.Error(c, response.CodeOrderError, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+func (h *Handler) ProviderReject(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	c.ShouldBindJSON(&req)
+	if err := h.orderService.ProviderRejectOrder(id, userID, req.Reason); err != nil {
+		response.Error(c, response.CodeOrderError, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
 func (h *Handler) Cancel(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)

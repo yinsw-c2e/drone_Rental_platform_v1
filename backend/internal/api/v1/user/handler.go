@@ -20,6 +20,16 @@ func NewHandler(userService *service.UserService, uploadService *upload.UploadSe
 	return &Handler{userService: userService, uploadService: uploadService}
 }
 
+func (h *Handler) GetMe(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	me, err := h.userService.GetMe(userID)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "用户不存在")
+		return
+	}
+	response.Success(c, me)
+}
+
 func (h *Handler) GetProfile(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	user, err := h.userService.GetProfile(userID)
@@ -32,7 +42,6 @@ func (h *Handler) GetProfile(c *gin.Context) {
 
 type UpdateProfileReq struct {
 	Nickname string `json:"nickname"`
-	UserType string `json:"user_type"`
 }
 
 func (h *Handler) UpdateProfile(c *gin.Context) {
@@ -42,7 +51,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-	if err := h.userService.UpdateProfile(userID, req.Nickname, "", req.UserType); err != nil {
+	if err := h.userService.UpdateProfile(userID, req.Nickname, "", ""); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}

@@ -1,31 +1,36 @@
-import api from './api';
-import {ApiResponse, User, TokenPair} from '../types';
+import api, {apiV2} from './api';
+import {ApiResponse, RoleSummary, TokenPair, User, V2ApiResponse} from '../types';
+
+type AuthPayload = {
+  user: User;
+  token: TokenPair;
+  role_summary?: RoleSummary;
+};
 
 export const authService = {
   sendCode: (phone: string) =>
     api.post<any, ApiResponse>('/auth/send-code', {phone}),
 
   register: (phone: string, password: string, code: string, nickname?: string) =>
-    api.post<any, ApiResponse<{user: User; token: TokenPair}>>('/auth/register', {
+    apiV2.post<any, V2ApiResponse<AuthPayload>>('/auth/register', {
       phone,
       password,
-      code,
       nickname,
     }),
 
   login: (phone: string, password?: string, code?: string) =>
-    api.post<any, ApiResponse<{user: User; token: TokenPair}>>('/auth/login', {
+    apiV2.post<any, V2ApiResponse<AuthPayload>>('/auth/login', {
       phone,
       password,
       code,
     }),
 
   refreshToken: (refreshToken: string) =>
-    api.post<any, ApiResponse<TokenPair>>('/auth/refresh-token', {
+    apiV2.post<any, V2ApiResponse<TokenPair>>('/auth/refresh-token', {
       refresh_token: refreshToken,
     }),
 
-  logout: () => api.post<any, ApiResponse>('/auth/logout'),
+  logout: () => apiV2.post<any, V2ApiResponse>('/auth/logout'),
 
   // 微信登录
   wechatLogin: (code: string) =>

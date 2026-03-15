@@ -29,11 +29,13 @@ import (
 	locationhandler "wurenji-backend/internal/api/v1/location"
 	"wurenji-backend/internal/api/v1/message"
 	"wurenji-backend/internal/api/v1/order"
+	ownerhandler "wurenji-backend/internal/api/v1/owner"
 	paymenthandler "wurenji-backend/internal/api/v1/payment"
 	pilothandler "wurenji-backend/internal/api/v1/pilot"
 	"wurenji-backend/internal/api/v1/review"
 	settlementhandler "wurenji-backend/internal/api/v1/settlement"
 	"wurenji-backend/internal/api/v1/user"
+	v2 "wurenji-backend/internal/api/v2"
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/amap"
@@ -111,13 +113,18 @@ func main() {
 	demandRepo := repository.NewDemandRepo(db)
 	messageRepo := repository.NewMessageRepo(db)
 	paymentRepo := repository.NewPaymentRepo(db)
+	orderArtifactRepo := repository.NewOrderArtifactRepo(db)
 	reviewRepo := repository.NewReviewRepo(db)
 	matchingRepo := repository.NewMatchingRepo(db)
 	addressRepo := repository.NewAddressRepo(db)
 	pilotRepo := repository.NewPilotRepo(db)
 	clientRepo := repository.NewClientRepo(db)
+	roleProfileRepo := repository.NewRoleProfileRepo(db)
 	dispatchRepo := repository.NewDispatchRepo(db)
+	demandDomainRepo := repository.NewDemandDomainRepo(db)
+	ownerDomainRepo := repository.NewOwnerDomainRepo(db)
 	flightRepo := repository.NewFlightRepo(db)
+	migrationRepo := repository.NewMigrationRepo(db)
 	airspaceRepo := repository.NewAirspaceRepo(db)
 	settlementRepo := repository.NewSettlementRepo(db)
 	creditRepo := repository.NewCreditRepository(db)
@@ -151,8 +158,6 @@ func main() {
 		pushService = push.NewMockPushService(zapLogger)
 		zapLogger.Info("Using mock push service")
 	}
-	// pushService 变量保留用于后续订单状态推送等场景
-	_ = pushService
 
 	// Init OAuth providers
 	var wechatOAuth *oauth.WeChatOAuth
@@ -174,25 +179,43 @@ func main() {
 	}
 
 	// Init business services
-	authService := service.NewAuthService(userRepo, rds, smsService, cfg, zapLogger)
-	userService := service.NewUserService(userRepo)
-	droneService := service.NewDroneService(droneRepo)
-	orderService := service.NewOrderService(orderRepo, droneRepo, demandRepo, cfg, zapLogger)
-	demandService := service.NewDemandService(demandRepo)
-	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, zapLogger)
-	paymentService := service.NewPaymentService(paymentRepo, orderRepo, paymentProvider, zapLogger)
+	authService := service.NewAuthService(userRepo, clientRepo, roleProfileRepo, rds, smsService, cfg, zapLogger)
+	userService := service.NewUserService(userRepo, clientRepo, roleProfileRepo, droneRepo, pilotRepo)
+	droneService := service.NewDroneService(droneRepo, roleProfileRepo, ownerDomainRepo)
+	ownerService := service.NewOwnerService(userRepo, droneRepo, pilotRepo, roleProfileRepo, ownerDomainRepo, demandDomainRepo)
+	orderService := service.NewOrderService(orderRepo, droneRepo, pilotRepo, demandRepo, paymentRepo, clientRepo, demandDomainRepo, ownerDomainRepo, orderArtifactRepo, cfg, zapLogger)
+	demandService := service.NewDemandService(demandRepo, clientRepo)
+	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, clientRepo, ownerDomainRepo, demandDomainRepo, zapLogger)
+	paymentService := service.NewPaymentService(paymentRepo, orderRepo, droneRepo, pilotRepo, orderArtifactRepo, paymentProvider, zapLogger)
 	messageService := service.NewMessageService(messageRepo)
+	eventService := service.NewEventService(messageService, pushService, zapLogger)
 	reviewService := service.NewReviewService(reviewRepo, droneRepo, orderRepo)
 	addressService := service.NewAddressService(addressRepo)
-	pilotService := service.NewPilotService(pilotRepo, userRepo, zapLogger)
-	clientService := service.NewClientService(clientRepo, userRepo)
-	dispatchService := service.NewDispatchService(dispatchRepo, pilotRepo, droneRepo, clientRepo, orderRepo, zapLogger)
-	flightService := service.NewFlightService(flightRepo, orderRepo, zapLogger)
+	pilotService := service.NewPilotService(pilotRepo, userRepo, roleProfileRepo, orderRepo, ownerDomainRepo, demandDomainRepo, dispatchRepo, flightRepo, zapLogger)
+	clientService := service.NewClientService(clientRepo, userRepo, roleProfileRepo, ownerDomainRepo, demandDomainRepo, orderService)
+	dispatchService := service.NewDispatchService(dispatchRepo, pilotRepo, droneRepo, clientRepo, orderRepo, ownerDomainRepo, demandDomainRepo, orderArtifactRepo, zapLogger)
+	flightService := service.NewFlightService(flightRepo, orderRepo, pilotRepo, zapLogger)
+	homeService := service.NewHomeService(userService, clientService, ownerService, pilotService, orderService, demandDomainRepo)
+	operationsService := service.NewOperationsService(migrationRepo, orderRepo)
 	airspaceService := service.NewAirspaceService(airspaceRepo, pilotRepo, droneRepo, orderRepo, zapLogger)
 	settlementService := service.NewSettlementService(settlementRepo, orderRepo, zapLogger)
 	creditService := service.NewCreditService(creditRepo)
 	insuranceService := service.NewInsuranceService(insuranceRepo, zapLogger)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
+
+	ownerService.SetMatchingService(matchingService)
+	ownerService.SetEventService(eventService)
+	pilotService.SetMatchingService(matchingService)
+	pilotService.SetDispatchService(dispatchService)
+	pilotService.SetFlightService(flightService)
+	pilotService.SetEventService(eventService)
+	clientService.SetMatchingService(matchingService)
+	clientService.SetEventService(eventService)
+	paymentService.SetDispatchService(dispatchService)
+	paymentService.SetEventService(eventService)
+	orderService.SetEventService(eventService)
+	dispatchService.SetEventService(eventService)
+	droneService.SetEventService(eventService)
 
 	// Init AMap service
 	amapService := amap.NewAmapService(cfg.Amap.APIKey, zapLogger)
@@ -202,17 +225,18 @@ func main() {
 		Auth:       auth.NewHandler(authService, wechatOAuth, qqOAuth),
 		User:       user.NewHandler(userService, uploadService),
 		Drone:      drone.NewHandler(droneService, uploadService),
+		Owner:      ownerhandler.NewHandler(ownerService, droneService),
 		Order:      order.NewHandler(orderService),
 		Demand:     demand.NewHandler(demandService, matchingService),
 		Payment:    paymenthandler.NewHandler(paymentService),
 		Message:    message.NewHandler(messageService),
 		Review:     review.NewHandler(reviewService),
-		Admin:      admin.NewHandler(userService, droneService, orderService, paymentService, pilotService, clientService),
+		Admin:      admin.NewHandler(userService, droneService, orderService, operationsService, paymentService, pilotService, clientService, ownerService, dispatchService, flightService),
 		Location:   locationhandler.NewHandler(amapService),
 		Address:    addresshandler.NewHandler(addressService),
 		Pilot:      pilothandler.NewHandler(pilotService, uploadService),
 		Client:     clienthandler.NewHandler(clientService),
-		Dispatch:   dispatchhandler.NewHandler(dispatchService, clientService, pilotService, orderRepo),
+		Dispatch:   dispatchhandler.NewHandler(dispatchService, clientService, pilotService, orderRepo, orderArtifactRepo, demandDomainRepo, ownerDomainRepo),
 		Flight:     flighthandler.NewHandler(flightService, pilotService),
 		Airspace:   airspacehandler.NewHandler(airspaceService),
 		Settlement: settlementhandler.NewHandler(settlementService),
@@ -220,6 +244,7 @@ func main() {
 		Insurance:  insurancehandler.NewHandler(insuranceService),
 		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, handlers.Admin, handlers.Analytics, handlers.Client)
 
 	// Setup Gin
 	gin.SetMode(cfg.Server.Mode)
@@ -230,6 +255,7 @@ func main() {
 
 	// Register routes
 	v1.RegisterRoutes(r, handlers, hub, cfg, zapLogger)
+	v2.RegisterRoutes(r, v2Handlers)
 
 	// Start server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -268,24 +294,38 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 func autoMigrate(db *gorm.DB) {
 	db.AutoMigrate(
 		&model.User{},
+		&model.ClientProfile{},
+		&model.OwnerProfile{},
+		&model.PilotProfile{},
 		&model.Drone{},
 		&model.RentalOffer{},
+		&model.OwnerSupply{},
 		&model.RentalDemand{},
 		&model.CargoDemand{},
+		&model.Demand{},
+		&model.DemandQuote{},
+		&model.DemandCandidatePilot{},
+		&model.MatchingLog{},
 		&model.Order{},
 		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
 		&model.Payment{},
+		&model.Refund{},
+		&model.DisputeRecord{},
 		&model.Message{},
 		&model.Review{},
 		&model.MatchingRecord{},
 		&model.SystemConfig{},
 		&model.AdminLog{},
+		&model.MigrationEntityMapping{},
+		&model.MigrationAuditRecord{},
 		&model.UserAddress{},
 		// 飞手相关表
 		&model.Pilot{},
 		&model.PilotCertification{},
 		&model.PilotFlightLog{},
 		&model.PilotDroneBinding{},
+		&model.OwnerPilotBinding{},
 		// 无人机维护与保险表
 		&model.DroneMaintenanceLog{},
 		&model.DroneInsuranceRecord{},
@@ -299,7 +339,10 @@ func autoMigrate(db *gorm.DB) {
 		&model.DispatchCandidate{},
 		&model.DispatchConfig{},
 		&model.DispatchLog{},
+		&model.FormalDispatchTask{},
+		&model.FormalDispatchLog{},
 		// 飞行监控相关表
+		&model.FlightRecord{},
 		&model.FlightPosition{},
 		&model.FlightAlert{},
 		&model.Geofence{},

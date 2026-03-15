@@ -1,467 +1,1619 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, ActivityIndicator, RefreshControl, Dimensions,
+  ActivityIndicator,
+  type DimensionValue,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {demandService} from '../../services/demand';
-import {RentalOffer, RentalDemand, CargoDemand} from '../../types';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {
+  getObjectStatusMeta,
+  getTonePalette,
+  VisualTone,
+} from '../../components/business/visuals';
+import { homeService } from '../../services/home';
+import { RootState } from '../../store/store';
+import { HomeDashboard, HomeFeedItem } from '../../types';
 
-export default function HomeScreen({navigation}: any) {
-  const [offers, setOffers] = useState<RentalOffer[]>([]);
-  const [demands, setDemands] = useState<RentalDemand[]>([]);
-  const [cargos, setCargos] = useState<CargoDemand[]>([]);
-  const [offersTotal, setOffersTotal] = useState(0);
-  const [demandsTotal, setDemandsTotal] = useState(0);
-  const [cargosTotal, setCargosTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [bannerIndex, setBannerIndex] = useState(0);
+type RoleView = 'all' | 'client' | 'owner' | 'pilot';
 
-  // 轮播图数据
-  const banners = [
-    {
-      title: '智能匹配，高效操合',
-      subtitle: '专业的无人机租赁平台',
-      gradient: ['#1890ff', '#096dd9'],
+type HeroTheme = {
+  gradient: [string, string];
+  accent: string;
+  surface: string;
+  border: string;
+  softText: string;
+  eyebrow: string;
+};
+
+type MetricCard = {
+  key: string;
+  label: string;
+  value: number;
+  hint: string;
+};
+
+type DashboardAction = {
+  key: string;
+  title: string;
+  desc: string;
+  icon: string;
+  tone: VisualTone;
+  onPress: () => void;
+  badge?: number;
+};
+
+type TodoItem = {
+  key: string;
+  title: string;
+  desc: string;
+  actionText: string;
+  onPress: () => void;
+  badge?: number;
+  tone?: VisualTone;
+};
+
+const CONTENT_SIDE_MARGIN = 16;
+const HERO_SIDE_PADDING = 18;
+const METRIC_GAP = 12;
+
+const emptyDashboard: HomeDashboard = {
+  role_summary: {
+    has_client_role: false,
+    has_owner_role: false,
+    has_pilot_role: false,
+    can_publish_supply: false,
+    can_accept_dispatch: false,
+    can_self_execute: false,
+  },
+  summary: {
+    in_progress_order_count: 0,
+    today_order_count: 0,
+    today_income_amount: 0,
+    alert_count: 0,
+  },
+  market_totals: {
+    supply_count: 0,
+    demand_count: 0,
+  },
+  role_views: {
+    client: {
+      open_demand_count: 0,
+      quoted_demand_count: 0,
+      pending_provider_confirmation_order_count: 0,
+      pending_payment_order_count: 0,
+      in_progress_order_count: 0,
     },
-    {
-      title: '全程保障，安全可靠',
-      subtitle: '实名认证，交易担保',
-      gradient: ['#52c41a', '#389e0d'],
+    owner: {
+      recommended_demand_count: 0,
+      active_supply_count: 0,
+      pending_quote_count: 0,
+      pending_provider_confirmation_order_count: 0,
+      pending_dispatch_order_count: 0,
     },
-    {
-      title: '丰富资源，价格透明',
-      subtitle: '数百家机主在线服务',
-      gradient: ['#fa8c16', '#d46b08'],
+    pilot: {
+      pending_response_dispatch_count: 0,
+      candidate_demand_count: 0,
+      active_dispatch_count: 0,
+      recent_flight_count: 0,
     },
-  ];
+  },
+  in_progress_orders: [],
+  market_feed: [],
+};
 
-  // 自动轮播
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setBannerIndex(prev => (prev + 1) % banners.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const cards = [
-    {title: '发布出租', desc: '发布无人机出租服务', screen: 'PublishOffer', color: '#1890ff', icon: '🚁'},
-    {title: '租赁需求', desc: '发布无人机租赁需求', screen: 'PublishDemand', color: '#52c41a', icon: '📋'},
-    {title: '货运需求', desc: '发布吊运/运输需求', screen: 'PublishCargo', color: '#fa8c16', icon: '📦'},
-    {title: '附近无人机', desc: '查看附近可用无人机', screen: 'NearbyDrones', color: '#722ed1', icon: '📍'},
-  ];
-
-  const fetchData = useCallback(async () => {
-    console.log('开始加载首页数据...');
-    try {
-      const [offersRes, demandsRes, cargosRes] = await Promise.all([
-        demandService.listOffers({page: 1, page_size: 5}),
-        demandService.listDemands({page: 1, page_size: 5}),
-        demandService.listCargos({page: 1, page_size: 5}),
-      ]);
-      console.log('首页数据加载详情:', {
-        offersRes,
-        demandsRes,
-        cargosRes,
-      });
-      
-      // 提取数据和总数
-      const offersList = offersRes.data?.list || [];
-      const demandsList = demandsRes.data?.list || [];
-      const cargosList = cargosRes.data?.list || [];
-      
-      setOffers(offersList);
-      setDemands(demandsList);
-      setCargos(cargosList);
-      setOffersTotal(offersRes.data?.total || offersList.length || 0);
-      setDemandsTotal(demandsRes.data?.total || demandsList.length || 0);
-      setCargosTotal(cargosRes.data?.total || cargosList.length || 0);
-      
-      console.log('首页数据设置完成:', {
-        offers: offersList.length,
-        demands: demandsList.length,
-        cargos: cargosList.length,
-        offersTotal: offersRes.data?.total,
-        demandsTotal: demandsRes.data?.total,
-        cargosTotal: cargosRes.data?.total,
-      });
-    } catch (e: any) {
-      console.error('首页数据加载失败:', e);
-      console.error('错误详情:', {
-        message: e.message,
-        stack: e.stack,
-        response: e.response,
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-  }, [fetchData]);
-
-  const formatPrice = (offer: RentalOffer) => {
-    if (!offer.price) return '价格面议';
-    const priceInYuan = (offer.price / 100).toFixed(0);
-    return offer.price_type === 'hourly'
-      ? `¥${priceInYuan}/小时`
-      : `¥${priceInYuan}/天`;
-  };
-
+function MetricTile({
+  metric,
+  theme,
+  width,
+}: {
+  metric: MetricCard;
+  theme: HeroTheme;
+  width?: DimensionValue;
+}) {
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1890ff']} />}
-      >
-        {/* 轮播图 */}
-        <View style={styles.bannerContainer}>
-          <LinearGradient
-            colors={banners[bannerIndex].gradient}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}
-            style={styles.banner}>
-            <Text style={styles.bannerTitle}>{banners[bannerIndex].title}</Text>
-            <Text style={styles.bannerSubtitle}>{banners[bannerIndex].subtitle}</Text>
-          </LinearGradient>
-          <View style={styles.bannerDots}>
-            {banners.map((_, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => setBannerIndex(index)}
-                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-                style={[
-                  styles.dot,
-                  index === bannerIndex && styles.dotActive,
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-  
-        {/* 数据统计 */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{offersTotal}</Text>
-            <Text style={styles.statLabel}>在线供给</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{demandsTotal}</Text>
-            <Text style={styles.statLabel}>租赁需求</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{cargosTotal}</Text>
-            <Text style={styles.statLabel}>货运订单</Text>
-          </View>
-        </View>
-  
-        {/* 快捷操作 */}
-        <View style={styles.grid}>
-          {cards.map((card, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.card,
-                {borderLeftColor: card.color},
-                (index + 1) % 2 === 0 && {marginRight: 0}, // 每行第2个卡片去掉右边距
-              ]}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate(card.screen)}>
-              <View style={[styles.cardIconContainer, {backgroundColor: card.color + '15'}]}>
-                <Text style={styles.cardIcon}>{card.icon}</Text>
-              </View>
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.cardDesc}>{card.desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* 最新供给 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>最新供给</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('OfferList')}>
-            <Text style={styles.moreText}>查看更多 &gt;</Text>
-          </TouchableOpacity>
-        </View>
-        {loading ? (
-          <ActivityIndicator style={{paddingVertical: 20}} color="#1890ff" />
-        ) : offers.length > 0 ? (
-          offers.map(item => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.listItem, {borderLeftWidth: 3, borderLeftColor: '#1890ff'}]}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
-              <View style={styles.offerIconBox}>
-                <Text style={{fontSize: 24}}>🚁</Text>
-              </View>
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.itemMeta}>
-                  {item.owner?.nickname || '无人机主'} · {item.service_type || '租赁'}
-                </Text>
-                <Text style={styles.itemLocation} numberOfLines={1}>{item.address || '位置未设置'}</Text>
-              </View>
-              <Text style={styles.itemPrice}>{formatPrice(item)}</Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🚁</Text>
-            <Text style={styles.emptyText}>暂无供给信息</Text>
-            <Text style={styles.emptyHint}>快来发布第一个供给吧</Text>
-          </View>
-        )}
-
-        {/* 最新需求 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>最新需求</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('DemandList')}>
-            <Text style={styles.moreText}>查看更多 &gt;</Text>
-          </TouchableOpacity>
-        </View>
-        {loading ? (
-          <ActivityIndicator style={{paddingVertical: 20}} color="#1890ff" />
-        ) : demands.length > 0 ? (
-          demands.map(item => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.listItem, {borderLeftWidth: 3, borderLeftColor: '#52c41a'}]}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
-              <View style={styles.itemContent}>
-                <View style={styles.demandHeader}>
-                  <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-                  {item.urgency === 'urgent' && (
-                    <View style={styles.urgentBadge}>
-                      <Text style={styles.urgentText}>紧急</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.demandBudget}>
-                  预算：¥{item.budget_min || 0} - ¥{item.budget_max || 0}
-                </Text>
-                <Text style={styles.itemLocation}>
-                  {item.city || item.address || '位置未设置'} · {item.demand_type || '租赁'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📋</Text>
-            <Text style={styles.emptyText}>暂无需求信息</Text>
-            <Text style={styles.emptyHint}>期待您的租赁需求</Text>
-          </View>
-        )}
-
-        {/* 最新货运 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>最新货运</Text>
-          <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('CargoList')}>
-            <Text style={styles.moreText}>查看更多 &gt;</Text>
-          </TouchableOpacity>
-        </View>
-        {loading ? (
-          <ActivityIndicator style={{paddingVertical: 20}} color="#fa8c16" />
-        ) : cargos.length > 0 ? (
-          cargos.map(item => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.listItem, {borderLeftWidth: 3, borderLeftColor: '#fa8c16'}]}
-              activeOpacity={0.8}
-              onPress={() => navigation.navigate('CargoDetail', {id: item.id})}>
-              <View style={styles.cargoIconBox}>
-                <Text style={{fontSize: 20}}>📦</Text>
-              </View>
-              <View style={styles.itemContent}>
-                <Text style={styles.itemTitle} numberOfLines={1}>
-                  {item.pickup_address} → {item.delivery_address}
-                </Text>
-                <Text style={styles.cargoMeta}>
-                  {item.cargo_weight}kg · {item.distance > 0 ? `${item.distance.toFixed(1)}km` : '距离未知'}
-                </Text>
-              </View>
-              <Text style={styles.cargoPrice}>¥{(item.offered_price / 100).toFixed(2)}</Text>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyText}>暂无货运需求</Text>
-            <Text style={styles.emptyHint}>发布您的货运任务</Text>
-          </View>
-        )}
-      </ScrollView>
+    <View
+      style={[
+        styles.metricTile,
+        width ? { width } : styles.metricTileFull,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+      ]}
+    >
+      <Text style={styles.metricValue}>{metric.value}</Text>
+      <Text style={styles.metricLabel}>{metric.label}</Text>
+      <Text style={styles.metricHint}>{metric.hint}</Text>
     </View>
   );
 }
 
+function ActionPill({
+  title,
+  onPress,
+  primary,
+  theme,
+}: {
+  title: string;
+  onPress: () => void;
+  primary?: boolean;
+  theme: HeroTheme;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.88}
+      onPress={onPress}
+      style={[
+        styles.heroActionBtn,
+        primary
+          ? { backgroundColor: '#ffffff' }
+          : {
+              backgroundColor: 'rgba(255,255,255,0.12)',
+              borderColor: 'rgba(255,255,255,0.22)',
+            },
+      ]}
+    >
+      <Text
+        style={[
+          styles.heroActionText,
+          primary ? { color: theme.accent } : styles.heroActionTextGhost,
+        ]}
+      >
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function QuickActionCard({ action }: { action: DashboardAction }) {
+  const palette = getTonePalette(action.tone);
+  return (
+    <TouchableOpacity
+      style={styles.quickActionCard}
+      onPress={action.onPress}
+      activeOpacity={0.88}
+    >
+      <View
+        style={[
+          styles.quickActionIconWrap,
+          { backgroundColor: palette.bg, borderColor: palette.border },
+        ]}
+      >
+        <Text style={styles.quickActionIcon}>{action.icon}</Text>
+        {typeof action.badge === 'number' && action.badge > 0 ? (
+          <View
+            style={[styles.quickActionBadge, { backgroundColor: palette.text }]}
+          >
+            <Text style={styles.quickActionBadgeText}>{action.badge}</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={styles.quickActionTitle}>{action.title}</Text>
+      <Text style={styles.quickActionDesc}>{action.desc}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function getHeroTheme(role: RoleView): HeroTheme {
+  switch (role) {
+    case 'client':
+      return {
+        gradient: ['#0f8f61', '#17a36b'],
+        accent: '#0f8f61',
+        surface: 'rgba(255,255,255,0.14)',
+        border: 'rgba(255,255,255,0.22)',
+        softText: 'rgba(239,255,247,0.88)',
+        eyebrow: '客户驾驶舱',
+      };
+    case 'owner':
+      return {
+        gradient: ['#0f5cab', '#1d4ed8'],
+        accent: '#0f5cab',
+        surface: 'rgba(255,255,255,0.14)',
+        border: 'rgba(255,255,255,0.22)',
+        softText: 'rgba(230,244,255,0.88)',
+        eyebrow: '机主驾驶舱',
+      };
+    case 'pilot':
+      return {
+        gradient: ['#b45309', '#d97706'],
+        accent: '#b45309',
+        surface: 'rgba(255,255,255,0.14)',
+        border: 'rgba(255,255,255,0.22)',
+        softText: 'rgba(255,247,237,0.9)',
+        eyebrow: '飞手驾驶舱',
+      };
+    default:
+      return {
+        gradient: ['#0f4c81', '#0f766e'],
+        accent: '#0f5cab',
+        surface: 'rgba(255,255,255,0.14)',
+        border: 'rgba(255,255,255,0.22)',
+        softText: 'rgba(236,253,245,0.9)',
+        eyebrow: '综合驾驶舱',
+      };
+  }
+}
+
+export default function HomeScreen({ navigation }: any) {
+  const authRoleSummary = useSelector(
+    (state: RootState) => state.auth.roleSummary,
+  );
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated,
+  );
+  const { width: viewportWidth } = useWindowDimensions();
+  const tabBarHeight = useBottomTabBarHeight();
+
+  const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const authStateRef = useRef(isAuthenticated);
+
+  const currentDashboard = dashboard || emptyDashboard;
+  const effectiveRoleSummary = useMemo(
+    () =>
+      dashboard?.role_summary || authRoleSummary || emptyDashboard.role_summary,
+    [authRoleSummary, dashboard?.role_summary],
+  );
+
+  const hasClient = effectiveRoleSummary.has_client_role;
+  const hasOwner = effectiveRoleSummary.has_owner_role;
+  const hasPilot = effectiveRoleSummary.has_pilot_role;
+  const roleCount = Number(hasClient) + Number(hasOwner) + Number(hasPilot);
+
+  const defaultRole = useMemo<RoleView>(() => {
+    if (roleCount > 1) {
+      return 'all';
+    }
+    if (hasClient) {
+      return 'client';
+    }
+    if (hasOwner) {
+      return 'owner';
+    }
+    if (hasPilot) {
+      return 'pilot';
+    }
+    return 'all';
+  }, [hasClient, hasOwner, hasPilot, roleCount]);
+
+  const [activeRole, setActiveRole] = useState<RoleView>(defaultRole);
+
+  const roleTabs = useMemo(() => {
+    const tabs: { key: RoleView; label: string }[] = [];
+    if (roleCount > 1) {
+      tabs.push({ key: 'all', label: '综合' });
+    }
+    if (hasClient) {
+      tabs.push({ key: 'client', label: '客户' });
+    }
+    if (hasOwner) {
+      tabs.push({ key: 'owner', label: '机主' });
+    }
+    if (hasPilot) {
+      tabs.push({ key: 'pilot', label: '飞手' });
+    }
+    if (tabs.length === 0) {
+      tabs.push({ key: 'all', label: '综合' });
+    }
+    return tabs;
+  }, [hasClient, hasOwner, hasPilot, roleCount]);
+
+  useEffect(() => {
+    const keys = roleTabs.map(item => item.key);
+    if (!keys.includes(activeRole)) {
+      setActiveRole(defaultRole);
+    }
+  }, [activeRole, defaultRole, roleTabs]);
+
+  useEffect(() => {
+    authStateRef.current = isAuthenticated;
+    if (!isAuthenticated) {
+      setDashboard(null);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [isAuthenticated]);
+
+  const fetchDashboard = useCallback(async () => {
+    if (!authStateRef.current) {
+      return;
+    }
+    try {
+      const res = await homeService.getDashboard();
+      if (authStateRef.current) {
+        setDashboard(res.data || emptyDashboard);
+      }
+    } catch (error) {
+      if (authStateRef.current) {
+        console.warn('加载首页驾驶舱失败:', error);
+      }
+    } finally {
+      if (authStateRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) {
+        return undefined;
+      }
+      fetchDashboard();
+      return undefined;
+    }, [fetchDashboard, isAuthenticated]),
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  const heroTheme = useMemo(() => getHeroTheme(activeRole), [activeRole]);
+  const metricColumns = viewportWidth >= 440 ? 3 : 2;
+  const contentRailWidth = Math.max(viewportWidth - CONTENT_SIDE_MARGIN * 2, 0);
+  const heroInnerWidth = Math.max(contentRailWidth - HERO_SIDE_PADDING * 2, 0);
+  const metricTileWidth = useMemo(() => {
+    if (metricColumns === 3) {
+      return Math.floor((heroInnerWidth - METRIC_GAP * 2) / 3);
+    }
+    return Math.floor((heroInnerWidth - METRIC_GAP) / 2);
+  }, [heroInnerWidth, metricColumns]);
+  const metricFullWidth = heroInnerWidth;
+
+  const heroConfig = useMemo(() => {
+    switch (activeRole) {
+      case 'client':
+        return {
+          title: '先发需求，再选方案',
+          subtitle:
+            '你最需要的是尽快发起需求、浏览供给、跟进报价与待支付订单。',
+          primaryAction: {
+            title: '立即发布需求',
+            onPress: () => navigation.navigate('PublishCargo'),
+          },
+          secondaryActions: [
+            {
+              title: '浏览供给',
+              onPress: () => navigation.navigate('OfferList'),
+            },
+            {
+              title: '我的订单',
+              onPress: () => navigation.navigate('MyOrders'),
+            },
+          ],
+          metrics: [
+            {
+              key: 'client-quoted',
+              label: '待选方案',
+              value: currentDashboard.role_views.client.quoted_demand_count,
+              hint: '已有报价进入筛选',
+            },
+            {
+              key: 'client-confirm',
+              label: '待确认',
+              value:
+                currentDashboard.role_views.client
+                  .pending_provider_confirmation_order_count,
+              hint: '等待机主确认',
+            },
+            {
+              key: 'client-payment',
+              label: '待支付',
+              value:
+                currentDashboard.role_views.client.pending_payment_order_count,
+              hint: '已选定方案待付款',
+            },
+            {
+              key: 'client-progress',
+              label: '进行中服务',
+              value: currentDashboard.role_views.client.in_progress_order_count,
+              hint: '已进入履约阶段',
+            },
+          ] as MetricCard[],
+        };
+      case 'owner':
+        return {
+          title: '先看新需求，再做承接',
+          subtitle:
+            '机主首页只聚焦获客、报价和履约准备，不再把客户信息和飞手信息混在一起。',
+          primaryAction: {
+            title: '查看新需求',
+            onPress: () => navigation.navigate('DemandList'),
+          },
+          secondaryActions: [
+            {
+              title: '发布供给',
+              onPress: () => navigation.navigate('PublishOffer'),
+            },
+            {
+              title: '机队资质',
+              onPress: () => navigation.navigate('MyDrones'),
+            },
+          ],
+          metrics: [
+            {
+              key: 'owner-demand',
+              label: '新需求',
+              value: currentDashboard.role_views.owner.recommended_demand_count,
+              hint: '平台推荐可报价需求',
+            },
+            {
+              key: 'owner-confirm',
+              label: '待确认',
+              value:
+                currentDashboard.role_views.owner
+                  .pending_provider_confirmation_order_count,
+              hint: '直达订单待处理',
+            },
+            {
+              key: 'owner-quote',
+              label: '待报价',
+              value: currentDashboard.role_views.owner.pending_quote_count,
+              hint: '已提交后继续跟进',
+            },
+            {
+              key: 'owner-dispatch',
+              label: '待指派',
+              value:
+                currentDashboard.role_views.owner.pending_dispatch_order_count,
+              hint: '成交后待安排执行',
+            },
+          ] as MetricCard[],
+        };
+      case 'pilot':
+        return {
+          title: '先接派单，再看执行',
+          subtitle:
+            '飞手视图只保留执行相关信息，避免把需求、供给和订单列表堆在一起。',
+          primaryAction: {
+            title: '待接派单',
+            onPress: () =>
+              navigation.navigate('PilotTaskList', { entry: 'assigned' }),
+          },
+          secondaryActions: [
+            {
+              title: '飞行记录',
+              onPress: () => navigation.navigate('FlightLog'),
+            },
+            {
+              title: '可报名需求',
+              onPress: () => navigation.navigate('DemandList'),
+            },
+          ],
+          metrics: [
+            {
+              key: 'pilot-pending',
+              label: '待响应派单',
+              value:
+                currentDashboard.role_views.pilot
+                  .pending_response_dispatch_count,
+              hint: '系统正式派单待确认',
+            },
+            {
+              key: 'pilot-active',
+              label: '今日任务',
+              value: currentDashboard.role_views.pilot.active_dispatch_count,
+              hint: '已接受或执行中的派单',
+            },
+            {
+              key: 'pilot-flight',
+              label: '最近飞行',
+              value: currentDashboard.role_views.pilot.recent_flight_count,
+              hint: '真实履约飞行记录',
+            },
+          ] as MetricCard[],
+        };
+      default:
+        const allSecondaryActions = [];
+        if (hasOwner) {
+          allSecondaryActions.push({
+            title: '查看新需求',
+            onPress: () => navigation.navigate('DemandList'),
+          });
+        }
+        if (hasPilot) {
+          allSecondaryActions.push({
+            title: '待接派单',
+            onPress: () =>
+              navigation.navigate('PilotTaskList', { entry: 'assigned' }),
+          });
+        }
+        if (hasClient && !hasOwner && !hasPilot) {
+          allSecondaryActions.push({
+            title: '浏览供给',
+            onPress: () => navigation.navigate('OfferList'),
+          });
+        }
+
+        const allMetrics: MetricCard[] = [];
+        if (hasClient) {
+          allMetrics.push({
+            key: 'all-progress',
+            label: '进行中订单',
+            value: currentDashboard.summary.in_progress_order_count,
+            hint: '当前正在执行的履约任务',
+          });
+        }
+        if (hasPilot) {
+          allMetrics.push({
+            key: 'all-pending',
+            label: '待接派单',
+            value:
+              currentDashboard.role_views.pilot.pending_response_dispatch_count,
+            hint: '需要飞手尽快响应',
+          });
+        }
+        if (hasOwner) {
+          allMetrics.push({
+            key: 'all-demand',
+            label: '待报价需求',
+            value: currentDashboard.role_views.owner.recommended_demand_count,
+            hint: '适合当前机队承接',
+          });
+        }
+        while (allMetrics.length < 3) {
+          allMetrics.push({
+            key: `all-filler-${allMetrics.length}`,
+            label: allMetrics.length === 1 ? '今日单量' : '市场需求',
+            value:
+              allMetrics.length === 1
+                ? currentDashboard.summary.today_order_count
+                : currentDashboard.market_totals.demand_count,
+            hint:
+              allMetrics.length === 1 ? '今天新进入的订单' : '平台公开可见需求',
+          });
+        }
+
+        return {
+          title: '先处理优先动作，再看全局',
+          subtitle:
+            '综合视图只保留今天最重要的三件事：发需求、看新需求、接派单。',
+          primaryAction: {
+            title: hasClient
+              ? '发布需求'
+              : hasOwner
+              ? '查看新需求'
+              : '待接派单',
+            onPress: hasClient
+              ? () => navigation.navigate('PublishCargo')
+              : hasOwner
+              ? () => navigation.navigate('DemandList')
+              : () =>
+                  navigation.navigate('PilotTaskList', { entry: 'assigned' }),
+          },
+          secondaryActions: allSecondaryActions.slice(0, 2),
+          metrics: allMetrics.slice(0, 3),
+        };
+    }
+  }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
+  const quickActions = useMemo<DashboardAction[]>(() => {
+    switch (activeRole) {
+      case 'client':
+        return [
+          {
+            key: 'client-publish',
+            title: '发布需求',
+            desc: '发起重载末端吊运需求',
+            icon: '📝',
+            tone: 'green',
+            onPress: () => navigation.navigate('PublishCargo'),
+          },
+          {
+            key: 'client-supply',
+            title: '浏览供给',
+            desc: '查看可直达下单的合规供给',
+            icon: '📦',
+            tone: 'blue',
+            onPress: () => navigation.navigate('OfferList'),
+            badge: currentDashboard.market_totals.supply_count,
+          },
+          {
+            key: 'client-demands',
+            title: '我的需求',
+            desc: '跟进报价与撮合进度',
+            icon: '🗂️',
+            tone: 'teal',
+            onPress: () => navigation.navigate('MyDemands'),
+            badge: currentDashboard.role_views.client.open_demand_count,
+          },
+          {
+            key: 'client-orders',
+            title: '我的订单',
+            desc: '查看付款、履约与完成状态',
+            icon: '📋',
+            tone: 'green',
+            onPress: () => navigation.navigate('MyOrders'),
+          },
+        ];
+      case 'owner':
+        return [
+          {
+            key: 'owner-demand',
+            title: '查看新需求',
+            desc: '进入需求市场寻找可承接任务',
+            icon: '📈',
+            tone: 'blue',
+            onPress: () => navigation.navigate('DemandList'),
+            badge: currentDashboard.role_views.owner.recommended_demand_count,
+          },
+          {
+            key: 'owner-offer',
+            title: '发布供给',
+            desc: '上架机型、能力与服务区域',
+            icon: '🚁',
+            tone: 'teal',
+            onPress: () => navigation.navigate('PublishOffer'),
+          },
+          {
+            key: 'owner-supplies',
+            title: '我的供给',
+            desc: '查看供给状态与曝光结果',
+            icon: '📦',
+            tone: 'green',
+            onPress: () => navigation.navigate('MyOffers'),
+            badge: currentDashboard.role_views.owner.active_supply_count,
+          },
+          {
+            key: 'owner-drones',
+            title: '机队资质',
+            desc: '维护设备、认证与可用状态',
+            icon: '🛩️',
+            tone: 'purple',
+            onPress: () => navigation.navigate('MyDrones'),
+          },
+        ];
+      case 'pilot':
+        return [
+          {
+            key: 'pilot-assigned',
+            title: '待接派单',
+            desc: '优先处理系统正式派单',
+            icon: '🎯',
+            tone: 'orange',
+            onPress: () =>
+              navigation.navigate('PilotTaskList', { entry: 'assigned' }),
+            badge:
+              currentDashboard.role_views.pilot.pending_response_dispatch_count,
+          },
+          {
+            key: 'pilot-nearby',
+            title: '可报名需求',
+            desc: '查看系统筛选后的公开需求',
+            icon: '🛰️',
+            tone: 'blue',
+            onPress: () => navigation.navigate('DemandList'),
+            badge: currentDashboard.role_views.pilot.candidate_demand_count,
+          },
+          {
+            key: 'pilot-records',
+            title: '飞行记录',
+            desc: '查看真实履约飞行数据',
+            icon: '🛫',
+            tone: 'purple',
+            onPress: () => navigation.navigate('FlightLog'),
+            badge: currentDashboard.role_views.pilot.recent_flight_count,
+          },
+        ];
+      default:
+        const actions: DashboardAction[] = [];
+        if (hasClient) {
+          actions.push({
+            key: 'all-publish',
+            title: '发布需求',
+            desc: '快速发起新的重载吊运任务',
+            icon: '📝',
+            tone: 'green',
+            onPress: () => navigation.navigate('PublishCargo'),
+          });
+        }
+        if (hasOwner) {
+          actions.push({
+            key: 'all-demand',
+            title: '查看新需求',
+            desc: '进入市场挑选可承接任务',
+            icon: '📈',
+            tone: 'blue',
+            onPress: () => navigation.navigate('DemandList'),
+            badge: currentDashboard.role_views.owner.recommended_demand_count,
+          });
+        }
+        if (hasPilot) {
+          actions.push({
+            key: 'all-pilot',
+            title: '待接派单',
+            desc: '飞手优先处理正式派单',
+            icon: '🎯',
+            tone: 'orange',
+            onPress: () =>
+              navigation.navigate('PilotTaskList', { entry: 'assigned' }),
+            badge:
+              currentDashboard.role_views.pilot.pending_response_dispatch_count,
+          });
+        }
+        actions.push({
+          key: 'all-orders',
+          title: '我的订单',
+          desc: '统一查看成交后的履约状态',
+          icon: '📦',
+          tone: 'teal',
+          onPress: () => navigation.navigate('MyOrders'),
+        });
+        return actions.slice(0, 4);
+    }
+  }, [activeRole, currentDashboard, navigation]);
+
+  const todoItems = useMemo<TodoItem[]>(() => {
+    switch (activeRole) {
+      case 'client':
+        return [
+          {
+            key: 'client-quote',
+            title: '待确认报价与方案',
+            desc: '先看哪些需求已经进入报价阶段，再决定是否继续推进。',
+            badge: currentDashboard.role_views.client.quoted_demand_count,
+            actionText: '查看需求',
+            onPress: () => navigation.navigate('MyDemands'),
+            tone: 'green',
+          },
+          {
+            key: 'client-confirm',
+            title: '待机主确认订单',
+            desc: '直达下单后，先由机主确认，再进入支付阶段。',
+            badge:
+              currentDashboard.role_views.client
+                .pending_provider_confirmation_order_count,
+            actionText: '查看订单',
+            onPress: () =>
+              navigation.navigate('MyOrders', {
+                roleFilter: 'client',
+                statusFilter: 'pending',
+                serverStatus: 'pending_provider_confirmation',
+              }),
+            tone: 'orange',
+          },
+          {
+            key: 'client-payment',
+            title: '待付款订单',
+            desc: '已选定方案但尚未付款的订单会在这里汇总。',
+            badge:
+              currentDashboard.role_views.client.pending_payment_order_count,
+            actionText: '去付款',
+            onPress: () =>
+              navigation.navigate('MyOrders', {
+                roleFilter: 'client',
+                statusFilter: 'pending',
+                serverStatus: 'pending_payment',
+              }),
+            tone: 'blue',
+          },
+          {
+            key: 'client-progress',
+            title: '进行中服务',
+            desc: '履约中的订单会持续出现在首页，避免你再去翻列表。',
+            badge: currentDashboard.role_views.client.in_progress_order_count,
+            actionText: '查看订单',
+            onPress: () => navigation.navigate('MyOrders'),
+            tone: 'teal',
+          },
+        ];
+      case 'owner':
+        return [
+          {
+            key: 'owner-recommend',
+            title: '待报价需求',
+            desc: '优先处理当前机队可承接的新需求，缩短获客反应时间。',
+            badge: currentDashboard.role_views.owner.recommended_demand_count,
+            actionText: '去报价',
+            onPress: () => navigation.navigate('DemandList'),
+            tone: 'blue',
+          },
+          {
+            key: 'owner-confirm',
+            title: '待确认直达单',
+            desc: '客户刚提交的直达订单会先停在这里，机主确认后才进入支付。',
+            badge:
+              currentDashboard.role_views.owner
+                .pending_provider_confirmation_order_count,
+            actionText: '去处理',
+            onPress: () =>
+              navigation.navigate('MyOrders', {
+                roleFilter: 'owner',
+                statusFilter: 'pending',
+                serverStatus: 'pending_provider_confirmation',
+              }),
+            tone: 'red',
+          },
+          {
+            key: 'owner-dispatch',
+            title: '待发起派单',
+            desc: '机主已经承接并完成支付的订单，会先停在待派阶段等待你安排执行。',
+            badge:
+              currentDashboard.role_views.owner.pending_dispatch_order_count,
+            actionText: '查看订单',
+            onPress: () =>
+              navigation.navigate('MyOrders', {
+                roleFilter: 'owner',
+                statusFilter: 'pending',
+                serverStatus: 'pending_dispatch',
+              }),
+            tone: 'orange',
+          },
+          {
+            key: 'owner-asset',
+            title: '供给与机队状态',
+            desc: '如果供给不上架或设备不合规，会直接影响后续承接和派单。',
+            badge: currentDashboard.role_views.owner.active_supply_count,
+            actionText: '查看机队',
+            onPress: () => navigation.navigate('MyDrones'),
+            tone: 'teal',
+          },
+        ];
+      case 'pilot':
+        return [
+          {
+            key: 'pilot-pending',
+            title: '待响应派单',
+            desc: '系统正式派单优先于候选报名，超时会自动回退。',
+            badge:
+              currentDashboard.role_views.pilot.pending_response_dispatch_count,
+            actionText: '去接单',
+            onPress: () =>
+              navigation.navigate('PilotTaskList', { entry: 'assigned' }),
+            tone: 'orange',
+          },
+          {
+            key: 'pilot-active',
+            title: '今日执行任务',
+            desc: '已接派单和执行中的任务保持在首页，减少来回切换。',
+            badge: currentDashboard.role_views.pilot.active_dispatch_count,
+            actionText: '查看任务',
+            onPress: () => navigation.navigate('PilotTaskList'),
+            tone: 'blue',
+          },
+          {
+            key: 'pilot-candidate',
+            title: '可报名需求',
+            desc: '公开需求报名不等于抢单成功，但能提前进入后续候选池。',
+            badge: currentDashboard.role_views.pilot.candidate_demand_count,
+            actionText: '去查看',
+            onPress: () => navigation.navigate('DemandList'),
+            tone: 'purple',
+          },
+        ];
+      default:
+        const items: TodoItem[] = [];
+        if (hasOwner) {
+          items.push({
+            key: 'all-capture',
+            title: '获客优先',
+            desc: '先看今天新需求和待报价机会，决定是否立刻承接。',
+            badge: currentDashboard.role_views.owner.recommended_demand_count,
+            actionText: '查看新需求',
+            onPress: () => navigation.navigate('DemandList'),
+            tone: 'blue',
+          });
+        }
+        if (hasPilot || hasClient) {
+          items.push({
+            key: 'all-exec',
+            title: '执行优先',
+            desc: '待接派单和进行中订单是今天最应该先处理的执行项。',
+            badge:
+              (hasPilot
+                ? currentDashboard.role_views.pilot
+                    .pending_response_dispatch_count
+                : 0) + currentDashboard.summary.in_progress_order_count,
+            actionText: '查看履约',
+            onPress: () => navigation.navigate('MyOrders'),
+            tone: 'orange',
+          });
+        }
+        items.push({
+          key: 'all-alert',
+          title: '异常提醒',
+          desc: '超时过久的订单会在这里提醒，避免阶段性积压。',
+          badge: currentDashboard.summary.alert_count,
+          actionText: '查看订单',
+          onPress: () => navigation.navigate('MyOrders'),
+          tone: 'red',
+        });
+        return items.slice(0, 3);
+    }
+  }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
+
+  const feedConfig = useMemo(() => {
+    const allItems = currentDashboard.market_feed;
+    if (activeRole === 'client') {
+      const items = allItems.filter(item => item.object_type === 'supply');
+      return {
+        title: '推荐供给',
+        hint: `供给 ${currentDashboard.market_totals.supply_count}`,
+        items,
+        emptyTitle: '还没有推荐供给',
+        emptyDesc:
+          '先发布需求或进入供给市场，平台会逐步按重载场景推荐可用供给。',
+        emptyAction: '浏览供给',
+        onEmptyAction: () => navigation.navigate('OfferList'),
+      };
+    }
+    if (activeRole === 'owner') {
+      const items = allItems.filter(item => item.object_type === 'demand');
+      return {
+        title: '平台推荐需求',
+        hint: `需求 ${currentDashboard.market_totals.demand_count}`,
+        items,
+        emptyTitle: '当前暂无推荐需求',
+        emptyDesc: '先完善供给和机队能力，平台才能更准确地把需求推给你。',
+        emptyAction: '查看供给',
+        onEmptyAction: () => navigation.navigate('MyOffers'),
+      };
+    }
+    if (activeRole === 'pilot') {
+      const items = allItems.filter(item => item.object_type === 'demand');
+      return {
+        title: '可报名公开需求',
+        hint: `候选 ${currentDashboard.role_views.pilot.candidate_demand_count}`,
+        items,
+        emptyTitle: '当前暂无可报名需求',
+        emptyDesc:
+          '先保持在线并完善飞手资料，平台筛选到合适任务后会出现在这里。',
+        emptyAction: '查看任务',
+        onEmptyAction: () => navigation.navigate('PilotTaskList'),
+      };
+    }
+    return {
+      title: '市场脉搏',
+      hint: `供给 ${currentDashboard.market_totals.supply_count} · 需求 ${currentDashboard.market_totals.demand_count}`,
+      items: allItems,
+      emptyTitle: '当前暂无市场更新',
+      emptyDesc: '可以先去市场页浏览供给和需求，后面这里会聚合推荐内容。',
+      emptyAction: '去市场',
+      onEmptyAction: () => navigation.navigate('DemandList'),
+    };
+  }, [activeRole, currentDashboard, navigation]);
+
+  const navigateFeedItem = useCallback(
+    (item: HomeFeedItem) => {
+      if (item.object_type === 'supply') {
+        navigation.navigate('OfferDetail', { id: item.object_id });
+        return;
+      }
+      navigation.navigate('DemandDetail', { id: item.object_id });
+    },
+    [navigation],
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabBarHeight + 20 },
+        ]}
+        scrollIndicatorInsets={{ bottom: tabBarHeight }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#0f5cab']}
+          />
+        }
+      >
+        <View style={styles.contentRail}>
+          <View style={styles.tabsWrap}>
+            {roleTabs.map(tab => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.roleTab,
+                  activeRole === tab.key && styles.roleTabActive,
+                ]}
+                onPress={() => setActiveRole(tab.key)}
+              >
+                <Text
+                  style={[
+                    styles.roleTabText,
+                    activeRole === tab.key && styles.roleTabTextActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.contentRail}>
+          <LinearGradient colors={heroTheme.gradient} style={styles.hero}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.heroCopyWrap}>
+                <Text
+                  style={[styles.heroEyebrow, { color: heroTheme.softText }]}
+                >
+                  {heroTheme.eyebrow}
+                </Text>
+                <Text style={styles.heroTitle}>{heroConfig.title}</Text>
+                <Text
+                  style={[styles.heroSubtitle, { color: heroTheme.softText }]}
+                >
+                  {heroConfig.subtitle}
+                </Text>
+              </View>
+
+              {currentDashboard.summary.alert_count > 0 ? (
+                <View style={styles.alertPill}>
+                  <Text style={styles.alertPillValue}>
+                    {currentDashboard.summary.alert_count}
+                  </Text>
+                  <Text style={styles.alertPillLabel}>异常提醒</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.heroActionRow}>
+              <ActionPill
+                title={heroConfig.primaryAction.title}
+                onPress={heroConfig.primaryAction.onPress}
+                primary
+                theme={heroTheme}
+              />
+              {heroConfig.secondaryActions.map(action => (
+                <ActionPill
+                  key={action.title}
+                  title={action.title}
+                  onPress={action.onPress}
+                  theme={heroTheme}
+                />
+              ))}
+            </View>
+
+            <View style={styles.metricGrid}>
+              {heroConfig.metrics.map((metric, index) => {
+                const shouldSpanFull =
+                  metricColumns === 2 &&
+                  heroConfig.metrics.length % 2 === 1 &&
+                  index === heroConfig.metrics.length - 1;
+
+                return (
+                  <MetricTile
+                    key={metric.key}
+                    metric={metric}
+                    theme={heroTheme}
+                    width={shouldSpanFull ? metricFullWidth : metricTileWidth}
+                  />
+                );
+              })}
+            </View>
+          </LinearGradient>
+        </View>
+
+        <View style={styles.contentRail}>
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>紧急待办</Text>
+              <Text style={styles.sectionHint}>先做现在最重要的事</Text>
+            </View>
+            {todoItems.map(item => {
+              const palette = getTonePalette(item.tone || 'blue');
+              return (
+                <ObjectCard
+                  key={item.key}
+                  style={styles.todoCard}
+                  highlightColor={palette.border}
+                >
+                  <View style={styles.todoHeader}>
+                    <Text style={styles.todoTitle}>{item.title}</Text>
+                    {typeof item.badge === 'number' && item.badge > 0 ? (
+                      <View
+                        style={[
+                          styles.todoBadge,
+                          {
+                            backgroundColor: palette.bg,
+                            borderColor: palette.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.todoBadgeText,
+                            { color: palette.text },
+                          ]}
+                        >
+                          {item.badge}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.todoDesc}>{item.desc}</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.todoActionBtn,
+                      { backgroundColor: palette.text },
+                    ]}
+                    onPress={item.onPress}
+                  >
+                    <Text style={styles.todoActionText}>{item.actionText}</Text>
+                  </TouchableOpacity>
+                </ObjectCard>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.contentRail}>
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>快捷入口</Text>
+              <Text style={styles.sectionHint}>按当前视图展示优先动作</Text>
+            </View>
+            <View style={styles.quickGrid}>
+              {quickActions.map(action => (
+                <QuickActionCard key={action.key} action={action} />
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.contentRail}>
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {activeRole === 'pilot' ? '当前执行订单' : '进行中任务'}
+              </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('MyOrders')}>
+                <Text style={styles.linkText}>查看全部</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loading ? (
+              <ActivityIndicator style={styles.loading} color="#0f5cab" />
+            ) : currentDashboard.in_progress_orders.length > 0 ? (
+              currentDashboard.in_progress_orders.map(order => (
+                <ObjectCard
+                  key={order.id}
+                  onPress={() =>
+                    navigation.navigate('OrderDetail', { id: order.id })
+                  }
+                >
+                  <View style={styles.orderHeader}>
+                    <Text style={styles.orderNo}>{order.order_no}</Text>
+                    <StatusBadge
+                      label=""
+                      meta={getObjectStatusMeta('order', order.status)}
+                    />
+                  </View>
+                  <Text style={styles.orderTitle} numberOfLines={2}>
+                    {order.title}
+                  </Text>
+                  <View style={styles.orderFooter}>
+                    <Text style={styles.orderMeta}>
+                      {order.created_at?.slice(0, 10)}
+                    </Text>
+                    <Text style={styles.orderAmount}>
+                      ¥{(order.total_amount / 100).toFixed(2)}
+                    </Text>
+                  </View>
+                </ObjectCard>
+              ))
+            ) : (
+              <ObjectCard>
+                <EmptyState
+                  icon="📭"
+                  title={
+                    activeRole === 'pilot'
+                      ? '当前没有执行中的订单'
+                      : '当前没有进行中的任务'
+                  }
+                  description="这里会汇总已进入履约阶段的订单，避免你在首页和列表页之间来回跳。"
+                  actionText="查看订单"
+                  onAction={() => navigation.navigate('MyOrders')}
+                />
+              </ObjectCard>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.contentRail}>
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{feedConfig.title}</Text>
+              <Text style={styles.sectionHint}>{feedConfig.hint}</Text>
+            </View>
+
+            {feedConfig.items.length > 0 ? (
+              feedConfig.items.map(item => (
+                <ObjectCard
+                  key={`${item.object_type}-${item.object_id}`}
+                  onPress={() => navigateFeedItem(item)}
+                >
+                  <View style={styles.feedHeader}>
+                    <SourceTag
+                      source={
+                        item.object_type === 'supply' ? 'supply' : 'demand'
+                      }
+                    />
+                  </View>
+                  <Text style={styles.feedTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.feedSubtitle} numberOfLines={2}>
+                    {item.subtitle}
+                  </Text>
+                </ObjectCard>
+              ))
+            ) : (
+              <ObjectCard>
+                <EmptyState
+                  icon={
+                    activeRole === 'pilot'
+                      ? '🛰️'
+                      : activeRole === 'owner'
+                      ? '📈'
+                      : '📦'
+                  }
+                  title={feedConfig.emptyTitle}
+                  description={feedConfig.emptyDesc}
+                  actionText={feedConfig.emptyAction}
+                  onAction={feedConfig.onEmptyAction}
+                />
+              </ObjectCard>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  scrollView: {flex: 1},
-  scrollContent: {paddingBottom: 80},
-  // 轮播图样式
-  bannerContainer: {
-    marginTop: 50, // 为刘海屏顶部安全区域留出空间
-    marginBottom: 16,
+  container: {
+    flex: 1,
+    backgroundColor: '#eef3f8',
   },
-  banner: {
-    height: 180, // 增加高度避免被截断
-    paddingHorizontal: 24,
-    paddingVertical: 0,
-    justifyContent: 'center',
+  scrollContent: {
+    paddingBottom: 28,
   },
-  bannerTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#fff',
-    letterSpacing: 0.5,
+  contentRail: {
+    marginHorizontal: CONTENT_SIDE_MARGIN,
   },
-  bannerSubtitle: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.95)',
-    marginTop: 8,
-    letterSpacing: 0.3,
-  },
-  bannerDots: {
+  tabsWrap: {
+    marginTop: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 5,
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
+    shadowColor: '#102a43',
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    marginHorizontal: 4,
-  },
-  dotActive: {
-    width: 24,
-    backgroundColor: '#1890ff',
-  },
-  // 数据统计样式
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    paddingVertical: 24,
-    shadowColor: '#1890ff',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 4,
-  },
-  statItem: {
+  roleTab: {
     flex: 1,
     alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1890ff',
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 6,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#f0f0f0',
-    alignSelf: 'center',
-  },
-  grid: {flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, paddingVertical: 8},
-  card: {
-    width: '48%', backgroundColor: '#fff', borderRadius: 12,
-    padding: 16, marginBottom: 12, borderLeftWidth: 4,
-    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
-    marginRight: '4%',
-  },
-  cardIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
   },
-  cardIcon: {fontSize: 32},
-  cardTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 4},
-  cardDesc: {fontSize: 12, color: '#999', lineHeight: 18},
-  section: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16,
-    marginTop: 8,
+  roleTabActive: {
+    backgroundColor: '#e6f4ff',
   },
-  sectionTitle: {fontSize: 19, fontWeight: 'bold', color: '#333'},
-  moreText: {fontSize: 14, color: '#1890ff', fontWeight: '500'},
-  listItem: {
-    flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 16,
-    marginBottom: 12, padding: 14, borderRadius: 12,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
-    shadowOffset: {width: 0, height: 2},
-    elevation: 2,
-    alignItems: 'center',
+  roleTabText: {
+    fontSize: 14,
+    color: '#667085',
+    fontWeight: '700',
   },
-  offerIconBox: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#e6f7ff',
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
-    borderWidth: 1,
-    borderColor: '#bae7ff',
+  roleTabTextActive: {
+    color: '#0f5cab',
   },
-  itemContent: {flex: 1, marginRight: 10},
-  itemTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4},
-  itemMeta: {fontSize: 13, color: '#999', marginTop: 2},
-  itemPrice: {fontSize: 16, color: '#f5222d', fontWeight: 'bold'},
-  itemLocation: {fontSize: 13, color: '#999', marginTop: 4},
-  demandHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 4},
-  demandBudget: {fontSize: 14, color: '#f5222d', marginTop: 2, fontWeight: '500'},
-  urgentBadge: {backgroundColor: '#ff4d4f', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginLeft: 8},
-  urgentText: {color: '#fff', fontSize: 11, fontWeight: '600'},
-  cargoIconBox: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#fff7e6',
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
-    borderWidth: 1,
-    borderColor: '#ffd591',
+  hero: {
+    marginTop: 12,
+    borderRadius: 26,
+    // paddingHorizontal: HERO_SIDE_PADDING,
+    paddingTop: 18,
+    paddingBottom: 20,
+    overflow: 'hidden',
   },
-  cargoMeta: {fontSize: 13, color: '#999', marginTop: 2},
-  cargoPrice: {fontSize: 16, color: '#fa8c16', fontWeight: 'bold'},
-  // 空状态样式
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: HERO_SIDE_PADDING,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-    opacity: 0.5,
+  heroCopyWrap: {
+    flex: 1,
+    paddingRight: 14,
   },
-  emptyText: {
-    fontSize: 15,
-    color: '#999',
+  heroEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
     marginBottom: 8,
   },
-  emptyHint: {
+  heroTitle: {
+    fontSize: 28,
+    lineHeight: 34,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  heroSubtitle: {
+    marginTop: 8,
     fontSize: 13,
-    color: '#bbb',
+    lineHeight: 20,
+  },
+  alertPill: {
+    minWidth: 74,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  alertPillValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff7e6',
+  },
+  alertPillLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  heroActionRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingHorizontal: HERO_SIDE_PADDING,
+  },
+  heroActionBtn: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderWidth: 1,
+  },
+  heroActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  heroActionTextGhost: {
+    color: '#ffffff',
+  },
+  metricGrid: {
+    marginTop: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: HERO_SIDE_PADDING,
+    marginBottom: 18,
+  },
+  metricTile: {
+    marginBottom: METRIC_GAP,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    minHeight: 126,
+  },
+  metricTileFull: {
+    width: '100%',
+  },
+  metricValue: {
+    fontSize: 24,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  metricLabel: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  metricHint: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 16,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  sectionWrap: {
+    marginTop: 14,
+  },
+  sectionHeader: {
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 17,
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  linkText: {
+    fontSize: 12,
+    color: '#0f5cab',
+    fontWeight: '700',
+  },
+  todoCard: {
+    marginBottom: 10,
+  },
+  todoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  todoTitle: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '800',
+    paddingRight: 10,
+  },
+  todoBadge: {
+    minWidth: 30,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  todoBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  todoDesc: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748b',
+  },
+  todoActionBtn: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  todoActionText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    width: '48%',
+    marginBottom: 10,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    shadowColor: '#102a43',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  quickActionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  quickActionIcon: {
+    fontSize: 20,
+  },
+  quickActionBadge: {
+    position: 'absolute',
+    right: -10,
+    top: -8,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionBadgeText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  quickActionTitle: {
+    marginTop: 12,
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  quickActionDesc: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#64748b',
+  },
+  loading: {
+    paddingVertical: 28,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderNo: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  orderTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    lineHeight: 23,
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  orderFooter: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderMeta: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  orderAmount: {
+    fontSize: 15,
+    color: '#dc2626',
+    fontWeight: '800',
+  },
+  feedHeader: {
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  feedTitle: {
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  feedSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748b',
   },
 });

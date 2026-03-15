@@ -11,16 +11,21 @@ import (
 	"wurenji-backend/internal/repository"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type DispatchService struct {
-	dispatchRepo *repository.DispatchRepo
-	pilotRepo    *repository.PilotRepo
-	droneRepo    *repository.DroneRepo
-	clientRepo   *repository.ClientRepo
-	orderRepo    *repository.OrderRepo
-	logger       *zap.Logger
-	config       *DispatchServiceConfig
+	dispatchRepo      *repository.DispatchRepo
+	pilotRepo         *repository.PilotRepo
+	droneRepo         *repository.DroneRepo
+	clientRepo        *repository.ClientRepo
+	orderRepo         *repository.OrderRepo
+	ownerDomainRepo   *repository.OwnerDomainRepo
+	demandDomainRepo  *repository.DemandDomainRepo
+	orderArtifactRepo *repository.OrderArtifactRepo
+	eventService      *EventService
+	logger            *zap.Logger
+	config            *DispatchServiceConfig
 }
 
 // DispatchServiceConfig 派单服务配置
@@ -49,6 +54,9 @@ func NewDispatchService(
 	droneRepo *repository.DroneRepo,
 	clientRepo *repository.ClientRepo,
 	orderRepo *repository.OrderRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	orderArtifactRepo *repository.OrderArtifactRepo,
 	logger *zap.Logger,
 ) *DispatchService {
 	// 默认配置
@@ -70,14 +78,39 @@ func NewDispatchService(
 	}
 
 	return &DispatchService{
-		dispatchRepo: dispatchRepo,
-		pilotRepo:    pilotRepo,
-		droneRepo:    droneRepo,
-		clientRepo:   clientRepo,
-		orderRepo:    orderRepo,
-		logger:       logger,
-		config:       config,
+		dispatchRepo:      dispatchRepo,
+		pilotRepo:         pilotRepo,
+		droneRepo:         droneRepo,
+		clientRepo:        clientRepo,
+		orderRepo:         orderRepo,
+		ownerDomainRepo:   ownerDomainRepo,
+		demandDomainRepo:  demandDomainRepo,
+		orderArtifactRepo: orderArtifactRepo,
+		logger:            logger,
+		config:            config,
 	}
+}
+
+func (s *DispatchService) SetEventService(eventService *EventService) {
+	s.eventService = eventService
+}
+
+func (s *DispatchService) AdminListFormalTasks(page, pageSize int, filters map[string]interface{}) ([]model.FormalDispatchTask, int64, error) {
+	if s.dispatchRepo == nil {
+		return nil, 0, errors.New("正式派单仓储未初始化")
+	}
+	return s.dispatchRepo.AdminListFormalTasks(page, pageSize, filters)
+}
+
+const maxFormalDispatchRetries = 3
+
+type dispatchPilotOption struct {
+	PilotUserID     int64
+	Source          string
+	Reason          string
+	SortWeight      int
+	Distance        float64
+	BindingPriority bool
 }
 
 // LoadConfigFromDB 从数据库加载配置
@@ -564,28 +597,6 @@ func (s *DispatchService) AcceptTask(candidateID int64, pilotID int64) error {
 		"candidate_id": candidateID,
 	})
 
-	// 创建派单执行订单
-	orderNo := fmt.Sprintf("DO%s%06d", time.Now().Format("20060102150405"), task.ID)
-	orderTitle := fmt.Sprintf("派单货运: %s -> %s", task.PickupAddress, task.DeliveryAddress)
-	order := &model.Order{
-		OrderNo:          orderNo,
-		OrderType:        "dispatch",
-		Title:            orderTitle,
-		RenterID:         task.ClientID,
-		PilotID:          candidate.PilotID,
-		DroneID:          candidate.DroneID,
-		OwnerID:          candidate.OwnerID,
-		RelatedID:        task.ID,
-		Status:           "confirmed",
-		ServiceAddress:   task.PickupAddress,
-		ServiceLatitude:  task.PickupLatitude,
-		ServiceLongitude: task.PickupLongitude,
-		TotalAmount:      task.FinalPrice,
-	}
-	if err := s.orderRepo.Create(order); err != nil {
-		s.logger.Error("创建派单订单失败", zap.Error(err))
-	}
-
 	return nil
 }
 
@@ -616,6 +627,297 @@ func (s *DispatchService) RejectTask(candidateID int64, pilotID int64, reason st
 	s.NotifyTopCandidate(candidate.TaskID)
 
 	return nil
+}
+
+func (s *DispatchService) EnsureOrderDispatch(orderID int64) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil || s.orderRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+
+	db := s.dispatchRepo.DB()
+	if db == nil {
+		return nil, errors.New("派单仓储未初始化")
+	}
+
+	var created *model.FormalDispatchTask
+	var createdNew bool
+	err := db.Transaction(func(tx *gorm.DB) error {
+		dispatchRepo := repository.NewDispatchRepo(tx)
+		orderRepo := repository.NewOrderRepo(tx)
+		pilotRepo := repository.NewPilotRepo(tx)
+		ownerRepo := repository.NewOwnerDomainRepo(tx)
+		demandRepo := repository.NewDemandDomainRepo(tx)
+		artifactRepo := repository.NewOrderArtifactRepo(tx)
+
+		task, isNew, err := s.ensureOrderDispatchWithRepos(orderID, dispatchRepo, orderRepo, pilotRepo, ownerRepo, demandRepo, artifactRepo)
+		if err != nil {
+			return err
+		}
+		created = task
+		createdNew = isNew
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if createdNew && created != nil && s.eventService != nil {
+		if order, err := s.orderRepo.GetByID(created.OrderID); err == nil && order != nil {
+			s.eventService.NotifyDispatchCreated(created, order)
+		}
+	}
+	return created, nil
+}
+
+func (s *DispatchService) AcceptFormalTask(dispatchID, pilotUserID int64) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil || s.orderRepo == nil || s.pilotRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+
+	db := s.dispatchRepo.DB()
+	if db == nil {
+		return nil, errors.New("派单仓储未初始化")
+	}
+
+	var result *model.FormalDispatchTask
+	var accepted bool
+	err := db.Transaction(func(tx *gorm.DB) error {
+		dispatchRepo := repository.NewDispatchRepo(tx)
+		orderRepo := repository.NewOrderRepo(tx)
+		pilotRepo := repository.NewPilotRepo(tx)
+		artifactRepo := repository.NewOrderArtifactRepo(tx)
+
+		pilot, err := pilotRepo.GetByUserID(pilotUserID)
+		if err != nil {
+			return errors.New("请先注册飞手身份")
+		}
+		if pilot.VerificationStatus != "verified" {
+			return errors.New("飞手资质尚未审核通过，不能接受正式派单")
+		}
+
+		task, err := dispatchRepo.GetFormalTaskByID(dispatchID)
+		if err != nil {
+			return errors.New("正式派单不存在")
+		}
+		if task.TargetPilotUserID != pilotUserID {
+			return errors.New("无权响应该正式派单")
+		}
+		if task.Status == "accepted" || task.Status == "executing" || task.Status == "finished" {
+			result = task
+			return nil
+		}
+		if task.Status != "pending_response" {
+			return errors.New("当前正式派单状态不允许接受")
+		}
+
+		order, err := orderRepo.GetByID(task.OrderID)
+		if err != nil {
+			return errors.New("订单不存在")
+		}
+
+		now := time.Now()
+		if err := dispatchRepo.UpdateFormalTaskFields(task.ID, map[string]interface{}{
+			"status":       "accepted",
+			"responded_at": &now,
+			"updated_at":   now,
+		}); err != nil {
+			return err
+		}
+		if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+			DispatchTaskID: task.ID,
+			ActionType:     "accepted",
+			OperatorUserID: pilotUserID,
+			Note:           "飞手已接受正式派单",
+		}); err != nil {
+			return err
+		}
+		accepted = true
+		if err := orderRepo.UpdateFields(task.OrderID, map[string]interface{}{
+			"status":                 "assigned",
+			"dispatch_task_id":       task.ID,
+			"executor_pilot_user_id": pilotUserID,
+			"pilot_id":               pilot.ID,
+			"execution_mode":         mapDispatchSourceToExecutionMode(task.DispatchSource),
+			"needs_dispatch":         true,
+			"updated_at":             now,
+		}); err != nil {
+			return err
+		}
+		order.Status = "assigned"
+		order.DispatchTaskID = &task.ID
+		order.ExecutorPilotUserID = pilotUserID
+		order.PilotID = pilot.ID
+		order.ExecutionMode = mapDispatchSourceToExecutionMode(task.DispatchSource)
+		order.NeedsDispatch = true
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      task.OrderID,
+			Status:       "assigned",
+			Note:         "飞手已接受正式派单，订单进入已分配",
+			OperatorID:   pilotUserID,
+			OperatorType: "pilot",
+		}); err != nil {
+			return err
+		}
+		if artifactRepo != nil {
+			if err := repository.UpsertOrderSnapshotBundle(artifactRepo, order, nil, nil); err != nil {
+				return err
+			}
+		}
+
+		result, err = dispatchRepo.GetFormalTaskByID(dispatchID)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if accepted && result != nil && s.eventService != nil {
+		if order, err := s.orderRepo.GetByID(result.OrderID); err == nil && order != nil {
+			s.eventService.NotifyDispatchAccepted(result, order)
+		}
+	}
+
+	return result, nil
+}
+
+func (s *DispatchService) RejectFormalTask(dispatchID, pilotUserID int64, reason string) (*model.FormalDispatchTask, error) {
+	return s.completeFormalTaskAndReassign(dispatchID, pilotUserID, "rejected", reason)
+}
+
+func (s *DispatchService) ReportFormalTaskException(dispatchID, operatorUserID int64, note string) (*model.FormalDispatchTask, error) {
+	return s.completeFormalTaskAndReassign(dispatchID, operatorUserID, "exception", note)
+}
+
+func (s *DispatchService) completeFormalTaskAndReassign(dispatchID, operatorUserID int64, terminalStatus, note string) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil || s.orderRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+
+	db := s.dispatchRepo.DB()
+	if db == nil {
+		return nil, errors.New("派单仓储未初始化")
+	}
+
+	var result *model.FormalDispatchTask
+	var stateChanged bool
+	var reassignedTask *model.FormalDispatchTask
+	var manualFallback bool
+	var affectedOrderID int64
+	var terminalReason string
+	err := db.Transaction(func(tx *gorm.DB) error {
+		dispatchRepo := repository.NewDispatchRepo(tx)
+		orderRepo := repository.NewOrderRepo(tx)
+		pilotRepo := repository.NewPilotRepo(tx)
+		ownerRepo := repository.NewOwnerDomainRepo(tx)
+		demandRepo := repository.NewDemandDomainRepo(tx)
+		artifactRepo := repository.NewOrderArtifactRepo(tx)
+
+		task, err := dispatchRepo.GetFormalTaskByID(dispatchID)
+		if err != nil {
+			return errors.New("正式派单不存在")
+		}
+		if operatorUserID != 0 && task.TargetPilotUserID != operatorUserID && task.ProviderUserID != operatorUserID {
+			return errors.New("无权操作该正式派单")
+		}
+		if task.Status == "rejected" || task.Status == "expired" || task.Status == "exception" {
+			result = task
+			return nil
+		}
+		if task.Status != "pending_response" && task.Status != "accepted" {
+			return errors.New("当前正式派单状态不允许该操作")
+		}
+		if terminalStatus == "rejected" && task.Status != "pending_response" {
+			return errors.New("已接受的正式派单不能再直接拒绝，请走异常回退")
+		}
+		if terminalStatus == "expired" && task.Status != "pending_response" {
+			return errors.New("仅待响应中的正式派单允许超时回退")
+		}
+
+		order, err := orderRepo.GetByID(task.OrderID)
+		if err != nil {
+			return errors.New("订单不存在")
+		}
+		affectedOrderID = order.ID
+
+		now := time.Now()
+		fields := map[string]interface{}{
+			"status":       terminalStatus,
+			"responded_at": &now,
+			"updated_at":   now,
+		}
+		if note != "" {
+			fields["reason"] = note
+		}
+		if err := dispatchRepo.UpdateFormalTaskFields(task.ID, fields); err != nil {
+			return err
+		}
+		if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+			DispatchTaskID: task.ID,
+			ActionType:     terminalStatus,
+			OperatorUserID: operatorUserID,
+			Note:           note,
+		}); err != nil {
+			return err
+		}
+		stateChanged = true
+		if err := orderRepo.UpdateFields(task.OrderID, map[string]interface{}{
+			"status":           "pending_dispatch",
+			"dispatch_task_id": task.ID,
+			"updated_at":       now,
+		}); err != nil {
+			return err
+		}
+		order.Status = "pending_dispatch"
+		order.DispatchTaskID = &task.ID
+		timelineNote := buildDispatchTerminalNote(terminalStatus, note)
+		operatorType := "pilot"
+		if terminalStatus == "expired" {
+			operatorType = "system"
+		} else if operatorUserID == task.ProviderUserID {
+			operatorType = "owner"
+		}
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      task.OrderID,
+			Status:       "pending_dispatch",
+			Note:         timelineNote,
+			OperatorID:   operatorUserID,
+			OperatorType: operatorType,
+		}); err != nil {
+			return err
+		}
+
+		nextTask, err := s.reassignOrderAfterTerminalTask(order, task, dispatchRepo, orderRepo, pilotRepo, ownerRepo, demandRepo, artifactRepo)
+		if err != nil {
+			return err
+		}
+		terminalReason = buildDispatchTerminalNote(terminalStatus, note)
+		if nextTask != nil {
+			reassignedTask = nextTask
+			result = nextTask
+			return nil
+		}
+		manualFallback = true
+
+		result, err = dispatchRepo.GetFormalTaskByID(dispatchID)
+		if err != nil {
+			result = task
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if stateChanged && s.eventService != nil && affectedOrderID > 0 {
+		if order, err := s.orderRepo.GetByID(affectedOrderID); err == nil && order != nil {
+			if reassignedTask != nil && reassignedTask.ID != dispatchID {
+				s.eventService.NotifyDispatchCreated(reassignedTask, order)
+				s.eventService.NotifyDispatchReassigned(order, reassignedTask, terminalReason)
+			} else if manualFallback {
+				s.eventService.NotifyDispatchManualRequired(order, terminalReason)
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // CancelTask 取消任务
@@ -656,7 +958,7 @@ func (s *DispatchService) GetCandidateByID(candidateID int64) (*model.DispatchCa
 }
 
 func (s *DispatchService) UpdateTaskOrderID(taskID int64, orderID int64) {
-	s.dispatchRepo.UpdateTaskFields(taskID, map[string]interface{}{"related_order_id": orderID})
+	s.dispatchRepo.UpdateTaskFields(taskID, map[string]interface{}{"order_id": orderID})
 }
 
 func (s *DispatchService) GetTaskByNo(taskNo string) (*model.DispatchTask, error) {
@@ -686,6 +988,215 @@ func (s *DispatchService) GetPendingTaskForPilot(pilotID int64) (*model.Dispatch
 
 func (s *DispatchService) GetTaskLogs(taskID int64) ([]model.DispatchLog, error) {
 	return s.dispatchRepo.GetLogsByTask(taskID)
+}
+
+func (s *DispatchService) GetFormalTask(dispatchID int64) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+	return s.dispatchRepo.GetFormalTaskByID(dispatchID)
+}
+
+func (s *DispatchService) ListFormalTasksByProvider(providerUserID int64, status string, page, pageSize int) ([]model.FormalDispatchTask, int64, error) {
+	if s.dispatchRepo == nil {
+		return nil, 0, errors.New("正式派单依赖未初始化")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	return s.dispatchRepo.ListFormalTasksByProvider(providerUserID, status, page, pageSize)
+}
+
+func (s *DispatchService) ListFormalTasksByPilot(pilotUserID int64, status string, page, pageSize int) ([]model.FormalDispatchTask, int64, error) {
+	if s.dispatchRepo == nil {
+		return nil, 0, errors.New("正式派单依赖未初始化")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	return s.dispatchRepo.ListFormalTasksByPilot(pilotUserID, status, page, pageSize)
+}
+
+func (s *DispatchService) ListFormalTasksByOrder(orderID int64) ([]model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+	return s.dispatchRepo.ListFormalTasksByOrder(orderID)
+}
+
+func (s *DispatchService) GetCurrentFormalTaskByOrder(orderID int64) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+	task, err := s.dispatchRepo.GetActiveFormalTaskByOrder(orderID)
+	if err == nil {
+		return task, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return s.dispatchRepo.GetFormalTaskByOrderID(orderID)
+	}
+	return nil, err
+}
+
+func (s *DispatchService) ListFormalLogs(dispatchID int64) ([]model.FormalDispatchLog, error) {
+	if s.dispatchRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+	return s.dispatchRepo.ListFormalLogsByDispatchTask(dispatchID)
+}
+
+func (s *DispatchService) ManualDispatchOrder(orderID, providerUserID int64, dispatchMode string, targetPilotUserID int64, reason string) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil || s.orderRepo == nil || s.pilotRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+	db := s.dispatchRepo.DB()
+	if db == nil {
+		return nil, errors.New("派单仓储未初始化")
+	}
+
+	var result *model.FormalDispatchTask
+	var affectedOrderID int64
+	var selfExecute bool
+	err := db.Transaction(func(tx *gorm.DB) error {
+		dispatchRepo := repository.NewDispatchRepo(tx)
+		orderRepo := repository.NewOrderRepo(tx)
+		pilotRepo := repository.NewPilotRepo(tx)
+		ownerRepo := repository.NewOwnerDomainRepo(tx)
+		demandRepo := repository.NewDemandDomainRepo(tx)
+		artifactRepo := repository.NewOrderArtifactRepo(tx)
+
+		order, task, isSelf, err := s.manualDispatchOrderWithRepos(orderID, providerUserID, dispatchMode, targetPilotUserID, reason, dispatchRepo, orderRepo, pilotRepo, ownerRepo, demandRepo, artifactRepo)
+		if err != nil {
+			return err
+		}
+		affectedOrderID = order.ID
+		result = task
+		selfExecute = isSelf
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if s.eventService != nil && affectedOrderID > 0 {
+		if order, err := s.orderRepo.GetByID(affectedOrderID); err == nil && order != nil {
+			if !selfExecute && result != nil {
+				s.eventService.NotifyDispatchCreated(result, order)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func (s *DispatchService) ReassignFormalTask(dispatchID, providerUserID int64, dispatchMode string, targetPilotUserID int64, reason string) (*model.FormalDispatchTask, error) {
+	if s.dispatchRepo == nil || s.orderRepo == nil || s.pilotRepo == nil {
+		return nil, errors.New("正式派单依赖未初始化")
+	}
+	db := s.dispatchRepo.DB()
+	if db == nil {
+		return nil, errors.New("派单仓储未初始化")
+	}
+
+	var result *model.FormalDispatchTask
+	var affectedOrderID int64
+	var manualReason string
+	err := db.Transaction(func(tx *gorm.DB) error {
+		dispatchRepo := repository.NewDispatchRepo(tx)
+		orderRepo := repository.NewOrderRepo(tx)
+		pilotRepo := repository.NewPilotRepo(tx)
+		ownerRepo := repository.NewOwnerDomainRepo(tx)
+		demandRepo := repository.NewDemandDomainRepo(tx)
+		artifactRepo := repository.NewOrderArtifactRepo(tx)
+
+		task, err := dispatchRepo.GetFormalTaskByID(dispatchID)
+		if err != nil {
+			return errors.New("正式派单不存在")
+		}
+		order, err := orderRepo.GetByID(task.OrderID)
+		if err != nil {
+			return errors.New("订单不存在")
+		}
+		if order.ProviderUserID != providerUserID && order.OwnerID != providerUserID && order.DroneOwnerUserID != providerUserID {
+			return errors.New("无权重派该订单")
+		}
+		if task.Status == "finished" {
+			return errors.New("已完成的正式派单不能重派")
+		}
+
+		now := time.Now()
+		manualReason = firstNonEmpty(reason, "机主手动重派")
+		if task.Status != "rejected" && task.Status != "expired" && task.Status != "exception" {
+			if err := dispatchRepo.UpdateFormalTaskFields(task.ID, map[string]interface{}{
+				"status":       "exception",
+				"responded_at": &now,
+				"reason":       manualReason,
+				"updated_at":   now,
+			}); err != nil {
+				return err
+			}
+		}
+		if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+			DispatchTaskID: task.ID,
+			ActionType:     "reassign",
+			OperatorUserID: providerUserID,
+			Note:           manualReason,
+		}); err != nil {
+			return err
+		}
+		if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+			"status":                 "pending_dispatch",
+			"needs_dispatch":         true,
+			"dispatch_task_id":       task.ID,
+			"executor_pilot_user_id": 0,
+			"pilot_id":               0,
+			"updated_at":             now,
+		}); err != nil {
+			return err
+		}
+		order.Status = "pending_dispatch"
+		order.NeedsDispatch = true
+		order.DispatchTaskID = &task.ID
+		order.ExecutorPilotUserID = 0
+		order.PilotID = 0
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "pending_dispatch",
+			Note:         "机主发起手动重派",
+			OperatorID:   providerUserID,
+			OperatorType: "owner",
+		}); err != nil {
+			return err
+		}
+
+		updatedOrder, newTask, _, err := s.manualDispatchOrderWithRepos(order.ID, providerUserID, dispatchMode, targetPilotUserID, manualReason, dispatchRepo, orderRepo, pilotRepo, ownerRepo, demandRepo, artifactRepo)
+		if err != nil {
+			return err
+		}
+		affectedOrderID = updatedOrder.ID
+		result = newTask
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if s.eventService != nil && affectedOrderID > 0 {
+		if order, err := s.orderRepo.GetByID(affectedOrderID); err == nil && order != nil {
+			if result != nil {
+				s.eventService.NotifyDispatchCreated(result, order)
+				s.eventService.NotifyDispatchReassigned(order, result, manualReason)
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // ==================== 后台任务处理 ====================
@@ -720,6 +1231,21 @@ func (s *DispatchService) ProcessPendingTasks() error {
 		}
 	}
 
+	if s.orderRepo != nil {
+		orders, _, err := s.orderRepo.List(1, 100, map[string]interface{}{
+			"status":         "pending_dispatch",
+			"needs_dispatch": true,
+		})
+		if err != nil {
+			return err
+		}
+		for i := range orders {
+			if _, err := s.EnsureOrderDispatch(orders[i].ID); err != nil && s.logger != nil {
+				s.logger.Warn("自动派单失败", zap.Int64("order_id", orders[i].ID), zap.Error(err))
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -736,6 +1262,17 @@ func (s *DispatchService) HandleExpiredTasks() error {
 			"fail_reason": "派单超时",
 		})
 		s.logAction(task.ID, "expired", "system", 0, nil)
+	}
+
+	expiredBefore := time.Now().Add(-time.Duration(s.config.ResponseTimeoutSeconds) * time.Second)
+	formalTasks, err := s.dispatchRepo.ListExpiredFormalTasks(expiredBefore, 100)
+	if err != nil {
+		return err
+	}
+	for _, task := range formalTasks {
+		if _, err := s.completeFormalTaskAndReassign(task.ID, 0, "expired", "正式派单响应超时"); err != nil && s.logger != nil {
+			s.logger.Warn("处理正式派单超时失败", zap.Int64("dispatch_task_id", task.ID), zap.Error(err))
+		}
 	}
 
 	return nil
@@ -780,4 +1317,527 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (s *DispatchService) ensureOrderDispatchWithRepos(
+	orderID int64,
+	dispatchRepo *repository.DispatchRepo,
+	orderRepo *repository.OrderRepo,
+	pilotRepo *repository.PilotRepo,
+	ownerRepo *repository.OwnerDomainRepo,
+	demandRepo *repository.DemandDomainRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+) (*model.FormalDispatchTask, bool, error) {
+	order, err := orderRepo.GetByID(orderID)
+	if err != nil {
+		return nil, false, errors.New("订单不存在")
+	}
+	if order.Status != "pending_dispatch" || !order.NeedsDispatch {
+		return nil, false, nil
+	}
+	if existing, err := dispatchRepo.GetActiveFormalTaskByOrder(order.ID); err == nil && existing != nil {
+		return existing, false, nil
+	}
+
+	history, err := dispatchRepo.ListFormalTasksByOrder(order.ID)
+	if err != nil {
+		return nil, false, err
+	}
+	excluded := buildExcludedPilotSet(history)
+	nextRetry := len(history)
+	if nextRetry >= maxFormalDispatchRetries {
+		task, err := s.markOrderManualDispatchRequired(order, dispatchRepo, orderRepo, artifactRepo, "自动重派次数已达上限，需机主手动处理")
+		return task, false, err
+	}
+
+	options, err := s.collectDispatchPilotOptions(order, excluded, ownerRepo, demandRepo, pilotRepo)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(options) == 0 {
+		task, err := s.markOrderManualDispatchRequired(order, dispatchRepo, orderRepo, artifactRepo, "当前无可用飞手，需机主手动处理")
+		return task, false, err
+	}
+
+	selected := options[0]
+	now := time.Now()
+	task := &model.FormalDispatchTask{
+		DispatchNo:        dispatchRepo.GenerateDispatchNo(),
+		OrderID:           order.ID,
+		ProviderUserID:    order.ProviderUserID,
+		TargetPilotUserID: selected.PilotUserID,
+		DispatchSource:    selected.Source,
+		RetryCount:        nextRetry,
+		Status:            "pending_response",
+		Reason:            selected.Reason,
+		SentAt:            &now,
+	}
+	if err := dispatchRepo.CreateFormalTask(task); err != nil {
+		return nil, false, err
+	}
+	if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+		DispatchTaskID: task.ID,
+		ActionType:     "created",
+		OperatorUserID: 0,
+		Note:           selected.Reason,
+	}); err != nil {
+		return nil, false, err
+	}
+	if nextRetry > 0 {
+		if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+			DispatchTaskID: task.ID,
+			ActionType:     "reassign",
+			OperatorUserID: 0,
+			Note:           fmt.Sprintf("自动重派第 %d 次", nextRetry),
+		}); err != nil {
+			return nil, false, err
+		}
+	}
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"dispatch_task_id": task.ID,
+		"execution_mode":   mapDispatchSourceToExecutionMode(selected.Source),
+		"updated_at":       now,
+	}); err != nil {
+		return nil, false, err
+	}
+	order.DispatchTaskID = &task.ID
+	order.ExecutionMode = mapDispatchSourceToExecutionMode(selected.Source)
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      order.ID,
+		Status:       "pending_dispatch",
+		Note:         fmt.Sprintf("已向飞手发起正式派单：%s", selected.Reason),
+		OperatorID:   0,
+		OperatorType: "system",
+	}); err != nil {
+		return nil, false, err
+	}
+	if artifactRepo != nil {
+		if err := repository.UpsertOrderSnapshotBundle(artifactRepo, order, nil, nil); err != nil {
+			return nil, false, err
+		}
+	}
+
+	return task, true, nil
+}
+
+func (s *DispatchService) reassignOrderAfterTerminalTask(
+	order *model.Order,
+	terminalTask *model.FormalDispatchTask,
+	dispatchRepo *repository.DispatchRepo,
+	orderRepo *repository.OrderRepo,
+	pilotRepo *repository.PilotRepo,
+	ownerRepo *repository.OwnerDomainRepo,
+	demandRepo *repository.DemandDomainRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+) (*model.FormalDispatchTask, error) {
+	if order == nil {
+		return nil, nil
+	}
+	nextTask, _, err := s.ensureOrderDispatchWithRepos(order.ID, dispatchRepo, orderRepo, pilotRepo, ownerRepo, demandRepo, artifactRepo)
+	if err != nil {
+		return nil, err
+	}
+	if nextTask == nil && terminalTask != nil {
+		if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+			DispatchTaskID: terminalTask.ID,
+			ActionType:     "reassign",
+			OperatorUserID: 0,
+			Note:           "无可用替补飞手，订单回退待人工处理",
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return nextTask, nil
+}
+
+func (s *DispatchService) markOrderManualDispatchRequired(
+	order *model.Order,
+	dispatchRepo *repository.DispatchRepo,
+	orderRepo *repository.OrderRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+	note string,
+) (*model.FormalDispatchTask, error) {
+	if order == nil {
+		return nil, nil
+	}
+	now := time.Now()
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"status":     "pending_dispatch",
+		"updated_at": now,
+	}); err != nil {
+		return nil, err
+	}
+	order.Status = "pending_dispatch"
+	latestTimeline, err := orderRepo.GetLatestTimeline(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	shouldAddTimeline := latestTimeline == nil || latestTimeline.Status != "pending_dispatch" || latestTimeline.Note != note
+	if shouldAddTimeline {
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "pending_dispatch",
+			Note:         note,
+			OperatorID:   0,
+			OperatorType: "system",
+		}); err != nil {
+			return nil, err
+		}
+	}
+	if artifactRepo != nil {
+		if err := repository.UpsertOrderSnapshotBundle(artifactRepo, order, nil, nil); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
+}
+
+func buildExcludedPilotSet(history []model.FormalDispatchTask) map[int64]bool {
+	excluded := make(map[int64]bool, len(history))
+	for _, item := range history {
+		if item.TargetPilotUserID == 0 {
+			continue
+		}
+		switch item.Status {
+		case "rejected", "expired", "exception", "accepted", "executing", "finished", "pending_response":
+			excluded[item.TargetPilotUserID] = true
+		}
+	}
+	return excluded
+}
+
+func (s *DispatchService) collectDispatchPilotOptions(
+	order *model.Order,
+	excluded map[int64]bool,
+	ownerRepo *repository.OwnerDomainRepo,
+	demandRepo *repository.DemandDomainRepo,
+	pilotRepo *repository.PilotRepo,
+) ([]dispatchPilotOption, error) {
+	options := make([]dispatchPilotOption, 0)
+	seen := make(map[int64]bool)
+
+	addOption := func(option dispatchPilotOption) {
+		if option.PilotUserID == 0 || excluded[option.PilotUserID] || seen[option.PilotUserID] {
+			return
+		}
+		seen[option.PilotUserID] = true
+		options = append(options, option)
+	}
+
+	if ownerRepo != nil {
+		bindings, _, err := ownerRepo.ListBindingsByOwner(order.ProviderUserID, "active", 1, 100)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		for _, binding := range bindings {
+			if pilotRepo != nil {
+				pilot, err := pilotRepo.GetByUserID(binding.PilotUserID)
+				if err != nil || pilot == nil || pilot.VerificationStatus != "verified" || pilot.AvailabilityStatus != "online" {
+					continue
+				}
+			}
+			reason := "优先指派绑定飞手"
+			if binding.IsPriority {
+				reason = "优先指派重点绑定飞手"
+			}
+			addOption(dispatchPilotOption{
+				PilotUserID:     binding.PilotUserID,
+				Source:          "bound_pilot",
+				Reason:          reason,
+				BindingPriority: binding.IsPriority,
+			})
+		}
+	}
+
+	if order.DemandID > 0 && demandRepo != nil {
+		candidates, err := demandRepo.ListActiveDemandCandidatesByDemand(order.DemandID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		for _, candidate := range candidates {
+			if pilotRepo != nil {
+				pilot, err := pilotRepo.GetByUserID(candidate.PilotUserID)
+				if err != nil || pilot == nil || pilot.VerificationStatus != "verified" || pilot.AvailabilityStatus != "online" {
+					continue
+				}
+			}
+			addOption(dispatchPilotOption{
+				PilotUserID: candidate.PilotUserID,
+				Source:      "candidate_pool",
+				Reason:      "优先触达该需求的候选飞手",
+			})
+		}
+	}
+
+	if pilotRepo != nil {
+		nearbyPilots, err := pilotRepo.FindNearby(order.ServiceLatitude, order.ServiceLongitude, s.config.MaxRadiusKM, 50)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		for _, pilot := range nearbyPilots {
+			addOption(dispatchPilotOption{
+				PilotUserID: pilot.UserID,
+				Source:      "general_pool",
+				Reason:      "扩展到普通飞手池自动派单",
+				Distance:    haversineDistance(order.ServiceLatitude, order.ServiceLongitude, pilot.CurrentLatitude, pilot.CurrentLongitude),
+			})
+		}
+	}
+
+	sortDispatchPilotOptions(options)
+	return options, nil
+}
+
+func sortDispatchPilotOptions(options []dispatchPilotOption) {
+	priorityOf := func(source string) int {
+		switch source {
+		case "bound_pilot":
+			return 0
+		case "candidate_pool":
+			return 1
+		default:
+			return 2
+		}
+	}
+	for i := 0; i < len(options); i++ {
+		for j := i + 1; j < len(options); j++ {
+			left := options[i]
+			right := options[j]
+			swap := false
+			if priorityOf(right.Source) < priorityOf(left.Source) {
+				swap = true
+			} else if priorityOf(right.Source) == priorityOf(left.Source) {
+				if right.Source == "bound_pilot" && right.BindingPriority && !left.BindingPriority {
+					swap = true
+				} else if right.Source == "general_pool" && right.Distance < left.Distance {
+					swap = true
+				}
+			}
+			if swap {
+				options[i], options[j] = options[j], options[i]
+			}
+		}
+	}
+}
+
+func mapDispatchSourceToExecutionMode(source string) string {
+	if source == "bound_pilot" {
+		return "bound_pilot"
+	}
+	return "dispatch_pool"
+}
+
+func buildDispatchTerminalNote(status, note string) string {
+	base := "正式派单已结束"
+	switch status {
+	case "rejected":
+		base = "飞手拒绝正式派单"
+	case "expired":
+		base = "正式派单已超时"
+	case "exception":
+		base = "正式派单出现异常"
+	}
+	if note == "" {
+		return base
+	}
+	return base + "：" + note
+}
+
+func (s *DispatchService) manualDispatchOrderWithRepos(
+	orderID, providerUserID int64,
+	dispatchMode string,
+	targetPilotUserID int64,
+	reason string,
+	dispatchRepo *repository.DispatchRepo,
+	orderRepo *repository.OrderRepo,
+	pilotRepo *repository.PilotRepo,
+	ownerRepo *repository.OwnerDomainRepo,
+	demandRepo *repository.DemandDomainRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+) (*model.Order, *model.FormalDispatchTask, bool, error) {
+	order, err := orderRepo.GetByID(orderID)
+	if err != nil {
+		return nil, nil, false, errors.New("订单不存在")
+	}
+	if order.ProviderUserID != providerUserID && order.OwnerID != providerUserID && order.DroneOwnerUserID != providerUserID {
+		return nil, nil, false, errors.New("无权派发该订单")
+	}
+	if order.Status != "pending_dispatch" {
+		return nil, nil, false, errors.New("当前订单状态不允许发起派单")
+	}
+
+	dispatchMode = normalizeManualDispatchMode(dispatchMode)
+	if dispatchMode == "" {
+		return nil, nil, false, errors.New("无效的派单方式")
+	}
+
+	if dispatchMode == "self_execute" {
+		pilot, err := pilotRepo.GetByUserID(providerUserID)
+		if err != nil || pilot == nil {
+			return nil, nil, false, errors.New("机主尚未具备可执行的飞手身份")
+		}
+		if pilot.VerificationStatus != "verified" {
+			return nil, nil, false, errors.New("机主飞手资质尚未审核通过，不能自执行")
+		}
+
+		now := time.Now()
+		if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+			"status":                 "assigned",
+			"needs_dispatch":         false,
+			"dispatch_task_id":       nil,
+			"executor_pilot_user_id": providerUserID,
+			"pilot_id":               pilot.ID,
+			"execution_mode":         "self_execute",
+			"updated_at":             now,
+		}); err != nil {
+			return nil, nil, false, err
+		}
+		order.Status = "assigned"
+		order.NeedsDispatch = false
+		order.DispatchTaskID = nil
+		order.ExecutorPilotUserID = providerUserID
+		order.PilotID = pilot.ID
+		order.ExecutionMode = "self_execute"
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "assigned",
+			Note:         firstNonEmpty(reason, "机主选择自执行，订单进入已分配"),
+			OperatorID:   providerUserID,
+			OperatorType: "owner",
+		}); err != nil {
+			return nil, nil, false, err
+		}
+		if artifactRepo != nil {
+			if err := repository.UpsertOrderSnapshotBundle(artifactRepo, order, nil, nil); err != nil {
+				return nil, nil, false, err
+			}
+		}
+		return order, nil, true, nil
+	}
+
+	if existing, err := dispatchRepo.GetActiveFormalTaskByOrder(order.ID); err == nil && existing != nil {
+		return nil, nil, false, errors.New("当前订单已有生效中的正式派单，请使用重派接口")
+	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, false, err
+	}
+
+	option, err := s.selectManualDispatchOption(order, dispatchMode, targetPilotUserID, ownerRepo, demandRepo, pilotRepo)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	now := time.Now()
+	history, err := dispatchRepo.ListFormalTasksByOrder(order.ID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	task := &model.FormalDispatchTask{
+		DispatchNo:        dispatchRepo.GenerateDispatchNo(),
+		OrderID:           order.ID,
+		ProviderUserID:    order.ProviderUserID,
+		TargetPilotUserID: option.PilotUserID,
+		DispatchSource:    option.Source,
+		RetryCount:        len(history),
+		Status:            "pending_response",
+		Reason:            firstNonEmpty(reason, option.Reason),
+		SentAt:            &now,
+	}
+	if err := dispatchRepo.CreateFormalTask(task); err != nil {
+		return nil, nil, false, err
+	}
+	if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+		DispatchTaskID: task.ID,
+		ActionType:     "created",
+		OperatorUserID: providerUserID,
+		Note:           firstNonEmpty(reason, option.Reason),
+	}); err != nil {
+		return nil, nil, false, err
+	}
+	if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+		DispatchTaskID: task.ID,
+		ActionType:     "manual_dispatch",
+		OperatorUserID: providerUserID,
+		Note:           fmt.Sprintf("机主手动派单，方式=%s", dispatchMode),
+	}); err != nil {
+		return nil, nil, false, err
+	}
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"dispatch_task_id": task.ID,
+		"needs_dispatch":   true,
+		"execution_mode":   mapDispatchSourceToExecutionMode(option.Source),
+		"updated_at":       now,
+	}); err != nil {
+		return nil, nil, false, err
+	}
+	order.DispatchTaskID = &task.ID
+	order.NeedsDispatch = true
+	order.ExecutionMode = mapDispatchSourceToExecutionMode(option.Source)
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      order.ID,
+		Status:       "pending_dispatch",
+		Note:         fmt.Sprintf("机主手动派单：%s", firstNonEmpty(reason, option.Reason)),
+		OperatorID:   providerUserID,
+		OperatorType: "owner",
+	}); err != nil {
+		return nil, nil, false, err
+	}
+	if artifactRepo != nil {
+		if err := repository.UpsertOrderSnapshotBundle(artifactRepo, order, nil, nil); err != nil {
+			return nil, nil, false, err
+		}
+	}
+
+	created, err := dispatchRepo.GetFormalTaskByID(task.ID)
+	if err != nil {
+		return order, task, false, nil
+	}
+	return order, created, false, nil
+}
+
+func (s *DispatchService) selectManualDispatchOption(
+	order *model.Order,
+	dispatchMode string,
+	targetPilotUserID int64,
+	ownerRepo *repository.OwnerDomainRepo,
+	demandRepo *repository.DemandDomainRepo,
+	pilotRepo *repository.PilotRepo,
+) (*dispatchPilotOption, error) {
+	if order == nil {
+		return nil, errors.New("订单不存在")
+	}
+
+	options, err := s.collectDispatchPilotOptions(order, map[int64]bool{}, ownerRepo, demandRepo, pilotRepo)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]dispatchPilotOption, 0, len(options))
+	for _, option := range options {
+		if dispatchMode != option.Source {
+			continue
+		}
+		if targetPilotUserID > 0 && option.PilotUserID != targetPilotUserID {
+			continue
+		}
+		filtered = append(filtered, option)
+	}
+	if len(filtered) == 0 {
+		switch dispatchMode {
+		case "bound_pilot":
+			return nil, errors.New("未找到可用的绑定飞手")
+		case "candidate_pool":
+			return nil, errors.New("未找到可用的候选飞手")
+		default:
+			return nil, errors.New("未找到可用的普通飞手")
+		}
+	}
+	return &filtered[0], nil
+}
+
+func normalizeManualDispatchMode(mode string) string {
+	switch mode {
+	case "self_execute", "bound_pilot", "candidate_pool", "general_pool":
+		return mode
+	default:
+		return ""
+	}
 }

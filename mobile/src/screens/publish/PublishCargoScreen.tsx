@@ -1,151 +1,166 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, Alert,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {demandService} from '../../services/demand';
-import {AddressData} from '../../types';
+
 import AddressInputField from '../../components/AddressInputField';
 import ImagePickerGroup from '../../components/ImagePickerGroup';
+import {demandV2Service} from '../../services/demandV2';
+import {AddressData} from '../../types';
 
-// 需要进行货物申报的类型（非普通包裹都建议申报）
-const REQUIRES_DECLARATION_TYPES = ['equipment', 'material', 'other'];
+const sceneOptions = [
+  {key: 'power_grid', label: '电网建设'},
+  {key: 'mountain_agriculture', label: '山区农副产品'},
+  {key: 'plateau_supply', label: '高原给养'},
+  {key: 'island_supply', label: '海岛补给'},
+  {key: 'emergency', label: '应急救援'},
+];
+
+const toAddressSnapshot = (value: AddressData | null | undefined) =>
+  value
+    ? {
+        text: value.address,
+        city: value.city,
+        district: value.district,
+        latitude: value.latitude,
+        longitude: value.longitude,
+      }
+    : undefined;
+
+const buildDefaultTimes = () => {
+  const start = new Date();
+  start.setDate(start.getDate() + 1);
+  start.setHours(8, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(18, 0, 0, 0);
+  const expires = new Date();
+  expires.setDate(expires.getDate() + 5);
+  expires.setHours(23, 59, 59, 0);
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    expires: expires.toISOString(),
+  };
+};
 
 export default function PublishCargoScreen({navigation}: any) {
-  const [cargoType, setCargoType] = useState('package');
+  const [cargoScene, setCargoScene] = useState(sceneOptions[0].key);
+  const [cargoType, setCargoType] = useState('material');
   const [cargoWeight, setCargoWeight] = useState('');
   const [cargoDescription, setCargoDescription] = useState('');
   const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
   const [offeredPrice, setOfferedPrice] = useState('');
+  const [tripCount, setTripCount] = useState('1');
   const [cargoImages, setCargoImages] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const cargoTypes = [
-    {key: 'package', label: '包裹快递'},
-    {key: 'equipment', label: '设备器材'},
-    {key: 'material', label: '物资材料'},
-    {key: 'other', label: '其他货物'},
-  ];
+  const defaults = useMemo(() => buildDefaultTimes(), []);
 
-  const needsDeclaration = REQUIRES_DECLARATION_TYPES.includes(cargoType);
-
-  const doPublish = async () => {
+  const handleSubmit = async () => {
     if (!pickupAddress || !deliveryAddress) {
-      Alert.alert('提示', '请填写取货和送达地址');
+      Alert.alert('提示', '请填写起点和终点地址');
       return;
     }
+    if (!(Number(cargoWeight) > 0)) {
+      Alert.alert('提示', '请填写有效的货物重量');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await demandService.createCargo({
+      const title = `${sceneOptions.find(item => item.key === cargoScene)?.label || '重载吊运'}：${pickupAddress.city || '起点'} -> ${deliveryAddress.city || '终点'}`;
+      const created = await demandV2Service.create({
+        title,
+        service_type: 'heavy_cargo_lift_transport',
+        cargo_scene: cargoScene,
+        description: cargoDescription.trim() || undefined,
+        departure_address: toAddressSnapshot(pickupAddress),
+        destination_address: toAddressSnapshot(deliveryAddress),
+        scheduled_start_at: defaults.start,
+        scheduled_end_at: defaults.end,
+        cargo_weight_kg: Number(cargoWeight),
         cargo_type: cargoType,
-        cargo_weight: Number(cargoWeight) || 0,
-        cargo_description: cargoDescription.trim(),
-        pickup_address: pickupAddress.address,
-        delivery_address: deliveryAddress.address,
-        offered_price: Number(offeredPrice) * 100 || 0,
-        images: cargoImages,
-        status: 'active',
+        cargo_special_requirements: cargoImages.length ? `附带货物照片 ${cargoImages.length} 张` : undefined,
+        estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
+        budget_max: offeredPrice ? Math.round(Number(offeredPrice) * 100) : undefined,
+        allows_pilot_candidate: true,
+        expires_at: defaults.expires,
       });
-      Alert.alert('成功', '货运需求发布成功', [
-        {text: '确定', onPress: () => navigation.goBack()},
+      await demandV2Service.publish(created.data.id);
+      Alert.alert('发布成功', '运输需求已进入公开需求市场。', [
+        {text: '查看需求', onPress: () => navigation.replace('DemandDetail', {id: created.data.id})},
       ]);
-    } catch (e: any) {
-      Alert.alert('发布失败', e.message);
+    } catch (error: any) {
+      Alert.alert('发布失败', error.message || '请稍后重试');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleSubmit = () => {
-    if (!pickupAddress || !deliveryAddress) {
-      Alert.alert('提示', '请填写取货和送达地址');
-      return;
-    }
-    // 非包裹类型：弹出申报引导
-    if (needsDeclaration) {
-      Alert.alert(
-        '建议先进行货物申报',
-        '您选择的货物类型属于特殊货物，建议在发布运单前先完成货物申报。申报审核通过后可享受更安全可靠的运输服务。',
-        [
-          {
-            text: '立即申报',
-            onPress: () => navigation.navigate('CargoDeclaration'),
-          },
-          {
-            text: '跳过，直接发布',
-            style: 'destructive',
-            onPress: doPublish,
-          },
-        ],
-      );
-      return;
-    }
-    doPublish();
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.label}>货物类型</Text>
-        <View style={styles.typeRow}>
-          {cargoTypes.map(ct => (
+        <Text style={styles.title}>发布运输需求</Text>
+        <Text style={styles.subtitle}>这里创建的是 v2 公开需求，不再直接生成旧货运订单。</Text>
+
+        <Text style={styles.label}>作业场景 *</Text>
+        <View style={styles.optionRow}>
+          {sceneOptions.map(option => (
             <TouchableOpacity
-              key={ct.key}
-              style={[styles.typeBtn, cargoType === ct.key && styles.typeBtnActive]}
-              onPress={() => setCargoType(ct.key)}>
-              <Text style={[styles.typeBtnText, cargoType === ct.key && styles.typeBtnTextActive]}>{ct.label}</Text>
+              key={option.key}
+              style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
+              onPress={() => setCargoScene(option.key)}>
+              <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>{option.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* 当选择非包裹类型时，显示申报引导横幅 */}
-        {needsDeclaration && (
-          <TouchableOpacity
-            style={styles.declarationBanner}
-            onPress={() => navigation.navigate('CargoDeclaration')}>
-            <Text style={styles.declarationBannerIcon}>⚠️</Text>
-            <View style={styles.declarationBannerText}>
-              <Text style={styles.declarationBannerTitle}>此类货物建议先申报</Text>
-              <Text style={styles.declarationBannerDesc}>设备器材、物资材料等特殊货物需先完成货物申报，审核通过后可享潜安全可靠运输。点此前往申报 ›</Text>
-            </View>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.label}>货物类型</Text>
+        <TextInput style={styles.input} placeholder="例如：塔材、设备器材、给养物资" value={cargoType} onChangeText={setCargoType} />
 
-        <Text style={styles.label}>货物重量 (kg)</Text>
-        <TextInput style={styles.input} placeholder="0" keyboardType="numeric" value={cargoWeight} onChangeText={setCargoWeight} />
+        <Text style={styles.label}>货物重量 (kg) *</Text>
+        <TextInput style={styles.input} keyboardType="numeric" placeholder="例如：120" value={cargoWeight} onChangeText={setCargoWeight} />
 
-        <Text style={styles.label}>货物描述</Text>
-        <TextInput style={[styles.input, {height: 70}]} placeholder="描述货物信息..." value={cargoDescription}
-          onChangeText={setCargoDescription} multiline textAlignVertical="top" />
+        <Text style={styles.label}>预计架次</Text>
+        <TextInput style={styles.input} keyboardType="numeric" placeholder="默认 1 架次" value={tripCount} onChangeText={setTripCount} />
+
+        <Text style={styles.label}>起点地址 *</Text>
+        <AddressInputField value={pickupAddress} placeholder="点击选择起点地址" onSelect={setPickupAddress} />
+
+        <Text style={styles.label}>终点地址 *</Text>
+        <AddressInputField value={deliveryAddress} placeholder="点击选择终点地址" onSelect={setDeliveryAddress} />
+
+        <Text style={styles.label}>预算上限 (元)</Text>
+        <TextInput style={styles.input} keyboardType="numeric" placeholder="可选，留空表示待沟通" value={offeredPrice} onChangeText={setOfferedPrice} />
+
+        <Text style={styles.label}>货物说明</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder="补充货物属性、装卸条件、现场风险等"
+          value={cargoDescription}
+          onChangeText={setCargoDescription}
+          multiline
+          textAlignVertical="top"
+        />
 
         <ImagePickerGroup
           label="货物照片（可选）"
-          hint="最多可上传 4 张，支持拍照或从相册选择"
+          hint="图片只作为需求补充说明，不再走旧货物订单链路。"
           images={cargoImages}
           onImagesChange={setCargoImages}
           maxCount={4}
         />
 
-        <Text style={styles.label}>取货地址 *</Text>
-        <AddressInputField
-          value={pickupAddress}
-          placeholder="点击选择取货地址"
-          onSelect={setPickupAddress}
-        />
-
-        <Text style={styles.label}>送达地址 *</Text>
-        <AddressInputField
-          value={deliveryAddress}
-          placeholder="点击选择送达地址"
-          onSelect={setDeliveryAddress}
-        />
-
-        <Text style={styles.label}>出价 (元)</Text>
-        <TextInput style={styles.input} placeholder="您愿意支付的运费" keyboardType="numeric" value={offeredPrice} onChangeText={setOfferedPrice} />
-
-        <TouchableOpacity style={[styles.submitBtn, submitting && {opacity: 0.6}]} onPress={handleSubmit} disabled={submitting}>
-          <Text style={styles.submitBtnText}>{submitting ? '发布中...' : '发布货运需求'}</Text>
+        <TouchableOpacity style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.submitBtnText}>{submitting ? '发布中...' : '发布运输需求'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -155,31 +170,44 @@ export default function PublishCargoScreen({navigation}: any) {
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#fff'},
   content: {padding: 20, paddingBottom: 40},
-  label: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8, marginTop: 16},
+  title: {fontSize: 24, fontWeight: '700', color: '#102a43'},
+  subtitle: {fontSize: 13, lineHeight: 20, color: '#6b7280', marginTop: 8},
+  label: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8, marginTop: 18},
   input: {
-    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 14,
-    paddingVertical: 10, fontSize: 15, backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#d9e2ec',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    backgroundColor: '#f8fafc',
   },
-  typeRow: {flexDirection: 'row', flexWrap: 'wrap'},
-  typeBtn: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
-    borderWidth: 1, borderColor: '#ddd', marginRight: 8, marginBottom: 8,
+  textarea: {height: 96},
+  optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
+  optionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#d9e2ec',
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: '#fff',
   },
-  typeBtnActive: {borderColor: '#1890ff', backgroundColor: '#e6f7ff'},
-  typeBtnText: {fontSize: 13, color: '#666'},
-  typeBtnTextActive: {color: '#1890ff'},
+  optionBtnActive: {
+    borderColor: '#fa8c16',
+    backgroundColor: '#fff7e6',
+  },
+  optionText: {fontSize: 13, color: '#475569'},
+  optionTextActive: {color: '#d46b08', fontWeight: '600'},
   submitBtn: {
-    marginTop: 30, height: 48, backgroundColor: '#fa8c16', borderRadius: 8,
-    justifyContent: 'center', alignItems: 'center',
+    marginTop: 28,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#fa8c16',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  submitBtnText: {color: '#fff', fontSize: 17, fontWeight: 'bold'},
-  declarationBanner: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#fff7e6', borderWidth: 1, borderColor: '#ffd591',
-    borderRadius: 8, padding: 12, marginTop: 12,
-  },
-  declarationBannerIcon: {fontSize: 18, marginRight: 10, marginTop: 1},
-  declarationBannerText: {flex: 1},
-  declarationBannerTitle: {fontSize: 14, fontWeight: '600', color: '#d46b08', marginBottom: 4},
-  declarationBannerDesc: {fontSize: 12, color: '#ad6800', lineHeight: 18},
+  submitBtnDisabled: {opacity: 0.6},
+  submitBtnText: {color: '#fff', fontSize: 17, fontWeight: '700'},
 });

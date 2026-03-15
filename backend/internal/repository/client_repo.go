@@ -1,9 +1,9 @@
 package repository
 
 import (
-	"wurenji-backend/internal/model"
 	"fmt"
 	"time"
+	"wurenji-backend/internal/model"
 
 	"gorm.io/gorm"
 )
@@ -14,6 +14,10 @@ type ClientRepo struct {
 
 func NewClientRepo(db *gorm.DB) *ClientRepo {
 	return &ClientRepo{db: db}
+}
+
+func (r *ClientRepo) DB() *gorm.DB {
+	return r.db
 }
 
 // ==================== Client CRUD ====================
@@ -170,7 +174,7 @@ func (r *ClientRepo) GetEnterpriseCertsByClientID(clientID int64) ([]model.Clien
 
 func (r *ClientRepo) GetValidEnterpriseCerts(clientID int64) ([]model.ClientEnterpriseCert, error) {
 	var certs []model.ClientEnterpriseCert
-	err := r.db.Where("client_id = ? AND status = ? AND (expire_date IS NULL OR expire_date > ?)", 
+	err := r.db.Where("client_id = ? AND status = ? AND (expire_date IS NULL OR expire_date > ?)",
 		clientID, "approved", time.Now()).Find(&certs).Error
 	return certs, err
 }

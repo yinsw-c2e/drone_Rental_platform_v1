@@ -13,8 +13,8 @@ import {Drone, Review} from '../../types';
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 const AVAILABILITY_MAP: Record<string, {label: string; color: string}> = {
-  available: {label: '可租赁', color: '#52c41a'},
-  rented: {label: '租赁中', color: '#faad14'},
+  available: {label: '可接单', color: '#52c41a'},
+  rented: {label: '执行中', color: '#faad14'},
   maintenance: {label: '维护中', color: '#ff4d4f'},
   offline: {label: '已下线', color: '#999'},
 };
@@ -69,19 +69,13 @@ export default function DroneDetailScreen({route, navigation}: any) {
   const handleRent = () => {
     if (!drone) return;
     if (drone.availability_status !== 'available') {
-      Alert.alert('提示', '该无人机当前不可租赁');
+      Alert.alert('提示', '该无人机当前不可接入市场链路');
       return;
     }
-    // 只传递必要的字段，避免参数过大
-    const droneParams = {
-      id: drone.id,
-      brand: drone.brand,
-      model: drone.model,
-      daily_price: drone.daily_price,
-      deposit: drone.deposit,
-      owner_id: drone.owner_id,
-    };
-    navigation.navigate('CreateOrder', {drone: droneParams});
+    Alert.alert('入口已切换', '新版下单链路统一从供给市场发起。', [
+      {text: '取消', style: 'cancel'},
+      {text: '去供给市场', onPress: () => navigation.navigate('OfferList')},
+    ]);
   };
 
   if (loading) {
@@ -195,7 +189,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
           <View style={styles.ratingRow}>
             {renderStars(Math.round(drone.rating || 0))}
             <Text style={styles.ratingText}>{drone.rating?.toFixed(1) || '0.0'}</Text>
-            <Text style={styles.orderCount}>{drone.order_count || 0}次租赁</Text>
+            <Text style={styles.orderCount}>{drone.order_count || 0}次履约</Text>
           </View>
         </View>
 
@@ -322,7 +316,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
             ]}
             onPress={handleRent}>
             <Text style={styles.bottomRentText}>
-              {drone.availability_status === 'available' ? '立即租赁' : availability.label}
+              {drone.availability_status === 'available' ? '去供给市场' : availability.label}
             </Text>
           </TouchableOpacity>
         </View>

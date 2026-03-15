@@ -79,7 +79,7 @@ func main() {
 		log.Fatal("数据库连接失败:", err)
 	}
 
-	fmt.Println("为管理员账号(user_id=1)添加测试订单...\n")
+	fmt.Println("为管理员账号(user_id=1)添加测试订单...")
 
 	// 订单1：进行中
 	now := time.Now()

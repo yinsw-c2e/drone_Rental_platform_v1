@@ -15,7 +15,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     try {
       const res: any = await adminApi.login(values.phone, values.password);
       const token = res.data.token.access_token;
+      const refreshToken = res.data.token.refresh_token;
       localStorage.setItem('admin_token', token);
+      if (refreshToken) {
+        localStorage.setItem('admin_refresh_token', refreshToken);
+      }
       onLogin(token);
       message.success('登录成功');
     } catch (e: any) {

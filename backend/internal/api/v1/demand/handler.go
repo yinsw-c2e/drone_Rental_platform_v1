@@ -49,7 +49,7 @@ func (h *Handler) GetOffer(c *gin.Context) {
 
 func (h *Handler) UpdateOffer(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	userID := c.GetInt64("user_id")
+	userID := middleware.GetUserID(c)
 
 	// 验证是否是供给的机主
 	existingOffer, err := h.demandService.GetOffer(id)
@@ -62,14 +62,19 @@ func (h *Handler) UpdateOffer(c *gin.Context) {
 		return
 	}
 
-	var offer model.RentalOffer
-	if err := c.ShouldBindJSON(&offer); err != nil {
+	updatedOffer := *existingOffer
+	if err := c.ShouldBindJSON(&updatedOffer); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-	offer.ID = id
-	offer.OwnerID = userID // 保持原机主
-	if err := h.demandService.UpdateOffer(&offer); err != nil {
+	updatedOffer.ID = id
+	updatedOffer.OwnerID = userID
+	updatedOffer.CreatedAt = existingOffer.CreatedAt
+	updatedOffer.UpdatedAt = existingOffer.UpdatedAt
+	updatedOffer.DeletedAt = existingOffer.DeletedAt
+	updatedOffer.Owner = nil
+	updatedOffer.Drone = nil
+	if err := h.demandService.UpdateOffer(&updatedOffer); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
@@ -78,6 +83,16 @@ func (h *Handler) UpdateOffer(c *gin.Context) {
 
 func (h *Handler) DeleteOffer(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	userID := middleware.GetUserID(c)
+	existingOffer, err := h.demandService.GetOffer(id)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "供给不存在")
+		return
+	}
+	if existingOffer.OwnerID != userID {
+		response.Error(c, response.CodeForbidden, "无权操作此供给")
+		return
+	}
 	if err := h.demandService.DeleteOffer(id); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
@@ -127,6 +142,7 @@ func (h *Handler) CreateDemand(c *gin.Context) {
 		return
 	}
 	demand.RenterID = userID
+	demand.ClientID = 0
 	if err := h.demandService.CreateDemand(&demand); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
@@ -150,13 +166,30 @@ func (h *Handler) GetDemand(c *gin.Context) {
 
 func (h *Handler) UpdateDemand(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	var demand model.RentalDemand
-	if err := c.ShouldBindJSON(&demand); err != nil {
+	userID := middleware.GetUserID(c)
+	existingDemand, err := h.demandService.GetDemand(id)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "需求不存在")
+		return
+	}
+	if existingDemand.RenterID != userID {
+		response.Error(c, response.CodeForbidden, "无权操作此需求")
+		return
+	}
+
+	updatedDemand := *existingDemand
+	if err := c.ShouldBindJSON(&updatedDemand); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-	demand.ID = id
-	if err := h.demandService.UpdateDemand(&demand); err != nil {
+	updatedDemand.ID = id
+	updatedDemand.RenterID = existingDemand.RenterID
+	updatedDemand.ClientID = existingDemand.ClientID
+	updatedDemand.CreatedAt = existingDemand.CreatedAt
+	updatedDemand.UpdatedAt = existingDemand.UpdatedAt
+	updatedDemand.DeletedAt = existingDemand.DeletedAt
+	updatedDemand.Renter = nil
+	if err := h.demandService.UpdateDemand(&updatedDemand); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
@@ -165,6 +198,16 @@ func (h *Handler) UpdateDemand(c *gin.Context) {
 
 func (h *Handler) DeleteDemand(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	userID := middleware.GetUserID(c)
+	existingDemand, err := h.demandService.GetDemand(id)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "需求不存在")
+		return
+	}
+	if existingDemand.RenterID != userID {
+		response.Error(c, response.CodeForbidden, "无权操作此需求")
+		return
+	}
 	if err := h.demandService.DeleteDemand(id); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
@@ -224,6 +267,7 @@ func (h *Handler) CreateCargo(c *gin.Context) {
 		return
 	}
 	cargo.PublisherID = userID
+	cargo.ClientID = 0
 	if err := h.demandService.CreateCargo(&cargo); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
@@ -246,13 +290,30 @@ func (h *Handler) GetCargo(c *gin.Context) {
 
 func (h *Handler) UpdateCargo(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	var cargo model.CargoDemand
-	if err := c.ShouldBindJSON(&cargo); err != nil {
+	userID := middleware.GetUserID(c)
+	existingCargo, err := h.demandService.GetCargo(id)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "货运需求不存在")
+		return
+	}
+	if existingCargo.PublisherID != userID {
+		response.Error(c, response.CodeForbidden, "无权操作此货运需求")
+		return
+	}
+
+	updatedCargo := *existingCargo
+	if err := c.ShouldBindJSON(&updatedCargo); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-	cargo.ID = id
-	if err := h.demandService.UpdateCargo(&cargo); err != nil {
+	updatedCargo.ID = id
+	updatedCargo.PublisherID = existingCargo.PublisherID
+	updatedCargo.ClientID = existingCargo.ClientID
+	updatedCargo.CreatedAt = existingCargo.CreatedAt
+	updatedCargo.UpdatedAt = existingCargo.UpdatedAt
+	updatedCargo.DeletedAt = existingCargo.DeletedAt
+	updatedCargo.Publisher = nil
+	if err := h.demandService.UpdateCargo(&updatedCargo); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
@@ -261,6 +322,16 @@ func (h *Handler) UpdateCargo(c *gin.Context) {
 
 func (h *Handler) DeleteCargo(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	userID := middleware.GetUserID(c)
+	existingCargo, err := h.demandService.GetCargo(id)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, "货运需求不存在")
+		return
+	}
+	if existingCargo.PublisherID != userID {
+		response.Error(c, response.CodeForbidden, "无权操作此货运需求")
+		return
+	}
 	if err := h.demandService.DeleteCargo(id); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return

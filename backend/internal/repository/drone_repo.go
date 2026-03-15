@@ -14,6 +14,10 @@ func NewDroneRepo(db *gorm.DB) *DroneRepo {
 	return &DroneRepo{db: db}
 }
 
+func (r *DroneRepo) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *DroneRepo) Create(drone *model.Drone) error {
 	return r.db.Create(drone).Error
 }
@@ -46,6 +50,27 @@ func (r *DroneRepo) ListByOwner(ownerID int64, page, pageSize int) ([]model.Dron
 	return drones, total, err
 }
 
+func (r *DroneRepo) CountByOwner(ownerID int64) (int64, error) {
+	var total int64
+	err := r.db.Model(&model.Drone{}).Where("owner_id = ?", ownerID).Count(&total).Error
+	return total, err
+}
+
+func (r *DroneRepo) CountMarketplaceEligibleByOwner(ownerID int64) (int64, error) {
+	var total int64
+	err := r.db.Model(&model.Drone{}).
+		Where("owner_id = ?", ownerID).
+		Where("availability_status = ?", "available").
+		Where("certification_status = ?", "approved").
+		Where("uom_verified = ?", "verified").
+		Where("insurance_verified = ?", "verified").
+		Where("airworthiness_verified = ?", "verified").
+		Where("mtow_kg >= ?", model.HeavyLiftMinMTOWKG).
+		Where("COALESCE(NULLIF(max_payload_kg, 0), max_load) >= ?", model.HeavyLiftMinPayloadKG).
+		Count(&total).Error
+	return total, err
+}
+
 func (r *DroneRepo) List(page, pageSize int, filters map[string]interface{}) ([]model.Drone, int64, error) {
 	var drones []model.Drone
 	var total int64
@@ -70,6 +95,11 @@ func (r *DroneRepo) FindNearby(lat, lng, radiusKM float64, page, pageSize int) (
 	query := r.db.Model(&model.Drone{}).
 		Where("availability_status = ?", "available").
 		Where("certification_status = ?", "approved").
+		Where("uom_verified = ?", "verified").
+		Where("insurance_verified = ?", "verified").
+		Where("airworthiness_verified = ?", "verified").
+		Where("mtow_kg >= ?", model.HeavyLiftMinMTOWKG).
+		Where("COALESCE(NULLIF(max_payload_kg, 0), max_load) >= ?", model.HeavyLiftMinPayloadKG).
 		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM)
 
 	query.Count(&total)
@@ -151,6 +181,8 @@ func (r *DroneRepo) FindFullyCertifiedDrones(lat, lng, radiusKM float64, page, p
 		Where("uom_verified = ?", "verified").
 		Where("insurance_verified = ?", "verified").
 		Where("airworthiness_verified = ?", "verified").
+		Where("mtow_kg >= ?", model.HeavyLiftMinMTOWKG).
+		Where("COALESCE(NULLIF(max_payload_kg, 0), max_load) >= ?", model.HeavyLiftMinPayloadKG).
 		Where("insurance_expire_date > NOW()").
 		Where("airworthiness_cert_expire > NOW()").
 		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM)

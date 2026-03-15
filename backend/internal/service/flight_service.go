@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/repository"
@@ -17,6 +18,7 @@ import (
 type FlightService struct {
 	flightRepo *repository.FlightRepo
 	orderRepo  *repository.OrderRepo
+	pilotRepo  *repository.PilotRepo
 	logger     *zap.Logger
 
 	// 配置
@@ -37,10 +39,16 @@ type FlightServiceConfig struct {
 	TrajectorySimpTolerance int // 轨迹简化容差(米)
 }
 
-func NewFlightService(flightRepo *repository.FlightRepo, orderRepo *repository.OrderRepo, logger *zap.Logger) *FlightService {
+func NewFlightService(
+	flightRepo *repository.FlightRepo,
+	orderRepo *repository.OrderRepo,
+	pilotRepo *repository.PilotRepo,
+	logger *zap.Logger,
+) *FlightService {
 	s := &FlightService{
 		flightRepo: flightRepo,
 		orderRepo:  orderRepo,
+		pilotRepo:  pilotRepo,
 		logger:     logger,
 		config: FlightServiceConfig{
 			LowBatteryWarning:       30,
@@ -71,6 +79,13 @@ func (s *FlightService) loadConfigFromDB() {
 	s.config.PositionReportInterval = s.flightRepo.GetConfigInt("position_report_interval", 3)
 	s.config.GeofenceAlertDistance = s.flightRepo.GetConfigInt("geofence_alert_distance", 100)
 	s.config.TrajectorySimpTolerance = s.flightRepo.GetConfigInt("trajectory_simplify_tolerance", 5)
+}
+
+func (s *FlightService) AdminListFlightRecords(page, pageSize int, filters map[string]interface{}) ([]model.FlightRecord, int64, error) {
+	if s.flightRepo == nil {
+		return nil, 0, errors.New("飞行记录仓储未初始化")
+	}
+	return s.flightRepo.AdminListFlightRecords(page, pageSize, filters)
 }
 
 // ==================== 位置上报 ====================
@@ -115,14 +130,342 @@ func (s *FlightService) ReportPosition(req *ReportPositionRequest) (*model.Fligh
 		RecordedAt:     time.Now(),
 	}
 
+	return s.persistPosition(pos, req.PilotID)
+}
+
+func (s *FlightService) persistPosition(pos *model.FlightPosition, fallbackPilotID int64) (*model.FlightPosition, []model.FlightAlert, error) {
+	order, err := s.orderRepo.GetByID(pos.OrderID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	record, err := s.ensureFlightRecord(order, fallbackPilotID, pos.RecordedAt)
+	if err != nil {
+		return nil, nil, err
+	}
+	pos.FlightRecordID = &record.ID
+
 	if err := s.flightRepo.RecordPosition(pos); err != nil {
 		return nil, nil, err
 	}
 
-	// 检查并生成告警
 	alerts := s.checkAndCreateAlerts(pos)
+	if _, err := s.refreshFlightRecordMetrics(record, order); err != nil {
+		return pos, alerts, err
+	}
 
 	return pos, alerts, nil
+}
+
+func (s *FlightService) SyncOrderFlightRecord(orderID int64) error {
+	order, err := s.orderRepo.GetByID(orderID)
+	if err != nil {
+		return err
+	}
+	_, err = s.syncOrderFlightRecord(order)
+	return err
+}
+
+func (s *FlightService) SyncPilotFulfillmentRecords(pilotID int64) error {
+	if pilotID <= 0 {
+		return nil
+	}
+
+	pilot, err := s.pilotRepo.GetByID(pilotID)
+	if err != nil {
+		return err
+	}
+	if pilot.UserID <= 0 {
+		return nil
+	}
+
+	orders, err := s.orderRepo.ListOrdersForFlightSyncByPilotUser(pilot.UserID)
+	if err != nil {
+		return err
+	}
+	for i := range orders {
+		if _, err := s.syncOrderFlightRecord(&orders[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *FlightService) syncOrderFlightRecord(order *model.Order) (*model.FlightRecord, error) {
+	if order == nil || order.ID == 0 {
+		return nil, nil
+	}
+
+	record, err := s.flightRepo.GetLatestFlightRecordByOrder(order.ID)
+	if err == nil && record != nil {
+		return s.refreshFlightRecordMetrics(record, order)
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if !s.shouldMaterializeFlightRecord(order) {
+		return nil, nil
+	}
+
+	recordedAt := order.UpdatedAt
+	if order.CompletedAt != nil {
+		recordedAt = *order.CompletedAt
+	}
+	if order.FlightEndTime != nil {
+		recordedAt = *order.FlightEndTime
+	}
+	if order.FlightStartTime != nil {
+		recordedAt = *order.FlightStartTime
+	}
+
+	record, err = s.ensureFlightRecord(order, order.PilotID, recordedAt)
+	if err != nil {
+		return nil, err
+	}
+	return s.refreshFlightRecordMetrics(record, order)
+}
+
+func (s *FlightService) shouldMaterializeFlightRecord(order *model.Order) bool {
+	if order == nil {
+		return false
+	}
+	if order.FlightStartTime != nil || order.FlightEndTime != nil {
+		return true
+	}
+	if order.ActualFlightDuration > 0 || order.ActualFlightDistance > 0 || order.MaxAltitude > 0 {
+		return true
+	}
+	positionCount, err := s.flightRepo.CountPositionsByOrder(order.ID)
+	if err == nil && positionCount > 0 {
+		return true
+	}
+	return false
+}
+
+func (s *FlightService) ensureFlightRecord(order *model.Order, fallbackPilotID int64, recordedAt time.Time) (*model.FlightRecord, error) {
+	record, err := s.flightRepo.GetActiveFlightRecordByOrder(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if err == nil {
+		if syncErr := s.syncFlightRecordWithOrder(record, order, fallbackPilotID, recordedAt); syncErr != nil {
+			return nil, syncErr
+		}
+		return record, nil
+	}
+
+	recordCount, err := s.flightRepo.CountFlightRecordsByOrder(order.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	pilotUserID, err := s.resolvePilotUserID(order, fallbackPilotID)
+	if err != nil {
+		return nil, err
+	}
+
+	takeoffAt := recordedAt
+	if order.FlightStartTime != nil {
+		takeoffAt = *order.FlightStartTime
+	}
+
+	orderNo := order.OrderNo
+	if orderNo == "" {
+		orderNo = fmt.Sprintf("ORD%d", order.ID)
+	}
+
+	record = &model.FlightRecord{
+		FlightNo:             fmt.Sprintf("%s-F%d", orderNo, recordCount+1),
+		OrderID:              order.ID,
+		DispatchTaskID:       order.DispatchTaskID,
+		PilotUserID:          pilotUserID,
+		DroneID:              order.DroneID,
+		TakeoffAt:            &takeoffAt,
+		TotalDurationSeconds: order.ActualFlightDuration,
+		TotalDistanceM:       float64(order.ActualFlightDistance),
+		MaxAltitudeM:         float64(order.MaxAltitude),
+		Status:               "executing",
+	}
+	if order.FlightEndTime != nil {
+		record.LandingAt = order.FlightEndTime
+		record.Status = "completed"
+	}
+
+	if err := s.flightRepo.CreateFlightRecord(record); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func (s *FlightService) resolvePilotUserID(order *model.Order, fallbackPilotID int64) (int64, error) {
+	if order.ExecutorPilotUserID > 0 {
+		return order.ExecutorPilotUserID, nil
+	}
+	if order.PilotID > 0 {
+		pilot, err := s.pilotRepo.GetByID(order.PilotID)
+		if err == nil && pilot.UserID > 0 {
+			return pilot.UserID, nil
+		}
+	}
+	if fallbackPilotID > 0 {
+		pilot, err := s.pilotRepo.GetByID(fallbackPilotID)
+		if err == nil && pilot.UserID > 0 {
+			return pilot.UserID, nil
+		}
+	}
+	return 0, nil
+}
+
+func (s *FlightService) syncFlightRecordWithOrder(record *model.FlightRecord, order *model.Order, fallbackPilotID int64, recordedAt time.Time) error {
+	changed := false
+
+	if record.DispatchTaskID == nil && order.DispatchTaskID != nil {
+		record.DispatchTaskID = order.DispatchTaskID
+		changed = true
+	}
+	if record.PilotUserID == 0 {
+		pilotUserID, err := s.resolvePilotUserID(order, fallbackPilotID)
+		if err != nil {
+			return err
+		}
+		if pilotUserID > 0 {
+			record.PilotUserID = pilotUserID
+			changed = true
+		}
+	}
+	if record.TakeoffAt == nil {
+		takeoffAt := recordedAt
+		if order.FlightStartTime != nil {
+			takeoffAt = *order.FlightStartTime
+		}
+		record.TakeoffAt = &takeoffAt
+		changed = true
+	} else if order.FlightStartTime != nil && order.FlightStartTime.Before(*record.TakeoffAt) {
+		record.TakeoffAt = order.FlightStartTime
+		changed = true
+	}
+
+	if order.FlightEndTime != nil && (record.LandingAt == nil || order.FlightEndTime.After(*record.LandingAt)) {
+		record.LandingAt = order.FlightEndTime
+		changed = true
+	}
+
+	targetStatus := record.Status
+	switch {
+	case order.Status == "cancelled" && record.TakeoffAt != nil:
+		targetStatus = "aborted"
+	case record.LandingAt != nil || order.Status == "delivered" || order.Status == "completed":
+		targetStatus = "completed"
+	case record.TakeoffAt != nil || order.Status == "in_transit":
+		targetStatus = "executing"
+	default:
+		targetStatus = "pending"
+	}
+	if targetStatus != record.Status {
+		record.Status = targetStatus
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return s.flightRepo.UpdateFlightRecord(record)
+}
+
+func (s *FlightService) refreshFlightRecordMetrics(record *model.FlightRecord, order *model.Order) (*model.FlightRecord, error) {
+	positions, err := s.flightRepo.GetPositionsByFlightRecord(record.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.syncFlightRecordWithOrder(record, order, order.PilotID, time.Now()); err != nil {
+		return nil, err
+	}
+
+	durationSec, distanceMeters, maxAlt := calcFlightMetricsFromPositions(positions)
+	if durationSec == 0 && order.ActualFlightDuration > 0 {
+		durationSec = int64(order.ActualFlightDuration)
+	}
+	if record.TakeoffAt == nil && len(positions) > 0 {
+		record.TakeoffAt = &positions[0].RecordedAt
+	}
+	if record.LandingAt == nil && order.FlightEndTime != nil {
+		record.LandingAt = order.FlightEndTime
+	}
+
+	if durationSec == 0 && record.TakeoffAt != nil && record.LandingAt != nil && record.LandingAt.After(*record.TakeoffAt) {
+		durationSec = int64(record.LandingAt.Sub(*record.TakeoffAt).Seconds())
+	}
+
+	record.TotalDurationSeconds = int(durationSec)
+	if distanceMeters == 0 && order.ActualFlightDistance > 0 {
+		distanceMeters = float64(order.ActualFlightDistance)
+	}
+	record.TotalDistanceM = distanceMeters
+	record.MaxAltitudeM = math.Max(math.Max(float64(maxAlt), float64(order.MaxAltitude)), record.MaxAltitudeM)
+
+	if err := s.syncFlightRecordWithOrder(record, order, order.PilotID, time.Now()); err != nil {
+		return nil, err
+	}
+	if err := s.flightRepo.UpdateFlightRecord(record); err != nil {
+		return nil, err
+	}
+	if err := s.syncOrderFlightSummary(order.ID); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func (s *FlightService) syncOrderFlightSummary(orderID int64) error {
+	records, err := s.flightRepo.ListFlightRecordsByOrder(orderID)
+	if err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		return nil
+	}
+
+	totalDuration := 0
+	totalDistance := 0.0
+	maxAltitude := 0.0
+	var earliestTakeoff *time.Time
+	var latestLanding *time.Time
+
+	for _, record := range records {
+		totalDuration += record.TotalDurationSeconds
+		totalDistance += record.TotalDistanceM
+		if record.MaxAltitudeM > maxAltitude {
+			maxAltitude = record.MaxAltitudeM
+		}
+		if record.TakeoffAt != nil && (earliestTakeoff == nil || record.TakeoffAt.Before(*earliestTakeoff)) {
+			t := *record.TakeoffAt
+			earliestTakeoff = &t
+		}
+		if record.LandingAt != nil && (latestLanding == nil || record.LandingAt.After(*latestLanding)) {
+			t := *record.LandingAt
+			latestLanding = &t
+		}
+	}
+
+	avgSpeed := 0
+	if totalDuration > 0 {
+		avgSpeed = int(math.Round((totalDistance / float64(totalDuration)) * 100))
+	}
+
+	fields := map[string]interface{}{
+		"actual_flight_duration": totalDuration,
+		"actual_flight_distance": int(math.Round(totalDistance)),
+		"max_altitude":           int(math.Round(maxAltitude)),
+		"avg_speed":              avgSpeed,
+	}
+	if earliestTakeoff != nil {
+		fields["flight_start_time"] = *earliestTakeoff
+	}
+	if latestLanding != nil {
+		fields["flight_end_time"] = *latestLanding
+	}
+
+	return s.orderRepo.UpdateFields(orderID, fields)
 }
 
 // checkAndCreateAlerts 检查状态并创建告警
@@ -194,6 +537,7 @@ func (s *FlightService) createAlert(pos *model.FlightPosition, alertType, level,
 	lng := pos.Longitude
 	alt := pos.Altitude
 	return model.FlightAlert{
+		FlightRecordID: pos.FlightRecordID,
 		OrderID:        pos.OrderID,
 		DroneID:        pos.DroneID,
 		PilotID:        pos.PilotID,
@@ -233,19 +577,20 @@ func (s *FlightService) checkGeofences(pos *model.FlightPosition) []model.Flight
 			}
 
 			alert := model.FlightAlert{
-				OrderID:     pos.OrderID,
-				DroneID:     pos.DroneID,
-				PilotID:     pos.PilotID,
-				AlertType:   "geofence",
-				AlertLevel:  level,
-				AlertCode:   "GEO_VIOLATION",
-				Title:       fmt.Sprintf("进入%s", fence.Name),
-				Description: fmt.Sprintf("无人机已进入%s(%s)，请立即撤离", fence.Name, fence.FenceType),
-				Latitude:    &pos.Latitude,
-				Longitude:   &pos.Longitude,
-				Altitude:    &pos.Altitude,
-				Status:      "active",
-				TriggeredAt: time.Now(),
+				FlightRecordID: pos.FlightRecordID,
+				OrderID:        pos.OrderID,
+				DroneID:        pos.DroneID,
+				PilotID:        pos.PilotID,
+				AlertType:      "geofence",
+				AlertLevel:     level,
+				AlertCode:      "GEO_VIOLATION",
+				Title:          fmt.Sprintf("进入%s", fence.Name),
+				Description:    fmt.Sprintf("无人机已进入%s(%s)，请立即撤离", fence.Name, fence.FenceType),
+				Latitude:       &pos.Latitude,
+				Longitude:      &pos.Longitude,
+				Altitude:       &pos.Altitude,
+				Status:         "active",
+				TriggeredAt:    time.Now(),
 			}
 			alerts = append(alerts, alert)
 
@@ -845,7 +1190,31 @@ func (s *FlightService) CompleteMultiPointTask(taskID int64) error {
 
 // GetFlightStats 获取飞行统计
 func (s *FlightService) GetFlightStats(orderID int64) (map[string]interface{}, error) {
+	if err := s.SyncOrderFlightRecord(orderID); err != nil {
+		return nil, err
+	}
 	return s.flightRepo.GetFlightStats(orderID)
+}
+
+func (s *FlightService) GetLatestFlightRecordByOrder(orderID int64) (*model.FlightRecord, error) {
+	if err := s.SyncOrderFlightRecord(orderID); err != nil {
+		return nil, err
+	}
+	return s.flightRepo.GetLatestFlightRecordByOrder(orderID)
+}
+
+func (s *FlightService) GetActiveFlightRecordByOrder(orderID int64) (*model.FlightRecord, error) {
+	if err := s.SyncOrderFlightRecord(orderID); err != nil {
+		return nil, err
+	}
+	return s.flightRepo.GetActiveFlightRecordByOrder(orderID)
+}
+
+func (s *FlightService) ListFlightRecordsByOrder(orderID int64) ([]model.FlightRecord, error) {
+	if err := s.SyncOrderFlightRecord(orderID); err != nil {
+		return nil, err
+	}
+	return s.flightRepo.ListFlightRecordsByOrder(orderID)
 }
 
 // GetLatestPosition 获取最新位置
@@ -961,7 +1330,7 @@ func (s *FlightService) GetDispatchCoords(order *model.Order) (startLat, startLn
 
 // SaveSimulatePosition 保存模拟飞行位置点
 func (s *FlightService) SaveSimulatePosition(pos *model.FlightPosition) {
-	if err := s.flightRepo.RecordPosition(pos); err != nil {
+	if _, _, err := s.persistPosition(pos, pos.PilotID); err != nil {
 		s.logger.Error("模拟飞行位置保存失败", zap.Error(err))
 	}
 }

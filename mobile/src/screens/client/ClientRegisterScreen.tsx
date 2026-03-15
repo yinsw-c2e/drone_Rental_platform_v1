@@ -1,28 +1,24 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  Alert,
+  Image,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
-  Alert,
+  StyleSheet,
+  Text,
   TextInput,
-  Image,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
-import {
-  registerIndividual,
-  registerEnterprise,
-  RegisterEnterpriseRequest,
-} from '../../services/client';
+
+import ObjectCard from '../../components/business/ObjectCard';
+import StatusBadge from '../../components/business/StatusBadge';
+import {registerEnterprise, RegisterEnterpriseRequest} from '../../services/client';
 import api from '../../services/api';
 
 export default function ClientRegisterScreen({navigation}: any) {
-  const [clientType, setClientType] = useState<'individual' | 'enterprise'>('individual');
   const [loading, setLoading] = useState(false);
-
-  // 企业表单
   const [companyName, setCompanyName] = useState('');
   const [licenseNo, setLicenseNo] = useState('');
   const [licenseDoc, setLicenseDoc] = useState('');
@@ -30,6 +26,11 @@ export default function ClientRegisterScreen({navigation}: any) {
   const [contactPerson, setContactPerson] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+
+  const completedCount = useMemo(() => {
+    return [companyName, licenseNo, licenseDoc, contactPerson || contactPhone || contactEmail || legalRep]
+      .filter(Boolean).length;
+  }, [companyName, contactEmail, contactPerson, contactPhone, legalRep, licenseDoc, licenseNo]);
 
   const pickImage = async () => {
     try {
@@ -40,58 +41,37 @@ export default function ClientRegisterScreen({navigation}: any) {
         maxHeight: 1200,
       });
 
-      if (result.assets && result.assets[0]) {
+      if (result.assets?.[0]) {
         const asset = result.assets[0];
         const formData = new FormData();
         formData.append('file', {
           uri: asset.uri,
           type: asset.type || 'image/jpeg',
-          name: asset.fileName || 'license.jpg',
+          name: asset.fileName || 'business-license.jpg',
         } as any);
 
         const uploadRes: any = await api.post('/pilot/upload-cert', formData, {
           headers: {'Content-Type': 'multipart/form-data'},
         });
         setLicenseDoc(uploadRes.data.url);
-        Alert.alert('提示', '图片上传成功');
+        Alert.alert('上传成功', '营业执照图片已上传。');
       }
     } catch (e: any) {
-      Alert.alert('错误', e.message || '图片上传失败');
-    }
-  };
-
-  const handleSubmitIndividual = async () => {
-    setLoading(true);
-    try {
-      await registerIndividual();
-      Alert.alert('成功', '个人客户注册成功', [
-        {text: '确定', onPress: () => navigation.goBack()},
-      ]);
-    } catch (e: any) {
-      const errMsg: string = e.response?.data?.error || e.message || '注册失败';
-      if (errMsg.includes('已存在')) {
-        Alert.alert('提示', '您已完成客户注册，无需重复注册', [
-          {text: '确定', onPress: () => navigation.goBack()},
-        ]);
-      } else {
-        Alert.alert('注册失败', errMsg);
-      }
-    } finally {
-      setLoading(false);
+      Alert.alert('上传失败', e?.message || '请稍后重试');
     }
   };
 
   const handleSubmitEnterprise = async () => {
     if (!companyName.trim()) {
-      Alert.alert('提示', '请输入企业名称');
+      Alert.alert('请补充信息', '请输入企业名称');
       return;
     }
     if (!licenseNo.trim()) {
-      Alert.alert('提示', '请输入统一社会信用代码');
+      Alert.alert('请补充信息', '请输入统一社会信用代码');
       return;
     }
     if (!licenseDoc) {
-      Alert.alert('提示', '请上传营业执照');
+      Alert.alert('请补充信息', '请上传营业执照');
       return;
     }
 
@@ -107,149 +87,130 @@ export default function ClientRegisterScreen({navigation}: any) {
         contact_email: contactEmail.trim() || undefined,
       };
       await registerEnterprise(data);
-      Alert.alert('成功', '企业客户注册申请已提交，请等待审核', [
-        {text: '确定', onPress: () => navigation.goBack()},
+      Alert.alert('提交成功', '企业客户升级申请已提交，请等待审核。', [
+        {text: '返回客户档案', onPress: () => navigation.goBack()},
       ]);
     } catch (e: any) {
-      const errMsg: string = e.response?.data?.error || e.message || '注册失败';
+      const errMsg: string = e?.response?.data?.error || e?.message || '提交失败';
       if (errMsg.includes('已存在')) {
-        Alert.alert('提示', '您已完成客户注册，无需重复注册', [
-          {text: '确定', onPress: () => navigation.goBack()},
+        Alert.alert('已处理', '当前账号已经提交过企业客户资料，可回到客户档案查看状态。', [
+          {text: '返回客户档案', onPress: () => navigation.goBack()},
         ]);
       } else {
-        Alert.alert('注册失败', errMsg);
+        Alert.alert('提交失败', errMsg);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = () => {
-    if (clientType === 'individual') {
-      handleSubmitIndividual();
-    } else {
-      handleSubmitEnterprise();
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>客户注册</Text>
-        <Text style={styles.subtitle}>注册后可以发布货运需求和下单</Text>
+        <ObjectCard style={styles.heroCard}>
+          <View style={styles.heroHeader}>
+            <View>
+              <Text style={styles.heroTitle}>企业客户升级</Text>
+              <Text style={styles.heroSubtitle}>个人客户档案已默认开通。这里仅用于升级企业资质，不再做重复“客户注册”。</Text>
+            </View>
+            <StatusBadge label={`进度 ${completedCount}/4`} tone="blue" />
+          </View>
+        </ObjectCard>
 
-        {/* 客户类型 */}
-        <Text style={styles.label}>客户类型</Text>
-        <View style={styles.typeRow}>
-          <TouchableOpacity
-            style={[styles.typeCard, clientType === 'individual' && styles.typeCardActive]}
-            onPress={() => setClientType('individual')}>
-            <Text style={[styles.typeCardTitle, clientType === 'individual' && styles.typeCardTitleActive]}>
-              个人客户
-            </Text>
-            <Text style={[styles.typeCardDesc, clientType === 'individual' && styles.typeCardDescActive]}>
-              快速注册，适合个人用户
-            </Text>
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>升级后你会得到什么</Text>
+          <View style={styles.bulletList}>
+            <Text style={styles.bulletItem}>1. 以企业主体发布需求和沉淀信用档案</Text>
+            <Text style={styles.bulletItem}>2. 对公联系人、企业名称、营业资质集中管理</Text>
+            <Text style={styles.bulletItem}>3. 后续便于拓展企业结算、审计和运营能力</Text>
+          </View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>企业资料</Text>
+
+          <Text style={styles.label}>企业名称 *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="请输入企业全称"
+            value={companyName}
+            onChangeText={setCompanyName}
+          />
+
+          <Text style={styles.label}>统一社会信用代码 *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="18 位统一社会信用代码"
+            value={licenseNo}
+            onChangeText={setLicenseNo}
+          />
+
+          <Text style={styles.label}>法定代表人</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="选填"
+            value={legalRep}
+            onChangeText={setLegalRep}
+          />
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>企业联系人</Text>
+
+          <Text style={styles.label}>联系人</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="建议填写后续业务联系人"
+            value={contactPerson}
+            onChangeText={setContactPerson}
+          />
+
+          <Text style={styles.label}>联系电话</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="选填"
+            keyboardType="phone-pad"
+            value={contactPhone}
+            onChangeText={setContactPhone}
+          />
+
+          <Text style={styles.label}>联系邮箱</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="选填"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={contactEmail}
+            onChangeText={setContactEmail}
+          />
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>营业执照</Text>
+          <Text style={styles.sectionDesc}>上传清晰完整的营业执照照片，用于企业主体审核。</Text>
+          <TouchableOpacity style={styles.imageUpload} onPress={pickImage} activeOpacity={0.85}>
+            {licenseDoc ? (
+              <Image source={{uri: licenseDoc}} style={styles.uploadedImage} />
+            ) : (
+              <View style={styles.uploadPlaceholder}>
+                <Text style={styles.uploadIcon}>+</Text>
+                <Text style={styles.uploadText}>点击上传营业执照</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </ObjectCard>
+
+        <View style={styles.footerActions}>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.cancelText}>先不升级</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.typeCard, clientType === 'enterprise' && styles.typeCardActive]}
-            onPress={() => setClientType('enterprise')}>
-            <Text style={[styles.typeCardTitle, clientType === 'enterprise' && styles.typeCardTitleActive]}>
-              企业客户
-            </Text>
-            <Text style={[styles.typeCardDesc, clientType === 'enterprise' && styles.typeCardDescActive]}>
-              需提交营业执照审核
-            </Text>
+            style={[styles.submitButton, loading && styles.buttonDisabled]}
+            onPress={handleSubmitEnterprise}
+            disabled={loading}>
+            <Text style={styles.submitText}>{loading ? '提交中...' : '提交企业升级'}</Text>
           </TouchableOpacity>
         </View>
-
-        {/* 企业客户表单 */}
-        {clientType === 'enterprise' && (
-          <View>
-            <Text style={styles.label}>企业名称 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="请输入企业全称"
-              value={companyName}
-              onChangeText={setCompanyName}
-            />
-
-            <Text style={styles.label}>统一社会信用代码 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="18位统一社会信用代码"
-              value={licenseNo}
-              onChangeText={setLicenseNo}
-            />
-
-            <Text style={styles.label}>法定代表人</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="选填"
-              value={legalRep}
-              onChangeText={setLegalRep}
-            />
-
-            <Text style={styles.label}>联系人</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="选填"
-              value={contactPerson}
-              onChangeText={setContactPerson}
-            />
-
-            <Text style={styles.label}>联系电话</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="选填"
-              value={contactPhone}
-              onChangeText={setContactPhone}
-              keyboardType="phone-pad"
-            />
-
-            <Text style={styles.label}>联系邮箱</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="选填"
-              value={contactEmail}
-              onChangeText={setContactEmail}
-              keyboardType="email-address"
-            />
-
-            <Text style={styles.label}>营业执照 *</Text>
-            <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>
-              {licenseDoc ? (
-                <Image source={{uri: licenseDoc}} style={styles.uploadedImage} />
-              ) : (
-                <View style={styles.uploadPlaceholder}>
-                  <Text style={styles.uploadIcon}>+</Text>
-                  <Text style={styles.uploadText}>点击上传营业执照</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {clientType === 'individual' && (
-          <View style={styles.individualNote}>
-            <Text style={styles.noteTitle}>个人客户说明</Text>
-            <Text style={styles.noteText}>
-              1. 个人客户注册无需提交额外资料{'\n'}
-              2. 系统会自动创建您的客户档案{'\n'}
-              3. 注册后即可发布货运需求{'\n'}
-              4. 首次下单可能需要通过征信审核
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}>
-          <Text style={styles.submitBtnText}>
-            {loading ? '提交中...' : clientType === 'individual' ? '立即注册' : '提交审核'}
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -258,133 +219,129 @@ export default function ClientRegisterScreen({navigation}: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#eef3f8',
   },
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 16,
+    paddingBottom: 32,
+    gap: 14,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
+  heroCard: {
+    backgroundColor: '#123b7a',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
-  },
-  typeRow: {
+  heroHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 12,
   },
-  typeCard: {
-    flex: 1,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#ddd',
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  heroSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  sectionCard: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#102a43',
+  },
+  sectionDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748b',
+  },
+  bulletList: {
+    gap: 10,
+  },
+  bulletItem: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#334e68',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334e68',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d8e1eb',
     borderRadius: 12,
-    alignItems: 'center',
-  },
-  typeCardActive: {
-    borderColor: '#1890ff',
-    backgroundColor: '#e6f7ff',
-  },
-  typeCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 6,
-  },
-  typeCardTitleActive: {
-    color: '#1890ff',
-  },
-  typeCardDesc: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
-  typeCardDescActive: {
-    color: '#1890ff',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#102a43',
   },
   imageUpload: {
-    height: 180,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderStyle: 'dashed',
-    borderRadius: 12,
+    minHeight: 180,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#d8e1eb',
     overflow: 'hidden',
+    backgroundColor: '#f8fafc',
   },
   uploadPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
+    minHeight: 180,
     alignItems: 'center',
-    backgroundColor: '#fafafa',
+    justifyContent: 'center',
   },
   uploadIcon: {
-    fontSize: 48,
-    color: '#ccc',
-    marginBottom: 8,
+    fontSize: 36,
+    color: '#94a3b8',
   },
   uploadText: {
+    marginTop: 8,
     fontSize: 14,
-    color: '#999',
+    color: '#64748b',
   },
   uploadedImage: {
     width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+    height: 220,
+    resizeMode: 'cover',
   },
-  individualNote: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+  footerActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  noteTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  noteText: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 20,
-  },
-  submitBtn: {
-    height: 50,
-    backgroundColor: '#1890ff',
-    borderRadius: 8,
-    justifyContent: 'center',
+  cancelButton: {
+    minWidth: 120,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#fff',
     alignItems: 'center',
-    marginTop: 32,
+    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 12,
   },
-  submitBtnDisabled: {
-    backgroundColor: '#ccc',
+  cancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334e68',
   },
-  submitBtnText: {
+  submitButton: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: '#175cd3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+  },
+  submitText: {
+    fontSize: 15,
+    fontWeight: '800',
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

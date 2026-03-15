@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"strings"
 	"time"
 	"wurenji-backend/internal/model"
 
@@ -14,6 +15,10 @@ type DispatchRepo struct {
 
 func NewDispatchRepo(db *gorm.DB) *DispatchRepo {
 	return &DispatchRepo{db: db}
+}
+
+func (r *DispatchRepo) DB() *gorm.DB {
+	return r.db
 }
 
 // ==================== 派单任务 CRUD ====================
@@ -213,8 +218,8 @@ func (r *DispatchRepo) ListCandidatesByPilot(pilotID int64, page, pageSize int) 
 			dt.required_pickup_time as expected_pickup_time,
 			dt.dispatch_deadline, dt.status as task_status,
 			dt.priority
-		FROM dispatch_candidates dc
-		JOIN dispatch_tasks dt ON dc.task_id = dt.id
+		FROM dispatch_pool_candidates dc
+		JOIN dispatch_pool_tasks dt ON dc.task_id = dt.id
 		WHERE dc.pilot_id = ?
 		ORDER BY dc.created_at DESC
 		LIMIT ? OFFSET ?`, pilotID, pageSize, offset).Rows()
@@ -284,11 +289,18 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 		AND d.certification_status = 'approved'
 		AND d.uom_verified = 'verified'
 		AND d.insurance_verified = 'verified'
-		AND d.max_load >= ?
+		AND d.airworthiness_verified = 'verified'
+		AND d.mtow_kg >= ?
+		AND COALESCE(NULLIF(d.max_payload_kg, 0), d.max_load) >= ?
 		AND ` + distanceExpr + ` < ?
 	`
 
-	args := []interface{}{lat, lng, lat, minLoad, lat, lng, lat, radiusKM}
+	args := []interface{}{
+		lat, lng, lat,
+		model.HeavyLiftMinMTOWKG,
+		maxFloat(minLoad, model.HeavyLiftMinPayloadKG),
+		lat, lng, lat, radiusKM,
+	}
 
 	if licenseType != "" {
 		query += " AND p.caac_license_type = ?"
@@ -323,6 +335,13 @@ type PilotDronePair struct {
 	DroneLatitude    float64 `json:"drone_latitude"`
 	DroneLongitude   float64 `json:"drone_longitude"`
 	Distance         float64 `json:"distance"`
+}
+
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // ==================== 派单配置 ====================
@@ -367,6 +386,10 @@ func (r *DispatchRepo) GetLogsByTask(taskID int64) ([]model.DispatchLog, error) 
 
 func (r *DispatchRepo) GenerateTaskNo() string {
 	return fmt.Sprintf("DT%s%06d", time.Now().Format("20060102150405"), time.Now().UnixNano()%1000000)
+}
+
+func (r *DispatchRepo) GenerateDispatchNo() string {
+	return fmt.Sprintf("DP%s%06d", time.Now().Format("20060102150405"), time.Now().UnixNano()%1000000)
 }
 
 // ==================== 统计 ====================
@@ -419,4 +442,124 @@ func (r *DispatchRepo) GetTaskStatsByPilot(pilotID int64) (map[string]int64, err
 	}
 
 	return stats, nil
+}
+
+// ==================== 正式派单任务 ====================
+
+func (r *DispatchRepo) CreateFormalTask(task *model.FormalDispatchTask) error {
+	return r.db.Create(task).Error
+}
+
+func (r *DispatchRepo) CreateFormalLog(log *model.FormalDispatchLog) error {
+	return r.db.Create(log).Error
+}
+
+func (r *DispatchRepo) GetFormalTaskByOrderID(orderID int64) (*model.FormalDispatchTask, error) {
+	var task model.FormalDispatchTask
+	err := r.db.Preload("Order").Preload("Provider").Preload("TargetPilot").
+		Where("order_id = ?", orderID).Order("id DESC").First(&task).Error
+	if err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
+func (r *DispatchRepo) ListFormalTasksByOrder(orderID int64) ([]model.FormalDispatchTask, error) {
+	var tasks []model.FormalDispatchTask
+	err := r.db.Preload("Order").Preload("Provider").Preload("TargetPilot").
+		Where("order_id = ?", orderID).Order("id ASC").Find(&tasks).Error
+	return tasks, err
+}
+
+func (r *DispatchRepo) ListFormalTasksByProvider(providerUserID int64, status string, page, pageSize int) ([]model.FormalDispatchTask, int64, error) {
+	var tasks []model.FormalDispatchTask
+	var total int64
+
+	query := r.db.Model(&model.FormalDispatchTask{}).Where("provider_user_id = ?", providerUserID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Preload("Order").
+		Preload("Provider").
+		Preload("TargetPilot").
+		Order("created_at DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&tasks).Error
+	return tasks, total, err
+}
+
+func (r *DispatchRepo) AdminListFormalTasks(page, pageSize int, filters map[string]interface{}) ([]model.FormalDispatchTask, int64, error) {
+	var tasks []model.FormalDispatchTask
+	var total int64
+
+	query := r.db.Model(&model.FormalDispatchTask{}).
+		Joins("LEFT JOIN orders ON orders.id = dispatch_tasks.order_id")
+	if status, ok := filters["status"].(string); ok && strings.TrimSpace(status) != "" {
+		query = query.Where("dispatch_tasks.status = ?", strings.TrimSpace(status))
+	}
+	if source, ok := filters["dispatch_source"].(string); ok && strings.TrimSpace(source) != "" {
+		query = query.Where("dispatch_tasks.dispatch_source = ?", strings.TrimSpace(source))
+	}
+	if keyword, ok := filters["keyword"].(string); ok && strings.TrimSpace(keyword) != "" {
+		like := "%" + strings.TrimSpace(keyword) + "%"
+		query = query.Where(`
+			dispatch_tasks.dispatch_no LIKE ? OR
+			orders.order_no LIKE ?
+		`, like, like)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Preload("Order").
+		Preload("Provider").
+		Preload("TargetPilot").
+		Order("dispatch_tasks.created_at DESC, dispatch_tasks.id DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&tasks).Error
+	return tasks, total, err
+}
+
+func (r *DispatchRepo) GetActiveFormalTaskByOrder(orderID int64) (*model.FormalDispatchTask, error) {
+	var task model.FormalDispatchTask
+	err := r.db.Preload("Order").Preload("Provider").Preload("TargetPilot").
+		Where("order_id = ? AND status IN ?", orderID, []string{"pending_response", "accepted", "executing"}).
+		Order("id DESC").
+		First(&task).Error
+	if err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
+func (r *DispatchRepo) ListFormalLogsByDispatchTask(dispatchTaskID int64) ([]model.FormalDispatchLog, error) {
+	var logs []model.FormalDispatchLog
+	err := r.db.Preload("Operator").
+		Where("dispatch_task_id = ?", dispatchTaskID).
+		Order("created_at ASC, id ASC").
+		Find(&logs).Error
+	return logs, err
+}
+
+func (r *DispatchRepo) ListExpiredFormalTasks(before time.Time, limit int) ([]model.FormalDispatchTask, error) {
+	var tasks []model.FormalDispatchTask
+	query := r.db.Model(&model.FormalDispatchTask{}).
+		Where("status = ?", "pending_response").
+		Where("COALESCE(sent_at, created_at) < ?", before).
+		Order("COALESCE(sent_at, created_at) ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	err := query.Find(&tasks).Error
+	return tasks, err
 }

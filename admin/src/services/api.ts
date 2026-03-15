@@ -6,7 +6,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // 从环境变量获取API配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v1';
+const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v2';
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '15000', 10);
 
 // 开发环境使用代理，生产环境直接请求
@@ -20,6 +20,23 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+const isV1SuccessCode = (code: unknown) => code === 0;
+const isV2SuccessCode = (code: unknown) => code === 'OK';
+const isSuccessCode = (code: unknown) => isV1SuccessCode(code) || isV2SuccessCode(code);
+
+const extractTokenPair = (payload: any) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  if (payload.access_token && payload.refresh_token) {
+    return payload;
+  }
+  if (payload.token?.access_token && payload.token?.refresh_token) {
+    return payload.token;
+  }
+  return null;
+};
 
 // Token刷新状态管理
 let isRefreshing = false;
@@ -49,8 +66,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => {
     const data = response.data;
-    // 业务错误（code !== 0）
-    if (data.code !== 0) {
+    if (!isSuccessCode(data?.code)) {
       return Promise.reject(new Error(data.message || '请求失败'));
     }
     return data;
@@ -83,8 +99,12 @@ api.interceptors.response.use(
             refresh_token: refreshToken,
           });
 
-          if (response.data.code === 0) {
-            const { access_token, refresh_token: newRefreshToken } = response.data.data;
+          if (isSuccessCode(response.data?.code)) {
+            const tokens = extractTokenPair(response.data?.data);
+            if (!tokens) {
+              throw new Error('refresh token response invalid');
+            }
+            const { access_token, refresh_token: newRefreshToken } = tokens;
             localStorage.setItem('admin_token', access_token);
             if (newRefreshToken) {
               localStorage.setItem('admin_refresh_token', newRefreshToken);
@@ -226,6 +246,65 @@ export const adminApi = {
   
   getOrderDetail: (id: number) =>
     api.get(`/admin/orders/${id}`),
+
+  // ========== 需求管理 ==========
+  getDemands: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    cargo_scene?: string;
+    keyword?: string;
+  }) => api.get('/admin/demands', { params }),
+
+  // ========== 供给管理 ==========
+  getSupplies: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    cargo_scene?: string;
+    keyword?: string;
+  }) => api.get('/admin/supplies', { params }),
+
+  // ========== 正式派单管理 ==========
+  getDispatchTasks: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    dispatch_source?: string;
+    keyword?: string;
+  }) => api.get('/admin/dispatch-tasks', { params }),
+
+  // ========== 飞行记录管理 ==========
+  getFlightRecords: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    keyword?: string;
+  }) => api.get('/admin/flight-records', { params }),
+
+  // ========== 迁移审计与异常订单 ==========
+  getMigrationAudits: (params?: {
+    page?: number;
+    page_size?: number;
+    severity?: string;
+    resolution_status?: string;
+    issue_type?: string;
+    audit_stage?: string;
+    keyword?: string;
+  }) => api.get('/admin/migration-audits', { params }),
+
+  getMigrationAuditSummary: () => api.get('/admin/migration-audits/summary'),
+
+  getOrderAnomalies: (params?: {
+    page?: number;
+    page_size?: number;
+    anomaly_type?: string;
+    severity?: string;
+    status?: string;
+    keyword?: string;
+  }) => api.get('/admin/orders/anomalies', { params }),
+
+  getOrderAnomalySummary: () => api.get('/admin/orders/anomalies/summary'),
 
   // ========== 支付管理 ==========
   getPayments: (params?: {

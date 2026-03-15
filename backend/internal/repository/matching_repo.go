@@ -14,6 +14,10 @@ func NewMatchingRepo(db *gorm.DB) *MatchingRepo {
 	return &MatchingRepo{db: db}
 }
 
+func (r *MatchingRepo) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *MatchingRepo) Create(record *model.MatchingRecord) error {
 	return r.db.Create(record).Error
 }

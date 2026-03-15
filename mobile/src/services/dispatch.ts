@@ -21,6 +21,7 @@ export interface DispatchTask {
   scheduled_time: string;
   deadline: string;
   max_budget: number;
+  offered_price?: number;
   status: string;
   assigned_pilot_id: number;
   assigned_drone_id: number;

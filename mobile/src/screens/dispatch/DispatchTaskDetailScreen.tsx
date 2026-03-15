@@ -1,457 +1,610 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  RefreshControl,
+  View,
 } from 'react-native';
-import {
-  getDispatchTask,
-  cancelDispatchTask,
-  getTaskCandidates,
-  getTaskLogs,
-  triggerMatch,
-  DispatchTask,
-  DispatchCandidate,
-  DispatchLog,
-} from '../../services/dispatch';
+import {useFocusEffect} from '@react-navigation/native';
+import {useSelector} from 'react-redux';
 
-const STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待派单', color: '#faad14'},
-  matching: {label: '匹配中', color: '#1890ff'},
-  dispatching: {label: '派单中', color: '#1890ff'},
-  assigned: {label: '已分配', color: '#52c41a'},
-  accepted: {label: '已接受', color: '#52c41a'},
-  in_progress: {label: '执行中', color: '#1890ff'},
-  completed: {label: '已完成', color: '#8c8c8c'},
-  cancelled: {label: '已取消', color: '#ff4d4f'},
-  expired: {label: '已过期', color: '#ff4d4f'},
-  failed: {label: '匹配失败', color: '#ff4d4f'},
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {dispatchV2Service} from '../../services/dispatchV2';
+import {RootState} from '../../store/store';
+import {V2DispatchTaskDetail, V2DispatchTaskSummary} from '../../types';
+
+type ActionButton = {
+  label: string;
+  tone: 'primary' | 'danger' | 'ghost';
+  onPress: () => void;
 };
 
-const TASK_TYPE_MAP: Record<string, string> = {
-  cargo_delivery: '货物运输', agriculture: '农业植保',
-  mapping: '航拍测绘', inspection: '巡检监测',
-  emergency: '应急救援', other: '其他',
+const formatMoney = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
+
+const MONITORABLE_ORDER_STATUSES = [
+  'assigned',
+  'confirmed',
+  'airspace_applying',
+  'airspace_approved',
+  'loading',
+  'in_transit',
+  'delivered',
+  'completed',
+];
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${month}-${day} ${hour}:${minute}`;
 };
 
-const PRIORITY_MAP: Record<string, {label: string; color: string}> = {
-  '5': {label: '普通', color: '#8c8c8c'},
-  '8': {label: '加急', color: '#fa8c16'},
-  '10': {label: '紧急', color: '#ff4d4f'},
-  normal: {label: '普通', color: '#8c8c8c'},
-  urgent: {label: '加急', color: '#fa8c16'},
-  critical: {label: '紧急', color: '#ff4d4f'},
+const getPartyName = (task?: V2DispatchTaskSummary['provider'] | V2DispatchTaskSummary['target_pilot'], fallback = '-') => {
+  if (!task) {
+    return fallback;
+  }
+  if (task.nickname) {
+    return task.nickname;
+  }
+  if (task.user_id) {
+    return `${fallback} #${task.user_id}`;
+  }
+  return fallback;
 };
 
-const CANDIDATE_STATUS: Record<string, {label: string; color: string}> = {
-  pending: {label: '待响应', color: '#faad14'},
-  accepted: {label: '已接受', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
-  expired: {label: '已过期', color: '#999'},
-};
-
-const LOG_ACTION_MAP: Record<string, string> = {
-  created: '任务创建', matching_started: '开始匹配', candidate_found: '发现候选飞手',
-  accepted: '飞手已接受', rejected: '飞手已拒绝', cancelled: '任务取消',
-  completed: '任务完成', expired: '任务过期', failed: '匹配失败',
-};
-
-type TabType = 'detail' | 'candidates' | 'logs';
+function DetailRow({label, value}: {label: string; value?: string}) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue}>{value || '-'}</Text>
+    </View>
+  );
+}
 
 export default function DispatchTaskDetailScreen({navigation, route}: any) {
-  const {id} = route.params;
-  const [task, setTask] = useState<DispatchTask | null>(null);
-  const [candidates, setCandidates] = useState<DispatchCandidate[]>([]);
-  const [logs, setLogs] = useState<DispatchLog[]>([]);
+  const currentUserId = Number(useSelector((state: RootState) => state.auth.user?.id) || 0);
+  const dispatchId = Number(route?.params?.id || route?.params?.dispatchId || 0);
+  const [detail, setDetail] = useState<V2DispatchTaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const [matching, setMatching] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('detail');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showRejectSheet, setShowRejectSheet] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
-  const loadData = async (silent = false) => {
-    if (!silent) setLoading(true);
+  const loadData = useCallback(async () => {
+    if (!dispatchId) {
+      setDetail(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      const [taskRes, candRes, logRes] = await Promise.allSettled([
-        getDispatchTask(id),
-        getTaskCandidates(id),
-        getTaskLogs(id),
-      ]);
-      if (taskRes.status === 'fulfilled') setTask(taskRes.value);
-      if (candRes.status === 'fulfilled') setCandidates(candRes.value || []);
-      if (logRes.status === 'fulfilled') setLogs(logRes.value || []);
-    } catch (e: any) {
-      Alert.alert('加载失败', e.message);
+      const res = await dispatchV2Service.get(dispatchId);
+      setDetail(res.data || null);
+    } catch (error) {
+      console.error('获取正式派单详情失败:', error);
+      setDetail(null);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [dispatchId]);
 
-  useEffect(() => { loadData(); }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
-  const handleRefresh = () => { setRefreshing(true); loadData(true); };
+  const task = detail?.dispatch_task;
+  const order = detail?.order || task?.order;
+  const isOwner = currentUserId > 0 && currentUserId === Number(task?.provider?.user_id || 0);
+  const isPilot = currentUserId > 0 && currentUserId === Number(task?.target_pilot?.user_id || 0);
+  const canRespond = String(task?.status || '').toLowerCase() === 'pending_response' && isPilot;
+  const canReassign = Boolean(
+    isOwner &&
+      task?.id &&
+      !['completed', 'finished'].includes(String(task?.status || '').toLowerCase()) &&
+      order?.id,
+  );
+  const canOpenFlightMonitor = Boolean(order?.id && MONITORABLE_ORDER_STATUSES.includes(String(order?.status || '').toLowerCase()));
 
-  const handleCancel = () => {
-    Alert.alert('确认取消', '确定要取消这个派单任务吗？', [
-      {text: '返回', style: 'cancel'},
-      {text: '确认取消', style: 'destructive', onPress: async () => {
-        setCancelling(true);
-        try {
-          await cancelDispatchTask(id);
-          Alert.alert('成功', '任务已取消', [{text: '确定', onPress: () => navigation.goBack()}]);
-        } catch (e: any) {
-          Alert.alert('取消失败', e.message);
-        } finally { setCancelling(false); }
-      }},
-    ]);
-  };
+  const actionButtons = useMemo<ActionButton[]>(() => {
+    if (!task || !order || actionLoading) {
+      return [];
+    }
 
-  const handleTriggerMatch = async () => {
-    setMatching(true);
-    try {
-      const result = await triggerMatch(id);
-      await loadData(true);
-      const count = Array.isArray(result) ? result.length : 0;
-      Alert.alert(
-        '匹配完成',
-        count > 0
-          ? `找到 ${count} 位候选飞手，已通知飞手响应`
-          : '暂未找到合适飞手，请稍后重试',
+    const actions: ActionButton[] = [
+      {
+        label: '查看订单详情',
+        tone: 'ghost',
+        onPress: () => navigation.navigate('OrderDetail', {id: order.id, orderId: order.id}),
+      },
+    ];
+
+    if (canOpenFlightMonitor) {
+      actions.unshift({
+        label: '飞行监控',
+        tone: 'ghost',
+        onPress: () =>
+          navigation.navigate('FlightMonitoring', {
+            orderId: order.id,
+            dispatchId: task.id,
+          }),
+      });
+    }
+
+    if (canReassign) {
+      actions.unshift({
+        label: '手动重派',
+        tone: 'primary',
+        onPress: () =>
+          navigation.navigate('CreateDispatchTask', {
+            orderId: order.id,
+            dispatchId: task.id,
+            id: order.id,
+          }),
+      });
+    }
+
+    if (canRespond) {
+      actions.unshift(
+        {
+          label: '拒绝派单',
+          tone: 'danger',
+          onPress: () => {
+            setRejectReason('');
+            setShowRejectSheet(true);
+          },
+        },
+        {
+          label: '接受派单',
+          tone: 'primary',
+          onPress: () => {
+            Alert.alert('接受正式派单', '确认接受这条正式派单吗？接受后订单会进入已分配状态。', [
+              {text: '取消', style: 'cancel'},
+              {
+                text: '确认接受',
+                onPress: async () => {
+                  setActionLoading(true);
+                  try {
+                    await dispatchV2Service.accept(task.id);
+                    await loadData();
+                    Alert.alert('已接受', '正式派单已接受，你现在可以继续进入订单详情或飞行监控。');
+                  } catch (error: any) {
+                    Alert.alert('操作失败', error?.message || '请稍后重试');
+                  } finally {
+                    setActionLoading(false);
+                  }
+                },
+              },
+            ]);
+          },
+        },
       );
-      if (count > 0) setActiveTab('candidates');
-    } catch (e: any) {
-      const msg = e?.message || '匹配请求失败，请检查网络后重试';
-      // 兼容后端返回"未找到合适的飞手"时刷新一次数据
-      await loadData(true);
-      Alert.alert('匹配结果', msg);
+    }
+
+    return actions;
+  }, [actionLoading, canOpenFlightMonitor, canReassign, canRespond, loadData, navigation, order, task]);
+
+  const handleReject = async () => {
+    if (!task?.id) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await dispatchV2Service.reject(task.id, rejectReason.trim() || undefined);
+      setShowRejectSheet(false);
+      setRejectReason('');
+      Alert.alert('已拒绝', '这条正式派单已回退。系统若找到下一位可用飞手，会自动生成新的正式派单。', [
+        {
+          text: '返回待办',
+          onPress: () => navigation.navigate('PilotTaskList', {entry: 'assigned', refreshedAt: Date.now()}),
+        },
+        {
+          text: '查看订单',
+          onPress: () => order?.id && navigation.navigate('OrderDetail', {id: order.id, orderId: order.id}),
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert('操作失败', error?.message || '请稍后重试');
     } finally {
-      setMatching(false);
+      setActionLoading(false);
     }
   };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#1890ff" style={{marginTop: 60}} />
+        <View style={styles.centerState}>
+          <ActivityIndicator size="large" color="#0f766e" />
+        </View>
       </SafeAreaView>
     );
   }
 
-  if (!task) {
+  if (!detail?.dispatch_task) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.empty}><Text style={styles.emptyText}>任务不存在</Text></View>
+        <View style={styles.centerState}>
+          <Text style={styles.emptyText}>正式派单不存在或当前账号没有查看权限。</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  const status = STATUS_MAP[task.status] || STATUS_MAP.pending;
-  const priority = PRIORITY_MAP[String(task.priority)] || PRIORITY_MAP.normal;
-  const taskType = TASK_TYPE_MAP[task.task_type] || task.task_type;
-  const canCancel = ['pending', 'matching', 'dispatching'].includes(task.status);
-  const canMatch = ['pending', 'matching'].includes(task.status);
-
-  const renderDetail = () => (
-    <>
-      {/* 路线信息 */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>路线信息</Text>
-        <View style={styles.routeRow}>
-          <View style={styles.greenDot} />
-          <View style={{flex: 1}}>
-            <Text style={styles.routeLabel}>取货地址</Text>
-            <Text style={styles.routeAddr}>{task.pickup_address || '未设置'}</Text>
-          </View>
-        </View>
-        <View style={styles.vertLine} />
-        <View style={styles.routeRow}>
-          <View style={styles.redDot} />
-          <View style={{flex: 1}}>
-            <Text style={styles.routeLabel}>送达地址</Text>
-            <Text style={styles.routeAddr}>{task.delivery_address || '未设置'}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* 货物信息 */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>货物信息</Text>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>重量</Text>
-            <Text style={styles.infoValue}>{task.cargo_weight ? `${task.cargo_weight} kg` : '-'}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>预算上限</Text>
-            <Text style={styles.infoValue}>
-              {task.max_budget ? `¥${(task.max_budget / 100).toFixed(0)}` : '系统定价'}
-            </Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>匹配尝试</Text>
-            <Text style={styles.infoValue}>{task.match_attempts ?? 0} / {3}</Text>
-          </View>
-        </View>
-        {task.cargo_description ? (
-          <View style={styles.descRow}>
-            <Text style={styles.infoLabel}>描述</Text>
-            <Text style={styles.infoValue}>{task.cargo_description}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* 时间信息 */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>时间信息</Text>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>创建时间</Text>
-            <Text style={styles.infoValue}>{task.created_at?.substring(0, 16) || '-'}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>预约时间</Text>
-            <Text style={styles.infoValue}>{task.scheduled_time?.substring(0, 16) || '立即派单'}</Text>
-          </View>
-        </View>
-      </View>
-    </>
-  );
-
-  const renderCandidates = () => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>匹配候选飞手（{candidates.length}）</Text>
-      {candidates.length === 0 ? (
-        <View style={styles.tabEmpty}>
-          <Text style={styles.tabEmptyText}>暂无候选飞手</Text>
-          <Text style={styles.tabEmptyHint}>
-            {canMatch ? '请点击下方「触发匹配」按钮开始匹配' : '系统将在合适时自动匹配'}
-          </Text>
-        </View>
-      ) : (
-        candidates.map((c, idx) => {
-          const cs = CANDIDATE_STATUS[c.status] || CANDIDATE_STATUS.pending;
-          return (
-            <View key={c.id} style={[styles.candidateCard, idx === 0 && styles.candidateCardFirst]}>
-              <View style={styles.candidateHeader}>
-                <View style={{flex: 1}}>
-                  <Text style={styles.candidateName}>✈️ 飞手 #{c.pilot_id}</Text>
-                  <Text style={styles.candidateScore}>综合评分 {c.total_score ?? '-'} 分</Text>
-                </View>
-                <View style={[styles.candidateStatusBadge, {backgroundColor: cs.color + '20'}]}>
-                  <Text style={[styles.candidateStatusText, {color: cs.color}]}>{cs.label}</Text>
-                </View>
-              </View>
-              <View style={styles.candidateStats}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>距离</Text>
-                  <Text style={styles.statValue}>{c.distance != null ? `${c.distance.toFixed(1)} km` : '-'}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>报价</Text>
-                  <Text style={styles.statValue}>
-                    {c.quoted_price ? `¥${(c.quoted_price / 100).toFixed(0)}` : '待报价'}
-                  </Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>无人机</Text>
-                  <Text style={styles.statValue}>#{c.drone_id ?? '-'}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>响应截止</Text>
-                  <Text style={styles.statValue}>{c.notified_at?.substring(11, 16) || '-'}</Text>
-                </View>
-              </View>
-              {c.response_note ? (
-                <Text style={styles.rejectReason}>拒绝原因：{c.response_note}</Text>
-              ) : null}
-            </View>
-          );
-        })
-      )}
-    </View>
-  );
-
-  const renderLogs = () => (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>任务日志</Text>
-      {logs.length === 0 ? (
-        <View style={styles.tabEmpty}>
-          <Text style={styles.tabEmptyText}>暂无日志记录</Text>
-        </View>
-      ) : (
-        logs.map((log, idx) => (
-          <View key={log.id} style={styles.logRow}>
-            <View style={styles.logDotWrap}>
-              <View style={[styles.logDot, {backgroundColor: idx === 0 ? '#1890ff' : '#d9d9d9'}]} />
-              {idx < logs.length - 1 && <View style={styles.logLine} />}
-            </View>
-            <View style={styles.logContent}>
-              <Text style={styles.logAction}>
-                {LOG_ACTION_MAP[log.action] || log.action}
-                {log.actor_type === 'system' ? ' (系统)' : log.actor_type === 'pilot' ? ' (飞手)' : ''}
-              </Text>
-              <Text style={styles.logTime}>{log.created_at?.substring(0, 16)}</Text>
-            </View>
-          </View>
-        ))
-      )}
-    </View>
-  );
+  const taskData = detail.dispatch_task;
+  const orderData = detail.order || taskData.order;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 状态头 */}
-      <View style={styles.header}>
-        <View style={styles.statusHeader}>
-          <View style={[styles.statusDot, {backgroundColor: status.color}]} />
-          <Text style={[styles.statusLabel, {color: status.color}]}>{status.label}</Text>
-          <View style={[styles.priorityBadge, {backgroundColor: priority.color + '20'}]}>
-            <Text style={[styles.priorityText, {color: priority.color}]}>{priority.label}</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <View style={styles.heroHeader}>
+            <View style={styles.heroTags}>
+              <SourceTag source="dispatch_task" />
+              <StatusBadge label="" meta={getObjectStatusMeta('dispatch_task', taskData.status)} />
+            </View>
+            <Text style={styles.heroCode}>{taskData.dispatch_no}</Text>
           </View>
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.taskNo}>{task.task_no}</Text>
-          <Text style={styles.taskType}>{taskType}</Text>
+          <Text style={styles.heroTitle}>{orderData?.title || '正式派单详情'}</Text>
+          <Text style={styles.heroDesc}>
+            正式派单只表达执行指令：派给谁、为何派、是否已响应，以及如果飞手拒绝后系统是否已开始自动重派。
+          </Text>
         </View>
 
-        {/* Tab 切换 */}
-        <View style={styles.tabBar}>
-          {([
-            {key: 'detail', label: '详情'},
-            {key: 'candidates', label: `候选飞手${candidates.length > 0 ? `(${candidates.length})` : ''}`},
-            {key: 'logs', label: `日志${logs.length > 0 ? `(${logs.length})` : ''}`},
-          ] as {key: TabType; label: string}[]).map(tab => (
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>派单摘要</Text>
+          <DetailRow label="派单状态" value={getObjectStatusMeta('dispatch_task', taskData.status).label} />
+          <DetailRow label="派单来源" value={taskData.dispatch_source || '-'} />
+          <DetailRow label="目标飞手" value={getPartyName(taskData.target_pilot, '飞手')} />
+          <DetailRow label="机主" value={getPartyName(taskData.provider, '机主')} />
+          <DetailRow label="重派次数" value={String(taskData.retry_count || 0)} />
+          <DetailRow label="发出时间" value={formatDateTime(taskData.sent_at)} />
+          <DetailRow label="响应时间" value={formatDateTime(taskData.responded_at)} />
+          {taskData.reason ? <DetailRow label="派单说明" value={taskData.reason} /> : null}
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>订单上下文</Text>
+          <DetailRow label="订单号" value={orderData?.order_no} />
+          <DetailRow label="订单来源" value={orderData?.order_source === 'supply_direct' ? '供给直达下单' : '需求市场成单'} />
+          <DetailRow label="订单状态" value={getObjectStatusMeta('order', orderData?.status).label} />
+          <DetailRow label="执行模式" value={orderData?.execution_mode || '-'} />
+          <DetailRow label="起始地址" value={orderData?.service_address || '-'} />
+          <DetailRow label="目的地址" value={orderData?.dest_address || '-'} />
+          <DetailRow label="订单金额" value={formatMoney(orderData?.total_amount)} />
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>派单日志</Text>
+          {detail.logs && detail.logs.length > 0 ? (
+            detail.logs.map((log, index) => {
+              const isLast = index === detail.logs.length - 1;
+              return (
+                <View key={`${log.id}-${index}`} style={styles.timelineItem}>
+                  <View style={styles.timelineAxis}>
+                    <View style={styles.timelineDot} />
+                    {!isLast ? <View style={styles.timelineLine} /> : null}
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineTitle}>{log.note || log.action_type}</Text>
+                    <Text style={styles.timelineMeta}>
+                      {formatDateTime(log.created_at)}
+                      {log.operator_nickname ? ` · ${log.operator_nickname}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.emptyLogs}>当前还没有派单日志。</Text>
+          )}
+        </ObjectCard>
+      </ScrollView>
+
+      {actionButtons.length > 0 ? (
+        <View style={styles.actionBar}>
+          {actionLoading ? <ActivityIndicator color="#0f766e" style={styles.actionSpinner} /> : null}
+          {actionButtons.map(button => (
             <TouchableOpacity
-              key={tab.key}
-              style={[styles.tabItem, activeTab === tab.key && styles.tabItemActive]}
-              onPress={() => setActiveTab(tab.key)}>
-              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-                {tab.label}
+              key={button.label}
+              style={[
+                styles.actionButton,
+                button.tone === 'primary' && styles.actionButtonPrimary,
+                button.tone === 'danger' && styles.actionButtonDanger,
+                button.tone === 'ghost' && styles.actionButtonGhost,
+              ]}
+              disabled={actionLoading}
+              onPress={button.onPress}>
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  button.tone === 'primary' && styles.actionButtonTextPrimary,
+                  button.tone === 'danger' && styles.actionButtonTextDanger,
+                  button.tone === 'ghost' && styles.actionButtonTextGhost,
+                ]}>
+                {button.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      ) : null}
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
-        {activeTab === 'detail' && renderDetail()}
-        {activeTab === 'candidates' && renderCandidates()}
-        {activeTab === 'logs' && renderLogs()}
-
-        {/* 操作按钮区 */}
-        <View style={styles.actions}>
-          {canMatch && (
-            <TouchableOpacity
-              style={[styles.matchBtn, matching && styles.btnDisabled]}
-              onPress={handleTriggerMatch}
-              disabled={matching}>
-              <Text style={styles.matchBtnText}>
-                {matching ? '匹配中...' : '🔍 触发匹配'}
-              </Text>
+      {showRejectSheet ? (
+        <View style={styles.rejectSheet}>
+          <Text style={styles.rejectTitle}>拒绝正式派单</Text>
+          <TextInput
+            style={styles.rejectInput}
+            placeholder="选填：补充拒绝原因，方便机主判断是否需要重派或调整执行来源"
+            multiline
+            value={rejectReason}
+            onChangeText={setRejectReason}
+          />
+          <View style={styles.rejectActions}>
+            <TouchableOpacity style={styles.sheetGhostBtn} onPress={() => setShowRejectSheet(false)}>
+              <Text style={styles.sheetGhostText}>取消</Text>
             </TouchableOpacity>
-          )}
-          {canCancel && (
-            <TouchableOpacity
-              style={[styles.cancelBtn, cancelling && styles.btnDisabled]}
-              onPress={handleCancel}
-              disabled={cancelling}>
-              <Text style={styles.cancelBtnText}>
-                {cancelling ? '取消中...' : '取消任务'}
-              </Text>
+            <TouchableOpacity style={styles.sheetDangerBtn} onPress={handleReject}>
+              <Text style={styles.sheetDangerText}>确认拒绝</Text>
             </TouchableOpacity>
-          )}
+          </View>
         </View>
-      </ScrollView>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  header: {backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 0},
-  content: {padding: 12, paddingBottom: 40},
-  empty: {flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 80},
-  emptyText: {fontSize: 16, color: '#999'},
-
-  statusHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 6},
-  statusDot: {width: 10, height: 10, borderRadius: 5, marginRight: 8},
-  statusLabel: {fontSize: 17, fontWeight: 'bold', marginRight: 10},
-  priorityBadge: {paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12},
-  priorityText: {fontSize: 12, fontWeight: '500'},
-  section: {marginBottom: 12},
-  taskNo: {fontSize: 12, color: '#999', marginBottom: 2},
-  taskType: {fontSize: 18, fontWeight: 'bold', color: '#333'},
-
-  tabBar: {flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#f0f0f0', marginTop: 4},
-  tabItem: {flex: 1, paddingVertical: 12, alignItems: 'center'},
-  tabItemActive: {borderBottomWidth: 2, borderBottomColor: '#1890ff'},
-  tabText: {fontSize: 13, color: '#666'},
-  tabTextActive: {color: '#1890ff', fontWeight: '600'},
-
-  card: {backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12},
-  cardTitle: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 12},
-
-  routeRow: {flexDirection: 'row', alignItems: 'flex-start', marginVertical: 4},
-  greenDot: {width: 10, height: 10, borderRadius: 5, backgroundColor: '#52c41a', marginRight: 12, marginTop: 4},
-  redDot: {width: 10, height: 10, borderRadius: 5, backgroundColor: '#ff4d4f', marginRight: 12, marginTop: 4},
-  vertLine: {width: 1, height: 12, backgroundColor: '#ddd', marginLeft: 4, marginVertical: 2},
-  routeLabel: {fontSize: 12, color: '#999', marginBottom: 2},
-  routeAddr: {fontSize: 14, color: '#333'},
-
-  infoGrid: {flexDirection: 'row', flexWrap: 'wrap'},
-  infoItem: {width: '50%', marginBottom: 12},
-  infoLabel: {fontSize: 12, color: '#999', marginBottom: 4},
-  infoValue: {fontSize: 14, color: '#333', fontWeight: '500'},
-  descRow: {marginTop: 4},
-
-  tabEmpty: {paddingVertical: 30, alignItems: 'center'},
-  tabEmptyText: {fontSize: 15, color: '#999', marginBottom: 6},
-  tabEmptyHint: {fontSize: 12, color: '#ccc', textAlign: 'center'},
-
-  // 候选人
-  candidateCard: {
-    borderTopWidth: 1, borderTopColor: '#f5f5f5', paddingTop: 12, marginTop: 12,
+  container: {
+    flex: 1,
+    backgroundColor: '#eef3f8',
   },
-  candidateCardFirst: {borderTopWidth: 0, marginTop: 0, paddingTop: 0},
-  candidateHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
-  candidateName: {fontSize: 15, fontWeight: '600', color: '#333'},
-  candidateScore: {fontSize: 12, color: '#1890ff', marginTop: 2},
-  candidateStatusBadge: {paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12},
-  candidateStatusText: {fontSize: 12, fontWeight: '500'},
-  candidateStats: {flexDirection: 'row', flexWrap: 'wrap'},
-  statItem: {width: '25%', marginBottom: 8},
-  statLabel: {fontSize: 11, color: '#999', marginBottom: 2},
-  statValue: {fontSize: 13, color: '#333', fontWeight: '500'},
-  rejectReason: {fontSize: 12, color: '#ff4d4f', marginTop: 4},
-
-  // 日志
-  logRow: {flexDirection: 'row', marginBottom: 4},
-  logDotWrap: {alignItems: 'center', width: 20, marginRight: 10},
-  logDot: {width: 8, height: 8, borderRadius: 4},
-  logLine: {flex: 1, width: 1, backgroundColor: '#f0f0f0', marginTop: 2},
-  logContent: {flex: 1, paddingBottom: 12},
-  logAction: {fontSize: 14, color: '#333', fontWeight: '500'},
-  logTime: {fontSize: 12, color: '#999', marginTop: 2},
-
-  // 操作
-  actions: {gap: 10, marginTop: 4},
-  matchBtn: {
-    backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+  centerState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
-  matchBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  cancelBtn: {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: '#ff4d4f',
-    borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#8c8c8c',
+    textAlign: 'center',
   },
-  btnDisabled: {opacity: 0.5},
-  cancelBtnText: {fontSize: 16, color: '#ff4d4f', fontWeight: '600'},
+  content: {
+    padding: 14,
+    paddingBottom: 132,
+  },
+  hero: {
+    backgroundColor: '#0f766e',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 12,
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroTags: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroCode: {
+    fontSize: 12,
+    color: '#d1fae5',
+    fontWeight: '600',
+  },
+  heroTitle: {
+    marginTop: 14,
+    fontSize: 24,
+    lineHeight: 30,
+    color: '#fff',
+    fontWeight: '800',
+  },
+  heroDesc: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#d1fae5',
+  },
+  sectionCard: {
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: '#1f1f1f',
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  rowLabel: {
+    width: 88,
+    fontSize: 13,
+    color: '#8c8c8c',
+  },
+  rowValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#262626',
+    fontWeight: '600',
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    minHeight: 56,
+  },
+  timelineAxis: {
+    width: 20,
+    alignItems: 'center',
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#0f766e',
+    marginTop: 4,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#d9d9d9',
+    marginTop: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingLeft: 10,
+    paddingBottom: 16,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    color: '#262626',
+    fontWeight: '700',
+  },
+  timelineMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#8c8c8c',
+  },
+  emptyLogs: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#8c8c8c',
+  },
+  actionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  actionSpinner: {
+    width: '100%',
+  },
+  actionButton: {
+    flexGrow: 1,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 110,
+  },
+  actionButtonPrimary: {
+    backgroundColor: '#0f766e',
+  },
+  actionButtonDanger: {
+    backgroundColor: '#fff1f0',
+    borderWidth: 1,
+    borderColor: '#ffccc7',
+  },
+  actionButtonGhost: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  actionButtonTextPrimary: {
+    color: '#fff',
+  },
+  actionButtonTextDanger: {
+    color: '#cf1322',
+  },
+  actionButtonTextGhost: {
+    color: '#434343',
+  },
+  rejectSheet: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 92,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  rejectTitle: {
+    fontSize: 16,
+    color: '#1f1f1f',
+    fontWeight: '800',
+  },
+  rejectInput: {
+    marginTop: 12,
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    color: '#262626',
+  },
+  rejectActions: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  sheetGhostBtn: {
+    borderRadius: 999,
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 10,
+  },
+  sheetGhostText: {
+    fontSize: 13,
+    color: '#595959',
+    fontWeight: '700',
+  },
+  sheetDangerBtn: {
+    borderRadius: 999,
+    backgroundColor: '#cf1322',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  sheetDangerText: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '700',
+  },
 });

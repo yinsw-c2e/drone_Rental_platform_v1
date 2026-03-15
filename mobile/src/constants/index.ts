@@ -58,6 +58,17 @@ const getApiBaseUrl = (): string => {
   return 'https://api.wurenji.com/api/v1';
 };
 
+const switchApiVersion = (baseUrl: string, version: 'v1' | 'v2'): string => {
+  const normalized = (baseUrl || '').replace(/\/+$/, '');
+  if (/\/api\/v[12]$/.test(normalized)) {
+    return normalized.replace(/\/api\/v[12]$/, `/api/${version}`);
+  }
+  if (/\/api$/.test(normalized)) {
+    return `${normalized}/${version}`;
+  }
+  return `${normalized}/api/${version}`;
+};
+
 /**
  * 获取WebSocket连接地址
  * 优先使用环境变量配置，否则使用默认值
@@ -102,6 +113,8 @@ const getWsBaseUrl = (): string => {
 
 // 导出配置常量
 export const API_BASE_URL = getApiBaseUrl();
+export const API_V1_BASE_URL = switchApiVersion(API_BASE_URL, 'v1');
+export const API_V2_BASE_URL = switchApiVersion(API_BASE_URL, 'v2');
 export const WS_BASE_URL = getWsBaseUrl();
 export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 
@@ -109,6 +122,8 @@ export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 console.log('='.repeat(60));
 console.log('📱 APP Configuration Loaded:');
 console.log('API_BASE_URL:', API_BASE_URL);
+console.log('API_V1_BASE_URL:', API_V1_BASE_URL);
+console.log('API_V2_BASE_URL:', API_V2_BASE_URL);
 console.log('WS_BASE_URL:', WS_BASE_URL);
 console.log('API_TIMEOUT:', API_TIMEOUT);
 console.log('Platform:', Platform.OS);

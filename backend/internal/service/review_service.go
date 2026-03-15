@@ -55,3 +55,7 @@ func (s *ReviewService) GetByOrder(orderID int64) ([]model.Review, error) {
 func (s *ReviewService) ListByTarget(targetType string, targetID int64, page, pageSize int) ([]model.Review, int64, error) {
 	return s.reviewRepo.ListByTarget(targetType, targetID, page, pageSize)
 }
+
+func (s *ReviewService) ListByReviewer(reviewerID int64, page, pageSize int) ([]model.Review, int64, error) {
+	return s.reviewRepo.ListByReviewer(reviewerID, page, pageSize)
+}

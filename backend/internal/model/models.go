@@ -29,12 +29,73 @@ func (User) TableName() string {
 	return "users"
 }
 
+type ClientProfile struct {
+	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID              int64          `gorm:"uniqueIndex;not null" json:"user_id"`
+	Status              string         `gorm:"type:varchar(20);default:active;index" json:"status"`
+	DefaultContactName  string         `gorm:"type:varchar(50)" json:"default_contact_name"`
+	DefaultContactPhone string         `gorm:"type:varchar(20)" json:"default_contact_phone"`
+	PreferredCity       string         `gorm:"type:varchar(50);index" json:"preferred_city"`
+	Remark              string         `gorm:"type:text" json:"remark"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (ClientProfile) TableName() string {
+	return "client_profiles"
+}
+
+type OwnerProfile struct {
+	ID                 int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID             int64          `gorm:"uniqueIndex;not null" json:"user_id"`
+	VerificationStatus string         `gorm:"type:varchar(20);default:pending;index" json:"verification_status"`
+	Status             string         `gorm:"type:varchar(20);default:active;index" json:"status"`
+	ServiceCity        string         `gorm:"type:varchar(50);index" json:"service_city"`
+	ContactPhone       string         `gorm:"type:varchar(20)" json:"contact_phone"`
+	Intro              string         `gorm:"type:text" json:"intro"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (OwnerProfile) TableName() string {
+	return "owner_profiles"
+}
+
+type PilotProfile struct {
+	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID              int64          `gorm:"uniqueIndex;not null" json:"user_id"`
+	VerificationStatus  string         `gorm:"type:varchar(20);default:pending;index" json:"verification_status"`
+	AvailabilityStatus  string         `gorm:"type:varchar(20);default:offline;index" json:"availability_status"`
+	ServiceRadiusKM     int            `gorm:"default:50" json:"service_radius_km"`
+	ServiceCities       JSON           `gorm:"type:json" json:"service_cities"`
+	SkillTags           JSON           `gorm:"type:json" json:"skill_tags"`
+	CAACLicenseNo       string         `gorm:"type:varchar(50);index" json:"caac_license_no"`
+	CAACLicenseExpireAt *time.Time     `json:"caac_license_expire_at"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+
+	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+func (PilotProfile) TableName() string {
+	return "pilot_profiles"
+}
+
 type Drone struct {
 	ID                  int64   `gorm:"primaryKey;autoIncrement" json:"id"`
 	OwnerID             int64   `gorm:"index;not null" json:"owner_id"`
 	Brand               string  `gorm:"type:varchar(100)" json:"brand"`
 	Model               string  `gorm:"type:varchar(100)" json:"model"`
 	SerialNumber        string  `gorm:"type:varchar(100);uniqueIndex" json:"serial_number"`
+	MTOWKG              float64 `gorm:"column:mtow_kg;type:decimal(10,2)" json:"mtow_kg"`
+	MaxPayloadKG        float64 `gorm:"column:max_payload_kg;type:decimal(10,2)" json:"max_payload_kg"`
 	MaxLoad             float64 `gorm:"type:decimal(10,2)" json:"max_load"`
 	MaxFlightTime       int     `json:"max_flight_time"`
 	MaxDistance         float64 `gorm:"type:decimal(10,2)" json:"max_distance"`
@@ -90,6 +151,53 @@ func (Drone) TableName() string {
 	return "drones"
 }
 
+const (
+	HeavyLiftMinMTOWKG    = 150.0
+	HeavyLiftMinPayloadKG = 50.0
+)
+
+func (d *Drone) EffectivePayloadKG() float64 {
+	if d == nil {
+		return 0
+	}
+	if d.MaxPayloadKG > 0 {
+		return d.MaxPayloadKG
+	}
+	return d.MaxLoad
+}
+
+func (d *Drone) MeetsHeavyLiftThreshold() bool {
+	if d == nil {
+		return false
+	}
+	return d.MTOWKG >= HeavyLiftMinMTOWKG && d.EffectivePayloadKG() >= HeavyLiftMinPayloadKG
+}
+
+func (d *Drone) EligibleForMarketplace() bool {
+	if d == nil {
+		return false
+	}
+	if !d.MeetsHeavyLiftThreshold() {
+		return false
+	}
+	if d.AvailabilityStatus != "available" {
+		return false
+	}
+	if d.CertificationStatus != "approved" {
+		return false
+	}
+	if d.UOMVerified != "verified" {
+		return false
+	}
+	if d.InsuranceVerified != "verified" {
+		return false
+	}
+	if d.AirworthinessVerified != "verified" {
+		return false
+	}
+	return true
+}
+
 type RentalOffer struct {
 	ID            int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	DroneID       int64          `gorm:"index;not null" json:"drone_id"`
@@ -119,9 +227,41 @@ func (RentalOffer) TableName() string {
 	return "rental_offers"
 }
 
+type OwnerSupply struct {
+	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	SupplyNo            string         `gorm:"type:varchar(50);uniqueIndex" json:"supply_no"`
+	OwnerUserID         int64          `gorm:"index;not null" json:"owner_user_id"`
+	DroneID             int64          `gorm:"index;not null" json:"drone_id"`
+	Title               string         `gorm:"type:varchar(200);not null" json:"title"`
+	Description         string         `gorm:"type:text" json:"description"`
+	ServiceTypes        JSON           `gorm:"type:json" json:"service_types"`
+	CargoScenes         JSON           `gorm:"type:json" json:"cargo_scenes"`
+	ServiceAreaSnapshot JSON           `gorm:"type:json" json:"service_area_snapshot"`
+	MTOWKG              float64        `gorm:"column:mtow_kg;type:decimal(10,2)" json:"mtow_kg"`
+	MaxPayloadKG        float64        `gorm:"column:max_payload_kg;type:decimal(10,2)" json:"max_payload_kg"`
+	MaxRangeKM          float64        `gorm:"column:max_range_km;type:decimal(10,2)" json:"max_range_km"`
+	BasePriceAmount     int64          `json:"base_price_amount"`
+	PricingUnit         string         `gorm:"type:varchar(20)" json:"pricing_unit"`
+	PricingRule         JSON           `gorm:"type:json" json:"pricing_rule"`
+	AvailableTimeSlots  JSON           `gorm:"type:json" json:"available_time_slots"`
+	AcceptsDirectOrder  bool           `gorm:"default:true" json:"accepts_direct_order"`
+	Status              string         `gorm:"type:varchar(20);default:draft;index" json:"status"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Owner *User  `gorm:"foreignKey:OwnerUserID" json:"owner,omitempty"`
+	Drone *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
+}
+
+func (OwnerSupply) TableName() string {
+	return "owner_supplies"
+}
+
 type RentalDemand struct {
 	ID               int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	RenterID         int64          `gorm:"index;not null" json:"renter_id"`
+	ClientID         int64          `gorm:"index" json:"client_id"`
 	DemandType       string         `gorm:"type:varchar(30)" json:"demand_type"`
 	Title            string         `gorm:"type:varchar(200);not null" json:"title"`
 	Description      string         `gorm:"type:text" json:"description"`
@@ -151,6 +291,7 @@ func (RentalDemand) TableName() string {
 type CargoDemand struct {
 	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	PublisherID         int64          `gorm:"index;not null" json:"publisher_id"`
+	ClientID            int64          `gorm:"index" json:"client_id"`
 	CargoType           string         `gorm:"type:varchar(30)" json:"cargo_type"` // package, equipment, material, other
 	CargoWeight         float64        `gorm:"type:decimal(10,2)" json:"cargo_weight"`
 	CargoSize           JSON           `gorm:"type:json" json:"cargo_size"`
@@ -179,15 +320,116 @@ func (CargoDemand) TableName() string {
 	return "cargo_demands"
 }
 
+type Demand struct {
+	ID                         int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	DemandNo                   string     `gorm:"type:varchar(50);uniqueIndex" json:"demand_no"`
+	ClientUserID               int64      `gorm:"index;not null" json:"client_user_id"`
+	Title                      string     `gorm:"type:varchar(200);not null" json:"title"`
+	ServiceType                string     `gorm:"type:varchar(50);not null" json:"service_type"`
+	CargoScene                 string     `gorm:"type:varchar(50);not null" json:"cargo_scene"`
+	Description                string     `gorm:"type:text" json:"description"`
+	DepartureAddressSnapshot   JSON       `gorm:"type:json" json:"departure_address_snapshot"`
+	DestinationAddressSnapshot JSON       `gorm:"type:json" json:"destination_address_snapshot"`
+	ServiceAddressSnapshot     JSON       `gorm:"type:json" json:"service_address_snapshot"`
+	ScheduledStartAt           *time.Time `json:"scheduled_start_at"`
+	ScheduledEndAt             *time.Time `json:"scheduled_end_at"`
+	CargoWeightKG              float64    `gorm:"type:decimal(10,2)" json:"cargo_weight_kg"`
+	CargoVolumeM3              float64    `gorm:"type:decimal(10,3)" json:"cargo_volume_m3"`
+	CargoType                  string     `gorm:"type:varchar(50)" json:"cargo_type"`
+	CargoSpecialRequirements   string     `gorm:"type:text" json:"cargo_special_requirements"`
+	EstimatedTripCount         int        `gorm:"default:1" json:"estimated_trip_count"`
+	CargoSnapshot              JSON       `gorm:"type:json" json:"cargo_snapshot"`
+	BudgetMin                  int64      `json:"budget_min"`
+	BudgetMax                  int64      `json:"budget_max"`
+	AllowsPilotCandidate       bool       `gorm:"default:false" json:"allows_pilot_candidate"`
+	SelectedQuoteID            int64      `json:"selected_quote_id"`
+	SelectedProviderUserID     int64      `json:"selected_provider_user_id"`
+	ExpiresAt                  *time.Time `json:"expires_at"`
+	Status                     string     `gorm:"type:varchar(30);default:draft;index" json:"status"`
+	CreatedAt                  time.Time  `json:"created_at"`
+	UpdatedAt                  time.Time  `json:"updated_at"`
+
+	Client *User `gorm:"foreignKey:ClientUserID" json:"client,omitempty"`
+}
+
+func (Demand) TableName() string {
+	return "demands"
+}
+
+type DemandQuote struct {
+	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	QuoteNo         string    `gorm:"type:varchar(50);uniqueIndex" json:"quote_no"`
+	DemandID        int64     `gorm:"index;not null" json:"demand_id"`
+	OwnerUserID     int64     `gorm:"index;not null" json:"owner_user_id"`
+	DroneID         int64     `gorm:"index;not null" json:"drone_id"`
+	PriceAmount     int64     `json:"price_amount"`
+	PricingSnapshot JSON      `gorm:"type:json" json:"pricing_snapshot"`
+	ExecutionPlan   string    `gorm:"type:text" json:"execution_plan"`
+	Status          string    `gorm:"type:varchar(20);default:submitted;index" json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+
+	Demand *Demand `gorm:"foreignKey:DemandID" json:"demand,omitempty"`
+	Owner  *User   `gorm:"foreignKey:OwnerUserID" json:"owner,omitempty"`
+	Drone  *Drone  `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
+}
+
+func (DemandQuote) TableName() string {
+	return "demand_quotes"
+}
+
+type DemandCandidatePilot struct {
+	ID                   int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	DemandID             int64     `gorm:"index;not null" json:"demand_id"`
+	PilotUserID          int64     `gorm:"index;not null" json:"pilot_user_id"`
+	Status               string    `gorm:"type:varchar(20);default:active;index" json:"status"`
+	AvailabilitySnapshot JSON      `gorm:"type:json" json:"availability_snapshot"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+
+	Demand *Demand `gorm:"foreignKey:DemandID" json:"demand,omitempty"`
+	Pilot  *User   `gorm:"foreignKey:PilotUserID" json:"pilot,omitempty"`
+}
+
+func (DemandCandidatePilot) TableName() string {
+	return "demand_candidate_pilots"
+}
+
+type MatchingLog struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	DemandID       int64     `gorm:"index;not null" json:"demand_id"`
+	ActorType      string    `gorm:"type:varchar(20);not null" json:"actor_type"`
+	ActionType     string    `gorm:"type:varchar(30);not null" json:"action_type"`
+	ResultSnapshot JSON      `gorm:"type:json" json:"result_snapshot"`
+	CreatedAt      time.Time `json:"created_at"`
+
+	Demand *Demand `gorm:"foreignKey:DemandID" json:"demand,omitempty"`
+}
+
+func (MatchingLog) TableName() string {
+	return "matching_logs"
+}
+
 type Order struct {
 	ID                     int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	OrderNo                string         `gorm:"type:varchar(30);uniqueIndex;not null" json:"order_no"`
 	OrderType              string         `gorm:"type:varchar(20);not null" json:"order_type"` // rental, cargo
 	RelatedID              int64          `json:"related_id"`
+	OrderSource            string         `gorm:"type:varchar(30);default:demand_market;index" json:"order_source"`
+	DemandID               int64          `gorm:"index" json:"demand_id"`
+	SourceSupplyID         int64          `gorm:"index" json:"source_supply_id"`
 	DroneID                int64          `gorm:"index" json:"drone_id"`
 	OwnerID                int64          `gorm:"index" json:"owner_id"`
 	PilotID                int64          `gorm:"index" json:"pilot_id"` // 飞手ID
 	RenterID               int64          `gorm:"index" json:"renter_id"`
+	ClientID               int64          `gorm:"index" json:"client_id"`
+	ClientUserID           int64          `gorm:"index" json:"client_user_id"`
+	ProviderUserID         int64          `gorm:"index" json:"provider_user_id"`
+	DroneOwnerUserID       int64          `gorm:"index" json:"drone_owner_user_id"`
+	ExecutorPilotUserID    int64          `gorm:"index" json:"executor_pilot_user_id"`
+	DispatchTaskID         *int64         `gorm:"index" json:"dispatch_task_id"`
+	NeedsDispatch          bool           `gorm:"default:false;index" json:"needs_dispatch"`
+	ExecutionMode          string         `gorm:"type:varchar(30);default:self_execute;index" json:"execution_mode"`
 	Title                  string         `gorm:"type:varchar(200)" json:"title"`
 	ServiceType            string         `gorm:"type:varchar(30)" json:"service_type"`
 	StartTime              time.Time      `json:"start_time"`
@@ -195,22 +437,38 @@ type Order struct {
 	ServiceLatitude        float64        `gorm:"type:decimal(10,7)" json:"service_latitude"`
 	ServiceLongitude       float64        `gorm:"type:decimal(10,7)" json:"service_longitude"`
 	ServiceAddress         string         `gorm:"type:varchar(255)" json:"service_address"`
+	DestLatitude           *float64       `gorm:"type:decimal(10,7)" json:"dest_latitude"`
+	DestLongitude          *float64       `gorm:"type:decimal(10,7)" json:"dest_longitude"`
+	DestAddress            string         `gorm:"type:varchar(255)" json:"dest_address"`
 	TotalAmount            int64          `json:"total_amount"`
 	PlatformCommissionRate float64        `gorm:"type:decimal(5,2)" json:"platform_commission_rate"`
 	PlatformCommission     int64          `json:"platform_commission"`
 	OwnerAmount            int64          `json:"owner_amount"`
 	DepositAmount          int64          `json:"deposit_amount"`
-	Status                 string         `gorm:"type:varchar(20);default:created" json:"status"`
+	Status                 string         `gorm:"type:varchar(40);default:created" json:"status"`
+	FlightStartTime        *time.Time     `json:"flight_start_time"`
+	FlightEndTime          *time.Time     `json:"flight_end_time"`
+	ActualFlightDistance   int            `json:"actual_flight_distance"`
+	ActualFlightDuration   int            `json:"actual_flight_duration"`
+	MaxAltitude            int            `json:"max_altitude"`
+	AvgSpeed               int            `json:"avg_speed"`
+	TrajectoryID           *int64         `gorm:"index" json:"trajectory_id"`
+	ProviderConfirmedAt    *time.Time     `json:"provider_confirmed_at"`
+	ProviderRejectedAt     *time.Time     `json:"provider_rejected_at"`
+	ProviderRejectReason   string         `gorm:"type:text" json:"provider_reject_reason"`
+	PaidAt                 *time.Time     `json:"paid_at"`
+	CompletedAt            *time.Time     `json:"completed_at"`
 	CancelReason           string         `gorm:"type:text" json:"cancel_reason"`
 	CancelBy               string         `gorm:"type:varchar(20)" json:"cancel_by"`
 	CreatedAt              time.Time      `json:"created_at"`
 	UpdatedAt              time.Time      `json:"updated_at"`
 	DeletedAt              gorm.DeletedAt `gorm:"index" json:"-"`
 
-	Drone  *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
-	Owner  *User  `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
-	Pilot  *Pilot `gorm:"foreignKey:PilotID" json:"pilot,omitempty"`
-	Renter *User  `gorm:"foreignKey:RenterID" json:"renter,omitempty"`
+	Demand *Demand `gorm:"foreignKey:DemandID" json:"demand,omitempty"`
+	Drone  *Drone  `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
+	Owner  *User   `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Pilot  *Pilot  `gorm:"foreignKey:PilotID" json:"pilot,omitempty"`
+	Renter *User   `gorm:"foreignKey:RenterID" json:"renter,omitempty"`
 
 	// 虚拟字段：是否已评件（不存储在数据库）
 	Reviewed bool `gorm:"-" json:"reviewed"`
@@ -223,7 +481,7 @@ func (Order) TableName() string {
 type OrderTimeline struct {
 	ID           int64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	OrderID      int64     `gorm:"index;not null" json:"order_id"`
-	Status       string    `gorm:"type:varchar(20)" json:"status"`
+	Status       string    `gorm:"type:varchar(40)" json:"status"`
 	Note         string    `gorm:"type:text" json:"note"`
 	OperatorID   int64     `json:"operator_id"`
 	OperatorType string    `gorm:"type:varchar(20)" json:"operator_type"` // owner, renter, system, admin
@@ -232,6 +490,21 @@ type OrderTimeline struct {
 
 func (OrderTimeline) TableName() string {
 	return "order_timelines"
+}
+
+type OrderSnapshot struct {
+	ID           int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID      int64     `gorm:"uniqueIndex:idx_order_snapshot_type;not null" json:"order_id"`
+	SnapshotType string    `gorm:"type:varchar(30);uniqueIndex:idx_order_snapshot_type;not null" json:"snapshot_type"`
+	SnapshotData JSON      `gorm:"type:json" json:"snapshot_data"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+
+	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+}
+
+func (OrderSnapshot) TableName() string {
+	return "order_snapshots"
 }
 
 type Payment struct {
@@ -251,6 +524,44 @@ type Payment struct {
 
 func (Payment) TableName() string {
 	return "payments"
+}
+
+type Refund struct {
+	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	RefundNo  string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"refund_no"`
+	OrderID   int64     `gorm:"index;not null" json:"order_id"`
+	PaymentID int64     `gorm:"uniqueIndex;not null" json:"payment_id"`
+	Amount    int64     `json:"amount"`
+	Reason    string    `gorm:"type:text" json:"reason"`
+	Status    string    `gorm:"type:varchar(20);default:pending;index" json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	Order   *Order   `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Payment *Payment `gorm:"foreignKey:PaymentID" json:"payment,omitempty"`
+}
+
+func (Refund) TableName() string {
+	return "refunds"
+}
+
+type DisputeRecord struct {
+	ID              int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID         int64          `gorm:"index;not null" json:"order_id"`
+	InitiatorUserID int64          `gorm:"index;not null" json:"initiator_user_id"`
+	DisputeType     string         `gorm:"type:varchar(30);not null" json:"dispute_type"`
+	Status          string         `gorm:"type:varchar(20);default:open;index" json:"status"`
+	Summary         string         `gorm:"type:text" json:"summary"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Order     *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Initiator *User  `gorm:"foreignKey:InitiatorUserID" json:"initiator,omitempty"`
+}
+
+func (DisputeRecord) TableName() string {
+	return "dispute_records"
 }
 
 type Message struct {
@@ -333,6 +644,87 @@ type AdminLog struct {
 
 func (AdminLog) TableName() string {
 	return "admin_logs"
+}
+
+type MigrationEntityMapping struct {
+	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	LegacyTable string    `gorm:"type:varchar(100);not null;index:idx_migration_entity_legacy,priority:1" json:"legacy_table"`
+	LegacyID    string    `gorm:"type:varchar(100);not null;index:idx_migration_entity_legacy,priority:2" json:"legacy_id"`
+	NewTable    string    `gorm:"type:varchar(100);not null;index:idx_migration_entity_new,priority:1" json:"new_table"`
+	NewID       string    `gorm:"type:varchar(100);not null;index:idx_migration_entity_new,priority:2" json:"new_id"`
+	MappingType string    `gorm:"type:varchar(20);default:migrated;index" json:"mapping_type"`
+	MappingNote string    `gorm:"type:varchar(255)" json:"mapping_note"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (MigrationEntityMapping) TableName() string {
+	return "migration_entity_mappings"
+}
+
+type MigrationAuditRecord struct {
+	ID               int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	AuditStage       string    `gorm:"type:varchar(50);not null;index" json:"audit_stage"`
+	LegacyTable      string    `gorm:"type:varchar(100);not null;index:idx_migration_audit_legacy,priority:1" json:"legacy_table"`
+	LegacyID         string    `gorm:"type:varchar(100);not null;default:'';index:idx_migration_audit_legacy,priority:2" json:"legacy_id"`
+	RelatedTable     string    `gorm:"type:varchar(100);not null;default:'';index:idx_migration_audit_related,priority:1" json:"related_table"`
+	RelatedID        string    `gorm:"type:varchar(100);not null;default:'';index:idx_migration_audit_related,priority:2" json:"related_id"`
+	IssueType        string    `gorm:"type:varchar(50);not null;index" json:"issue_type"`
+	Severity         string    `gorm:"type:varchar(20);not null;default:warning;index" json:"severity"`
+	IssueMessage     string    `gorm:"type:text;not null" json:"issue_message"`
+	PayloadJSON      JSON      `gorm:"type:json" json:"payload_json"`
+	ResolutionStatus string    `gorm:"type:varchar(20);not null;default:open;index" json:"resolution_status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+func (MigrationAuditRecord) TableName() string {
+	return "migration_audit_records"
+}
+
+type CountBucket struct {
+	Key   string `json:"key"`
+	Count int64  `json:"count"`
+}
+
+type MigrationAuditSummary struct {
+	Total         int64         `json:"total"`
+	OpenCount     int64         `json:"open_count"`
+	ResolvedCount int64         `json:"resolved_count"`
+	CriticalCount int64         `json:"critical_count"`
+	WarningCount  int64         `json:"warning_count"`
+	InfoCount     int64         `json:"info_count"`
+	ByIssueType   []CountBucket `json:"by_issue_type"`
+	ByStage       []CountBucket `json:"by_stage"`
+}
+
+type OrderAnomaly struct {
+	OrderID          int64      `json:"order_id"`
+	OrderNo          string     `json:"order_no"`
+	Title            string     `json:"title"`
+	Status           string     `json:"status"`
+	OrderSource      string     `json:"order_source"`
+	ExecutionMode    string     `json:"execution_mode"`
+	NeedsDispatch    bool       `json:"needs_dispatch"`
+	DispatchTaskID   *int64     `json:"dispatch_task_id"`
+	ProviderUserID   int64      `json:"provider_user_id"`
+	ClientUserID     int64      `json:"client_user_id"`
+	ProviderNickname string     `json:"provider_nickname"`
+	ClientNickname   string     `json:"client_nickname"`
+	AnomalyType      string     `json:"anomaly_type"`
+	Severity         string     `json:"severity"`
+	Message          string     `json:"message"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	CompletedAt      *time.Time `json:"completed_at"`
+}
+
+type OrderAnomalySummary struct {
+	Total         int64         `json:"total"`
+	CriticalCount int64         `json:"critical_count"`
+	WarningCount  int64         `json:"warning_count"`
+	ByAnomalyType []CountBucket `json:"by_anomaly_type"`
+	ByOrderStatus []CountBucket `json:"by_order_status"`
 }
 
 // UserAddress 用户常用地址
@@ -478,6 +870,28 @@ type PilotDroneBinding struct {
 
 func (PilotDroneBinding) TableName() string {
 	return "pilot_drone_bindings"
+}
+
+type OwnerPilotBinding struct {
+	ID          int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	OwnerUserID int64          `gorm:"index:idx_owner_pilot_pair;not null" json:"owner_user_id"`
+	PilotUserID int64          `gorm:"index:idx_owner_pilot_pair;not null" json:"pilot_user_id"`
+	InitiatedBy string         `gorm:"type:varchar(20);default:owner" json:"initiated_by"`
+	Status      string         `gorm:"type:varchar(30);default:pending_confirmation;index" json:"status"`
+	IsPriority  bool           `gorm:"default:false" json:"is_priority"`
+	Note        string         `gorm:"type:text" json:"note"`
+	ConfirmedAt *time.Time     `json:"confirmed_at"`
+	DissolvedAt *time.Time     `json:"dissolved_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Owner *User `gorm:"foreignKey:OwnerUserID" json:"owner,omitempty"`
+	Pilot *User `gorm:"foreignKey:PilotUserID" json:"pilot,omitempty"`
+}
+
+func (OwnerPilotBinding) TableName() string {
+	return "owner_pilot_bindings"
 }
 
 // ==================== 无人机维护与保险相关模型 ====================
@@ -698,7 +1112,7 @@ func (CargoDeclaration) TableName() string {
 
 // ==================== 智能匹配与派单相关模型 ====================
 
-// DispatchTask 派单任务
+// DispatchTask 旧派单任务池对象（保留现有 v1 匹配/候选流程）
 type DispatchTask struct {
 	ID            int64  `gorm:"primaryKey;autoIncrement" json:"id"`
 	TaskNo        string `gorm:"type:varchar(50);uniqueIndex;not null" json:"task_no"`
@@ -768,10 +1182,10 @@ type DispatchTask struct {
 }
 
 func (DispatchTask) TableName() string {
-	return "dispatch_tasks"
+	return "dispatch_pool_tasks"
 }
 
-// DispatchCandidate 派单候选人
+// DispatchCandidate 旧派单候选人（对应任务池候选）
 type DispatchCandidate struct {
 	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
 	TaskID  int64 `gorm:"index;not null" json:"task_id"`
@@ -811,10 +1225,10 @@ type DispatchCandidate struct {
 }
 
 func (DispatchCandidate) TableName() string {
-	return "dispatch_candidates"
+	return "dispatch_pool_candidates"
 }
 
-// DispatchConfig 派单配置
+// DispatchConfig 旧任务池匹配配置
 type DispatchConfig struct {
 	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	ConfigKey   string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"config_key"`
@@ -825,10 +1239,10 @@ type DispatchConfig struct {
 }
 
 func (DispatchConfig) TableName() string {
-	return "dispatch_configs"
+	return "dispatch_pool_configs"
 }
 
-// DispatchLog 派单日志
+// DispatchLog 旧任务池日志
 type DispatchLog struct {
 	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	TaskID    int64     `gorm:"index;not null" json:"task_id"`
@@ -840,17 +1254,89 @@ type DispatchLog struct {
 }
 
 func (DispatchLog) TableName() string {
+	return "dispatch_pool_logs"
+}
+
+// FormalDispatchTask 正式派单任务。用于表达“某订单发给某个飞手的一次正式执行指令”。
+type FormalDispatchTask struct {
+	ID                int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	DispatchNo        string         `gorm:"type:varchar(50);uniqueIndex;not null" json:"dispatch_no"`
+	OrderID           int64          `gorm:"index;not null" json:"order_id"`
+	ProviderUserID    int64          `gorm:"index;not null" json:"provider_user_id"`
+	TargetPilotUserID int64          `gorm:"index;not null" json:"target_pilot_user_id"`
+	DispatchSource    string         `gorm:"type:varchar(30);not null;index" json:"dispatch_source"`
+	RetryCount        int            `gorm:"default:0" json:"retry_count"`
+	Status            string         `gorm:"type:varchar(20);default:pending_response;index" json:"status"`
+	Reason            string         `gorm:"type:text" json:"reason"`
+	SentAt            *time.Time     `json:"sent_at"`
+	RespondedAt       *time.Time     `json:"responded_at"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Order       *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Provider    *User  `gorm:"foreignKey:ProviderUserID" json:"provider,omitempty"`
+	TargetPilot *User  `gorm:"foreignKey:TargetPilotUserID" json:"target_pilot,omitempty"`
+}
+
+func (FormalDispatchTask) TableName() string {
+	return "dispatch_tasks"
+}
+
+// FormalDispatchLog 正式派单日志
+type FormalDispatchLog struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	DispatchTaskID int64     `gorm:"index;not null" json:"dispatch_task_id"`
+	ActionType     string    `gorm:"type:varchar(30);not null" json:"action_type"`
+	OperatorUserID int64     `gorm:"index" json:"operator_user_id"`
+	Note           string    `gorm:"type:text" json:"note"`
+	CreatedAt      time.Time `json:"created_at"`
+
+	DispatchTask *FormalDispatchTask `gorm:"foreignKey:DispatchTaskID" json:"dispatch_task,omitempty"`
+	Operator     *User               `gorm:"foreignKey:OperatorUserID" json:"operator,omitempty"`
+}
+
+func (FormalDispatchLog) TableName() string {
 	return "dispatch_logs"
 }
 
 // ==================== 飞行监控相关模型 ====================
 
+// FlightRecord 订单履约飞行记录。每条记录表示一个订单执行过程中的独立架次。
+type FlightRecord struct {
+	ID                   int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	FlightNo             string         `gorm:"type:varchar(50);uniqueIndex;not null" json:"flight_no"`
+	OrderID              int64          `gorm:"index;not null" json:"order_id"`
+	DispatchTaskID       *int64         `gorm:"index" json:"dispatch_task_id"`
+	PilotUserID          int64          `gorm:"index" json:"pilot_user_id"`
+	DroneID              int64          `gorm:"index;not null" json:"drone_id"`
+	TakeoffAt            *time.Time     `json:"takeoff_at"`
+	LandingAt            *time.Time     `json:"landing_at"`
+	TotalDurationSeconds int            `gorm:"default:0" json:"total_duration_seconds"`
+	TotalDistanceM       float64        `gorm:"type:decimal(12,2);default:0" json:"total_distance_m"`
+	MaxAltitudeM         float64        `gorm:"type:decimal(10,2);default:0" json:"max_altitude_m"`
+	Status               string         `gorm:"type:varchar(20);default:pending;index" json:"status"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
+
+	Order        *Order              `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	DispatchTask *FormalDispatchTask `gorm:"foreignKey:DispatchTaskID" json:"dispatch_task,omitempty"`
+	Pilot        *User               `gorm:"foreignKey:PilotUserID" json:"pilot,omitempty"`
+	Drone        *Drone              `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
+}
+
+func (FlightRecord) TableName() string {
+	return "flight_records"
+}
+
 // FlightPosition 飞行实时位置记录
 type FlightPosition struct {
-	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID int64 `gorm:"index;not null" json:"order_id"`
-	DroneID int64 `gorm:"index;not null" json:"drone_id"`
-	PilotID int64 `json:"pilot_id"`
+	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	FlightRecordID *int64 `gorm:"index" json:"flight_record_id"`
+	OrderID        int64  `gorm:"index;not null" json:"order_id"`
+	DroneID        int64  `gorm:"index;not null" json:"drone_id"`
+	PilotID        int64  `json:"pilot_id"`
 
 	// 位置信息
 	Latitude  float64 `gorm:"type:decimal(10,7);not null" json:"latitude"`
@@ -875,8 +1361,9 @@ type FlightPosition struct {
 	RecordedAt time.Time `gorm:"not null" json:"recorded_at"`
 	CreatedAt  time.Time `json:"created_at"`
 
-	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
-	Drone *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
+	FlightRecord *FlightRecord `gorm:"foreignKey:FlightRecordID" json:"flight_record,omitempty"`
+	Order        *Order        `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Drone        *Drone        `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
 }
 
 func (FlightPosition) TableName() string {
@@ -885,10 +1372,11 @@ func (FlightPosition) TableName() string {
 
 // FlightAlert 飞行告警记录
 type FlightAlert struct {
-	ID      int64 `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID int64 `gorm:"index;not null" json:"order_id"`
-	DroneID int64 `gorm:"index;not null" json:"drone_id"`
-	PilotID int64 `json:"pilot_id"`
+	ID             int64  `gorm:"primaryKey;autoIncrement" json:"id"`
+	FlightRecordID *int64 `gorm:"index" json:"flight_record_id"`
+	OrderID        int64  `gorm:"index;not null" json:"order_id"`
+	DroneID        int64  `gorm:"index;not null" json:"drone_id"`
+	PilotID        int64  `json:"pilot_id"`
 
 	AlertType  string `gorm:"type:varchar(50);not null" json:"alert_type"`  // low_battery, geofence, deviation, signal_lost, altitude, speed, weather
 	AlertLevel string `gorm:"type:varchar(20);not null" json:"alert_level"` // info, warning, critical
@@ -918,8 +1406,9 @@ type FlightAlert struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
-	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
-	Drone *Drone `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
+	FlightRecord *FlightRecord `gorm:"foreignKey:FlightRecordID" json:"flight_record,omitempty"`
+	Order        *Order        `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Drone        *Drone        `gorm:"foreignKey:DroneID" json:"drone,omitempty"`
 }
 
 func (FlightAlert) TableName() string {

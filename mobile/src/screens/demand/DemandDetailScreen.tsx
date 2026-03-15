@@ -1,41 +1,136 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {useSelector} from 'react-redux';
+
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {demandV2Service} from '../../services/demandV2';
 import {RootState} from '../../store/store';
-import {demandService} from '../../services/demand';
-import {RentalDemand} from '../../types';
+import {DemandDetail, DemandQuoteSummary} from '../../types';
+import {
+  formatDemandBudget,
+  formatDemandSchedule,
+  formatTripCount,
+  getDemandSceneLabel,
+  resolveDemandPrimaryAddress,
+} from '../../utils/demandMeta';
+import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {formatAmountYuan, summarizeFlexibleValue} from '../../utils/supplyMeta';
 
 export default function DemandDetailScreen({route, navigation}: any) {
-  const {id} = route.params;
-  const [demand, setDemand] = useState<RentalDemand | null>(null);
-  const [loading, setLoading] = useState(true);
+  const demandId = Number(route.params?.id || route.params?.demandId || 0);
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const effectiveRoleSummary = useMemo(
+    () => getEffectiveRoleSummary(roleSummary, currentUser),
+    [currentUser, roleSummary],
+  );
 
-  useEffect(() => {
-    fetchDemand();
-  }, [id]);
+  const [demand, setDemand] = useState<DemandDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [candidateSubmitting, setCandidateSubmitting] = useState(false);
+  const [quotesVisible, setQuotesVisible] = useState(false);
+  const [quotesLoading, setQuotesLoading] = useState(false);
+  const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
+  const [selectingQuoteId, setSelectingQuoteId] = useState<number | null>(null);
 
-  const fetchDemand = async () => {
+  const isOwnDemand = demand?.client_user_id === currentUser?.id;
+  const canQuoteAsOwner = !isOwnDemand && effectiveRoleSummary.has_owner_role;
+  const canOperateCandidate = !isOwnDemand && effectiveRoleSummary.has_pilot_role && !!demand?.allows_pilot_candidate;
+  const activeCandidate = demand?.my_candidate?.status === 'active';
+  const hasOwnQuote = Boolean(demand?.my_quote);
+
+  const fetchDemand = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await demandService.getDemand(id);
+      const res = await demandV2Service.getById(demandId);
       setDemand(res.data);
-    } catch (e) {
-      Alert.alert('错误', '获取需求详情失败');
+    } catch (error: any) {
+      Alert.alert('错误', error.message || '获取需求详情失败');
+      setDemand(null);
     } finally {
       setLoading(false);
     }
+  }, [demandId]);
+
+  useEffect(() => {
+    fetchDemand();
+  }, [fetchDemand, route.params?.refreshAt]);
+
+  const loadQuotes = useCallback(async () => {
+    if (!demandId) {
+      return;
+    }
+    setQuotesLoading(true);
+    try {
+      const res = await demandV2Service.listQuotes(demandId);
+      setQuotes(res.data?.items || []);
+    } catch (error: any) {
+      Alert.alert('加载失败', error.message || '获取报价失败');
+    } finally {
+      setQuotesLoading(false);
+    }
+  }, [demandId]);
+
+  const toggleQuotes = async () => {
+    const nextVisible = !quotesVisible;
+    setQuotesVisible(nextVisible);
+    if (nextVisible && quotes.length === 0) {
+      await loadQuotes();
+    }
   };
 
-  // 判断是否为发布者
-  const isPublisher = demand?.renter_id === currentUser?.id;
+  const handleCandidateToggle = async () => {
+    if (!demand) {
+      return;
+    }
+    setCandidateSubmitting(true);
+    try {
+      if (activeCandidate) {
+        const res = await demandV2Service.withdrawCandidate(demand.id);
+        setDemand(prev => (prev ? {...prev, my_candidate: res.data, candidate_pilot_count: Math.max((prev.candidate_pilot_count || 1) - 1, 0)} : prev));
+      } else {
+        const res = await demandV2Service.applyCandidate(demand.id);
+        setDemand(prev => (prev ? {...prev, my_candidate: res.data, candidate_pilot_count: (prev.candidate_pilot_count || 0) + 1} : prev));
+      }
+    } catch (error: any) {
+      Alert.alert(activeCandidate ? '取消失败' : '报名失败', error.message || '请稍后再试');
+    } finally {
+      setCandidateSubmitting(false);
+    }
+  };
+
+  const handleSelectQuote = async (quote: DemandQuoteSummary) => {
+    if (!demand) {
+      return;
+    }
+    setSelectingQuoteId(quote.id);
+    try {
+      const res = await demandV2Service.selectProvider(demand.id, quote.id);
+      Alert.alert('已生成订单', '需求已转为待支付订单，后续履约请到订单页处理。', [
+        {text: '查看订单', onPress: () => navigation.navigate('OrderDetail', {id: res.data.order_id})},
+      ]);
+    } catch (error: any) {
+      Alert.alert('选择失败', error.message || '暂时无法选定该方案');
+    } finally {
+      setSelectingQuoteId(null);
+    }
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 100}} color="#1890ff" />
+        <ActivityIndicator style={styles.loader} color="#1677ff" />
       </SafeAreaView>
     );
   }
@@ -43,9 +138,10 @@ export default function DemandDetailScreen({route, navigation}: any) {
   if (!demand) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.empty}>
+        <View style={styles.emptyBox}>
           <Text style={styles.emptyIcon}>📋</Text>
-          <Text style={styles.emptyText}>需求信息不存在</Text>
+          <Text style={styles.emptyTitle}>需求不存在</Text>
+          <Text style={styles.emptyDesc}>这条需求可能已关闭，或者当前账号无权查看。</Text>
         </View>
       </SafeAreaView>
     );
@@ -53,95 +149,207 @@ export default function DemandDetailScreen({route, navigation}: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scroll}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{demand.title}</Text>
-          {demand.urgency === 'urgent' && (
-            <View style={styles.urgentBadge}>
-              <Text style={styles.urgentText}>紧急需求</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <View style={styles.heroHeader}>
+            <View style={styles.heroTitleWrap}>
+              <Text style={styles.demandNo}>{demand.demand_no}</Text>
+              <Text style={styles.title}>{demand.title}</Text>
             </View>
-          )}
-          <Text style={styles.budget}>
-            预算：¥{demand.budget_min || 0} - ¥{demand.budget_max || 0}
+            <StatusBadge meta={getObjectStatusMeta('demand', demand.status)} label="" />
+          </View>
+
+          <View style={styles.tagRow}>
+            <SourceTag source="demand" />
+          </View>
+
+          <Text style={styles.budget}>{formatDemandBudget(demand.budget_min, demand.budget_max)}</Text>
+          <Text style={styles.heroDesc}>
+            {getDemandSceneLabel(demand.cargo_scene)} · {formatTripCount(demand.estimated_trip_count)} · {resolveDemandPrimaryAddress(demand)}
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>需求信息</Text>
+        {canQuoteAsOwner || canOperateCandidate ? (
+          <View style={styles.actionPanel}>
+            <Text style={styles.sectionTitle}>你在这里可以做什么</Text>
+            {canQuoteAsOwner ? (
+              <TouchableOpacity
+                style={[styles.primaryBtn, styles.ownerBtn]}
+                onPress={() =>
+                  navigation.navigate('DemandQuoteCompose', {
+                    demandId: demand.id,
+                    demandTitle: demand.title,
+                    existingQuote: demand.my_quote || null,
+                  })
+                }
+                activeOpacity={0.9}>
+                <Text style={styles.primaryBtnText}>{hasOwnQuote ? '更新报价方案' : '提交报价方案'}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {canOperateCandidate ? (
+              <TouchableOpacity
+                style={[styles.primaryBtn, activeCandidate ? styles.ghostBtn : styles.pilotBtn]}
+                onPress={handleCandidateToggle}
+                activeOpacity={0.9}
+                disabled={candidateSubmitting}>
+                <Text style={[styles.primaryBtnText, activeCandidate && styles.ghostBtnText]}>
+                  {candidateSubmitting ? '处理中...' : activeCandidate ? '取消候选报名' : '报名候选'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            <Text style={styles.helperText}>机主报价和飞手候选现在都只围绕新版需求对象运转，不再混入旧订单入口。</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>需求详情</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>需求类型</Text>
-            <Text style={styles.infoValue}>{demand.demand_type || '租赁'}</Text>
+            <Text style={styles.infoLabel}>服务类型</Text>
+            <Text style={styles.infoValue}>重载吊运</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>详细地址</Text>
-            <Text style={styles.infoValue}>{demand.address || '未设置'}</Text>
+            <Text style={styles.infoLabel}>作业场景</Text>
+            <Text style={styles.infoValue}>{getDemandSceneLabel(demand.cargo_scene)}</Text>
           </View>
-
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>需求描述</Text>
-          <Text style={styles.description}>{demand.description || '暂无描述'}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>租客信息</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>昵称</Text>
-            <Text style={styles.infoValue}>{demand.renter?.nickname || '未知'}</Text>
+            <Text style={styles.infoLabel}>服务地址</Text>
+            <Text style={styles.infoValue}>{resolveDemandPrimaryAddress(demand)}</Text>
           </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>预约时间</Text>
+            <Text style={styles.infoValue}>{formatDemandSchedule(demand.scheduled_start_at, demand.scheduled_end_at)}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>货物重量</Text>
+            <Text style={styles.infoValue}>{demand.cargo_weight_kg || 0} kg</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>货物类型</Text>
+            <Text style={styles.infoValue}>{summarizeFlexibleValue(demand.cargo_type, '未填写')}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>预计架次</Text>
+            <Text style={styles.infoValue}>{formatTripCount(demand.estimated_trip_count)}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>飞手候选</Text>
+            <Text style={styles.infoValue}>{demand.allows_pilot_candidate ? '开放' : '关闭'}</Text>
+          </View>
+          <Text style={styles.description}>{demand.description || '客户暂未补充更多任务说明。'}</Text>
+          {demand.cargo_special_requirements ? (
+            <View style={styles.noteBox}>
+              <Text style={styles.noteLabel}>特殊要求</Text>
+              <Text style={styles.noteText}>{demand.cargo_special_requirements}</Text>
+            </View>
+          ) : null}
         </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>撮合进度</Text>
+          <View style={styles.metricRow}>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricValue}>{demand.quote_count || 0}</Text>
+              <Text style={styles.metricLabel}>报价方案</Text>
+            </View>
+            <View style={styles.metricCard}>
+              <Text style={styles.metricValue}>{demand.candidate_pilot_count || 0}</Text>
+              <Text style={styles.metricLabel}>候选飞手</Text>
+            </View>
+          </View>
+          {isOwnDemand ? (
+            <TouchableOpacity style={styles.quoteTrigger} onPress={toggleQuotes}>
+              <Text style={styles.quoteTriggerText}>{quotesVisible ? '收起报价方案' : '查看报价方案'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {isOwnDemand && quotesVisible ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>报价方案</Text>
+            {quotesLoading ? (
+              <ActivityIndicator color="#1677ff" />
+            ) : quotes.length === 0 ? (
+              <Text style={styles.emptyText}>还没有机主提交报价。</Text>
+            ) : (
+              quotes.map(item => (
+                <View key={item.id} style={styles.quoteCard}>
+                  <View style={styles.quoteHeader}>
+                    <Text style={styles.quoteOwner}>{item.owner?.nickname || `机主 #${item.owner_user_id}`}</Text>
+                    <StatusBadge meta={getObjectStatusMeta('quote', item.status)} label="" />
+                  </View>
+                  <Text style={styles.quotePrice}>{formatAmountYuan(item.price_amount)}</Text>
+                  <Text style={styles.quoteDesc}>{item.execution_plan || '机主未补充更多报价说明。'}</Text>
+                  <Text style={styles.quoteMeta}>设备：{item.drone?.brand || '-'} {item.drone?.model || ''}</Text>
+                  <TouchableOpacity
+                    style={[styles.selectBtn, selectingQuoteId === item.id && styles.disabledBtn]}
+                    onPress={() => handleSelectQuote(item)}
+                    disabled={selectingQuoteId === item.id}>
+                    <Text style={styles.selectBtnText}>{selectingQuoteId === item.id ? '处理中...' : '选定此方案'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
       </ScrollView>
-
-      {!isPublisher && (
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.contactBtn} onPress={() => {
-            if (demand.renter?.id) {
-              navigation.navigate('Messages', {
-                screen: 'Chat',
-                params: {peerId: demand.renter.id, peerName: demand.renter.nickname},
-              });
-            }
-          }}>
-            <Text style={styles.contactBtnText}>联系租客</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  scroll: {flex: 1},
-  header: {
-    backgroundColor: '#fff', padding: 24, alignItems: 'center',
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+  container: {flex: 1, backgroundColor: '#f3f7fb'},
+  content: {padding: 16, paddingBottom: 28},
+  loader: {marginTop: 120},
+  emptyBox: {margin: 18, marginTop: 48, padding: 28, backgroundColor: '#fff', borderRadius: 20, alignItems: 'center'},
+  emptyIcon: {fontSize: 36},
+  emptyTitle: {fontSize: 18, fontWeight: '700', color: '#102a43', marginTop: 12},
+  emptyDesc: {fontSize: 13, color: '#64748b', marginTop: 8, textAlign: 'center', lineHeight: 20},
+  hero: {backgroundColor: '#0f5cab', borderRadius: 24, padding: 18, marginBottom: 14},
+  heroHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12},
+  heroTitleWrap: {flex: 1},
+  demandNo: {fontSize: 12, color: '#d6e4ff', fontWeight: '700'},
+  title: {fontSize: 24, lineHeight: 30, color: '#fff', fontWeight: '800', marginTop: 8},
+  tagRow: {flexDirection: 'row', gap: 8, marginTop: 14},
+  budget: {fontSize: 18, color: '#fff7e6', fontWeight: '800', marginTop: 14},
+  heroDesc: {fontSize: 13, lineHeight: 20, color: '#d6e4ff', marginTop: 8},
+  card: {backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14},
+  sectionTitle: {fontSize: 18, fontWeight: '700', color: '#102a43'},
+  actionPanel: {backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14},
+  primaryBtn: {height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 12},
+  ownerBtn: {backgroundColor: '#1677ff'},
+  pilotBtn: {backgroundColor: '#fa8c16'},
+  ghostBtn: {backgroundColor: '#fff7e6', borderWidth: 1, borderColor: '#ffd591'},
+  primaryBtnText: {color: '#fff', fontSize: 15, fontWeight: '700'},
+  ghostBtnText: {color: '#d46b08'},
+  helperText: {fontSize: 12, lineHeight: 18, color: '#64748b', marginTop: 10},
+  infoRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginTop: 12},
+  infoLabel: {fontSize: 13, color: '#64748b'},
+  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: '#102a43', fontWeight: '600'},
+  description: {fontSize: 13, lineHeight: 21, color: '#334155', marginTop: 14},
+  noteBox: {backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginTop: 12},
+  noteLabel: {fontSize: 12, color: '#64748b', marginBottom: 4},
+  noteText: {fontSize: 13, lineHeight: 20, color: '#0f172a'},
+  metricRow: {flexDirection: 'row', gap: 12, marginTop: 14},
+  metricCard: {flex: 1, backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, alignItems: 'center'},
+  metricValue: {fontSize: 24, fontWeight: '800', color: '#1677ff'},
+  metricLabel: {fontSize: 12, color: '#64748b', marginTop: 6},
+  quoteTrigger: {marginTop: 14, alignSelf: 'flex-start'},
+  quoteTriggerText: {fontSize: 14, color: '#1677ff', fontWeight: '700'},
+  emptyText: {fontSize: 13, color: '#64748b', marginTop: 14},
+  quoteCard: {borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 14, marginTop: 12},
+  quoteHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8},
+  quoteOwner: {fontSize: 15, fontWeight: '700', color: '#102a43'},
+  quotePrice: {fontSize: 18, fontWeight: '800', color: '#cf1322', marginTop: 10},
+  quoteDesc: {fontSize: 13, color: '#475569', lineHeight: 20, marginTop: 8},
+  quoteMeta: {fontSize: 12, color: '#64748b', marginTop: 8},
+  selectBtn: {
+    marginTop: 12,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#1677ff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  title: {fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center'},
-  urgentBadge: {backgroundColor: '#ff4d4f', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, marginTop: 8},
-  urgentText: {color: '#fff', fontSize: 12, fontWeight: 'bold'},
-  budget: {fontSize: 20, color: '#f5222d', fontWeight: 'bold', marginTop: 12},
-  section: {
-    backgroundColor: '#fff', marginTop: 10, padding: 16,
-    borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#f0f0f0',
-  },
-  sectionTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12},
-  infoRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
-  },
-  infoLabel: {fontSize: 14, color: '#666'},
-  infoValue: {fontSize: 14, color: '#333', fontWeight: '500'},
-  description: {fontSize: 14, color: '#666', lineHeight: 22},
-  footer: {
-    backgroundColor: '#fff', padding: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0',
-  },
-  contactBtn: {
-    backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
-  },
-  contactBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  empty: {alignItems: 'center', paddingTop: 100},
-  emptyIcon: {fontSize: 48, marginBottom: 12},
-  emptyText: {fontSize: 16, color: '#999'},
+  selectBtnText: {fontSize: 14, color: '#fff', fontWeight: '700'},
+  disabledBtn: {opacity: 0.6},
 });

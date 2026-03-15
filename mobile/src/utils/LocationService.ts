@@ -1,5 +1,8 @@
-import {Platform, PermissionsAndroid} from 'react-native';
+import {Platform} from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
+
+const PermissionsAndroid =
+  Platform.OS === 'android' ? require('react-native').PermissionsAndroid : null;
 
 export interface LocationCoords {
   latitude: number;
@@ -60,7 +63,7 @@ export function wgs84ToGcj02(wgsLng: number, wgsLat: number): LocationCoords {
  * 请求定位权限
  */
 async function requestPermission(): Promise<boolean> {
-  if (Platform.OS === 'android') {
+  if (Platform.OS === 'android' && PermissionsAndroid) {
     try {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,

@@ -71,7 +71,7 @@ func main() {
 	fmt.Printf("\n✅ 成功修复 %d 台无人机的状态\n", fixed)
 
 	// 再次验证
-	fmt.Println("\n=== 验证修复结果 ===\n")
+	fmt.Println("\n=== 验证修复结果 ===")
 
 	verifyQuery := `
 		SELECT 

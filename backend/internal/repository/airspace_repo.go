@@ -166,10 +166,10 @@ func (r *AirspaceRepo) CheckNoFlyZoneConflict(lat, lng float64, altitude int) ([
 	return zones, err
 }
 
-// GetCargoWeightByOrderID 通过订单ID获取货物重量(优先从派单任务取，其次从货运需求取)
+// GetCargoWeightByOrderID 通过订单ID获取货物重量(优先从旧任务池取，其次从货运需求取)
 func (r *AirspaceRepo) GetCargoWeightByOrderID(orderID int64) float64 {
 	var weight float64
-	// 优先从 dispatch_tasks 获取
+	// 优先从 dispatch_pool_tasks 获取
 	err := r.db.Model(&model.DispatchTask{}).Where("order_id = ?", orderID).
 		Select("cargo_weight").Limit(1).Scan(&weight).Error
 	if err == nil && weight > 0 {

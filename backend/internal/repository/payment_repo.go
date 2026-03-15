@@ -14,6 +14,10 @@ func NewPaymentRepo(db *gorm.DB) *PaymentRepo {
 	return &PaymentRepo{db: db}
 }
 
+func (r *PaymentRepo) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *PaymentRepo) Create(payment *model.Payment) error {
 	return r.db.Create(payment).Error
 }

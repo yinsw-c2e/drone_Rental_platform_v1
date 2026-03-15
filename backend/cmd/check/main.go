@@ -47,5 +47,5 @@ func main() {
 		total += count
 	}
 	fmt.Printf("%-20s: %d 条\n", "总计", total)
-	fmt.Println("========================\n")
+	fmt.Println("========================")
 }

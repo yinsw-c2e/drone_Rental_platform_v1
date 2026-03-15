@@ -73,6 +73,10 @@ export default function ChatScreen({route, navigation}: any) {
         </TouchableOpacity>
       </View>
       <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.noticeBanner}>
+          <Text style={styles.noticeTitle}>沟通消息</Text>
+          <Text style={styles.noticeText}>聊天仅用于沟通协作，订单确认、派单接受、退款处理等正式状态，请以系统通知和业务页面为准。</Text>
+        </View>
         <FlatList
           data={messages}
           keyExtractor={item => String(item.id)}
@@ -108,6 +112,17 @@ const styles = StyleSheet.create({
   headerTitle: {fontSize: 17, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center'},
   listBtn: {paddingHorizontal: 8, paddingVertical: 4},
   listText: {fontSize: 15, color: '#1890ff'},
+  noticeBanner: {
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 4,
+    backgroundColor: '#fffbe6',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  noticeTitle: {fontSize: 13, fontWeight: '700', color: '#ad6800'},
+  noticeText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: '#8c6d1f'},
   msgRow: {flexDirection: 'row', marginBottom: 12},
   msgRowRight: {justifyContent: 'flex-end'},
   bubble: {maxWidth: '75%', padding: 12, borderRadius: 12},

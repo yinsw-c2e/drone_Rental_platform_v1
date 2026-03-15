@@ -4,20 +4,68 @@ import (
 	"errors"
 	"time"
 
+	"gorm.io/gorm"
+
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/repository"
 )
 
 type DroneService struct {
-	droneRepo *repository.DroneRepo
+	droneRepo       *repository.DroneRepo
+	roleProfileRepo *repository.RoleProfileRepo
+	ownerDomainRepo *repository.OwnerDomainRepo
+	eventService    *EventService
 }
 
-func NewDroneService(droneRepo *repository.DroneRepo) *DroneService {
-	return &DroneService{droneRepo: droneRepo}
+func NewDroneService(
+	droneRepo *repository.DroneRepo,
+	roleProfileRepo *repository.RoleProfileRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+) *DroneService {
+	return &DroneService{
+		droneRepo:       droneRepo,
+		roleProfileRepo: roleProfileRepo,
+		ownerDomainRepo: ownerDomainRepo,
+	}
+}
+
+func (s *DroneService) SetEventService(eventService *EventService) {
+	s.eventService = eventService
 }
 
 func (s *DroneService) Create(drone *model.Drone) error {
-	return s.droneRepo.Create(drone)
+	if drone == nil {
+		return errors.New("无人机参数不能为空")
+	}
+
+	s.normalizeCapacityFields(drone)
+
+	db := s.droneRepo.DB()
+	if db == nil {
+		return errors.New("无人机仓储未初始化")
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		droneRepo := repository.NewDroneRepo(tx)
+		if err := droneRepo.Create(drone); err != nil {
+			return err
+		}
+		if s.ownerDomainRepo != nil {
+			if err := repository.NewOwnerDomainRepo(tx).SyncSupplyCapabilityByDrone(drone); err != nil {
+				return err
+			}
+		}
+		if s.roleProfileRepo == nil || drone.OwnerID == 0 {
+			return nil
+		}
+		roleProfileRepo := repository.NewRoleProfileRepo(tx)
+		return roleProfileRepo.EnsureOwnerProfile(&model.OwnerProfile{
+			UserID:             drone.OwnerID,
+			VerificationStatus: "pending",
+			Status:             "active",
+			ServiceCity:        drone.City,
+		})
+	})
 }
 
 func (s *DroneService) GetByID(id int64) (*model.Drone, error) {
@@ -32,7 +80,23 @@ func (s *DroneService) Update(userID int64, drone *model.Drone) error {
 	if existing.OwnerID != userID {
 		return errors.New("无权修改此无人机")
 	}
-	return s.droneRepo.Update(drone)
+	s.normalizeCapacityFields(drone)
+
+	db := s.droneRepo.DB()
+	if db == nil {
+		return s.droneRepo.Update(drone)
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		droneRepo := repository.NewDroneRepo(tx)
+		if err := droneRepo.Update(drone); err != nil {
+			return err
+		}
+		if s.ownerDomainRepo != nil {
+			return repository.NewOwnerDomainRepo(tx).SyncSupplyCapabilityByDrone(drone)
+		}
+		return nil
+	})
 }
 
 func (s *DroneService) Delete(userID, droneID int64) error {
@@ -69,7 +133,22 @@ func (s *DroneService) UpdateAvailability(userID, droneID int64, status string) 
 	if existing.OwnerID != userID {
 		return errors.New("无权操作此无人机")
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{"availability_status": status})
+	db := s.droneRepo.DB()
+	if db == nil {
+		return s.droneRepo.UpdateFields(droneID, map[string]interface{}{"availability_status": status})
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		droneRepo := repository.NewDroneRepo(tx)
+		if err := droneRepo.UpdateFields(droneID, map[string]interface{}{"availability_status": status}); err != nil {
+			return err
+		}
+		if s.ownerDomainRepo != nil {
+			existing.AvailabilityStatus = status
+			return repository.NewOwnerDomainRepo(tx).SyncSupplyCapabilityByDrone(existing)
+		}
+		return nil
+	})
 }
 
 func (s *DroneService) SubmitCertification(userID, droneID int64, docs model.JSON) error {
@@ -80,7 +159,7 @@ func (s *DroneService) SubmitCertification(userID, droneID int64, docs model.JSO
 	if existing.OwnerID != userID {
 		return errors.New("无权操作此无人机")
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{
+	return s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
 		"certification_docs":   docs,
 		"certification_status": "pending",
 	})
@@ -91,7 +170,11 @@ func (s *DroneService) ApproveCertification(droneID int64, approved bool) error 
 	if !approved {
 		status = "rejected"
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{"certification_status": status})
+	if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{"certification_status": status}); err != nil {
+		return err
+	}
+	s.notifyDroneQualificationResult(droneID, "drone_certification_reviewed", "无人机资质审核结果", approved, "无人机资质审核已通过。", "无人机资质审核未通过，请检查后重新提交。")
+	return nil
 }
 
 // ==================== UOM平台登记 ====================
@@ -111,7 +194,7 @@ func (s *DroneService) SubmitUOMRegistration(userID, droneID int64, req *SubmitU
 	if existing.OwnerID != userID {
 		return errors.New("无权操作此无人机")
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{
+	return s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
 		"uom_registration_no":  req.RegistrationNo,
 		"uom_registration_doc": req.RegistrationDoc,
 		"uom_verified":         "pending",
@@ -129,7 +212,11 @@ func (s *DroneService) ApproveUOMRegistration(droneID int64, approved bool) erro
 		now := time.Now()
 		fields["uom_verified_at"] = &now
 	}
-	return s.droneRepo.UpdateFields(droneID, fields)
+	if err := s.updateCertificationDrivenSupplyStatus(droneID, fields); err != nil {
+		return err
+	}
+	s.notifyDroneQualificationResult(droneID, "drone_uom_reviewed", "UOM 登记审核结果", approved, "UOM 登记已审核通过。", "UOM 登记审核未通过，请检查后重新提交。")
+	return nil
 }
 
 // ==================== 保险信息 ====================
@@ -159,7 +246,7 @@ func (s *DroneService) SubmitInsurance(userID, droneID int64, req *SubmitInsuran
 		return errors.New("第三者责任险保额必须≥500万元")
 	}
 
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{
+	return s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
 		"insurance_policy_no":   req.PolicyNo,
 		"insurance_company":     req.InsuranceCompany,
 		"insurance_coverage":    req.CoverageAmount,
@@ -175,7 +262,11 @@ func (s *DroneService) ApproveInsurance(droneID int64, approved bool) error {
 	if !approved {
 		status = "rejected"
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{"insurance_verified": status})
+	if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{"insurance_verified": status}); err != nil {
+		return err
+	}
+	s.notifyDroneQualificationResult(droneID, "drone_insurance_reviewed", "保险审核结果", approved, "无人机保险审核已通过。", "无人机保险审核未通过，请检查后重新提交。")
+	return nil
 }
 
 // ==================== 适航证书 ====================
@@ -196,7 +287,7 @@ func (s *DroneService) SubmitAirworthiness(userID, droneID int64, req *SubmitAir
 	if existing.OwnerID != userID {
 		return errors.New("无权操作此无人机")
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{
+	return s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
 		"airworthiness_cert_no":     req.CertNo,
 		"airworthiness_cert_expire": req.ExpireDate,
 		"airworthiness_cert_doc":    req.CertDoc,
@@ -210,7 +301,62 @@ func (s *DroneService) ApproveAirworthiness(droneID int64, approved bool) error 
 	if !approved {
 		status = "rejected"
 	}
-	return s.droneRepo.UpdateFields(droneID, map[string]interface{}{"airworthiness_verified": status})
+	if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{"airworthiness_verified": status}); err != nil {
+		return err
+	}
+	s.notifyDroneQualificationResult(droneID, "drone_airworthiness_reviewed", "适航审核结果", approved, "无人机适航审核已通过。", "无人机适航审核未通过，请检查后重新提交。")
+	return nil
+}
+
+func (s *DroneService) normalizeCapacityFields(drone *model.Drone) {
+	if drone == nil {
+		return
+	}
+	if drone.MaxPayloadKG <= 0 && drone.MaxLoad > 0 {
+		drone.MaxPayloadKG = drone.MaxLoad
+	}
+	if drone.MaxLoad <= 0 && drone.MaxPayloadKG > 0 {
+		drone.MaxLoad = drone.MaxPayloadKG
+	}
+}
+
+func (s *DroneService) updateCertificationDrivenSupplyStatus(droneID int64, fields map[string]interface{}) error {
+	db := s.droneRepo.DB()
+	if db == nil {
+		return s.droneRepo.UpdateFields(droneID, fields)
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		droneRepo := repository.NewDroneRepo(tx)
+		if err := droneRepo.UpdateFields(droneID, fields); err != nil {
+			return err
+		}
+		if s.ownerDomainRepo != nil {
+			drone, err := droneRepo.GetByID(droneID)
+			if err != nil {
+				return err
+			}
+			s.normalizeCapacityFields(drone)
+			return repository.NewOwnerDomainRepo(tx).SyncSupplyCapabilityByDrone(drone)
+		}
+		return nil
+	})
+}
+
+func (s *DroneService) notifyDroneQualificationResult(droneID int64, eventType, title string, approved bool, successContent, rejectedContent string) {
+	if s.eventService == nil {
+		return
+	}
+	drone, err := s.droneRepo.GetByID(droneID)
+	if err != nil || drone == nil {
+		return
+	}
+	s.normalizeCapacityFields(drone)
+	content := successContent
+	if !approved {
+		content = rejectedContent
+	}
+	s.eventService.NotifyDroneQualification(drone, eventType, title, content)
 }
 
 // ==================== 维护记录 ====================

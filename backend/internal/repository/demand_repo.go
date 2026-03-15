@@ -14,6 +14,10 @@ func NewDemandRepo(db *gorm.DB) *DemandRepo {
 	return &DemandRepo{db: db}
 }
 
+func (r *DemandRepo) DB() *gorm.DB {
+	return r.db
+}
+
 // Rental Offer
 func (r *DemandRepo) CreateOffer(offer *model.RentalOffer) error {
 	return r.db.Create(offer).Error
@@ -58,6 +62,54 @@ func (r *DemandRepo) ListOffers(page, pageSize int, filters map[string]interface
 
 		// 映射 owner
 		ownerMap := make(map[int64]*model.User)
+		for i := range owners {
+			ownerMap[owners[i].ID] = &owners[i]
+		}
+
+		for i := range offers {
+			if owner, ok := ownerMap[offers[i].OwnerID]; ok {
+				offers[i].Owner = owner
+			}
+		}
+	}
+
+	return offers, total, err
+}
+
+func (r *DemandRepo) ListMarketplaceOffers(page, pageSize int, filters map[string]interface{}) ([]model.RentalOffer, int64, error) {
+	var offers []model.RentalOffer
+	var total int64
+
+	query := r.db.Model(&model.RentalOffer{}).
+		Joins("JOIN drones ON drones.id = rental_offers.drone_id AND drones.deleted_at IS NULL").
+		Where("drones.mtow_kg >= ?", model.HeavyLiftMinMTOWKG).
+		Where("COALESCE(NULLIF(drones.max_payload_kg, 0), drones.max_load) >= ?", model.HeavyLiftMinPayloadKG).
+		Where("drones.availability_status = ?", "available").
+		Where("drones.certification_status = ?", "approved").
+		Where("drones.uom_verified = ?", "verified").
+		Where("drones.insurance_verified = ?", "verified").
+		Where("drones.airworthiness_verified = ?", "verified")
+
+	for k, v := range filters {
+		query = query.Where("rental_offers."+k+" = ?", v)
+	}
+
+	query.Count(&total)
+	err := query.Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Order("rental_offers.created_at DESC").
+		Find(&offers).Error
+
+	if err == nil && len(offers) > 0 {
+		ownerIDs := make([]int64, 0, len(offers))
+		for _, offer := range offers {
+			ownerIDs = append(ownerIDs, offer.OwnerID)
+		}
+
+		var owners []model.User
+		r.db.Where("id IN ?", ownerIDs).Find(&owners)
+
+		ownerMap := make(map[int64]*model.User, len(owners))
 		for i := range owners {
 			ownerMap[owners[i].ID] = &owners[i]
 		}

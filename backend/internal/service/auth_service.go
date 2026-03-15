@@ -9,6 +9,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
@@ -18,15 +19,71 @@ import (
 )
 
 type AuthService struct {
-	userRepo   *repository.UserRepo
-	rds        *redis.Client
-	smsService *sms.SMSService
-	cfg        *config.Config
-	logger     *zap.Logger
+	userRepo        *repository.UserRepo
+	clientRepo      *repository.ClientRepo
+	roleProfileRepo *repository.RoleProfileRepo
+	rds             *redis.Client
+	smsService      *sms.SMSService
+	cfg             *config.Config
+	logger          *zap.Logger
 }
 
-func NewAuthService(userRepo *repository.UserRepo, rds *redis.Client, smsService *sms.SMSService, cfg *config.Config, logger *zap.Logger) *AuthService {
-	return &AuthService{userRepo: userRepo, rds: rds, smsService: smsService, cfg: cfg, logger: logger}
+func NewAuthService(userRepo *repository.UserRepo, clientRepo *repository.ClientRepo, roleProfileRepo *repository.RoleProfileRepo, rds *redis.Client, smsService *sms.SMSService, cfg *config.Config, logger *zap.Logger) *AuthService {
+	return &AuthService{
+		userRepo:        userRepo,
+		clientRepo:      clientRepo,
+		roleProfileRepo: roleProfileRepo,
+		rds:             rds,
+		smsService:      smsService,
+		cfg:             cfg,
+		logger:          logger,
+	}
+}
+
+// ensureDefaultClientProfile 默认创建个人客户档案，避免新用户再走一次初始化流程。
+func (s *AuthService) ensureDefaultClientProfile(user *model.User) error {
+	if user == nil || user.ID == 0 {
+		return nil
+	}
+	if user.UserType == "admin" {
+		return nil
+	}
+
+	if s.clientRepo != nil {
+		_, err := s.clientRepo.GetByUserID(user.ID)
+		if err == nil {
+			goto ensureV2
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		if err := s.clientRepo.Create(&model.Client{
+			UserID:              user.ID,
+			ClientType:          "individual",
+			PlatformCreditScore: 600,
+			Status:              "active",
+		}); err != nil {
+			return err
+		}
+	}
+
+ensureV2:
+	if s.roleProfileRepo == nil {
+		return nil
+	}
+
+	defaultContactName := user.Nickname
+	if defaultContactName == "" {
+		defaultContactName = user.Phone
+	}
+
+	return s.roleProfileRepo.EnsureClientProfile(&model.ClientProfile{
+		UserID:              user.ID,
+		Status:              "active",
+		DefaultContactName:  defaultContactName,
+		DefaultContactPhone: user.Phone,
+	})
 }
 
 func (s *AuthService) SendCode(phone string) error {
@@ -88,7 +145,7 @@ func (s *AuthService) Register(phone, password, nickname string) (*model.User, *
 		UserType:     "renter",
 		Status:       "active",
 	}
-	if err := s.userRepo.Create(user); err != nil {
+	if err := s.createUserWithDefaultProfiles(user); err != nil {
 		return nil, nil, err
 	}
 
@@ -112,6 +169,9 @@ func (s *AuthService) Login(phone, password string) (*model.User, *jwtpkg.TokenP
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, nil, errors.New("账号或密码错误")
+	}
+	if err := s.ensureDefaultClientProfile(user); err != nil {
+		s.logger.Warn("补齐默认客户档案失败", zap.Int64("user_id", user.ID), zap.Error(err))
 	}
 
 	tokens, err := jwtpkg.GenerateTokenPair(user.ID, user.UserType, s.cfg.JWT.Secret, s.cfg.JWT.AccessExpire, s.cfg.JWT.RefreshExpire)
@@ -137,13 +197,16 @@ func (s *AuthService) LoginByCode(phone, code string) (*model.User, *jwtpkg.Toke
 			UserType: "renter",
 			Status:   "active",
 		}
-		if err := s.userRepo.Create(user); err != nil {
+		if err := s.createUserWithDefaultProfiles(user); err != nil {
 			return nil, nil, err
 		}
 	}
 
 	if user.Status != "active" {
 		return nil, nil, errors.New("账号已被禁用")
+	}
+	if err := s.ensureDefaultClientProfile(user); err != nil {
+		s.logger.Warn("补齐默认客户档案失败", zap.Int64("user_id", user.ID), zap.Error(err))
 	}
 
 	tokens, err := jwtpkg.GenerateTokenPair(user.ID, user.UserType, s.cfg.JWT.Secret, s.cfg.JWT.AccessExpire, s.cfg.JWT.RefreshExpire)
@@ -242,13 +305,16 @@ func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform str
 			user.QQOpenID = openID
 		}
 
-		if createErr := s.userRepo.Create(user); createErr != nil {
-			return nil, nil, fmt.Errorf("创建用户失败: %w", createErr)
+		if err := s.createUserWithDefaultProfiles(user); err != nil {
+			return nil, nil, fmt.Errorf("创建用户失败: %w", err)
 		}
 	}
 
 	if user.Status != "active" {
 		return nil, nil, errors.New("账号已被禁用")
+	}
+	if err := s.ensureDefaultClientProfile(user); err != nil {
+		s.logger.Warn("补齐默认客户档案失败", zap.Int64("user_id", user.ID), zap.Error(err))
 	}
 
 	tokens, err := jwtpkg.GenerateTokenPair(user.ID, user.UserType, s.cfg.JWT.Secret, s.cfg.JWT.AccessExpire, s.cfg.JWT.RefreshExpire)
@@ -257,4 +323,36 @@ func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform str
 	}
 
 	return user, tokens, nil
+}
+
+func (s *AuthService) createUserWithDefaultProfiles(user *model.User) error {
+	if user == nil {
+		return errors.New("用户参数不能为空")
+	}
+
+	db := s.userRepo.DB()
+	if db == nil {
+		return errors.New("用户仓储未初始化")
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		userRepo := repository.NewUserRepo(tx)
+		clientRepo := repository.NewClientRepo(tx)
+		roleProfileRepo := repository.NewRoleProfileRepo(tx)
+
+		if err := userRepo.Create(user); err != nil {
+			return err
+		}
+
+		tempService := &AuthService{
+			userRepo:        userRepo,
+			clientRepo:      clientRepo,
+			roleProfileRepo: roleProfileRepo,
+			rds:             s.rds,
+			smsService:      s.smsService,
+			cfg:             s.cfg,
+			logger:          s.logger,
+		}
+		return tempService.ensureDefaultClientProfile(user)
+	})
 }

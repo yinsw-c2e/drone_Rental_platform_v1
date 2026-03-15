@@ -1,0 +1,1057 @@
+openapi: 3.0.3
+info:
+  title: Drone Rental Platform API v2
+  version: 0.3.8
+  description: |
+    当前已实现的 API v2 路由清单与联调文档。
+    该文件以当前代码实现为准，只覆盖已经接入真实 handler 的接口；仍为 NotImplemented 的 v2 路由不在本文件中展开。
+    业务口径以 BUSINESS_API_CONTRACT.md 与 BUSINESS_ROLE_REDESIGN.md 为补充说明。
+servers:
+  - url: http://127.0.0.1:8081/api/v2
+    description: Local development
+security:
+  - BearerAuth: []
+tags:
+  - name: Base
+  - name: Auth
+  - name: Me
+  - name: Client
+  - name: Supply
+  - name: Demand
+  - name: Owner
+  - name: Pilot
+  - name: Order
+  - name: Dispatch
+  - name: Payment
+  - name: Settlement
+  - name: Notification
+  - name: Review
+paths:
+  /status:
+    get:
+      tags: [Base]
+      summary: API v2 status
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /me:
+    get:
+      tags: [Me]
+      summary: Get initialization payload and RoleSummary
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /me/reviews:
+    get:
+      tags: [Review]
+      summary: List my review records
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /client/profile:
+    get:
+      tags: [Client]
+      summary: Get client profile
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+    patch:
+      tags: [Client]
+      summary: Update client profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /supplies:
+    get:
+      tags: [Supply]
+      summary: List marketplace supplies visible to client
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /supplies/{supply_id}:
+    get:
+      tags: [Supply]
+      summary: Get supply detail
+      parameters:
+        - $ref: '#/components/parameters/SupplyID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /supplies/{supply_id}/orders:
+    post:
+      tags: [Supply, Order]
+      summary: Create direct order from supply
+      parameters:
+        - $ref: '#/components/parameters/SupplyID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /demands:
+    post:
+      tags: [Demand]
+      summary: Create demand draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /demands/my:
+    get:
+      tags: [Demand]
+      summary: List my demands
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /demands/{demand_id}:
+    get:
+      tags: [Demand]
+      summary: Get demand detail
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+    patch:
+      tags: [Demand]
+      summary: Update demand draft
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /demands/{demand_id}/publish:
+    post:
+      tags: [Demand]
+      summary: Publish demand
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /demands/{demand_id}/cancel:
+    post:
+      tags: [Demand]
+      summary: Cancel demand
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /demands/{demand_id}/quotes:
+    get:
+      tags: [Demand]
+      summary: List quotes for demand
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Demand, Owner]
+      summary: Create quote for demand
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /demands/{demand_id}/select-provider:
+    post:
+      tags: [Demand, Order]
+      summary: Select quote and create demand_market order
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /demands/{demand_id}/candidate:
+    post:
+      tags: [Demand, Pilot]
+      summary: Apply as candidate pilot
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+    delete:
+      tags: [Demand, Pilot]
+      summary: Withdraw candidate application
+      parameters:
+        - $ref: '#/components/parameters/DemandID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/profile:
+    get:
+      tags: [Owner]
+      summary: Get owner profile
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+    put:
+      tags: [Owner]
+      summary: Update owner profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/drones:
+    get:
+      tags: [Owner]
+      summary: List owner drones
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Owner]
+      summary: Create owner drone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/drones/{drone_id}:
+    get:
+      tags: [Owner]
+      summary: Get owner drone detail
+      parameters:
+        - $ref: '#/components/parameters/DroneID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/drones/{drone_id}/certifications:
+    post:
+      tags: [Owner]
+      summary: Submit drone certification material
+      parameters:
+        - $ref: '#/components/parameters/DroneID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/supplies:
+    get:
+      tags: [Owner]
+      summary: List owner supplies
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Owner]
+      summary: Create owner supply draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/supplies/{supply_id}/status:
+    patch:
+      tags: [Owner]
+      summary: Update owner supply status
+      parameters:
+        - $ref: '#/components/parameters/SupplyID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: active
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/demands/recommended:
+    get:
+      tags: [Owner]
+      summary: List recommended demands for owner
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /owner/quotes:
+    get:
+      tags: [Owner]
+      summary: List owner quotes
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /owner/pilot-bindings:
+    get:
+      tags: [Owner]
+      summary: List pilot bindings for owner
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Owner]
+      summary: Invite pilot binding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/pilot-bindings/{binding_id}/confirm:
+    post:
+      tags: [Owner]
+      summary: Confirm pilot binding
+      parameters:
+        - $ref: '#/components/parameters/BindingID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/pilot-bindings/{binding_id}/reject:
+    post:
+      tags: [Owner]
+      summary: Reject pilot binding
+      parameters:
+        - $ref: '#/components/parameters/BindingID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /owner/pilot-bindings/{binding_id}/status:
+    patch:
+      tags: [Owner]
+      summary: Update pilot binding status
+      parameters:
+        - $ref: '#/components/parameters/BindingID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: paused
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/profile:
+    get:
+      tags: [Pilot]
+      summary: Get pilot profile
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+    put:
+      tags: [Pilot]
+      summary: Upsert pilot profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/availability:
+    patch:
+      tags: [Pilot]
+      summary: Update pilot online / dispatch availability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                availability_status:
+                  type: string
+                  example: online
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/owner-bindings:
+    get:
+      tags: [Pilot]
+      summary: List owner bindings for pilot
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Pilot]
+      summary: Apply owner binding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/owner-bindings/{binding_id}/confirm:
+    post:
+      tags: [Pilot]
+      summary: Confirm owner binding invitation
+      parameters:
+        - $ref: '#/components/parameters/BindingID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/owner-bindings/{binding_id}/reject:
+    post:
+      tags: [Pilot]
+      summary: Reject owner binding invitation
+      parameters:
+        - $ref: '#/components/parameters/BindingID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/owner-bindings/{binding_id}/status:
+    patch:
+      tags: [Pilot]
+      summary: Update owner binding status
+      parameters:
+        - $ref: '#/components/parameters/BindingID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: dissolved
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /pilot/candidate-demands:
+    get:
+      tags: [Pilot]
+      summary: List candidate-open demands for pilot
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /pilot/dispatch-tasks:
+    get:
+      tags: [Pilot, Dispatch]
+      summary: List formal dispatch tasks for pilot
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /pilot/flight-records:
+    get:
+      tags: [Pilot]
+      summary: List pilot flight records
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /orders:
+    get:
+      tags: [Order]
+      summary: List orders by role and status
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/OrderRole'
+        - $ref: '#/components/parameters/OrderStatus'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /orders/{order_id}:
+    get:
+      tags: [Order]
+      summary: Get order detail
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/provider-confirm:
+    post:
+      tags: [Order]
+      summary: Provider confirm direct order
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/provider-reject:
+    post:
+      tags: [Order]
+      summary: Provider reject direct order
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: 当前时间段无可用设备
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/pay:
+    post:
+      tags: [Order, Payment]
+      summary: Create order payment
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/monitor:
+    get:
+      tags: [Order]
+      summary: Get order monitor payload
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/dispatch:
+    post:
+      tags: [Order, Dispatch]
+      summary: Manual dispatch or self-execute transition
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/payments:
+    get:
+      tags: [Payment]
+      summary: List order payments
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /orders/{order_id}/refunds:
+    get:
+      tags: [Payment]
+      summary: List order refunds
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /orders/{order_id}/refund:
+    post:
+      tags: [Payment]
+      summary: Request order refund
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/settlement:
+    get:
+      tags: [Settlement]
+      summary: Get order settlement
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/disputes:
+    get:
+      tags: [Order]
+      summary: List order disputes
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Order]
+      summary: Create order dispute
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisputeCreateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /orders/{order_id}/reviews:
+    get:
+      tags: [Review]
+      summary: List order reviews
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+    post:
+      tags: [Review]
+      summary: Create order review
+      parameters:
+        - $ref: '#/components/parameters/OrderID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /dispatch-tasks/{dispatch_id}:
+    get:
+      tags: [Dispatch]
+      summary: Get formal dispatch task detail
+      parameters:
+        - $ref: '#/components/parameters/DispatchID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /dispatch-tasks/{dispatch_id}/accept:
+    post:
+      tags: [Dispatch]
+      summary: Pilot accept dispatch task
+      parameters:
+        - $ref: '#/components/parameters/DispatchID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /dispatch-tasks/{dispatch_id}/reject:
+    post:
+      tags: [Dispatch]
+      summary: Pilot reject dispatch task
+      parameters:
+        - $ref: '#/components/parameters/DispatchID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /dispatch-tasks/{dispatch_id}/reassign:
+    post:
+      tags: [Dispatch]
+      summary: Reassign formal dispatch task
+      parameters:
+        - $ref: '#/components/parameters/DispatchID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dispatch_mode:
+                  type: string
+                  example: candidate_pool
+                target_pilot_user_id:
+                  type: integer
+                  format: int64
+                reason:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+  /notifications:
+    get:
+      tags: [Notification]
+      summary: List system notifications
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessList'
+  /notifications/{notification_id}/read:
+    post:
+      tags: [Notification]
+      summary: Mark system notification as read
+      parameters:
+        - $ref: '#/components/parameters/NotificationID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessObject'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        default: 20
+    OrderRole:
+      name: role
+      in: query
+      schema:
+        type: string
+        enum: [client, owner, pilot]
+        default: client
+    OrderStatus:
+      name: status
+      in: query
+      schema:
+        type: string
+    SupplyID:
+      name: supply_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    DemandID:
+      name: demand_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    DroneID:
+      name: drone_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    BindingID:
+      name: binding_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    OrderID:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    DispatchID:
+      name: dispatch_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    NotificationID:
+      name: notification_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+  responses:
+    SuccessObject:
+      description: Success response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/V2Envelope'
+    SuccessList:
+      description: Paginated success response
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/V2Envelope'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/V2ListData'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    V2Envelope:
+      type: object
+      properties:
+        code:
+          type: string
+          example: OK
+        message:
+          type: string
+          example: success
+        data:
+          $ref: '#/components/schemas/GenericObject'
+        meta:
+          $ref: '#/components/schemas/GenericObject'
+        trace_id:
+          type: string
+          example: trace-12345
+    ErrorEnvelope:
+      type: object
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: invalid payload
+        trace_id:
+          type: string
+          example: trace-12345
+    V2ListData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          format: int64
+          example: 100
+    GenericObject:
+      type: object
+      additionalProperties: true
+    RegisterRequest:
+      type: object
+      required: [phone, password, code]
+      properties:
+        phone:
+          type: string
+          example: '13800138000'
+        password:
+          type: string
+          example: Passw0rd!
+        code:
+          type: string
+          example: '123456'
+        nickname:
+          type: string
+          example: 测试用户
+    LoginRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          example: '13800138000'
+        password:
+          type: string
+          example: Passw0rd!
+        code:
+          type: string
+          example: '123456'
+    PaymentCreateRequest:
+      type: object
+      required: [method]
+      properties:
+        method:
+          type: string
+          enum: [mock, wechat, alipay]
+          example: mock
+    DispatchRequest:
+      type: object
+      required: [dispatch_mode]
+      properties:
+        dispatch_mode:
+          type: string
+          enum: [self_execute, bound_pilot, candidate_pool, public_pool]
+          example: candidate_pool
+        target_pilot_user_id:
+          type: integer
+          format: int64
+        reason:
+          type: string
+    DisputeCreateRequest:
+      type: object
+      required: [summary]
+      properties:
+        dispute_type:
+          type: string
+          example: delivery_issue
+        summary:
+          type: string
+          example: 到货时间与约定不一致
+    ReviewCreateRequest:
+      type: object
+      required: [target_user_id, target_role, rating, content]
+      properties:
+        target_user_id:
+          type: integer
+          format: int64
+          example: 23
+        target_role:
+          type: string
+          enum: [client, owner, pilot]
+          example: owner
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        content:
+          type: string
+          example: 按时完成山区吊运任务

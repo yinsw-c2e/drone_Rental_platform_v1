@@ -152,6 +152,214 @@ func (h *Handler) UpdateAvailability(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// ListOwnerBindings 获取飞手视角绑定机主列表
+func (h *Handler) ListOwnerBindings(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	status := c.Query("status")
+
+	bindings, total, err := h.pilotService.ListOwnerBindings(userID, status, page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.SuccessWithPage(c, bindings, total, page, pageSize)
+}
+
+// ApplyOwnerBinding 飞手申请绑定机主
+func (h *Handler) ApplyOwnerBinding(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	var req service.PilotBindingApplyInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	binding, err := h.pilotService.ApplyOwnerBinding(userID, &req)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, binding)
+}
+
+// ConfirmOwnerBinding 飞手确认机主邀请
+func (h *Handler) ConfirmOwnerBinding(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	bindingID, err := strconv.ParseInt(c.Param("binding_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的绑定ID")
+		return
+	}
+
+	binding, err := h.pilotService.ConfirmOwnerBinding(userID, bindingID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, binding)
+}
+
+// RejectOwnerBinding 飞手拒绝机主邀请
+func (h *Handler) RejectOwnerBinding(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	bindingID, err := strconv.ParseInt(c.Param("binding_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的绑定ID")
+		return
+	}
+
+	binding, err := h.pilotService.RejectOwnerBinding(userID, bindingID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, binding)
+}
+
+// UpdateOwnerBindingStatus 飞手更新绑定状态
+func (h *Handler) UpdateOwnerBindingStatus(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	bindingID, err := strconv.ParseInt(c.Param("binding_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的绑定ID")
+		return
+	}
+
+	var req struct {
+		Status string `json:"status" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	binding, err := h.pilotService.UpdateOwnerBindingStatus(userID, bindingID, req.Status)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, binding)
+}
+
+// ListCandidateDemands 获取可报名候选的公开需求
+func (h *Handler) ListCandidateDemands(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	demands, total, err := h.pilotService.ListCandidateDemands(userID, page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.SuccessWithPage(c, demands, total, page, pageSize)
+}
+
+// ApplyDemandCandidate 报名需求候选
+func (h *Handler) ApplyDemandCandidate(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	demandID, err := strconv.ParseInt(c.Param("demand_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	candidate, err := h.pilotService.ApplyDemandCandidate(userID, demandID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, candidate)
+}
+
+// WithdrawDemandCandidate 取消需求候选报名
+func (h *Handler) WithdrawDemandCandidate(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	demandID, err := strconv.ParseInt(c.Param("demand_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	candidate, err := h.pilotService.WithdrawDemandCandidate(userID, demandID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, candidate)
+}
+
+// ListDispatchTasks 获取我的正式派单任务
+func (h *Handler) ListDispatchTasks(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	status := c.Query("status")
+
+	tasks, total, err := h.pilotService.ListDispatchTasks(userID, status, page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.SuccessWithPage(c, tasks, total, page, pageSize)
+}
+
+// AcceptDispatchTask 接受正式派单
+func (h *Handler) AcceptDispatchTask(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	dispatchID, err := strconv.ParseInt(c.Param("dispatch_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的派单ID")
+		return
+	}
+
+	task, err := h.pilotService.AcceptDispatchTask(userID, dispatchID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, task)
+}
+
+// RejectDispatchTask 拒绝正式派单
+func (h *Handler) RejectDispatchTask(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	dispatchID, err := strconv.ParseInt(c.Param("dispatch_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的派单ID")
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	task, err := h.pilotService.RejectDispatchTask(userID, dispatchID, req.Reason)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, task)
+}
+
 // List 获取飞手列表
 func (h *Handler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -365,6 +573,25 @@ func (h *Handler) GetFlightStats(c *gin.Context) {
 	response.Success(c, stats)
 }
 
+// GetFlightRecords 获取真实履约飞行记录
+func (h *Handler) GetFlightRecords(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	records, total, err := h.pilotService.ListFlightRecords(userID, page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list":  records,
+		"total": total,
+		"page":  page,
+	})
+}
+
 // AddFlightLog 添加飞行记录 (手动录入)
 func (h *Handler) AddFlightLog(c *gin.Context) {
 	userID := c.GetInt64("user_id")
@@ -376,21 +603,21 @@ func (h *Handler) AddFlightLog(c *gin.Context) {
 	}
 
 	var req struct {
-		DroneID          int64      `json:"drone_id"`
-		FlightDate       time.Time  `json:"flight_date" binding:"required"`
-		FlightDuration   float64    `json:"flight_duration" binding:"required"` // 分钟
-		FlightDistance   float64    `json:"flight_distance"`
-		StartLatitude    float64    `json:"start_latitude"`
-		StartLongitude   float64    `json:"start_longitude"`
-		StartAddress     string     `json:"start_address"`
-		EndLatitude      float64    `json:"end_latitude"`
-		EndLongitude     float64    `json:"end_longitude"`
-		EndAddress       string     `json:"end_address"`
-		MaxAltitude      float64    `json:"max_altitude"`
-		CargoWeight      float64    `json:"cargo_weight"`
-		WeatherCondition string     `json:"weather_condition"`
-		FlightType       string     `json:"flight_type"`
-		IncidentReport   string     `json:"incident_report"`
+		DroneID          int64     `json:"drone_id"`
+		FlightDate       time.Time `json:"flight_date" binding:"required"`
+		FlightDuration   float64   `json:"flight_duration" binding:"required"` // 分钟
+		FlightDistance   float64   `json:"flight_distance"`
+		StartLatitude    float64   `json:"start_latitude"`
+		StartLongitude   float64   `json:"start_longitude"`
+		StartAddress     string    `json:"start_address"`
+		EndLatitude      float64   `json:"end_latitude"`
+		EndLongitude     float64   `json:"end_longitude"`
+		EndAddress       string    `json:"end_address"`
+		MaxAltitude      float64   `json:"max_altitude"`
+		CargoWeight      float64   `json:"cargo_weight"`
+		WeatherCondition string    `json:"weather_condition"`
+		FlightType       string    `json:"flight_type"`
+		IncidentReport   string    `json:"incident_report"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())

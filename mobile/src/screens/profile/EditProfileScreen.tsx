@@ -3,24 +3,20 @@ import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TextInput, TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
-import {useSelector, useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 import {updateUser} from '../../store/slices/authSlice';
 import {userService} from '../../services/user';
-
-const USER_TYPES: {key: 'renter' | 'drone_owner' | 'cargo_owner'; label: string; desc: string}[] = [
-  {key: 'renter', label: '租客', desc: '租用无人机进行各类作业'},
-  {key: 'drone_owner', label: '无人机机主', desc: '出租自有无人机提供服务'},
-  {key: 'cargo_owner', label: '货主', desc: '发布货运需求使用物流服务'},
-];
+import {getRoleLabels} from '../../utils/roleSummary';
 
 export default function EditProfileScreen({navigation}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const dispatch = useDispatch();
 
   const [nickname, setNickname] = useState(user?.nickname || '');
-  const [userType, setUserType] = useState(user?.user_type || 'renter');
   const [saving, setSaving] = useState(false);
+  const roleLabels = getRoleLabels(roleSummary, user);
 
   const handleSave = async () => {
     if (!nickname.trim()) {
@@ -37,9 +33,6 @@ export default function EditProfileScreen({navigation}: any) {
       const updates: Record<string, string> = {};
       if (nickname.trim() !== user?.nickname) {
         updates.nickname = nickname.trim();
-      }
-      if (userType !== user?.user_type) {
-        updates.user_type = userType;
       }
 
       if (Object.keys(updates).length === 0) {
@@ -84,25 +77,20 @@ export default function EditProfileScreen({navigation}: any) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>用户身份</Text>
-          <Text style={styles.sectionDesc}>选择您的主要身份，可随时更改</Text>
+          <Text style={styles.sectionTitle}>当前身份摘要</Text>
+          <Text style={styles.sectionDesc}>身份由后端档案和能力摘要统一判断，不再通过前端直接修改</Text>
 
-          {USER_TYPES.map(type => (
-            <TouchableOpacity
-              key={type.key}
-              style={[styles.typeItem, userType === type.key && styles.typeItemActive]}
-              onPress={() => setUserType(type.key)}>
-              <View style={{flex: 1}}>
-                <Text style={[styles.typeLabel, userType === type.key && styles.typeLabelActive]}>
-                  {type.label}
-                </Text>
-                <Text style={styles.typeDesc}>{type.desc}</Text>
-              </View>
-              <View style={[styles.radio, userType === type.key && styles.radioActive]}>
-                {userType === type.key && <View style={styles.radioInner} />}
-              </View>
-            </TouchableOpacity>
-          ))}
+          <View style={styles.roleSummaryBox}>
+            {roleLabels.length > 0 ? (
+              roleLabels.map(label => (
+                <View key={label} style={styles.roleChip}>
+                  <Text style={styles.roleChipText}>{label}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.roleEmptyText}>当前暂无可识别身份</Text>
+            )}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -160,22 +148,15 @@ const styles = StyleSheet.create({
     flex: 1, textAlign: 'right', fontSize: 15, color: '#333',
     paddingVertical: 0, marginLeft: 16,
   },
-  typeItem: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
-    paddingHorizontal: 4,
+  roleSummaryBox: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 8},
+  roleChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#e6f4ff',
   },
-  typeItemActive: {backgroundColor: '#f0f8ff', borderRadius: 8, marginHorizontal: -4, paddingHorizontal: 8},
-  typeLabel: {fontSize: 15, fontWeight: '500', color: '#333'},
-  typeLabelActive: {color: '#1890ff'},
-  typeDesc: {fontSize: 12, color: '#999', marginTop: 2},
-  radio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2,
-    borderColor: '#d9d9d9', justifyContent: 'center', alignItems: 'center',
-    marginLeft: 12,
-  },
-  radioActive: {borderColor: '#1890ff'},
-  radioInner: {width: 10, height: 10, borderRadius: 5, backgroundColor: '#1890ff'},
+  roleChipText: {fontSize: 13, color: '#1677ff', fontWeight: '600'},
+  roleEmptyText: {fontSize: 13, color: '#999'},
   footer: {
     backgroundColor: '#fff', padding: 16, paddingBottom: 32,
     borderTopWidth: 1, borderTopColor: '#e8e8e8',

@@ -1,15 +1,16 @@
 package client
 
 import (
-	"wurenji-backend/internal/model"
-	"wurenji-backend/internal/pkg/response"
-	"wurenji-backend/internal/service"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/response"
+	"wurenji-backend/internal/service"
 )
 
 type Handler struct {
@@ -50,13 +51,13 @@ func (h *Handler) RegisterEnterprise(c *gin.Context) {
 	}
 
 	var req struct {
-		CompanyName        string `json:"company_name" binding:"required"`
-		BusinessLicenseNo  string `json:"business_license_no" binding:"required"`
-		BusinessLicenseDoc string `json:"business_license_doc" binding:"required"`
+		CompanyName         string `json:"company_name" binding:"required"`
+		BusinessLicenseNo   string `json:"business_license_no" binding:"required"`
+		BusinessLicenseDoc  string `json:"business_license_doc" binding:"required"`
 		LegalRepresentative string `json:"legal_representative"`
-		ContactPerson      string `json:"contact_person"`
-		ContactPhone       string `json:"contact_phone"`
-		ContactEmail       string `json:"contact_email"`
+		ContactPerson       string `json:"contact_person"`
+		ContactPhone        string `json:"contact_phone"`
+		ContactEmail        string `json:"contact_email"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -117,6 +118,240 @@ func (h *Handler) GetByID(c *gin.Context) {
 	}
 
 	response.Success(c, client)
+}
+
+// CreateDemand 创建客户需求草稿
+// POST /api/v1/client/demands
+func (h *Handler) CreateDemand(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	var req service.ClientDemandInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	demand, err := h.clientService.CreateDemand(userID, &req)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, demand)
+}
+
+// UpdateDemand 更新草稿需求
+// PATCH /api/v1/client/demands/:id
+func (h *Handler) UpdateDemand(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	demandID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	var req service.ClientDemandInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	demand, err := h.clientService.UpdateDemand(userID, demandID, &req)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, demand)
+}
+
+// PublishDemand 发布需求
+// POST /api/v1/client/demands/:id/publish
+func (h *Handler) PublishDemand(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	demandID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	demand, err := h.clientService.PublishDemand(userID, demandID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, demand)
+}
+
+// CancelDemand 取消需求
+// POST /api/v1/client/demands/:id/cancel
+func (h *Handler) CancelDemand(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	demandID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	demand, err := h.clientService.CancelDemand(userID, demandID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, demand)
+}
+
+// MyDemands 获取我的需求列表
+// GET /api/v1/client/demands
+func (h *Handler) MyDemands(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	status := c.Query("status")
+
+	demands, total, err := h.clientService.ListMyDemands(userID, status, page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.SuccessWithPage(c, demands, total, page, pageSize)
+}
+
+// GetDemand 获取需求详情
+// GET /api/v1/client/demands/:id
+func (h *Handler) GetDemand(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	demandID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	demand, err := h.clientService.GetDemandDetail(userID, demandID)
+	if err != nil {
+		response.Error(c, response.CodeNotFound, err.Error())
+		return
+	}
+
+	response.Success(c, demand)
+}
+
+// ListDemandQuotes 获取需求报价列表
+// GET /api/v1/client/demands/:id/quotes
+func (h *Handler) ListDemandQuotes(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	demandID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	quotes, err := h.clientService.ListDemandQuotes(userID, demandID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, quotes)
+}
+
+// SelectProvider 选择机主报价并转订单
+// POST /api/v1/client/demands/:id/select-provider
+func (h *Handler) SelectProvider(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	demandID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求ID")
+		return
+	}
+
+	var req struct {
+		QuoteID int64 `json:"quote_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	result, err := h.clientService.SelectProvider(userID, demandID, req.QuoteID)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+// CreateDirectOrder 从供给发起直达下单
+// POST /api/v1/supplies/:supply_id/orders
+func (h *Handler) CreateDirectOrder(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	if userID == 0 {
+		response.Unauthorized(c, "未授权")
+		return
+	}
+
+	supplyID, err := strconv.ParseInt(c.Param("supply_id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的供给ID")
+		return
+	}
+
+	var req service.DirectOrderInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+
+	result, err := h.clientService.CreateDirectSupplyOrder(userID, supplyID, &req)
+	if err != nil {
+		response.Error(c, response.CodeParamError, err.Error())
+		return
+	}
+
+	response.Success(c, result)
 }
 
 // UpdateProfile 更新客户档案

@@ -23,14 +23,14 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			response.Unauthorized(c, "missing authorization header")
+			unauthorized(c, "missing authorization header")
 			c.Abort()
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			response.Unauthorized(c, "invalid authorization format")
+			unauthorized(c, "invalid authorization format")
 			c.Abort()
 			return
 		}
@@ -41,7 +41,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		if tokenBlacklistRedis != nil {
 			key := "token:blacklist:" + tokenStr
 			if _, err := tokenBlacklistRedis.Get(c.Request.Context(), key).Result(); err == nil {
-				response.Unauthorized(c, "token has been revoked")
+				unauthorized(c, "token has been revoked")
 				c.Abort()
 				return
 			}
@@ -49,7 +49,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		claims, err := jwtpkg.ParseToken(tokenStr, config.AppConfig.JWT.Secret)
 		if err != nil {
-			response.Unauthorized(c, "invalid or expired token")
+			unauthorized(c, "invalid or expired token")
 			c.Abort()
 			return
 		}
@@ -64,12 +64,28 @@ func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userType, exists := c.Get("user_type")
 		if !exists || userType != "admin" {
-			response.Forbidden(c, "admin access required")
+			forbidden(c, "admin access required")
 			c.Abort()
 			return
 		}
 		c.Next()
 	}
+}
+
+func unauthorized(c *gin.Context, message string) {
+	if strings.HasPrefix(c.Request.URL.Path, "/api/v2") {
+		response.V2Unauthorized(c, message)
+		return
+	}
+	response.Unauthorized(c, message)
+}
+
+func forbidden(c *gin.Context, message string) {
+	if strings.HasPrefix(c.Request.URL.Path, "/api/v2") {
+		response.V2Forbidden(c, message)
+		return
+	}
+	response.Forbidden(c, message)
 }
 
 func GetUserID(c *gin.Context) int64 {

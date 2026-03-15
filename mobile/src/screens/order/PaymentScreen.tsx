@@ -1,114 +1,190 @@
-import React, {useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
-  ActivityIndicator, Alert,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {paymentService} from '../../services/payment';
-import {Order} from '../../types';
+import {useFocusEffect} from '@react-navigation/native';
 
-type PaymentMethod = 'wechat' | 'alipay' | 'mock';
+import ObjectCard from '../../components/business/ObjectCard';
+import StatusBadge from '../../components/business/StatusBadge';
+import SourceTag from '../../components/business/SourceTag';
+import {orderFinanceV2Service} from '../../services/orderFinanceV2';
+import {orderV2Service} from '../../services/orderV2';
+import {
+  V2OrderDetail,
+  V2PaymentSummary,
+  V2RefundSummary,
+} from '../../types';
 
-const METHODS: {key: PaymentMethod; label: string; icon: string; desc: string}[] = [
-  {key: 'wechat', label: '微信支付', icon: '\ud83d\udcf1', desc: '使用微信完成支付'},
-  {key: 'alipay', label: '支付宝', icon: '\ud83d\udcb3', desc: '使用支付宝完成支付'},
-  {key: 'mock', label: '模拟支付', icon: '\ud83e\uddea', desc: '开发测试用，立即完成支付'},
-];
+const METHODS = [
+  {key: 'wechat', label: '微信支付', icon: '📱', desc: '生成支付单后等待外部支付完成'},
+  {key: 'alipay', label: '支付宝', icon: '💳', desc: '生成支付单后等待外部支付完成'},
+  {key: 'mock', label: '模拟支付', icon: '🧪', desc: '开发测试环境建议使用，立即回写支付成功'},
+] as const;
+
+type PaymentMethod = (typeof METHODS)[number]['key'];
+type ResultState = {
+  mode: 'success' | 'pending' | 'fail';
+  title: string;
+  desc: string;
+};
+
+const formatMoney = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${month}-${day} ${hour}:${minute}`;
+};
+
+const getPaymentStatusTone = (status?: string | null) => {
+  switch (String(status || '').toLowerCase()) {
+    case 'paid':
+      return 'green' as const;
+    case 'pending':
+      return 'orange' as const;
+    case 'refunded':
+      return 'gray' as const;
+    case 'failed':
+      return 'red' as const;
+    default:
+      return 'gray' as const;
+  }
+};
+
+const getRefundStatusTone = (status?: string | null) => {
+  switch (String(status || '').toLowerCase()) {
+    case 'success':
+    case 'completed':
+      return 'green' as const;
+    case 'processing':
+      return 'blue' as const;
+    case 'pending':
+      return 'orange' as const;
+    case 'failed':
+      return 'red' as const;
+    default:
+      return 'gray' as const;
+  }
+};
 
 export default function PaymentScreen({route, navigation}: any) {
-  const order: Order = route.params?.order;
+  const orderId = Number(route.params?.orderId || route.params?.id || route.params?.order?.id || 0);
+  const [detail, setDetail] = useState<V2OrderDetail | null>(null);
+  const [payments, setPayments] = useState<V2PaymentSummary[]>([]);
+  const [refunds, setRefunds] = useState<V2RefundSummary[]>([]);
   const [selected, setSelected] = useState<PaymentMethod>('mock');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState(false);
-  const [result, setResult] = useState<'success' | 'fail' | null>(null);
+  const [result, setResult] = useState<ResultState | null>(null);
 
-  if (!order) {
+  const loadData = useCallback(async () => {
+    if (!orderId) {
+      setDetail(null);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+    try {
+      const [orderRes, paymentRes, refundRes] = await Promise.all([
+        orderV2Service.get(orderId),
+        orderFinanceV2Service.listPayments(orderId),
+        orderFinanceV2Service.listRefunds(orderId),
+      ]);
+      setDetail(orderRes.data || null);
+      setPayments(paymentRes.data?.items || []);
+      setRefunds(refundRes.data?.items || []);
+    } catch (error: any) {
+      Alert.alert('加载失败', error?.message || '请稍后重试');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [orderId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
+
+  const totalPay = useMemo(() => {
+    if (!detail) {
+      return 0;
+    }
+    return Number(detail.total_amount || 0) + Number(detail.financial_summary?.deposit_amount || 0);
+  }, [detail]);
+
+  const canPay = !!detail && (detail.status === 'pending_payment' || detail.status === 'accepted') && !detail.paid_at;
+
+  const handlePay = async () => {
+    if (!detail) {
+      return;
+    }
+    setPaying(true);
+    try {
+      const res = await orderFinanceV2Service.createPayment(detail.id, selected);
+      const latestPayment = res.data?.payment;
+
+      if (selected === 'mock' && String(latestPayment?.status || '').toLowerCase() === 'paid') {
+        setResult({
+          mode: 'success',
+          title: '支付成功',
+          desc: `订单 ${detail.order_no} 已完成支付，后续履约会按订单状态继续推进。`,
+        });
+      } else {
+        setResult({
+          mode: 'pending',
+          title: '支付单已创建',
+          desc: `支付单号 ${latestPayment?.payment_no || '-'} 已生成。当前开发环境未接真实支付 SDK，请继续使用模拟支付联调。`,
+        });
+      }
+      await loadData();
+    } catch (error: any) {
+      Alert.alert('支付失败', error?.message || '请稍后重试');
+      setResult({
+        mode: 'fail',
+        title: '支付失败',
+        desc: error?.message || '订单支付未完成，请稍后重试。',
+      });
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.center}>
-          <Text style={{color: '#999'}}>订单信息缺失</Text>
+        <View style={styles.centerState}>
+          <ActivityIndicator color="#114178" />
+          <Text style={styles.stateText}>正在加载订单支付信息...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const totalPay = order.total_amount + order.deposit_amount;
-
-  const handlePay = async () => {
-    console.log('开始支付流程...');
-    setPaying(true);
-    try {
-      console.log('创建支付记录, order.id:', order.id, 'method:', selected);
-      const createRes = await paymentService.create(order.id, selected);
-      console.log('创建支付成功:', createRes);
-      const paymentNo = createRes.data?.payment?.payment_no;
-      console.log('paymentNo:', paymentNo);
-
-      if (!paymentNo) {
-        throw new Error('获取支付单号失败');
-      }
-
-      if (selected === 'mock' && paymentNo) {
-        console.log('执行模拟支付回调, paymentNo:', paymentNo);
-        const callbackRes = await paymentService.mockCallback(paymentNo);
-        console.log('模拟支付回调成功:', callbackRes);
-        console.log('设置结果为 success');
-        setResult('success');
-        console.log('result 已设置为 success');
-      } else if (paymentNo) {
-        console.log('轮询支付状态...');
-        // For real payment, we'd invoke native SDK here.
-        // For now, poll payment status after a delay.
-        let attempts = 0;
-        const poll = async (): Promise<boolean> => {
-          const statusRes = await paymentService.getStatus(paymentNo);
-          console.log('支付状态:', statusRes.data?.status);
-          if (statusRes.data?.status === 'paid') return true;
-          if (++attempts < 10) {
-            await new Promise(r => setTimeout(r, 2000));
-            return poll();
-          }
-          return false;
-        };
-        const paid = await poll();
-        console.log('轮询结果:', paid);
-        setResult(paid ? 'success' : 'fail');
-      }
-    } catch (e: any) {
-      console.error('支付失败:', e);
-      console.error('错误详情:', e.message, e.response?.data);
-      Alert.alert('支付失败', e.message || '请稍后重试');
-      setResult('fail');
-    } finally {
-      console.log('支付流程结束, paying 设置为 false');
-      setPaying(false);
-    }
-  };
-
-  if (result) {
+  if (!detail) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.resultContainer}>
-          <Text style={styles.resultIcon}>{result === 'success' ? '\u2705' : '\u274c'}</Text>
-          <Text style={styles.resultTitle}>
-            {result === 'success' ? '支付成功' : '支付失败'}
-          </Text>
-          <Text style={styles.resultDesc}>
-            {result === 'success'
-              ? `已支付 \u00a5${(totalPay / 100).toFixed(2)}`
-              : '支付未完成，请稍后重试'}
-          </Text>
-          <TouchableOpacity
-            style={styles.resultBtn}
-            onPress={() => {
-              if (result === 'success') {
-                navigation.goBack();
-              } else {
-                setResult(null);
-              }
-            }}>
-            <Text style={styles.resultBtnText}>
-              {result === 'success' ? '返回订单' : '重新支付'}
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.centerState}>
+          <Text style={styles.stateText}>订单信息缺失</Text>
         </View>
       </SafeAreaView>
     );
@@ -116,136 +192,322 @@ export default function PaymentScreen({route, navigation}: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Amount */}
-        <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>支付金额</Text>
-          <Text style={styles.amountValue}>
-            {'\u00a5'}{(totalPay / 100).toFixed(2)}
-          </Text>
-          <View style={styles.amountBreakdown}>
-            <Text style={styles.breakdownText}>
-              订单金额 {'\u00a5'}{(order.total_amount / 100).toFixed(2)}
-            </Text>
-            {order.deposit_amount > 0 && (
-              <Text style={styles.breakdownText}>
-                {' + '}押金 {'\u00a5'}{(order.deposit_amount / 100).toFixed(2)}
-              </Text>
-            )}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+          setRefreshing(true);
+          loadData();
+        }} />}
+      >
+        <View style={styles.hero}>
+          <View style={styles.heroTagRow}>
+            <SourceTag source="order" />
+            <StatusBadge label="" meta={{label: detail.status || '订单', tone: detail.paid_at ? 'green' : 'orange'}} />
           </View>
+          <Text style={styles.heroOrderNo}>{detail.order_no}</Text>
+          <Text style={styles.heroAmount}>{formatMoney(totalPay)}</Text>
+          <Text style={styles.heroHint}>当前订单支付和退款动作都挂在订单对象下，和订单状态一起推进。</Text>
         </View>
 
-        {/* Order info */}
-        <View style={styles.card}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>订单号</Text>
-            <Text style={styles.infoValue}>{order.order_no}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>服务</Text>
-            <Text style={styles.infoValue}>{order.title}</Text>
-          </View>
-        </View>
+        {result ? (
+          <ObjectCard style={styles.resultCard}>
+            <Text style={styles.resultTitle}>{result.title}</Text>
+            <Text style={styles.resultDesc}>{result.desc}</Text>
+            <View style={styles.resultActionRow}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => setResult(null)}>
+                <Text style={styles.secondaryBtnText}>关闭结果</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => navigation.navigate('OrderDetail', {id: detail.id, orderId: detail.id})}>
+                <Text style={styles.primaryBtnText}>返回订单</Text>
+              </TouchableOpacity>
+            </View>
+          </ObjectCard>
+        ) : null}
 
-        {/* Payment methods */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>选择支付方式</Text>
-          {METHODS.map(m => (
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>订单支付摘要</Text>
+          <View style={styles.row}><Text style={styles.rowLabel}>订单标题</Text><Text style={styles.rowValue}>{detail.title}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>订单金额</Text><Text style={styles.rowValue}>{formatMoney(detail.total_amount)}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>押金</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.deposit_amount)}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>已支付</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.paid_amount)}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>已退款</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.refunded_amount)}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>订单状态</Text><Text style={styles.rowValue}>{detail.status}</Text></View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>支付方式</Text>
+          <Text style={styles.sectionHint}>开发测试阶段建议使用模拟支付，真实渠道目前只创建支付单，不会自动完成回调。</Text>
+          {METHODS.map(method => (
             <TouchableOpacity
-              key={m.key}
-              style={[styles.methodItem, selected === m.key && styles.methodItemActive]}
-              onPress={() => setSelected(m.key)}>
-              <Text style={styles.methodIcon}>{m.icon}</Text>
-              <View style={{flex: 1}}>
-                <Text style={styles.methodLabel}>{m.label}</Text>
-                <Text style={styles.methodDesc}>{m.desc}</Text>
+              key={method.key}
+              style={[styles.methodItem, selected === method.key && styles.methodItemActive]}
+              onPress={() => setSelected(method.key)}>
+              <Text style={styles.methodIcon}>{method.icon}</Text>
+              <View style={styles.methodContent}>
+                <Text style={styles.methodLabel}>{method.label}</Text>
+                <Text style={styles.methodDesc}>{method.desc}</Text>
               </View>
-              <View style={[styles.radio, selected === m.key && styles.radioActive]}>
-                {selected === m.key && <View style={styles.radioInner} />}
+              <View style={[styles.radio, selected === method.key && styles.radioActive]}>
+                {selected === method.key ? <View style={styles.radioInner} /> : null}
               </View>
             </TouchableOpacity>
           ))}
-        </View>
-      </View>
+          <TouchableOpacity
+            style={[styles.primaryBtn, (!canPay || paying) && styles.primaryBtnDisabled]}
+            disabled={!canPay || paying}
+            onPress={handlePay}>
+            {paying ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>确认支付 {formatMoney(totalPay)}</Text>}
+          </TouchableOpacity>
+          {!canPay ? (
+            <Text style={styles.sectionHint}>当前订单状态不是待支付，不能重复发起支付。</Text>
+          ) : null}
+        </ObjectCard>
 
-      {/* Pay button */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={[styles.payBtn, paying && styles.payBtnDisabled]}
-          onPress={handlePay}
-          disabled={paying}>
-          {paying ? (
-            <ActivityIndicator color="#fff" />
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>支付记录</Text>
+          {payments.length === 0 ? (
+            <Text style={styles.emptyText}>当前还没有支付记录。</Text>
           ) : (
-            <Text style={styles.payBtnText}>
-              确认支付 {'\u00a5'}{(totalPay / 100).toFixed(2)}
-            </Text>
+            payments.map(item => (
+              <View key={item.id} style={styles.recordItem}>
+                <View style={styles.recordHeader}>
+                  <Text style={styles.recordCode}>{item.payment_no}</Text>
+                  <StatusBadge label={item.status || '未知'} tone={getPaymentStatusTone(item.status)} />
+                </View>
+                <Text style={styles.recordMeta}>{item.payment_method || '-'} · {formatMoney(item.amount)}</Text>
+                <Text style={styles.recordMeta}>支付时间：{formatDateTime(item.paid_at || item.created_at)}</Text>
+              </View>
+            ))
           )}
-        </TouchableOpacity>
-      </View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>退款记录</Text>
+          {refunds.length === 0 ? (
+            <Text style={styles.emptyText}>当前还没有退款记录。退款处理请前往“售后处理”页面。</Text>
+          ) : (
+            refunds.map(item => (
+              <View key={item.id} style={styles.recordItem}>
+                <View style={styles.recordHeader}>
+                  <Text style={styles.recordCode}>{item.refund_no}</Text>
+                  <StatusBadge label={item.status || '未知'} tone={getRefundStatusTone(item.status)} />
+                </View>
+                <Text style={styles.recordMeta}>{formatMoney(item.amount)} · {item.reason || '未填写退款原因'}</Text>
+                <Text style={styles.recordMeta}>更新时间：{formatDateTime(item.updated_at || item.created_at)}</Text>
+              </View>
+            ))
+          )}
+        </ObjectCard>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  content: {flex: 1},
-
-  // Amount
-  amountCard: {backgroundColor: '#1890ff', padding: 24, alignItems: 'center'},
-  amountLabel: {fontSize: 14, color: 'rgba(255,255,255,0.8)'},
-  amountValue: {fontSize: 36, fontWeight: '700', color: '#fff', marginTop: 4},
-  amountBreakdown: {flexDirection: 'row', marginTop: 8},
-  breakdownText: {fontSize: 12, color: 'rgba(255,255,255,0.7)'},
-
-  // Card
-  card: {backgroundColor: '#fff', marginTop: 10, padding: 16},
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12},
-
-  infoRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+  container: {
+    flex: 1,
+    backgroundColor: '#eef3f8',
   },
-  infoLabel: {fontSize: 14, color: '#666'},
-  infoValue: {fontSize: 14, color: '#333'},
-
-  // Payment methods
-  methodItem: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
-  methodItemActive: {backgroundColor: '#f0f8ff'},
-  methodIcon: {fontSize: 24, marginRight: 12},
-  methodLabel: {fontSize: 15, fontWeight: '500', color: '#333'},
-  methodDesc: {fontSize: 12, color: '#999', marginTop: 2},
-  radio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2,
-    borderColor: '#d9d9d9', justifyContent: 'center', alignItems: 'center',
+  stateText: {
+    fontSize: 14,
+    color: '#6b7280',
   },
-  radioActive: {borderColor: '#1890ff'},
-  radioInner: {width: 10, height: 10, borderRadius: 5, backgroundColor: '#1890ff'},
-
-  // Bottom
-  bottomBar: {
-    backgroundColor: '#fff', padding: 16, paddingBottom: 32,
-    borderTopWidth: 1, borderTopColor: '#e8e8e8',
+  content: {
+    padding: 14,
+    paddingBottom: 24,
   },
-  payBtn: {
-    height: 48, backgroundColor: '#1890ff', borderRadius: 24,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  payBtnDisabled: {backgroundColor: '#91caff'},
-  payBtnText: {color: '#fff', fontSize: 17, fontWeight: '600'},
-
-  // Result
-  resultContainer: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40},
-  resultIcon: {fontSize: 64, marginBottom: 16},
-  resultTitle: {fontSize: 22, fontWeight: '700', color: '#333', marginBottom: 8},
-  resultDesc: {fontSize: 15, color: '#666', marginBottom: 32},
-  resultBtn: {
-    paddingHorizontal: 40, paddingVertical: 12, backgroundColor: '#1890ff',
+  hero: {
     borderRadius: 24,
+    backgroundColor: '#114178',
+    padding: 20,
+    marginBottom: 12,
   },
-  resultBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  heroTagRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  heroOrderNo: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#d6e4ff',
+    fontWeight: '700',
+  },
+  heroAmount: {
+    marginTop: 14,
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '800',
+  },
+  heroHint: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#d6e4ff',
+  },
+  sectionCard: {
+    marginBottom: 12,
+  },
+  resultCard: {
+    marginBottom: 12,
+    backgroundColor: '#f6ffed',
+  },
+  resultTitle: {
+    fontSize: 17,
+    color: '#1f1f1f',
+    fontWeight: '800',
+  },
+  resultDesc: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#595959',
+  },
+  resultActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 14,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: '#1f1f1f',
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  sectionHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#8c8c8c',
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  rowLabel: {
+    fontSize: 13,
+    color: '#8c8c8c',
+  },
+  rowValue: {
+    fontSize: 14,
+    color: '#1f1f1f',
+    fontWeight: '700',
+  },
+  methodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  methodItemActive: {
+    backgroundColor: '#f6fbff',
+  },
+  methodIcon: {
+    fontSize: 22,
+    marginRight: 12,
+  },
+  methodContent: {
+    flex: 1,
+  },
+  methodLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1f1f1f',
+  },
+  methodDesc: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#8c8c8c',
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioActive: {
+    borderColor: '#114178',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#114178',
+  },
+  primaryBtn: {
+    alignSelf: 'stretch',
+    marginTop: 14,
+    borderRadius: 999,
+    backgroundColor: '#114178',
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  primaryBtnDisabled: {
+    backgroundColor: '#91a8c2',
+  },
+  primaryBtnText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '800',
+  },
+  secondaryBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    backgroundColor: '#fff',
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    color: '#114178',
+    fontWeight: '700',
+  },
+  recordItem: {
+    borderRadius: 16,
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    padding: 12,
+    marginTop: 10,
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  recordCode: {
+    fontSize: 13,
+    color: '#595959',
+    fontWeight: '700',
+  },
+  recordMeta: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#8c8c8c',
+    lineHeight: 18,
+  },
+  emptyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#8c8c8c',
+  },
 });

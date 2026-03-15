@@ -3,6 +3,41 @@
 本文件列出系统所有需要配置的第三方服务、API密钥和生产环境配置项。
 部署前请逐项确认已完成申请和配置。
 
+## 当前 v2 部署前必查
+
+当前项目已经切到“重载末端货物吊运”v2 业务模型。正式部署或交接前，建议先完成以下 6 项：
+
+1. 确认数据库结构迁移已执行完毕  
+推荐至少完成：
+   - `901_phase9_prepare_v2_schema.sql`
+   - `911_phase9_backfill_v2_data.sql`
+
+2. 确认后端健康检查通过
+```bash
+curl -sS --max-time 5 http://127.0.0.1:8080/api/v2/status
+```
+
+3. 确认阶段 10 自动角色验收可跑通
+```bash
+cd backend
+PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
+```
+
+4. 确认当前项目文档已对齐
+- [BUSINESS_ROLE_REDESIGN.md](./BUSINESS_ROLE_REDESIGN.md)
+- [BUSINESS_API_CONTRACT.md](./BUSINESS_API_CONTRACT.md)
+- [ROLE_ACCEPTANCE_WALKTHROUGH.md](./ROLE_ACCEPTANCE_WALKTHROUGH.md)
+- [DEMO_ACCOUNTS.md](./DEMO_ACCOUNTS.md)
+
+5. 确认重载准入规则已生效
+- `mtow_kg >= 150`
+- `max_payload_kg >= 50`
+- 关键资质审核状态完整
+
+6. 生产环境不要启用开发演示数据整理逻辑  
+说明：
+`PREPARE_DEMO_DATA=1` 只允许用于开发测试环境，不允许用于生产环境。
+
 ---
 
 ## 1. 基础服务

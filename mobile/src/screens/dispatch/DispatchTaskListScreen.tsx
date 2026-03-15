@@ -1,207 +1,297 @@
-import React, {useState, useCallback} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
+  ActivityIndicator,
   FlatList,
-  TouchableOpacity,
-  Alert,
   RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {
-  listClientTasks,
-  DispatchTask,
-} from '../../services/dispatch';
 
-const STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待派单', color: '#faad14'},
-  matching: {label: '匹配中', color: '#1890ff'},
-  assigned: {label: '已分配', color: '#52c41a'},
-  accepted: {label: '已接受', color: '#52c41a'},
-  in_progress: {label: '执行中', color: '#1890ff'},
-  completed: {label: '已完成', color: '#8c8c8c'},
-  cancelled: {label: '已取消', color: '#ff4d4f'},
-  failed: {label: '匹配失败', color: '#ff4d4f'},
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {dispatchV2Service} from '../../services/dispatchV2';
+import {V2DispatchTaskSummary} from '../../types';
+
+const STATUS_TABS = [
+  {key: 'all', label: '全部'},
+  {key: 'pending_response', label: '待响应'},
+  {key: 'accepted', label: '已接单'},
+  {key: 'executing', label: '执行中'},
+  {key: 'closed', label: '已结束'},
+] as const;
+
+type StatusFilter = (typeof STATUS_TABS)[number]['key'];
+
+const CLOSED_STATUSES = ['rejected', 'expired', 'exception', 'completed', 'finished'];
+
+const formatMoney = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${month}-${day} ${hour}:${minute}`;
 };
 
-const TASK_TYPE_MAP: Record<string, string> = {
-  cargo_delivery: '货物运输',
-  agriculture: '农业植保',
-  mapping: '航拍测绘',
-  inspection: '巡检监测',
-  emergency: '应急救援',
-  other: '其他',
+const getStatusMatched = (status: string, filter: StatusFilter) => {
+  if (filter === 'all') {
+    return true;
+  }
+  if (filter === 'closed') {
+    return CLOSED_STATUSES.includes(String(status || '').toLowerCase());
+  }
+  return String(status || '').toLowerCase() === filter;
 };
 
-const PRIORITY_MAP: Record<string, {label: string; color: string}> = {
-  normal: {label: '普通', color: '#8c8c8c'},
-  urgent: {label: '加急', color: '#fa8c16'},
-  critical: {label: '紧急', color: '#ff4d4f'},
+const getPilotLabel = (task: V2DispatchTaskSummary) => {
+  if (task.target_pilot?.nickname) {
+    return task.target_pilot.nickname;
+  }
+  if (task.target_pilot?.user_id) {
+    return `飞手 #${task.target_pilot.user_id}`;
+  }
+  return '待指定飞手';
 };
 
 export default function DispatchTaskListScreen({navigation}: any) {
-  const [tasks, setTasks] = useState<DispatchTask[]>([]);
+  const [tasks, setTasks] = useState<V2DispatchTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeStatus, setActiveStatus] = useState<StatusFilter>('all');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const res = await listClientTasks({page: 1, page_size: 50});
-      setTasks(res.list || []);
-    } catch (e: any) {
-      Alert.alert('错误', e.message);
+      const res = await dispatchV2Service.list({role: 'owner', page: 1, page_size: 100});
+      setTasks(res.data?.items || []);
+    } catch (error) {
+      console.error('获取正式派单列表失败:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, []),
+    }, [loadData]),
   );
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
-
-  const renderItem = ({item}: {item: DispatchTask}) => {
-    const status = STATUS_MAP[item.status] || STATUS_MAP.pending;
-    const priority = PRIORITY_MAP[item.priority] || PRIORITY_MAP.normal;
-    const taskType = TASK_TYPE_MAP[item.task_type] || item.task_type;
-
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <Text style={styles.taskNo}>{item.task_no}</Text>
-            <View style={[styles.priorityBadge, {backgroundColor: priority.color + '20'}]}>
-              <Text style={[styles.priorityText, {color: priority.color}]}>{priority.label}</Text>
-            </View>
-          </View>
-          <View style={[styles.statusBadge, {backgroundColor: status.color + '20'}]}>
-            <Text style={[styles.statusText, {color: status.color}]}>{status.label}</Text>
-          </View>
-        </View>
-
-        <View style={styles.cardBody}>
-          <Text style={styles.taskType}>{taskType}</Text>
-          <View style={styles.routeRow}>
-            <View style={styles.routeDot} />
-            <Text style={styles.routeText} numberOfLines={1}>{item.pickup_address || '待确认'}</Text>
-          </View>
-          <View style={styles.routeLine} />
-          <View style={styles.routeRow}>
-            <View style={[styles.routeDot, {backgroundColor: '#ff4d4f'}]} />
-            <Text style={styles.routeText} numberOfLines={1}>{item.delivery_address || '待确认'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.cardFooter}>
-          <Text style={styles.footerText}>
-            {item.cargo_weight ? `${item.cargo_weight}kg` : '-'}
-          </Text>
-          <Text style={styles.footerText}>
-            {item.max_budget ? `预算 ¥${(item.max_budget / 100).toFixed(0)}` : '系统定价'}
-          </Text>
-          <Text style={styles.footerDate}>
-            {item.created_at?.substring(0, 10)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>暂无派单任务</Text>
-      <Text style={styles.emptySubText}>点击下方按钮创建新任务</Text>
-    </View>
+  const filteredTasks = useMemo(
+    () => tasks.filter(task => getStatusMatched(task.status, activeStatus)),
+    [activeStatus, tasks],
   );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>加载中...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={tasks}
-        renderItem={renderItem}
-        keyExtractor={item => item.id.toString()}
+        data={filteredTasks}
+        keyExtractor={item => String(item.id)}
+        renderItem={({item}) => (
+          <ObjectCard style={styles.card} onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardHeaderLeft}>
+                <SourceTag source="dispatch_task" />
+                <StatusBadge label="" meta={getObjectStatusMeta('dispatch_task', item.status)} />
+              </View>
+              <Text style={styles.code}>{item.dispatch_no}</Text>
+            </View>
+
+            <Text style={styles.title}>{item.order?.title || '正式派单任务'}</Text>
+            <Text style={styles.route} numberOfLines={2}>
+              {item.order?.service_address || '未设置起点'}
+              {item.order?.dest_address ? ` -> ${item.order.dest_address}` : ''}
+            </Text>
+
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>目标飞手：{getPilotLabel(item)}</Text>
+              <Text style={styles.metaText}>派单来源：{item.dispatch_source || '-'}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>订单状态：{getObjectStatusMeta('order', item.order?.status).label}</Text>
+              <Text style={styles.metaText}>重派次数：{item.retry_count || 0}</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>发出时间：{formatDateTime(item.sent_at)}</Text>
+              <Text style={styles.metaText}>订单金额：{formatMoney(item.order?.total_amount)}</Text>
+            </View>
+          </ObjectCard>
+        )}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+          setRefreshing(true);
+          loadData();
+        }} colors={['#0f766e']} />}
+        contentContainerStyle={styles.content}
         ListHeaderComponent={
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('CreateDispatchTask')}>
-            <Text style={styles.addBtnIcon}>+</Text>
-            <Text style={styles.addBtnText}>创建派单任务</Text>
-          </TouchableOpacity>
+          <View>
+            <View style={styles.hero}>
+              <Text style={styles.heroEyebrow}>正式派单</Text>
+              <Text style={styles.heroTitle}>这里只看执行指令</Text>
+              <Text style={styles.heroDesc}>
+                派单任务不再混需求、订单创建或候选匹配过程。这里展示的是已经发出的正式派单，以及它当前的响应和执行状态。
+              </Text>
+            </View>
+
+            <ObjectCard style={styles.filterCard}>
+              <Text style={styles.filterTitle}>状态筛选</Text>
+              <View style={styles.filterRow}>
+                {STATUS_TABS.map(tab => (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[styles.filterChip, activeStatus === tab.key && styles.filterChipActive]}
+                    onPress={() => setActiveStatus(tab.key)}>
+                    <Text style={[styles.filterChipText, activeStatus === tab.key && styles.filterChipTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ObjectCard>
+          </View>
         }
-        ListEmptyComponent={renderEmpty}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.loading} color="#0f766e" />
+          ) : (
+            <ObjectCard>
+              <EmptyState
+                icon="📡"
+                title="当前没有正式派单"
+                description="如果订单还没进入派单阶段，请先去订单页确认待处理订单；只有正式发出的派单，才会出现在这里。"
+                actionText="查看订单"
+                onAction={() => navigation.navigate('MyOrders', {roleFilter: 'owner'})}
+              />
+            </ObjectCard>
+          )
         }
-        contentContainerStyle={styles.listContent}
       />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 16, color: '#666' },
-  listContent: { paddingBottom: 24 },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#1890ff', marginHorizontal: 16, marginTop: 16,
-    paddingVertical: 14, borderRadius: 8,
+  container: {
+    flex: 1,
+    backgroundColor: '#eef3f8',
   },
-  addBtnIcon: { fontSize: 20, color: '#fff', marginRight: 8 },
-  addBtnText: { fontSize: 16, color: '#fff', fontWeight: '600' },
-  emptyContainer: { paddingTop: 60, alignItems: 'center' },
-  emptyText: { fontSize: 16, color: '#666', marginBottom: 8 },
-  emptySubText: { fontSize: 14, color: '#999' },
-  card: {
-    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 12,
-    borderRadius: 12, padding: 16,
+  content: {
+    padding: 14,
+    paddingBottom: 28,
   },
-  cardHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  hero: {
+    backgroundColor: '#0f766e',
+    borderRadius: 24,
+    padding: 20,
     marginBottom: 12,
   },
-  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  taskNo: { fontSize: 14, fontWeight: '600', color: '#333', marginRight: 8 },
-  priorityBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  priorityText: { fontSize: 11, fontWeight: '500' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 12, fontWeight: '500' },
-  cardBody: { borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 12 },
-  taskType: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 10 },
-  routeRow: { flexDirection: 'row', alignItems: 'center' },
-  routeDot: {
-    width: 10, height: 10, borderRadius: 5, backgroundColor: '#52c41a', marginRight: 10,
+  heroEyebrow: {
+    fontSize: 12,
+    color: '#ccfbf1',
+    fontWeight: '700',
   },
-  routeText: { fontSize: 14, color: '#333', flex: 1 },
-  routeLine: {
-    width: 1, height: 16, backgroundColor: '#ddd', marginLeft: 4.5, marginVertical: 2,
+  heroTitle: {
+    marginTop: 8,
+    fontSize: 28,
+    lineHeight: 34,
+    color: '#fff',
+    fontWeight: '800',
   },
-  cardFooter: {
-    flexDirection: 'row', justifyContent: 'space-between', marginTop: 12,
-    paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0',
+  heroDesc: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#d1fae5',
   },
-  footerText: { fontSize: 12, color: '#666' },
-  footerDate: { fontSize: 12, color: '#999' },
+  filterCard: {
+    marginBottom: 12,
+  },
+  filterTitle: {
+    fontSize: 14,
+    color: '#262626',
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  filterChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  filterChipActive: {
+    borderColor: '#0f766e',
+    backgroundColor: '#ecfdf5',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#595959',
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#0f766e',
+  },
+  loading: {
+    paddingVertical: 48,
+  },
+  card: {
+    marginBottom: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  code: {
+    fontSize: 12,
+    color: '#8c8c8c',
+    fontWeight: '600',
+  },
+  title: {
+    marginTop: 14,
+    fontSize: 17,
+    lineHeight: 24,
+    color: '#1f1f1f',
+    fontWeight: '700',
+  },
+  route: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#595959',
+  },
+  metaRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  metaText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#595959',
+  },
 });

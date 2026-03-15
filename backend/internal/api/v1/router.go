@@ -19,6 +19,7 @@ import (
 	"wurenji-backend/internal/api/v1/location"
 	"wurenji-backend/internal/api/v1/message"
 	"wurenji-backend/internal/api/v1/order"
+	"wurenji-backend/internal/api/v1/owner"
 	"wurenji-backend/internal/api/v1/payment"
 	"wurenji-backend/internal/api/v1/pilot"
 	"wurenji-backend/internal/api/v1/review"
@@ -38,6 +39,7 @@ type Handlers struct {
 	Demand     *demand.Handler
 	Payment    *payment.Handler
 	Message    *message.Handler
+	Owner      *owner.Handler
 	Review     *review.Handler
 	Admin      *admin.Handler
 	Location   *location.Handler
@@ -83,6 +85,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 	authenticated.Use(middleware.AuthMiddleware())
 	{
 		authenticated.POST("/auth/logout", h.Auth.Logout)
+		authenticated.GET("/me", h.User.GetMe)
 
 		// User
 		userGroup := authenticated.Group("/user")
@@ -120,6 +123,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Rental Offers
 		offerGroup := authenticated.Group("/rental/offer")
+		offerGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			offerGroup.GET("", h.Demand.ListOffers)
 			offerGroup.POST("", h.Demand.CreateOffer)
@@ -131,6 +135,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Rental Demands
 		demandGroup := authenticated.Group("/rental/demand")
+		demandGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			demandGroup.GET("", h.Demand.ListDemands)
 			demandGroup.POST("", h.Demand.CreateDemand)
@@ -143,6 +148,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Cargo Demands
 		cargoGroup := authenticated.Group("/cargo")
+		cargoGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			cargoGroup.GET("", h.Demand.ListCargos)
 			cargoGroup.POST("", h.Demand.CreateCargo)
@@ -155,12 +161,15 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Orders
 		orderGroup := authenticated.Group("/order")
+		orderGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			orderGroup.POST("", h.Order.Create)
 			orderGroup.GET("", h.Order.List)
 			orderGroup.GET("/:id", h.Order.GetByID)
 			orderGroup.PUT("/:id/accept", h.Order.Accept)
 			orderGroup.PUT("/:id/reject", h.Order.Reject)
+			orderGroup.POST("/:id/provider-confirm", h.Order.ProviderConfirm)
+			orderGroup.POST("/:id/provider-reject", h.Order.ProviderReject)
 			orderGroup.PUT("/:id/cancel", h.Order.Cancel)
 			orderGroup.PUT("/:id/start", h.Order.Start)
 			orderGroup.PUT("/:id/complete", h.Order.Complete)
@@ -169,6 +178,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Payment
 		paymentGroup := authenticated.Group("/payment")
+		paymentGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			paymentGroup.POST("/create", h.Payment.Create)
 			paymentGroup.GET("/:id/status", h.Payment.GetStatus)
@@ -217,15 +227,24 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Pilot 飞手相关接口
 		pilotGroup := authenticated.Group("/pilot")
+		pilotGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			pilotGroup.POST("/register", h.Pilot.Register)              // 注册成为飞手
 			pilotGroup.GET("/profile", h.Pilot.GetProfile)              // 获取飞手档案
 			pilotGroup.PUT("/profile", h.Pilot.UpdateProfile)           // 更新飞手档案
 			pilotGroup.PUT("/location", h.Pilot.UpdateLocation)         // 更新实时位置
 			pilotGroup.PUT("/availability", h.Pilot.UpdateAvailability) // 更新接单状态
-			pilotGroup.GET("/list", h.Pilot.List)                       // 获取飞手列表
-			pilotGroup.GET("/nearby", h.Pilot.Nearby)                   // 查找附近飞手
-			pilotGroup.GET("/:id", h.Pilot.GetByID)                     // 获取指定飞手信息
+			pilotGroup.GET("/owner-bindings", h.Pilot.ListOwnerBindings)
+			pilotGroup.POST("/owner-bindings", h.Pilot.ApplyOwnerBinding)
+			pilotGroup.POST("/owner-bindings/:binding_id/confirm", h.Pilot.ConfirmOwnerBinding)
+			pilotGroup.POST("/owner-bindings/:binding_id/reject", h.Pilot.RejectOwnerBinding)
+			pilotGroup.PATCH("/owner-bindings/:binding_id/status", h.Pilot.UpdateOwnerBindingStatus)
+			pilotGroup.GET("/candidate-demands", h.Pilot.ListCandidateDemands)
+			pilotGroup.GET("/dispatch-tasks", h.Pilot.ListDispatchTasks)
+			pilotGroup.GET("/flight-records", h.Pilot.GetFlightRecords)
+			pilotGroup.GET("/list", h.Pilot.List)     // 获取飞手列表
+			pilotGroup.GET("/nearby", h.Pilot.Nearby) // 查找附近飞手
+			pilotGroup.GET("/:id", h.Pilot.GetByID)   // 获取指定飞手信息
 
 			// 资质证书
 			pilotGroup.POST("/certification", h.Pilot.SubmitCertification)  // 提交资质证书
@@ -255,8 +274,16 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 			// 档案管理
 			clientGroup.GET("/profile", h.Client.GetProfile)    // 获取客户档案
 			clientGroup.PUT("/profile", h.Client.UpdateProfile) // 更新客户档案
-			clientGroup.GET("/list", h.Client.List)             // 获取客户列表
-			clientGroup.GET("/:id", h.Client.GetByID)           // 获取指定客户
+			clientGroup.POST("/demands", h.Client.CreateDemand)
+			clientGroup.GET("/demands", h.Client.MyDemands)
+			clientGroup.GET("/demands/:id", h.Client.GetDemand)
+			clientGroup.PATCH("/demands/:id", h.Client.UpdateDemand)
+			clientGroup.POST("/demands/:id/publish", h.Client.PublishDemand)
+			clientGroup.POST("/demands/:id/cancel", h.Client.CancelDemand)
+			clientGroup.GET("/demands/:id/quotes", h.Client.ListDemandQuotes)
+			clientGroup.POST("/demands/:id/select-provider", h.Client.SelectProvider)
+			clientGroup.GET("/list", h.Client.List)   // 获取客户列表
+			clientGroup.GET("/:id", h.Client.GetByID) // 获取指定客户
 
 			// 征信查询
 			clientGroup.POST("/credit/check", h.Client.RequestCreditCheck) // 发起征信查询
@@ -286,8 +313,37 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 			clientGroup.GET("/admin/cargo/pending", h.Client.AdminListPendingCargoDeclarations) // 待审批货物申报
 		}
 
+		ownerGroup := authenticated.Group("/owner")
+		ownerGroup.Use(middleware.FreezeLegacyWriteMiddleware())
+		{
+			ownerGroup.GET("/profile", h.Owner.GetProfile)
+			ownerGroup.PUT("/profile", h.Owner.UpdateProfile)
+			ownerGroup.GET("/drones", h.Owner.ListDrones)
+			ownerGroup.POST("/drones", h.Owner.CreateDrone)
+			ownerGroup.GET("/drones/:drone_id", h.Owner.GetDrone)
+			ownerGroup.GET("/supplies", h.Owner.ListSupplies)
+			ownerGroup.POST("/supplies", h.Owner.CreateSupply)
+			ownerGroup.GET("/supplies/:supply_id", h.Owner.GetSupply)
+			ownerGroup.PATCH("/supplies/:supply_id/status", h.Owner.UpdateSupplyStatus)
+			ownerGroup.GET("/demands/recommended", h.Owner.RecommendedDemands)
+			ownerGroup.GET("/quotes", h.Owner.ListQuotes)
+			ownerGroup.GET("/pilot-bindings", h.Owner.ListPilotBindings)
+			ownerGroup.POST("/pilot-bindings", h.Owner.InvitePilotBinding)
+			ownerGroup.POST("/pilot-bindings/:binding_id/confirm", h.Owner.ConfirmPilotBinding)
+			ownerGroup.POST("/pilot-bindings/:binding_id/reject", h.Owner.RejectPilotBinding)
+			ownerGroup.PATCH("/pilot-bindings/:binding_id/status", h.Owner.UpdatePilotBindingStatus)
+		}
+
+		authenticated.POST("/demands/:demand_id/quotes", h.Owner.CreateQuote)
+		authenticated.POST("/supplies/:supply_id/orders", h.Client.CreateDirectOrder)
+		authenticated.POST("/demands/:demand_id/candidate", h.Pilot.ApplyDemandCandidate)
+		authenticated.DELETE("/demands/:demand_id/candidate", h.Pilot.WithdrawDemandCandidate)
+		authenticated.POST("/dispatch-tasks/:dispatch_id/accept", h.Pilot.AcceptDispatchTask)
+		authenticated.POST("/dispatch-tasks/:dispatch_id/reject", h.Pilot.RejectDispatchTask)
+
 		// Dispatch 智能派单相关接口
 		dispatchGroup := authenticated.Group("/dispatch")
+		dispatchGroup.Use(middleware.FreezeLegacyWriteMiddleware("/api/v1/dispatch/admin/"))
 		{
 			// 业主端
 			dispatchGroup.POST("/task", h.Dispatch.CreateTask)                  // 创建派单任务
@@ -315,6 +371,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 
 		// Flight 飞行监控相关接口
 		flightGroup := authenticated.Group("/flight")
+		flightGroup.Use(middleware.FreezeLegacyWriteMiddleware())
 		{
 			// 位置上报与查询
 			flightGroup.POST("/position", h.Flight.ReportPosition)                      // 上报飞行位置
@@ -560,7 +617,17 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 		adminGroup.PUT("/pilots/:id/health-check", h.Admin.ApprovePilotHealthCheck)
 		adminGroup.GET("/clients", h.Admin.ClientList)
 		adminGroup.PUT("/clients/:id/verify", h.Admin.VerifyClient)
+		adminGroup.GET("/demands", h.Admin.DemandList)
+		adminGroup.GET("/supplies", h.Admin.SupplyList)
 		adminGroup.GET("/orders", h.Admin.OrderList)
+		adminGroup.GET("/orders/anomalies", h.Admin.OrderAnomalyList)
+		adminGroup.GET("/orders/anomalies/summary", h.Admin.OrderAnomalySummary)
+		adminGroup.GET("/dispatch-tasks", h.Admin.DispatchTaskList)
+		adminGroup.GET("/flight-records", h.Admin.FlightRecordList)
+		adminGroup.GET("/migration-audits", h.Admin.MigrationAuditList)
+		adminGroup.GET("/migration-audits/summary", h.Admin.MigrationAuditSummary)
 		adminGroup.GET("/payments", h.Admin.PaymentList)
+		adminGroup.POST("/demands/handle-expired", h.Admin.HandleExpiredDemands)
+		adminGroup.POST("/pilot-bindings/handle-expired", h.Admin.HandleExpiredPilotBindings)
 	}
 }

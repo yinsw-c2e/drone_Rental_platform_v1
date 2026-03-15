@@ -1,97 +1,241 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  SafeAreaView, RefreshControl,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {demandService} from '../../services/demand';
-import {RentalOffer} from '../../types';
+import {useSelector} from 'react-redux';
+
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {supplyService} from '../../services/supply';
+import {RootState} from '../../store/store';
+import {SupplySummary} from '../../types';
+import {formatSupplyPricing, getSupplySceneLabel} from '../../utils/supplyMeta';
+
+const SCENE_FILTERS = [
+  {key: '', label: '全部场景'},
+  {key: 'power_grid', label: '电网建设'},
+  {key: 'mountain_agriculture', label: '山区农副产品'},
+  {key: 'plateau_supply', label: '高原给养'},
+  {key: 'island_supply', label: '海岛补给'},
+  {key: 'emergency', label: '应急救援'},
+];
+
+function SceneTag({label}: {label: string}) {
+  return (
+    <View style={styles.sceneTag}>
+      <Text style={styles.sceneTagText}>{label}</Text>
+    </View>
+  );
+}
 
 export default function OfferListScreen({navigation}: any) {
-  const [offers, setOffers] = useState<RentalOffer[]>([]);
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+
+  const [supplies, setSupplies] = useState<SupplySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [region, setRegion] = useState('');
+  const [activeScene, setActiveScene] = useState('');
 
-  const fetchOffers = useCallback(async (pageNum = 1, isRefresh = false) => {
-    console.log('开始获取供给列表, page:', pageNum);
-    try {
-      const res = await demandService.listOffers({page: pageNum, page_size: 10});
-      console.log('获取供给响应:', res);
-      const list = res.data?.list || [];
-      console.log('供给数据 list:', list, 'length:', list.length);
-      if (isRefresh || pageNum === 1) {
-        setOffers(list);
-      } else {
-        setOffers(prev => [...prev, ...list]);
+  const fetchSupplies = useCallback(
+    async (pageNum = 1, isRefresh = false) => {
+      try {
+        const res = await supplyService.list({
+          page: pageNum,
+          page_size: 10,
+          region: region.trim() || undefined,
+          cargo_scene: activeScene || undefined,
+          accepts_direct_order: true,
+          service_type: 'heavy_cargo_lift_transport',
+        });
+        const list = res.data?.items || [];
+        if (isRefresh || pageNum === 1) {
+          setSupplies(list);
+        } else {
+          setSupplies(prev => [...prev, ...list]);
+        }
+        const total = res.meta?.total || 0;
+        setHasMore(pageNum * 10 < total);
+      } catch (error) {
+        console.error('获取供给市场失败:', error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-      setHasMore(list.length === 10);
-    } catch (e: any) {
-      console.error('获取供给列表失败:', e);
-      console.error('错误详情:', e.message, e.response);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    [activeScene, region],
+  );
 
   useEffect(() => {
-    fetchOffers(1, true);
-  }, [fetchOffers]);
+    setLoading(true);
+    setPage(1);
+    fetchSupplies(1, true);
+  }, [activeScene]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(1);
-    fetchOffers(1, true);
-  }, [fetchOffers]);
+    fetchSupplies(1, true);
+  }, [fetchSupplies]);
+
+  const onSearch = useCallback(() => {
+    setLoading(true);
+    setPage(1);
+    fetchSupplies(1, true);
+  }, [fetchSupplies]);
 
   const onLoadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchOffers(nextPage);
+    if (loading || refreshing || !hasMore) {
+      return;
     }
-  }, [loading, hasMore, page, fetchOffers]);
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchSupplies(nextPage);
+  }, [fetchSupplies, hasMore, loading, page, refreshing]);
 
-  const formatPrice = (offer: RentalOffer) => {
-    if (!offer.price) return '价格面议';
-    const priceInYuan = (offer.price / 100).toFixed(0);
-    return offer.price_type === 'hourly'
-      ? `¥${priceInYuan}/小时`
-      : `¥${priceInYuan}/天`;
+  const heroTitle = useMemo(() => {
+    if (region.trim()) {
+      return `${region.trim()} 供给市场`;
+    }
+    return '重载吊运供给市场';
+  }, [region]);
+
+  const renderItem = ({item}: {item: SupplySummary}) => {
+    const isMySupply = item.owner_user_id === currentUser?.id;
+    return (
+      <ObjectCard
+        style={styles.card}
+        onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderLeft}>
+            <SourceTag source="supply" />
+            <StatusBadge label="" meta={getObjectStatusMeta('supply', item.status)} />
+          </View>
+          {item.accepts_direct_order ? (
+            <View style={styles.directPill}>
+              <Text style={styles.directPillText}>支持直达下单</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Text style={styles.supplyNo}>{item.supply_no}</Text>
+        <Text style={styles.title}>{item.title}</Text>
+
+        <View style={styles.sceneRow}>
+          {(item.cargo_scenes || []).slice(0, 3).map(scene => (
+            <SceneTag key={scene} label={getSupplySceneLabel(scene)} />
+          ))}
+        </View>
+
+        <View style={styles.metricRow}>
+          <Text style={styles.metricText}>起飞重量 {item.mtow_kg || 0}kg</Text>
+          <Text style={styles.metricText}>最大吊重 {item.max_payload_kg || 0}kg</Text>
+        </View>
+
+        <View style={styles.cardFooter}>
+          <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
+          <TouchableOpacity
+            style={[styles.detailBtn, isMySupply && styles.detailBtnOwner]}
+            onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
+            <Text style={[styles.detailBtnText, isMySupply && styles.detailBtnTextOwner]}>
+              {isMySupply ? '查看供给' : '查看详情'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ObjectCard>
+    );
   };
-
-  const renderItem = ({item}: {item: RentalOffer}) => (
-    <TouchableOpacity
-      style={styles.item}
-      onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
-      <View style={styles.iconBox}>
-        <Text style={{fontSize: 28}}>🚁</Text>
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.meta}>{item.owner?.nickname || '无人机主'} · {item.service_type || '租赁'}</Text>
-        <Text style={styles.location} numberOfLines={1}>{item.address || '位置未设置'}</Text>
-      </View>
-      <Text style={styles.price}>{formatPrice(item)}</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={offers}
+        data={supplies}
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1890ff']} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f5cab']} />
+        }
         onEndReached={onLoadMore}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={{padding: 12}}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🚁</Text>
-            <Text style={styles.emptyText}>{loading ? '加载中...' : '暂无供给信息'}</Text>
+        onEndReachedThreshold={0.35}
+        contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.hero}>
+              <Text style={styles.heroEyebrow}>供给市场</Text>
+              <Text style={styles.heroTitle}>{heroTitle}</Text>
+              <Text style={styles.heroDesc}>
+                这里只展示满足平台重载门槛、并支持客户直达下单的供给，不再混需求卡片和订单卡片。
+              </Text>
+            </View>
+
+            <ObjectCard style={styles.filterCard}>
+              <Text style={styles.filterTitle}>筛选条件</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="按作业区域筛选，例如：广东、海岛、高原"
+                value={region}
+                onChangeText={setRegion}
+                onSubmitEditing={onSearch}
+              />
+
+              <View style={styles.filterChipRow}>
+                {SCENE_FILTERS.map(filter => (
+                  <TouchableOpacity
+                    key={filter.key || 'all'}
+                    style={[
+                      styles.filterChip,
+                      activeScene === filter.key && styles.filterChipActive,
+                    ]}
+                    onPress={() => setActiveScene(filter.key)}>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        activeScene === filter.key && styles.filterChipTextActive,
+                      ]}>
+                      {filter.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity style={styles.searchBtn} onPress={onSearch}>
+                <Text style={styles.searchBtnText}>更新筛选结果</Text>
+              </TouchableOpacity>
+            </ObjectCard>
           </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.loading} color="#0f5cab" />
+          ) : (
+            <ObjectCard>
+              <EmptyState
+                icon="🛩️"
+                title="当前没有匹配的供给"
+                description="可以调整场景或区域筛选，或者先发布需求，让平台反向撮合合适机主。"
+                actionText="发布需求"
+                onAction={() => navigation.navigate('PublishCargo')}
+              />
+            </ObjectCard>
+          )
+        }
+        ListFooterComponent={
+          hasMore && supplies.length > 0 ? (
+            <ActivityIndicator style={styles.footerLoading} color="#0f5cab" />
+          ) : null
         }
       />
     </SafeAreaView>
@@ -99,22 +243,202 @@ export default function OfferListScreen({navigation}: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  item: {
-    flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10,
-    padding: 14, marginBottom: 10, alignItems: 'center',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  container: {
+    flex: 1,
+    backgroundColor: '#eef3f8',
   },
-  iconBox: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#e6f7ff',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  content: {
+    padding: 14,
+    paddingBottom: 28,
+    gap: 12,
   },
-  content: {flex: 1, marginRight: 8},
-  title: {fontSize: 15, fontWeight: '600', color: '#333'},
-  meta: {fontSize: 12, color: '#999', marginTop: 4},
-  location: {fontSize: 12, color: '#999', marginTop: 2},
-  price: {fontSize: 14, color: '#f5222d', fontWeight: 'bold'},
-  empty: {alignItems: 'center', paddingTop: 100},
-  emptyIcon: {fontSize: 48, marginBottom: 12},
-  emptyText: {fontSize: 16, color: '#999'},
+  hero: {
+    backgroundColor: '#0f5cab',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 12,
+  },
+  heroEyebrow: {
+    fontSize: 12,
+    color: '#d6e4ff',
+    fontWeight: '700',
+  },
+  heroTitle: {
+    marginTop: 8,
+    fontSize: 28,
+    lineHeight: 34,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  heroDesc: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#d6e4ff',
+  },
+  filterCard: {
+    marginBottom: 12,
+  },
+  filterTitle: {
+    fontSize: 16,
+    color: '#0f172a',
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#dbe3ec',
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0f172a',
+  },
+  filterChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+  },
+  filterChipActive: {
+    borderColor: '#91caff',
+    backgroundColor: '#e6f4ff',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '700',
+  },
+  filterChipTextActive: {
+    color: '#0958d9',
+  },
+  searchBtn: {
+    marginTop: 12,
+    backgroundColor: '#0f5cab',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  searchBtnText: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  card: {
+    marginBottom: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  directPill: {
+    borderRadius: 999,
+    backgroundColor: '#ecfdf3',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  directPillText: {
+    fontSize: 11,
+    color: '#047857',
+    fontWeight: '800',
+  },
+  supplyNo: {
+    marginTop: 12,
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  title: {
+    marginTop: 6,
+    fontSize: 17,
+    lineHeight: 24,
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  sceneRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sceneTag: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#dbe3ec',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  sceneTagText: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '700',
+  },
+  metricRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  metricText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  cardFooter: {
+    marginTop: 14,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  price: {
+    flex: 1,
+    fontSize: 16,
+    color: '#dc2626',
+    fontWeight: '800',
+  },
+  detailBtn: {
+    borderRadius: 999,
+    backgroundColor: '#0f5cab',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  detailBtnOwner: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#0f5cab',
+  },
+  detailBtnText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  detailBtnTextOwner: {
+    color: '#0f5cab',
+  },
+  loading: {
+    paddingVertical: 36,
+  },
+  footerLoading: {
+    paddingVertical: 18,
+  },
 });

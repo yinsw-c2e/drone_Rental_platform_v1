@@ -17,6 +17,10 @@ func NewPilotRepo(db *gorm.DB) *PilotRepo {
 	return &PilotRepo{db: db}
 }
 
+func (r *PilotRepo) DB() *gorm.DB {
+	return r.db
+}
+
 // Create 创建飞手档案
 func (r *PilotRepo) Create(pilot *model.Pilot) error {
 	return r.db.Create(pilot).Error
@@ -261,7 +265,7 @@ func (r *PilotRepo) ListFlightPositionsByOrderID(orderID int64) ([]model.FlightP
 	return rows, err
 }
 
-// FindDispatchTaskForOrder 查找订单对应的派单任务(优先显式关联, 其次按地址+飞手接受记录匹配)
+// FindDispatchTaskForOrder 查找订单对应的旧任务池任务(优先显式关联, 其次按地址+飞手接受记录匹配)
 func (r *PilotRepo) FindDispatchTaskForOrder(
 	pilotID int64,
 	orderID int64,
@@ -294,8 +298,8 @@ func (r *PilotRepo) FindDispatchTaskForOrder(
 
 	err = r.db.Raw(`
 		SELECT dt.*
-		FROM dispatch_tasks dt
-		JOIN dispatch_candidates dc ON dc.task_id = dt.id
+		FROM dispatch_pool_tasks dt
+		JOIN dispatch_pool_candidates dc ON dc.task_id = dt.id
 		WHERE dc.pilot_id = ?
 			AND dc.status = 'accepted'
 			AND dt.pickup_address = ?
@@ -333,6 +337,15 @@ func (r *PilotRepo) CreateBinding(binding *model.PilotDroneBinding) error {
 	return r.db.Create(binding).Error
 }
 
+func (r *PilotRepo) GetBindingByID(id int64) (*model.PilotDroneBinding, error) {
+	var binding model.PilotDroneBinding
+	err := r.db.Where("id = ? AND deleted_at IS NULL", id).First(&binding).Error
+	if err != nil {
+		return nil, err
+	}
+	return &binding, nil
+}
+
 // GetBindingsByPilotID 获取飞手绑定的无人机
 func (r *PilotRepo) GetBindingsByPilotID(pilotID int64) ([]model.PilotDroneBinding, error) {
 	var bindings []model.PilotDroneBinding
@@ -360,6 +373,19 @@ func (r *PilotRepo) CheckBinding(pilotID, droneID int64) (bool, error) {
 		Where("effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)", now, now).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func (r *PilotRepo) CountActiveBindingsByOwnerAndPilot(ownerID, pilotID, excludeID int64) (int64, error) {
+	var count int64
+	now := time.Now()
+	query := r.db.Model(&model.PilotDroneBinding{}).
+		Where("owner_id = ? AND pilot_id = ? AND deleted_at IS NULL AND status = 'active'", ownerID, pilotID).
+		Where("effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)", now, now)
+	if excludeID > 0 {
+		query = query.Where("id <> ?", excludeID)
+	}
+	err := query.Count(&count).Error
+	return count, err
 }
 
 // RevokeBinding 撤销绑定

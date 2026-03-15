@@ -11,22 +11,41 @@ import (
 )
 
 type Handler struct {
-	userService    *service.UserService
-	droneService   *service.DroneService
-	orderService   *service.OrderService
-	paymentService *service.PaymentService
-	pilotService   *service.PilotService
-	clientService  *service.ClientService
+	userService     *service.UserService
+	droneService    *service.DroneService
+	orderService    *service.OrderService
+	opsService      *service.OperationsService
+	paymentService  *service.PaymentService
+	pilotService    *service.PilotService
+	clientService   *service.ClientService
+	ownerService    *service.OwnerService
+	dispatchService *service.DispatchService
+	flightService   *service.FlightService
 }
 
-func NewHandler(userService *service.UserService, droneService *service.DroneService, orderService *service.OrderService, paymentService *service.PaymentService, pilotService *service.PilotService, clientService *service.ClientService) *Handler {
+func NewHandler(
+	userService *service.UserService,
+	droneService *service.DroneService,
+	orderService *service.OrderService,
+	opsService *service.OperationsService,
+	paymentService *service.PaymentService,
+	pilotService *service.PilotService,
+	clientService *service.ClientService,
+	ownerService *service.OwnerService,
+	dispatchService *service.DispatchService,
+	flightService *service.FlightService,
+) *Handler {
 	return &Handler{
-		userService:    userService,
-		droneService:   droneService,
-		orderService:   orderService,
-		paymentService: paymentService,
-		pilotService:   pilotService,
-		clientService:  clientService,
+		userService:     userService,
+		droneService:    droneService,
+		orderService:    orderService,
+		opsService:      opsService,
+		paymentService:  paymentService,
+		pilotService:    pilotService,
+		clientService:   clientService,
+		ownerService:    ownerService,
+		dispatchService: dispatchService,
+		flightService:   flightService,
 	}
 }
 
@@ -96,20 +115,20 @@ func (h *Handler) DroneList(c *gin.Context) {
 	if cs := c.Query("certification_status"); cs != "" {
 		filters["certification_status"] = cs
 	}
-	
+
 	// 1. 查询无人机列表
 	drones, total, err := h.droneService.List(page, pageSize, filters)
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
-	
+
 	// 2. 收集所有的 owner_id
 	ownerIDs := make([]int64, 0, len(drones))
 	for i := range drones {
 		ownerIDs = append(ownerIDs, drones[i].OwnerID)
 	}
-	
+
 	// 3. 批量查询用户信息（只查一次数据库）
 	owners, err := h.userService.GetByIDs(ownerIDs)
 	if err != nil {
@@ -117,10 +136,10 @@ func (h *Handler) DroneList(c *gin.Context) {
 		// 只是不会显示机主信息
 		owners = make(map[int64]*model.User)
 	}
-	
+
 	// 4. 转换为 DTO
 	dtoList := ToDroneDTOList(drones, owners)
-	
+
 	response.SuccessWithPage(c, dtoList, total, page, pageSize)
 }
 
@@ -203,6 +222,87 @@ func (h *Handler) OrderList(c *gin.Context) {
 	response.SuccessWithPage(c, orders, total, page, pageSize)
 }
 
+func (h *Handler) DemandList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	filters := map[string]interface{}{}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters["keyword"] = keyword
+	}
+	if cargoScene := c.Query("cargo_scene"); cargoScene != "" {
+		filters["cargo_scene"] = cargoScene
+	}
+	items, total, err := h.clientService.AdminListDemands(page, pageSize, filters)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, items, total, page, pageSize)
+}
+
+func (h *Handler) SupplyList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	filters := map[string]interface{}{}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters["keyword"] = keyword
+	}
+	if cargoScene := c.Query("cargo_scene"); cargoScene != "" {
+		filters["cargo_scene"] = cargoScene
+	}
+	items, total, err := h.ownerService.AdminListSupplies(page, pageSize, filters)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, items, total, page, pageSize)
+}
+
+func (h *Handler) DispatchTaskList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	filters := map[string]interface{}{}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters["keyword"] = keyword
+	}
+	if source := c.Query("dispatch_source"); source != "" {
+		filters["dispatch_source"] = source
+	}
+	items, total, err := h.dispatchService.AdminListFormalTasks(page, pageSize, filters)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, items, total, page, pageSize)
+}
+
+func (h *Handler) FlightRecordList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	filters := map[string]interface{}{}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters["keyword"] = keyword
+	}
+	items, total, err := h.flightService.AdminListFlightRecords(page, pageSize, filters)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, items, total, page, pageSize)
+}
+
 func (h *Handler) PaymentList(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -212,6 +312,93 @@ func (h *Handler) PaymentList(c *gin.Context) {
 		return
 	}
 	response.SuccessWithPage(c, payments, total, page, pageSize)
+}
+
+func (h *Handler) MigrationAuditList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	filters := map[string]interface{}{}
+	if severity := c.Query("severity"); severity != "" {
+		filters["severity"] = severity
+	}
+	if resolutionStatus := c.Query("resolution_status"); resolutionStatus != "" {
+		filters["resolution_status"] = resolutionStatus
+	}
+	if issueType := c.Query("issue_type"); issueType != "" {
+		filters["issue_type"] = issueType
+	}
+	if auditStage := c.Query("audit_stage"); auditStage != "" {
+		filters["audit_stage"] = auditStage
+	}
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters["keyword"] = keyword
+	}
+	items, total, err := h.opsService.AdminListMigrationAudits(page, pageSize, filters)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, items, total, page, pageSize)
+}
+
+func (h *Handler) MigrationAuditSummary(c *gin.Context) {
+	summary, err := h.opsService.AdminGetMigrationAuditSummary()
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.Success(c, summary)
+}
+
+func (h *Handler) OrderAnomalyList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	filters := map[string]interface{}{}
+	if anomalyType := c.Query("anomaly_type"); anomalyType != "" {
+		filters["anomaly_type"] = anomalyType
+	}
+	if severity := c.Query("severity"); severity != "" {
+		filters["severity"] = severity
+	}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if keyword := c.Query("keyword"); keyword != "" {
+		filters["keyword"] = keyword
+	}
+	items, total, err := h.opsService.AdminListOrderAnomalies(page, pageSize, filters)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, items, total, page, pageSize)
+}
+
+func (h *Handler) OrderAnomalySummary(c *gin.Context) {
+	summary, err := h.opsService.AdminGetOrderAnomalySummary()
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.Success(c, summary)
+}
+
+func (h *Handler) HandleExpiredDemands(c *gin.Context) {
+	processed, err := h.clientService.CloseExpiredDemands(100)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"processed": processed})
+}
+
+func (h *Handler) HandleExpiredPilotBindings(c *gin.Context) {
+	processed, err := h.ownerService.ExpirePendingBindings(100)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"processed": processed})
 }
 
 // ==================== 飞手管理 ====================
@@ -325,8 +512,8 @@ func (h *Handler) ApprovePilotHealthCheck(c *gin.Context) {
 func (h *Handler) ClientList(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	clientType := c.Query("client_type")         // individual / enterprise
-	status := c.Query("verification_status")     // pending / verified / rejected
+	clientType := c.Query("client_type")     // individual / enterprise
+	status := c.Query("verification_status") // pending / verified / rejected
 
 	clients, total, err := h.clientService.List(page, pageSize, clientType, status)
 	if err != nil {

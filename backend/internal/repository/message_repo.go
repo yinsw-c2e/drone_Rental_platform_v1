@@ -76,6 +76,46 @@ func (r *MessageRepo) GetUnreadCount(userID int64) (int64, error) {
 	return count, err
 }
 
+func (r *MessageRepo) GetUnreadNotificationCount(userID int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Message{}).
+		Where("receiver_id = ? AND sender_id = ? AND is_read = 0", userID, 0).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *MessageRepo) ListSystemNotifications(userID int64, page, pageSize int) ([]model.Message, int64, error) {
+	var messages []model.Message
+	var total int64
+
+	query := r.db.Model(&model.Message{}).
+		Where("receiver_id = ? AND sender_id = ?", userID, 0)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.
+		Order("created_at DESC, id DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&messages).Error
+	return messages, total, err
+}
+
+func (r *MessageRepo) GetNotificationByID(id int64) (*model.Message, error) {
+	var message model.Message
+	err := r.db.Where("id = ? AND sender_id = ?", id, 0).First(&message).Error
+	if err != nil {
+		return nil, err
+	}
+	return &message, nil
+}
+
+func (r *MessageRepo) MarkNotificationRead(id, userID int64) error {
+	return r.db.Model(&model.Message{}).
+		Where("id = ? AND receiver_id = ? AND sender_id = ?", id, userID, 0).
+		Updates(map[string]interface{}{"is_read": true, "read_at": gorm.Expr("NOW()")}).Error
+}
+
 // GetMessagesByPeer retrieves all messages between two users, regardless of conversation_id format
 func (r *MessageRepo) GetMessagesByPeer(userID, peerID int64, page, pageSize int) ([]model.Message, int64, error) {
 	var messages []model.Message

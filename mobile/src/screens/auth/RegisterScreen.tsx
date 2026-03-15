@@ -46,7 +46,11 @@ export default function RegisterScreen({navigation}: any) {
     }
     try {
       const res = await authService.register(phone, password, code, nickname);
-      dispatch(setCredentials(res.data));
+      dispatch(setCredentials({
+        user: res.data.user,
+        token: res.data.token,
+        roleSummary: res.data.role_summary || null,
+      }));
     } catch (e: any) {
       Alert.alert('注册失败', e.message);
     }

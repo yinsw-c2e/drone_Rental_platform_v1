@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -19,7 +20,11 @@ func NewFlightRepo(db *gorm.DB) *FlightRepo {
 	return &FlightRepo{db: db}
 }
 
-// GetDispatchTask 根据 ID 查询 dispatch_task（模拟飞行用）
+func (r *FlightRepo) DB() *gorm.DB {
+	return r.db
+}
+
+// GetDispatchTask 根据 ID 查询旧任务池 dispatch_pool_task（模拟飞行用）
 func (r *FlightRepo) GetDispatchTask(taskID int64) (*model.DispatchTask, error) {
 	var task model.DispatchTask
 	if err := r.db.First(&task, taskID).Error; err != nil {
@@ -29,6 +34,52 @@ func (r *FlightRepo) GetDispatchTask(taskID int64) (*model.DispatchTask, error) 
 }
 
 // ==================== 飞行位置相关 ====================
+
+func (r *FlightRepo) CreateFlightRecord(record *model.FlightRecord) error {
+	return r.db.Create(record).Error
+}
+
+func (r *FlightRepo) UpdateFlightRecord(record *model.FlightRecord) error {
+	return r.db.Save(record).Error
+}
+
+func (r *FlightRepo) GetFlightRecordByID(id int64) (*model.FlightRecord, error) {
+	var record model.FlightRecord
+	if err := r.db.Where("id = ?", id).First(&record).Error; err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (r *FlightRepo) CountFlightRecordsByOrder(orderID int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.FlightRecord{}).
+		Where("order_id = ? AND deleted_at IS NULL", orderID).
+		Count(&count).Error
+	return count, err
+}
+
+func (r *FlightRepo) GetLatestFlightRecordByOrder(orderID int64) (*model.FlightRecord, error) {
+	var record model.FlightRecord
+	err := r.db.Where("order_id = ? AND deleted_at IS NULL", orderID).
+		Order("created_at DESC").
+		First(&record).Error
+	if err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (r *FlightRepo) GetActiveFlightRecordByOrder(orderID int64) (*model.FlightRecord, error) {
+	var record model.FlightRecord
+	err := r.db.Where("order_id = ? AND status IN ?", orderID, []string{"pending", "executing"}).
+		Order("created_at DESC").
+		First(&record).Error
+	if err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
 
 // RecordPosition 记录飞行位置
 func (r *FlightRepo) RecordPosition(pos *model.FlightPosition) error {
@@ -61,6 +112,21 @@ func (r *FlightRepo) GetPositionsByOrder(orderID int64, limit int) ([]model.Flig
 		query = query.Limit(limit)
 	}
 	err := query.Find(&positions).Error
+	return positions, err
+}
+
+func (r *FlightRepo) CountPositionsByOrder(orderID int64) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.FlightPosition{}).Where("order_id = ?", orderID).Count(&count).Error
+	return count, err
+}
+
+// GetPositionsByFlightRecord 获取指定飞行记录的位置点
+func (r *FlightRepo) GetPositionsByFlightRecord(flightRecordID int64) ([]model.FlightPosition, error) {
+	var positions []model.FlightPosition
+	err := r.db.Where("flight_record_id = ?", flightRecordID).
+		Order("recorded_at ASC").
+		Find(&positions).Error
 	return positions, err
 }
 
@@ -157,6 +223,134 @@ func (r *FlightRepo) GetUnresolvedAlertCount(orderID int64) (int64, error) {
 		Where("order_id = ? AND status IN ?", orderID, []string{"active", "acknowledged"}).
 		Count(&count).Error
 	return count, err
+}
+
+func (r *FlightRepo) CountAlertsByOrder(orderID int64) (map[string]int64, error) {
+	var alertStats []struct {
+		AlertLevel string `gorm:"column:alert_level"`
+		Count      int64  `gorm:"column:count"`
+	}
+
+	if err := r.db.Model(&model.FlightAlert{}).
+		Select("alert_level, COUNT(*) as count").
+		Where("order_id = ?", orderID).
+		Group("alert_level").
+		Scan(&alertStats).Error; err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]int64, len(alertStats))
+	for _, row := range alertStats {
+		result[row.AlertLevel] = row.Count
+	}
+	return result, nil
+}
+
+func (r *FlightRepo) ListFlightRecordsByOrder(orderID int64) ([]model.FlightRecord, error) {
+	var records []model.FlightRecord
+	err := r.db.Where("order_id = ? AND deleted_at IS NULL", orderID).
+		Order("created_at ASC").
+		Find(&records).Error
+	return records, err
+}
+
+func (r *FlightRepo) AdminListFlightRecords(page, pageSize int, filters map[string]interface{}) ([]model.FlightRecord, int64, error) {
+	var records []model.FlightRecord
+	var total int64
+
+	query := r.db.Model(&model.FlightRecord{}).
+		Joins("LEFT JOIN orders ON orders.id = flight_records.order_id")
+	if status, ok := filters["status"].(string); ok && strings.TrimSpace(status) != "" {
+		query = query.Where("flight_records.status = ?", strings.TrimSpace(status))
+	}
+	if keyword, ok := filters["keyword"].(string); ok && strings.TrimSpace(keyword) != "" {
+		like := "%" + strings.TrimSpace(keyword) + "%"
+		query = query.Where(`
+			flight_records.flight_no LIKE ? OR
+			orders.order_no LIKE ?
+		`, like, like)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Preload("Order").
+		Preload("DispatchTask").
+		Preload("Pilot").
+		Preload("Drone").
+		Order("COALESCE(flight_records.takeoff_at, flight_records.created_at) DESC, flight_records.id DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&records).Error
+	return records, total, err
+}
+
+type PilotFulfillmentFlightRow struct {
+	FlightRecordID       int64      `gorm:"column:flight_record_id"`
+	FlightNo             string     `gorm:"column:flight_no"`
+	OrderID              int64      `gorm:"column:order_id"`
+	OrderNo              string     `gorm:"column:order_no"`
+	ServiceAddress       string     `gorm:"column:service_address"`
+	DestAddress          string     `gorm:"column:dest_address"`
+	TakeoffAt            *time.Time `gorm:"column:takeoff_at"`
+	LandingAt            *time.Time `gorm:"column:landing_at"`
+	TotalDurationSeconds int        `gorm:"column:total_duration_seconds"`
+	TotalDistanceM       float64    `gorm:"column:total_distance_m"`
+	MaxAltitudeM         float64    `gorm:"column:max_altitude_m"`
+	RecordStatus         string     `gorm:"column:record_status"`
+	OrderUpdatedAt       time.Time  `gorm:"column:order_updated_at"`
+}
+
+func (r *FlightRepo) ListPilotFulfillmentFlights(pilotUserID int64) ([]PilotFulfillmentFlightRow, error) {
+	var rows []PilotFulfillmentFlightRow
+	err := r.db.Raw(`
+		SELECT
+			fr.id AS flight_record_id,
+			fr.flight_no,
+			fr.order_id,
+			o.order_no,
+			o.service_address,
+			o.dest_address,
+			fr.takeoff_at,
+			fr.landing_at,
+			fr.total_duration_seconds,
+			fr.total_distance_m,
+			fr.max_altitude_m,
+			fr.status AS record_status,
+			o.updated_at AS order_updated_at
+		FROM flight_records fr
+		JOIN orders o ON o.id = fr.order_id
+		WHERE fr.deleted_at IS NULL
+		  AND fr.pilot_user_id = ?
+		ORDER BY COALESCE(fr.landing_at, fr.takeoff_at, fr.updated_at, fr.created_at) DESC, fr.id DESC
+	`, pilotUserID).Scan(&rows).Error
+	return rows, err
+}
+
+func (r *FlightRepo) GetPilotFulfillmentStats(pilotUserID int64) (totalHours float64, totalDistanceKM float64, totalFlights int64, maxAltitude float64, err error) {
+	var result struct {
+		TotalDurationSeconds int64   `gorm:"column:total_duration_seconds"`
+		TotalDistanceM       float64 `gorm:"column:total_distance_m"`
+		TotalFlights         int64   `gorm:"column:total_flights"`
+		MaxAltitudeM         float64 `gorm:"column:max_altitude_m"`
+	}
+
+	err = r.db.Model(&model.FlightRecord{}).
+		Select(`
+			COALESCE(SUM(total_duration_seconds), 0) AS total_duration_seconds,
+			COALESCE(SUM(total_distance_m), 0) AS total_distance_m,
+			COUNT(*) AS total_flights,
+			COALESCE(MAX(max_altitude_m), 0) AS max_altitude_m
+		`).
+		Where("pilot_user_id = ? AND deleted_at IS NULL", pilotUserID).
+		Scan(&result).Error
+	if err != nil {
+		return 0, 0, 0, 0, err
+	}
+
+	return float64(result.TotalDurationSeconds) / 3600.0, result.TotalDistanceM / 1000.0, result.TotalFlights, result.MaxAltitudeM, nil
 }
 
 // ==================== 电子围栏相关 ====================
@@ -315,25 +509,36 @@ func (r *FlightRepo) GetAllConfigs() ([]model.FlightMonitorConfig, error) {
 func (r *FlightRepo) GetFlightStats(orderID int64) (map[string]interface{}, error) {
 	stats := make(map[string]interface{})
 
+	records, err := r.ListFlightRecordsByOrder(orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	totalDuration := 0
+	totalDistance := 0.0
+	maxAltitude := 0.0
+	for _, record := range records {
+		totalDuration += record.TotalDurationSeconds
+		totalDistance += record.TotalDistanceM
+		if record.MaxAltitudeM > maxAltitude {
+			maxAltitude = record.MaxAltitudeM
+		}
+	}
+
+	stats["flight_record_count"] = len(records)
+	stats["flight_duration"] = totalDuration
+	stats["flight_distance"] = totalDistance
+	stats["max_altitude"] = maxAltitude
+
 	// 位置点数
 	var posCount int64
 	r.db.Model(&model.FlightPosition{}).Where("order_id = ?", orderID).Count(&posCount)
 	stats["position_count"] = posCount
 
 	// 告警统计
-	var alertStats []struct {
-		AlertLevel string `gorm:"column:alert_level"`
-		Count      int64  `gorm:"column:count"`
-	}
-	r.db.Model(&model.FlightAlert{}).
-		Select("alert_level, COUNT(*) as count").
-		Where("order_id = ?", orderID).
-		Group("alert_level").
-		Scan(&alertStats)
-
-	alertMap := make(map[string]int64)
-	for _, s := range alertStats {
-		alertMap[s.AlertLevel] = s.Count
+	alertMap, err := r.CountAlertsByOrder(orderID)
+	if err != nil {
+		return nil, err
 	}
 	stats["alerts"] = alertMap
 
@@ -341,16 +546,6 @@ func (r *FlightRepo) GetFlightStats(orderID int64) (map[string]interface{}, erro
 	var violationCount int64
 	r.db.Model(&model.GeofenceViolation{}).Where("order_id = ?", orderID).Count(&violationCount)
 	stats["violation_count"] = violationCount
-
-	// 飞行距离和时间(从位置记录计算)
-	var firstPos, lastPos model.FlightPosition
-	r.db.Where("order_id = ?", orderID).Order("recorded_at ASC").First(&firstPos)
-	r.db.Where("order_id = ?", orderID).Order("recorded_at DESC").First(&lastPos)
-
-	if firstPos.ID > 0 && lastPos.ID > 0 {
-		duration := lastPos.RecordedAt.Sub(firstPos.RecordedAt).Seconds()
-		stats["flight_duration"] = int(duration)
-	}
 
 	return stats, nil
 }

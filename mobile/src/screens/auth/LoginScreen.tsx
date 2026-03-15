@@ -1,4 +1,4 @@
-import React, {useState, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -20,22 +20,17 @@ import {API_BASE_URL, WS_BASE_URL, APP_CONFIG} from '../../constants';
 
 // ============ 快速登录账号数据 ============
 const QUICK_LOGIN_ACCOUNTS = {
-  business: [
-    {label: '业主1 (13800000002)', phone: '13800000002', password: 'password123', role: '业主1'},
-    {label: '业主2 (13800000003)', phone: '13800000003', password: 'password123', role: '业主2'},
-    {label: '业主6 (13800000006)', phone: '13800000006', password: 'password123', role: '业主6'},
-    {label: '业主7 (13800000007)', phone: '13800000007', password: 'password123', role: '业主7'},
+  client: [
+    {label: '客户样本 (13800000004)', phone: '13800000004', password: 'password123', role: '客户'},
+  ],
+  owner: [
+    {label: '机主样本 (13800000007)', phone: '13800000007', password: 'password123', role: '机主'},
   ],
   pilot: [
-    {label: '张飞手 (13900000013)', phone: '13900000013', password: 'password123', role: '飞手·张'},
-    {label: '李飞手 (13900000014)', phone: '13900000014', password: 'password123', role: '飞手·李'},
-    {label: '王飞手 (13900000015)', phone: '13900000015', password: 'password123', role: '飞手·王'},
-    {label: '赵飞手 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手·赵'},
-    {label: '陈飞手 (13900000017)', phone: '13900000017', password: 'password123', role: '飞手·陈'},
+    {label: '飞手样本 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手'},
   ],
-  renter: [
-    {label: '租客1 (13800000004)', phone: '13800000004', password: 'password123', role: '租客1'},
-    {label: '租客2 (13800000005)', phone: '13800000005', password: 'password123', role: '租客2'},
+  composite: [
+    {label: '复合身份样本 (13800000002)', phone: '13800000002', password: 'password123', role: '复合身份'},
   ],
   admin: [
     {label: '管理员 (13800000001)', phone: '13800000001', password: 'password123', role: '管理员'},
@@ -43,7 +38,7 @@ const QUICK_LOGIN_ACCOUNTS = {
 };
 
 type AccountItem = {label: string; phone: string; password: string; role: string};
-type DropdownKey = 'business' | 'pilot' | 'renter' | 'admin';
+type DropdownKey = 'client' | 'owner' | 'pilot' | 'composite' | 'admin';
 
 export default function LoginScreen({navigation}: any) {
   const dispatch = useDispatch();
@@ -54,10 +49,42 @@ export default function LoginScreen({navigation}: any) {
   const [countdown, setCountdown] = useState(0);
   const [debugError, setDebugError] = useState<string>(''); // 调试错误信息
   const [showConfig, setShowConfig] = useState(false); // 配置信息展开/折叠
+  const [submitting, setSubmitting] = useState(false);
 
   // 下拉框状态
   const [dropdown, setDropdown] = useState<{key: DropdownKey; visible: boolean} | null>(null);
   const [selected, setSelected] = useState<{[k in DropdownKey]?: AccountItem}>({});
+  const requestIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const beginSubmit = () => {
+    if (submittingRef.current) {
+      return null;
+    }
+    submittingRef.current = true;
+    requestIdRef.current += 1;
+    setSubmitting(true);
+    return requestIdRef.current;
+  };
+
+  const isLatestRequest = (requestId: number) =>
+    mountedRef.current && requestIdRef.current === requestId;
+
+  const finishSubmit = (requestId: number) => {
+    if (requestIdRef.current === requestId) {
+      submittingRef.current = false;
+    }
+    if (isLatestRequest(requestId)) {
+      setSubmitting(false);
+    }
+  };
 
   const handleWeChatLogin = () => {
     // 微信SDK需要原生模块支持，这里提示需要配置
@@ -105,34 +132,61 @@ export default function LoginScreen({navigation}: any) {
       Alert.alert('提示', '请输入手机号');
       return;
     }
+    const requestId = beginSubmit();
+    if (!requestId) {
+      return;
+    }
     try {
+      setDebugError('');
       let res;
       if (loginMode === 'code') {
         res = await authService.login(phone, undefined, code);
       } else {
         res = await authService.login(phone, password);
       }
-      dispatch(setCredentials(res.data));
+      if (!isLatestRequest(requestId)) {
+        return;
+      }
+      dispatch(setCredentials({
+        user: res.data.user,
+        token: res.data.token,
+        roleSummary: res.data.role_summary || null,
+      }));
     } catch (e: any) {
-      Alert.alert('登录失败', e.message);
+      if (isLatestRequest(requestId)) {
+        Alert.alert('登录失败', e.message);
+      }
+    } finally {
+      finishSubmit(requestId);
     }
   };
 
   // 快速登录（开发模式）
   const quickLogin = async (userPhone: string, userPassword: string, role: string) => {
+    const requestId = beginSubmit();
+    if (!requestId) {
+      return;
+    }
     setDebugError(''); // 清空之前的错误
     try {
       const startTime = Date.now();
       const res = await authService.login(userPhone, userPassword);
+      if (!isLatestRequest(requestId)) {
+        return;
+      }
       const elapsed = Date.now() - startTime;
       
-      dispatch(setCredentials(res.data));
+      dispatch(setCredentials({
+        user: res.data.user,
+        token: res.data.token,
+        roleSummary: res.data.role_summary || null,
+      }));
       
-      // 成功信息
-      const successMsg = `✅ 登录成功\n角色: ${role}\n耗时: ${elapsed}ms\nAPI: ${API_BASE_URL}`;
-      setDebugError(successMsg);
-      Alert.alert('成功', `已登录为${role}`);
+      setDebugError(`✅ 登录成功\n角色: ${role}\n耗时: ${elapsed}ms\nAPI: ${API_BASE_URL}`);
     } catch (e: any) {
+      if (!isLatestRequest(requestId)) {
+        return;
+      }
       const errorMsg = e.message || '未知错误';
       const errorDetails = `❌ 快速登录失败\n\n账号: ${userPhone}\n密码: ${userPassword}\n角色: ${role}\n\nAPI: ${API_BASE_URL}\n\n错误信息:\n${errorMsg}\n\n原始错误:\n${JSON.stringify(e, null, 2)}`;
       
@@ -140,6 +194,8 @@ export default function LoginScreen({navigation}: any) {
       
       // 也显示 Alert，但不阻断查看详细信息
       Alert.alert('快速登录失败', `${errorMsg}\n\n详细错误信息请查看下方红色区域`);
+    } finally {
+      finishSubmit(requestId);
     }
   };
 
@@ -189,8 +245,11 @@ export default function LoginScreen({navigation}: any) {
           />
         )}
 
-        <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-          <Text style={styles.loginBtnText}>登录</Text>
+        <TouchableOpacity
+          style={[styles.loginBtn, submitting && styles.loginBtnDisabled]}
+          onPress={handleLogin}
+          disabled={submitting}>
+          <Text style={styles.loginBtnText}>{submitting ? '登录中...' : '登录'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -263,9 +322,10 @@ export default function LoginScreen({navigation}: any) {
           <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
 
           {([
-            {key: 'business' as DropdownKey, label: '🏠 业主', color: '#1890ff'},
+            {key: 'client' as DropdownKey, label: '📦 客户', color: '#1890ff'},
+            {key: 'owner' as DropdownKey, label: '🚁 机主', color: '#0f766e'},
             {key: 'pilot' as DropdownKey, label: '✈️ 飞手', color: '#52c41a'},
-            {key: 'renter' as DropdownKey, label: '📦 租客', color: '#fa8c16'},
+            {key: 'composite' as DropdownKey, label: '🧩 复合身份', color: '#fa8c16'},
             {key: 'admin' as DropdownKey, label: '⚙️ 管理员', color: '#722ed1'},
           ]).map(({key, label, color}) => {
             const acct = selected[key];
@@ -286,8 +346,8 @@ export default function LoginScreen({navigation}: any) {
                 <TouchableOpacity
                   style={[styles.devLoginBtn, {backgroundColor: acct ? color : '#d9d9d9'}]}
                   onPress={() => acct && quickLogin(acct.phone, acct.password, acct.role)}
-                  disabled={!acct}>
-                  <Text style={styles.devLoginBtnText}>登录</Text>
+                  disabled={!acct || submitting}>
+                  <Text style={styles.devLoginBtnText}>{submitting ? '登录中...' : '登录'}</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -306,9 +366,10 @@ export default function LoginScreen({navigation}: any) {
               <View style={styles.modalBox}>
                 <Text style={styles.modalTitle}>
                   {dropdown ? {
-                    business: '🏠 选择业主账号',
+                    client: '📦 选择客户账号',
+                    owner: '🚁 选择机主账号',
                     pilot: '✈️ 选择飞手账号',
-                    renter: '📦 选择租客账号',
+                    composite: '🧩 选择复合身份账号',
                     admin: '⚙️ 选择管理员账号',
                   }[dropdown.key] : ''}
                 </Text>
@@ -365,6 +426,7 @@ const styles = StyleSheet.create({
     height: 48, backgroundColor: '#1890ff', borderRadius: 8,
     justifyContent: 'center', alignItems: 'center', marginTop: 8,
   },
+  loginBtnDisabled: {opacity: 0.75},
   loginBtnText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
   switchBtn: {marginTop: 16, alignItems: 'center'},
   switchBtnText: {color: '#1890ff', fontSize: 14},

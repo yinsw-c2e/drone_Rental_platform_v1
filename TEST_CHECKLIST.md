@@ -2,6 +2,43 @@
 
 > 本清单供用户手动测试使用，覆盖平台8个阶段的核心功能
 
+## 当前 v2 验收基线
+
+从阶段 10 开始，当前项目的主验收口径已经切换到 v2 业务模型。建议优先按下面顺序执行，而不是直接从历史分模块手工点一遍：
+
+1. 自动角色验收：
+```bash
+cd backend
+PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
+```
+
+2. 查看自动验收报告：
+- [ROLE_ACCEPTANCE_WALKTHROUGH.md](./ROLE_ACCEPTANCE_WALKTHROUGH.md)
+- [backend/docs/phase10_role_acceptance_last_run.json](./backend/docs/phase10_role_acceptance_last_run.json)
+
+3. 执行移动端回归与截图验收：
+- [MOBILE_REGRESSION_ACCEPTANCE.md](./MOBILE_REGRESSION_ACCEPTANCE.md)
+
+4. 演示账号说明：
+- [DEMO_ACCOUNTS.md](./DEMO_ACCOUNTS.md)
+
+### 当前已通过的自动验收主链路
+
+1. 客户：供给市场 -> 直达下单 -> 机主确认 -> 支付
+2. 客户：创建需求 -> 发布需求 -> 选择报价 -> 转单 -> 支付
+3. 飞手：报名候选 -> 查看正式派单 -> 接受正式派单
+4. 复合身份：首页综合视图 + 机主档案入口 + 飞手档案入口
+
+### 当前最近一次稳定通过时间
+
+- `2026-03-15 12:13:06 +08:00`
+
+### 说明
+
+1. 下文历史手工测试项仍保留，作为扩展功能清单使用
+2. 但它们已经不是当前 v2 主链路的第一验收入口
+3. 后续新增测试应优先补到上面 3 份阶段 10 文档中
+
 ## 测试环境准备
 
 ### 启动服务

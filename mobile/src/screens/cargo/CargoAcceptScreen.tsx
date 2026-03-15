@@ -71,10 +71,7 @@ export default function CargoAcceptScreen({route, navigation}: any) {
         {
           text: '查看订单',
           onPress: () => {
-            navigation.navigate('Orders', {
-              screen: 'OrderDetail',
-              params: {id: res.data.id},
-            });
+            navigation.navigate('OrderDetail', {id: res.data.id});
           },
         },
       ]);
@@ -150,7 +147,7 @@ export default function CargoAcceptScreen({route, navigation}: any) {
             <Text style={styles.emptyText}>您还没有可用的无人机</Text>
             <TouchableOpacity
               style={styles.addBtn}
-              onPress={() => navigation.navigate('Profile', {screen: 'AddDrone'})}>
+              onPress={() => navigation.navigate('AddDrone')}>
               <Text style={styles.addBtnText}>去添加</Text>
             </TouchableOpacity>
           </View>

@@ -1,32 +1,123 @@
 package service
 
 import (
-	"wurenji-backend/internal/model"
-	"wurenji-backend/internal/repository"
 	"errors"
 	"time"
+
+	"gorm.io/gorm"
+
+	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/repository"
 )
 
 type ClientService struct {
-	clientRepo *repository.ClientRepo
-	userRepo   *repository.UserRepo
+	clientRepo       *repository.ClientRepo
+	userRepo         *repository.UserRepo
+	roleProfileRepo  *repository.RoleProfileRepo
+	ownerDomainRepo  *repository.OwnerDomainRepo
+	demandDomainRepo *repository.DemandDomainRepo
+	orderService     *OrderService
+	matchingService  *MatchingService
+	eventService     *EventService
 }
 
-func NewClientService(clientRepo *repository.ClientRepo, userRepo *repository.UserRepo) *ClientService {
+func NewClientService(
+	clientRepo *repository.ClientRepo,
+	userRepo *repository.UserRepo,
+	roleProfileRepo *repository.RoleProfileRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	orderService *OrderService,
+) *ClientService {
 	return &ClientService{
-		clientRepo: clientRepo,
-		userRepo:   userRepo,
+		clientRepo:       clientRepo,
+		userRepo:         userRepo,
+		roleProfileRepo:  roleProfileRepo,
+		ownerDomainRepo:  ownerDomainRepo,
+		demandDomainRepo: demandDomainRepo,
+		orderService:     orderService,
 	}
 }
 
-// ==================== 客户注册与档案管理 ====================
+type ClientProfileUpdateInput struct {
+	ClientType          *string `json:"client_type"`
+	CompanyName         *string `json:"company_name"`
+	BusinessLicenseNo   *string `json:"business_license_no"`
+	BusinessLicenseDoc  *string `json:"business_license_doc"`
+	LegalRepresentative *string `json:"legal_representative"`
+	ContactPerson       *string `json:"contact_person"`
+	ContactPhone        *string `json:"contact_phone"`
+	ContactEmail        *string `json:"contact_email"`
+	DefaultContactName  *string `json:"default_contact_name"`
+	DefaultContactPhone *string `json:"default_contact_phone"`
+	PreferredCity       *string `json:"preferred_city"`
+	Remark              *string `json:"remark"`
+}
 
-// RegisterIndividual 注册个人客户
-func (s *ClientService) RegisterIndividual(userID int64) (*model.Client, error) {
-	// 检查是否已存在
-	existing, _ := s.clientRepo.GetByUserID(userID)
-	if existing != nil {
-		return nil, errors.New("客户档案已存在")
+type ClientProfileView struct {
+	ID                  int64      `json:"id"`
+	UserID              int64      `json:"user_id"`
+	ClientType          string     `json:"client_type"`
+	CompanyName         string     `json:"company_name,omitempty"`
+	BusinessLicenseNo   string     `json:"business_license_no,omitempty"`
+	BusinessLicenseDoc  string     `json:"business_license_doc,omitempty"`
+	LegalRepresentative string     `json:"legal_representative,omitempty"`
+	ContactPerson       string     `json:"contact_person,omitempty"`
+	ContactPhone        string     `json:"contact_phone,omitempty"`
+	ContactEmail        string     `json:"contact_email,omitempty"`
+	DefaultContactName  string     `json:"default_contact_name,omitempty"`
+	DefaultContactPhone string     `json:"default_contact_phone,omitempty"`
+	PreferredCity       string     `json:"preferred_city,omitempty"`
+	Remark              string     `json:"remark,omitempty"`
+	Status              string     `json:"status"`
+	VerificationStatus  string     `json:"verification_status"`
+	EnterpriseVerified  string     `json:"enterprise_verified"`
+	CreditCheckStatus   string     `json:"credit_check_status"`
+	PlatformCreditScore int        `json:"platform_credit_score"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	VerifiedAt          *time.Time `json:"verified_at,omitempty"`
+}
+
+type SupplyMarketQuery struct {
+	Region             string
+	CargoScene         string
+	ServiceType        string
+	MinPayloadKG       float64
+	AcceptsDirectOrder *bool
+}
+
+type DemandStats struct {
+	QuoteCount          int64 `json:"quote_count"`
+	CandidatePilotCount int64 `json:"candidate_pilot_count"`
+}
+
+func (s *ClientService) SetMatchingService(matchingService *MatchingService) {
+	s.matchingService = matchingService
+}
+
+func (s *ClientService) SetEventService(eventService *EventService) {
+	s.eventService = eventService
+}
+
+func (s *ClientService) AdminListDemands(page, pageSize int, filters map[string]interface{}) ([]model.Demand, int64, error) {
+	if s.demandDomainRepo == nil {
+		return nil, 0, errors.New("需求域仓储未初始化")
+	}
+	return s.demandDomainRepo.AdminListDemands(page, pageSize, filters)
+}
+
+func (s *ClientService) ensureDefaultClient(userID int64) (*model.Client, error) {
+	existing, err := s.clientRepo.GetByUserID(userID)
+	if err == nil && existing != nil {
+		if err := s.ensureClientRoleProfile(existing.UserID); err != nil {
+			return nil, err
+		}
+		return existing, nil
+	}
+
+	if _, err := s.userRepo.GetByID(userID); err != nil {
+		return nil, errors.New("用户不存在")
 	}
 
 	client := &model.Client{
@@ -35,17 +126,43 @@ func (s *ClientService) RegisterIndividual(userID int64) (*model.Client, error) 
 		PlatformCreditScore: 600,
 		Status:              "active",
 	}
-
 	if err := s.clientRepo.Create(client); err != nil {
 		return nil, err
 	}
 
-	// 更新用户类型
-	if err := s.userRepo.UpdateUserType(userID, "client"); err != nil {
+	if err := s.ensureClientRoleProfile(userID); err != nil {
 		return nil, err
 	}
-
 	return client, nil
+}
+
+func (s *ClientService) ensureClientRoleProfile(userID int64) error {
+	if s.roleProfileRepo == nil || userID == 0 {
+		return nil
+	}
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return err
+	}
+
+	defaultContactName := user.Nickname
+	if defaultContactName == "" {
+		defaultContactName = user.Phone
+	}
+
+	return s.roleProfileRepo.EnsureClientProfile(&model.ClientProfile{
+		UserID:              userID,
+		Status:              "active",
+		DefaultContactName:  defaultContactName,
+		DefaultContactPhone: user.Phone,
+	})
+}
+
+// ==================== 客户注册与档案管理 ====================
+
+// RegisterIndividual 注册个人客户
+func (s *ClientService) RegisterIndividual(userID int64) (*model.Client, error) {
+	return s.ensureDefaultClient(userID)
 }
 
 // RegisterEnterprise 注册企业客户
@@ -53,7 +170,28 @@ func (s *ClientService) RegisterEnterprise(userID int64, companyName, businessLi
 	// 检查是否已存在
 	existing, _ := s.clientRepo.GetByUserID(userID)
 	if existing != nil {
-		return nil, errors.New("客户档案已存在")
+		if existing.ClientType == "enterprise" {
+			return nil, errors.New("企业档案已存在")
+		}
+
+		updates := map[string]interface{}{
+			"client_type":          "enterprise",
+			"company_name":         companyName,
+			"business_license_no":  businessLicenseNo,
+			"business_license_doc": businessLicenseDoc,
+			"legal_representative": legalRep,
+			"contact_person":       contactPerson,
+			"contact_phone":        contactPhone,
+			"contact_email":        contactEmail,
+			"status":               "active",
+		}
+		if err := s.clientRepo.UpdateFields(existing.ID, updates); err != nil {
+			return nil, err
+		}
+		if err := s.ensureClientRoleProfile(userID); err != nil {
+			return nil, err
+		}
+		return s.clientRepo.GetByID(existing.ID)
 	}
 
 	// 检查营业执照是否已被注册
@@ -79,9 +217,7 @@ func (s *ClientService) RegisterEnterprise(userID int64, companyName, businessLi
 	if err := s.clientRepo.Create(client); err != nil {
 		return nil, err
 	}
-
-	// 更新用户类型
-	if err := s.userRepo.UpdateUserType(userID, "client"); err != nil {
+	if err := s.ensureClientRoleProfile(userID); err != nil {
 		return nil, err
 	}
 
@@ -90,7 +226,24 @@ func (s *ClientService) RegisterEnterprise(userID int64, companyName, businessLi
 
 // GetProfile 获取客户档案
 func (s *ClientService) GetProfile(userID int64) (*model.Client, error) {
-	return s.clientRepo.GetByUserID(userID)
+	return s.ensureDefaultClient(userID)
+}
+
+func (s *ClientService) GetCurrentProfile(userID int64) (*ClientProfileView, error) {
+	client, err := s.ensureDefaultClient(userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureClientRoleProfile(userID); err != nil {
+		return nil, err
+	}
+
+	roleProfile, err := s.roleProfileRepo.GetClientProfileByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildClientProfileView(client, roleProfile), nil
 }
 
 // GetByID 根据ID获取客户
@@ -107,8 +260,118 @@ func (s *ClientService) UpdateProfile(clientID int64, updates map[string]interfa
 	delete(updates, "platform_credit_score")
 	delete(updates, "verification_status")
 	delete(updates, "enterprise_verified")
-	
+
 	return s.clientRepo.UpdateFields(clientID, updates)
+}
+
+func (s *ClientService) UpdateCurrentProfile(userID int64, input *ClientProfileUpdateInput) (*ClientProfileView, error) {
+	client, err := s.ensureDefaultClient(userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureClientRoleProfile(userID); err != nil {
+		return nil, err
+	}
+
+	db := s.clientRepo.DB()
+	if db == nil {
+		return nil, errors.New("客户域数据库未初始化")
+	}
+
+	var updatedView *ClientProfileView
+	err = db.Transaction(func(tx *gorm.DB) error {
+		clientRepo := repository.NewClientRepo(tx)
+		roleRepo := repository.NewRoleProfileRepo(tx)
+
+		clientUpdates := buildClientProfileUpdates(input)
+		if len(clientUpdates) > 0 {
+			if err := clientRepo.UpdateFields(client.ID, clientUpdates); err != nil {
+				return err
+			}
+		}
+
+		if err := roleRepo.EnsureClientProfile(&model.ClientProfile{UserID: userID, Status: "active"}); err != nil {
+			return err
+		}
+
+		roleUpdates := buildClientRoleProfileUpdates(input)
+		if len(roleUpdates) > 0 {
+			if err := tx.Model(&model.ClientProfile{}).Where("user_id = ?", userID).Updates(roleUpdates).Error; err != nil {
+				return err
+			}
+		}
+
+		updatedClient, err := clientRepo.GetByUserID(userID)
+		if err != nil {
+			return err
+		}
+		roleProfile, err := roleRepo.GetClientProfileByUserID(userID)
+		if err != nil {
+			return err
+		}
+		updatedView = buildClientProfileView(updatedClient, roleProfile)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedView, nil
+}
+
+func (s *ClientService) ListMarketplaceSupplies(query SupplyMarketQuery, page, pageSize int) ([]model.OwnerSupply, int64, error) {
+	if s.ownerDomainRepo == nil {
+		return nil, 0, errors.New("供给域仓储未初始化")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if query.ServiceType == "" {
+		query.ServiceType = defaultDemandServiceType
+	}
+	return s.ownerDomainRepo.ListMarketplaceSupplies(
+		query.Region,
+		query.CargoScene,
+		query.ServiceType,
+		query.MinPayloadKG,
+		query.AcceptsDirectOrder,
+		page,
+		pageSize,
+	)
+}
+
+func (s *ClientService) GetMarketplaceSupplyDetail(supplyID int64) (*model.OwnerSupply, error) {
+	if s.ownerDomainRepo == nil {
+		return nil, errors.New("供给域仓储未初始化")
+	}
+	return s.ownerDomainRepo.GetMarketplaceSupplyByID(supplyID)
+}
+
+func (s *ClientService) GetDemandStats(demandIDs []int64) (map[int64]DemandStats, error) {
+	result := make(map[int64]DemandStats)
+	if s.demandDomainRepo == nil || len(demandIDs) == 0 {
+		return result, nil
+	}
+
+	quoteCounts, err := s.demandDomainRepo.CountQuotesByDemandIDs(demandIDs)
+	if err != nil {
+		return nil, err
+	}
+	candidateCounts, err := s.demandDomainRepo.CountActiveCandidatesByDemandIDs(demandIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, demandID := range demandIDs {
+		result[demandID] = DemandStats{
+			QuoteCount:          quoteCounts[demandID],
+			CandidatePilotCount: candidateCounts[demandID],
+		}
+	}
+	return result, nil
 }
 
 // List 获取客户列表
@@ -162,10 +425,10 @@ func (s *ClientService) RequestCreditCheck(clientID int64, provider, checkType s
 	// 更新客户征信信息
 	now := time.Now()
 	s.clientRepo.UpdateFields(client.ID, map[string]interface{}{
-		"credit_provider":    provider,
-		"credit_score":       check.CreditScore,
+		"credit_provider":     provider,
+		"credit_score":        check.CreditScore,
 		"credit_check_status": "approved",
-		"credit_check_time":  &now,
+		"credit_check_time":   &now,
 	})
 
 	return check, nil
@@ -185,6 +448,94 @@ func (s *ClientService) getCreditLevel(score int) string {
 // GetCreditHistory 获取征信查询历史
 func (s *ClientService) GetCreditHistory(clientID int64, limit int) ([]model.ClientCreditCheck, error) {
 	return s.clientRepo.GetCreditChecksByClientID(clientID, limit)
+}
+
+func buildClientProfileView(client *model.Client, roleProfile *model.ClientProfile) *ClientProfileView {
+	if client == nil {
+		return nil
+	}
+
+	view := &ClientProfileView{
+		ID:                  client.ID,
+		UserID:              client.UserID,
+		ClientType:          client.ClientType,
+		CompanyName:         client.CompanyName,
+		BusinessLicenseNo:   client.BusinessLicenseNo,
+		BusinessLicenseDoc:  client.BusinessLicenseDoc,
+		LegalRepresentative: client.LegalRepresentative,
+		ContactPerson:       client.ContactPerson,
+		ContactPhone:        client.ContactPhone,
+		ContactEmail:        client.ContactEmail,
+		Status:              client.Status,
+		VerificationStatus:  client.VerificationStatus,
+		EnterpriseVerified:  client.EnterpriseVerified,
+		CreditCheckStatus:   client.CreditCheckStatus,
+		PlatformCreditScore: client.PlatformCreditScore,
+		CreatedAt:           client.CreatedAt,
+		UpdatedAt:           client.UpdatedAt,
+		VerifiedAt:          client.VerifiedAt,
+	}
+
+	if roleProfile != nil {
+		view.DefaultContactName = roleProfile.DefaultContactName
+		view.DefaultContactPhone = roleProfile.DefaultContactPhone
+		view.PreferredCity = roleProfile.PreferredCity
+		view.Remark = roleProfile.Remark
+	}
+
+	return view
+}
+
+func buildClientProfileUpdates(input *ClientProfileUpdateInput) map[string]interface{} {
+	if input == nil {
+		return nil
+	}
+	updates := map[string]interface{}{}
+	if input.ClientType != nil {
+		updates["client_type"] = *input.ClientType
+	}
+	if input.CompanyName != nil {
+		updates["company_name"] = *input.CompanyName
+	}
+	if input.BusinessLicenseNo != nil {
+		updates["business_license_no"] = *input.BusinessLicenseNo
+	}
+	if input.BusinessLicenseDoc != nil {
+		updates["business_license_doc"] = *input.BusinessLicenseDoc
+	}
+	if input.LegalRepresentative != nil {
+		updates["legal_representative"] = *input.LegalRepresentative
+	}
+	if input.ContactPerson != nil {
+		updates["contact_person"] = *input.ContactPerson
+	}
+	if input.ContactPhone != nil {
+		updates["contact_phone"] = *input.ContactPhone
+	}
+	if input.ContactEmail != nil {
+		updates["contact_email"] = *input.ContactEmail
+	}
+	return updates
+}
+
+func buildClientRoleProfileUpdates(input *ClientProfileUpdateInput) map[string]interface{} {
+	if input == nil {
+		return nil
+	}
+	updates := map[string]interface{}{}
+	if input.DefaultContactName != nil {
+		updates["default_contact_name"] = *input.DefaultContactName
+	}
+	if input.DefaultContactPhone != nil {
+		updates["default_contact_phone"] = *input.DefaultContactPhone
+	}
+	if input.PreferredCity != nil {
+		updates["preferred_city"] = *input.PreferredCity
+	}
+	if input.Remark != nil {
+		updates["remark"] = *input.Remark
+	}
+	return updates
 }
 
 // GetLatestCreditCheck 获取最新征信结果

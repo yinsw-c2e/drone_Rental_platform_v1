@@ -1,125 +1,183 @@
-import React, {useState, useCallback} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
   Alert,
   RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {
-  getPilotProfile,
-  updatePilotAvailability,
-  getFlightStats,
-  Pilot,
-  FlightStats,
-} from '../../services/pilot';
-import {getMyActiveOrder, getOrderByTaskId, listPilotTasks} from '../../services/dispatch';
 
-const STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待审核', color: '#faad14'},
-  verified: {label: '已认证', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
+import ObjectCard from '../../components/business/ObjectCard';
+import StatusBadge from '../../components/business/StatusBadge';
+import {dispatchV2Service} from '../../services/dispatchV2';
+import {pilotV2Service} from '../../services/pilotV2';
+import {aggregateFlightRecords, formatHoursFromSeconds} from '../../utils/flightRecords';
+
+const STATUS_MAP: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray'}> = {
+  verified: {label: '已认证', tone: 'green'},
+  approved: {label: '已认证', tone: 'green'},
+  pending: {label: '审核中', tone: 'orange'},
+  rejected: {label: '未通过', tone: 'red'},
+  unverified: {label: '未认证', tone: 'gray'},
 };
 
-const AVAILABILITY_STATUS_MAP: Record<string, {label: string; color: string}> = {
-  online: {label: '接单中', color: '#52c41a'},
-  available: {label: '接单中', color: '#52c41a'},
-  busy: {label: '忙碌中', color: '#faad14'},
-  offline: {label: '离线', color: '#999'},
+const availabilityMap: Record<string, {label: string; tone: 'green' | 'orange' | 'gray'}> = {
+  online: {label: '接单中', tone: 'green'},
+  available: {label: '接单中', tone: 'green'},
+  busy: {label: '忙碌中', tone: 'orange'},
+  offline: {label: '离线', tone: 'gray'},
+};
+
+const skillOptions = ['电网吊运', '山区运输', '应急救援', '海岛补给', '高原补给'];
+
+const parseSkills = (skills: any): string[] => {
+  if (Array.isArray(skills)) {
+    return skills.filter(Boolean).map(String);
+  }
+  return [];
 };
 
 export default function PilotProfileScreen({navigation}: any) {
-  const [pilot, setPilot] = useState<Pilot | null>(null);
-  const [flightStats, setFlightStats] = useState<FlightStats | null>(null);
+  const [pilot, setPilot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({current_city: '', service_radius: '50', special_skills: [] as string[]});
+  const [flightStats, setFlightStats] = useState({
+    totalFlights: 0,
+    totalDurationSeconds: 0,
+    totalDistanceM: 0,
+    maxAltitudeM: 0,
+  });
+  const [dispatchStats, setDispatchStats] = useState({pending: 0, active: 0});
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const [profileData, statsData] = await Promise.all([
-        getPilotProfile(),
-        getFlightStats(),
+      const [profileRes, flightRecords, dispatchRes] = await Promise.all([
+        pilotV2Service.getProfile().catch(() => null),
+        pilotV2Service.listAllFlightRecords({page_size: 100}),
+        dispatchV2Service.list({role: 'pilot', page: 1, page_size: 100}).catch(() => null),
       ]);
-      setPilot(profileData);
-      setFlightStats(statsData);
-      // availability_status: 'online'/'available' = 接单中
-      setIsAvailable(
-        profileData.availability_status === 'online' ||
-        profileData.availability_status === 'available' ||
-        profileData.is_available === true
-      );
-    } catch (e: any) {
-      Alert.alert('错误', e.message);
+
+      const profile = profileRes?.data || null;
+      setPilot(profile);
+      if (profile) {
+        setDraft({
+          current_city: profile.current_city || '',
+          service_radius: String(profile.service_radius_km || Math.round(profile.service_radius || 50) || 50),
+          special_skills: parseSkills(profile.special_skills),
+        });
+      }
+
+      setFlightStats(aggregateFlightRecords(flightRecords));
+
+      const dispatchItems = dispatchRes?.data?.items || [];
+      setDispatchStats({
+        pending: dispatchItems.filter((item: any) => item.status === 'pending_response').length,
+        active: dispatchItems.filter((item: any) => ['accepted', 'executing', 'in_progress'].includes(item.status)).length,
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, []),
+    }, [loadData]),
   );
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
-  };
+  }, [loadData]);
 
-  const toggleAvailability = async (value: boolean) => {
-    try {
-      await updatePilotAvailability(value);
-      setIsAvailable(value);
-      Alert.alert('提示', value ? '已开启接单' : '已关闭接单');
-    } catch (e: any) {
-      Alert.alert('错误', e.message);
+  const toggleAvailability = useCallback(async (enabled: boolean) => {
+    if (!pilot) {
+      return;
     }
-  };
-
-  const handleEnterFlightMonitoring = async () => {
     try {
-      const activeOrder = await getMyActiveOrder();
-      if (activeOrder?.id) {
-        navigation.navigate('FlightMonitoring', {orderId: activeOrder.id});
+      const res = await pilotV2Service.updateAvailability(enabled ? 'online' : 'offline');
+      setPilot(res.data);
+    } catch (e: any) {
+      Alert.alert('更新失败', e?.message || '请稍后重试');
+    }
+  }, [pilot]);
+
+  const toggleSkill = useCallback((skill: string) => {
+    setDraft(prev => ({
+      ...prev,
+      special_skills: prev.special_skills.includes(skill)
+        ? prev.special_skills.filter(item => item !== skill)
+        : [...prev.special_skills, skill],
+    }));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!pilot) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await pilotV2Service.upsertProfile({
+        current_city: draft.current_city.trim(),
+        service_radius: Number(draft.service_radius) || 50,
+        special_skills: draft.special_skills,
+      });
+      setPilot(res.data);
+      Alert.alert('保存成功', '飞手设置已更新。');
+    } catch (e: any) {
+      Alert.alert('保存失败', e?.message || '请稍后重试');
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, pilot]);
+
+  const handleEnterFlightMonitoring = useCallback(async () => {
+    try {
+      const res = await dispatchV2Service.list({role: 'pilot', page: 1, page_size: 20});
+      const activeTask = (res.data?.items || []).find((item: any) => item.order?.id && !['rejected', 'finished', 'cancelled'].includes(item.status));
+      if (activeTask?.order?.id) {
+        navigation.navigate('FlightMonitoring', {orderId: activeTask.order.id, dispatchId: activeTask.id});
         return;
       }
-
-      // 无进行中订单时，回退到最近一条可关联订单，避免“无入口”。
-      const pilotTasksRes = await listPilotTasks({page: 1, page_size: 20});
-      const latestTask = (pilotTasksRes.data || []).find((t: any) => Number(t?.task_id) > 0);
-      if (latestTask?.task_id) {
-        const order = await getOrderByTaskId(Number(latestTask.task_id));
-        if (order?.id) {
-          navigation.navigate('FlightMonitoring', {orderId: order.id});
-          return;
-        }
-      }
-
-      Alert.alert(
-        '提示',
-        '当前没有可监控的执行订单，请先从接单任务进入。',
-        [
-          {text: '取消', style: 'cancel'},
-          {text: '去接单任务', onPress: () => navigation.navigate('PilotTaskList')},
-        ],
-      );
+      Alert.alert('当前没有可监控任务', '先从正式派单里接受一条执行任务，再进入飞行监控。', [
+        {text: '取消', style: 'cancel'},
+        {text: '去派单任务', onPress: () => navigation.navigate('PilotTaskList')},
+      ]);
     } catch (e: any) {
-      Alert.alert('错误', e?.message || '获取执行订单失败');
+      Alert.alert('获取失败', e?.message || '请稍后重试');
     }
-  };
+  }, [navigation]);
+
+  const verificationStatus = STATUS_MAP[pilot?.verification_status || 'unverified'] || STATUS_MAP.unverified;
+  const availabilityStatus = availabilityMap[pilot?.availability_status || 'offline'] || availabilityMap.offline;
+  const hoursText = formatHoursFromSeconds(flightStats.totalDurationSeconds);
+  const serviceRadiusText = Number(draft.service_radius || 0) > 0 ? `${Number(draft.service_radius)}km` : '未设置';
+  const isOnline = ['online', 'available'].includes(pilot?.availability_status || 'offline');
+
+  const summaryItems = useMemo(
+    () => [
+      {label: '待响应派单', value: dispatchStats.pending},
+      {label: '执行中任务', value: dispatchStats.active},
+      {label: '真实飞行记录', value: flightStats.totalFlights},
+      {label: '总飞行时长', value: hoursText},
+    ],
+    [dispatchStats.active, dispatchStats.pending, flightStats.totalFlights, hoursText],
+  );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>加载中...</Text>
+        <View style={styles.loadingWrap}>
+          <Text style={styles.loadingText}>飞手档案加载中...</Text>
         </View>
       </SafeAreaView>
     );
@@ -128,407 +186,155 @@ export default function PilotProfileScreen({navigation}: any) {
   if (!pilot) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>您还不是飞手</Text>
-          <TouchableOpacity
-            style={styles.registerBtn}
-            onPress={() => navigation.navigate('PilotRegister')}>
-            <Text style={styles.registerBtnText}>申请成为飞手</Text>
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyTitle}>还没有飞手档案</Text>
+          <Text style={styles.emptyDesc}>先完成飞手认证，后面这里才会出现接单状态、服务区域和执行统计。</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('PilotRegister')}>
+            <Text style={styles.primaryButtonText}>去做飞手认证</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  const verificationStatus = STATUS_MAP[pilot.verification_status] || STATUS_MAP.pending;
-  const availabilityStatus = AVAILABILITY_STATUS_MAP[pilot.availability_status] || AVAILABILITY_STATUS_MAP.offline;
-  const totalFlights = flightStats?.total_flights || 0;
-  const totalHours = flightStats?.total_hours || 0;
-  const totalDistance = flightStats?.total_distance || 0;
-  const timeText = totalHours < 1 ? `${Math.round(totalHours * 60)}m` : `${totalHours.toFixed(1)}h`;
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }>
-        {/* 头部信息 */}
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {pilot.license_type?.charAt(0)?.toUpperCase() || 'P'}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusDot,
-                {backgroundColor: availabilityStatus.color},
-              ]}
-            />
-          </View>
-          <Text style={styles.licenseNo}>{pilot.license_no}</Text>
-          <View style={styles.statusBadge}>
-            <View
-              style={[
-                styles.statusIndicator,
-                {backgroundColor: verificationStatus.color},
-              ]}
-            />
-            <Text style={[styles.statusText, {color: verificationStatus.color}]}>
-              {verificationStatus.label}
-            </Text>
-          </View>
-        </View>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        <ObjectCard style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>飞手档案</Text>
+          <Text style={styles.heroTitle}>认证、接单、服务范围在这里统一设置</Text>
+          <Text style={styles.heroDesc}>飞手中心现在只保留执行相关能力：认证状态、接单状态、服务区域、技能标签和真实履约统计。</Text>
 
-        {/* 接单开关 */}
-        {pilot.verification_status === 'verified' && (
-          <View style={styles.availabilityCard}>
-            <View style={styles.availabilityRow}>
-              <Text style={styles.availabilityLabel}>接单状态</Text>
-              <View style={styles.availabilityRight}>
-                <Text style={[styles.availabilityStatus, {color: availabilityStatus.color}]}>
-                  {availabilityStatus.label}
-                </Text>
-                <Switch
-                  value={isAvailable}
-                  onValueChange={toggleAvailability}
-                  trackColor={{false: '#ddd', true: '#52c41a'}}
-                  thumbColor="#fff"
-                />
+          <View style={styles.heroBadgeRow}>
+            <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
+            <StatusBadge label={availabilityStatus.label} tone={availabilityStatus.tone} />
+          </View>
+
+          <View style={styles.heroMeta}>
+            <Text style={styles.heroMetaLine}>执照类型：{pilot.caac_license_type || '-'}</Text>
+            <Text style={styles.heroMetaLine}>执照编号：{pilot.caac_license_no || '-'}</Text>
+            <Text style={styles.heroMetaLine}>服务城市：{draft.current_city || '未设置'} · 服务半径：{serviceRadiusText}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            {summaryItems.map(item => (
+              <View key={item.label} style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>{item.value}</Text>
+                <Text style={styles.summaryLabel}>{item.label}</Text>
               </View>
-            </View>
+            ))}
           </View>
-        )}
+        </ObjectCard>
 
-        {/* 飞行统计 */}
-        <View style={styles.statsCard}>
-          <Text style={styles.cardTitle}>飞行统计</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{totalFlights}</Text>
-              <Text style={styles.statsLabel}>总飞行次数</Text>
+        <ObjectCard style={styles.sectionCard}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchTextWrap}>
+              <Text style={styles.sectionTitle}>接单状态</Text>
+              <Text style={styles.sectionDesc}>通过认证后，可随时切换是否接受新的正式派单。</Text>
             </View>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>
-                {timeText}
-              </Text>
-              <Text style={styles.statsLabel}>总飞行时长</Text>
-            </View>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>
-                {(totalDistance / 1000).toFixed(1)}km
-              </Text>
-              <Text style={styles.statsLabel}>总飞行距离</Text>
-            </View>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{pilot.average_rating?.toFixed(1) || '5.0'}</Text>
-              <Text style={styles.statsLabel}>平均评分</Text>
-            </View>
+            <Switch value={isOnline} onValueChange={toggleAvailability} trackColor={{false: '#d8e1eb', true: '#22c55e'}} thumbColor="#fff" />
           </View>
-        </View>
+        </ObjectCard>
 
-        {/* 资质信息 */}
-        <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>资质信息</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>执照类型</Text>
-            <Text style={styles.infoValue}>{pilot.license_type || '-'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>执照编号</Text>
-            <Text style={styles.infoValue}>{pilot.license_no || '-'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>发证机关</Text>
-            <Text style={styles.infoValue}>{pilot.license_issuer || '-'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>有效期至</Text>
-            <Text style={styles.infoValue}>
-              {pilot.license_expire_date?.substring(0, 10) || '-'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>服务半径</Text>
-            <Text style={styles.infoValue}>{pilot.service_radius_km || 50} 公里</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>信用分</Text>
-            <Text style={styles.infoValue}>{pilot.credit_score || 600}</Text>
-          </View>
-        </View>
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>服务设置</Text>
+          <Text style={styles.inputLabel}>当前服务城市</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="例如：佛山"
+            value={draft.current_city}
+            onChangeText={text => setDraft(prev => ({...prev, current_city: text}))}
+          />
 
-        {/* 认证状态 */}
-        <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>认证状态</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>无犯罪记录</Text>
-            <Text
-              style={[
-                styles.infoValue,
-                {color: STATUS_MAP[pilot.criminal_check_status]?.color || '#999'},
-              ]}>
-              {STATUS_MAP[pilot.criminal_check_status]?.label || '未提交'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>健康证明</Text>
-            <Text
-              style={[
-                styles.infoValue,
-                {color: STATUS_MAP[pilot.health_check_status]?.color || '#999'},
-              ]}>
-              {STATUS_MAP[pilot.health_check_status]?.label || '未提交'}
-            </Text>
-          </View>
-        </View>
+          <Text style={styles.inputLabel}>服务半径（公里）</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="默认 50"
+            keyboardType="number-pad"
+            value={draft.service_radius}
+            onChangeText={text => setDraft(prev => ({...prev, service_radius: text}))}
+          />
 
-        {/* 操作按钮 */}
-        <View style={styles.actionCard}>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('PilotTaskList')}>
-            <Text style={styles.actionText}>接单任务</Text>
+          <Text style={styles.inputLabel}>技能标签</Text>
+          <View style={styles.skillRow}>
+            {skillOptions.map(skill => {
+              const active = draft.special_skills.includes(skill);
+              return (
+                <TouchableOpacity key={skill} style={[styles.skillChip, active && styles.skillChipActive]} onPress={() => toggleSkill(skill)}>
+                  <Text style={[styles.skillChipText, active && styles.skillChipTextActive]}>{skill}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>认证与执行入口</Text>
+          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('PilotTaskList')}>
+            <Text style={styles.actionTitle}>正式派单</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={handleEnterFlightMonitoring}>
-            <Text style={styles.actionText}>飞行监控</Text>
+          <TouchableOpacity style={styles.actionRow} onPress={handleEnterFlightMonitoring}>
+            <Text style={styles.actionTitle}>飞行监控</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('TrajectoryRecord')}>
-            <Text style={styles.actionText}>轨迹与路线</Text>
+          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('FlightLog')}>
+            <Text style={styles.actionTitle}>飞行记录</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('CertificationUpload')}>
-            <Text style={styles.actionText}>证书管理</Text>
+          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('PilotOwnerBindings')}>
+            <Text style={styles.actionTitle}>绑定机主</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('FlightLog')}>
-            <Text style={styles.actionText}>飞行记录</Text>
+          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('PilotRegister')}>
+            <Text style={styles.actionTitle}>补充/更新认证资料</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('BoundDrones')}>
-            <Text style={styles.actionText}>绑定的无人机</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
+        </ObjectCard>
+
+        <TouchableOpacity style={[styles.primaryButton, saving && styles.primaryButtonDisabled]} onPress={handleSave} disabled={saving}>
+          <Text style={styles.primaryButtonText}>{saving ? '保存中...' : '保存飞手设置'}</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  registerBtn: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    backgroundColor: '#1890ff',
-    borderRadius: 8,
-  },
-  registerBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  header: {
-    backgroundColor: '#1890ff',
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1890ff',
-  },
-  statusDot: {
-    position: 'absolute',
-    right: 4,
-    bottom: 4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  licenseNo: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 12,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  availabilityCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: -20,
-    borderRadius: 12,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  availabilityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  availabilityLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  availabilityRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  availabilityStatus: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginRight: 12,
-  },
-  statsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  statsItem: {
-    width: '50%',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  statsValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1890ff',
-  },
-  statsLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  infoCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-  },
-  actionCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 24,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  actionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  actionText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  actionArrow: {
-    fontSize: 20,
-    color: '#ccc',
-  },
+  container: {flex: 1, backgroundColor: '#eef3f8'},
+  content: {padding: 16, paddingBottom: 32, gap: 14},
+  loadingWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  loadingText: {fontSize: 15, color: '#64748b'},
+  emptyWrap: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28},
+  emptyTitle: {fontSize: 22, fontWeight: '800', color: '#102a43', textAlign: 'center'},
+  emptyDesc: {marginTop: 10, fontSize: 14, lineHeight: 22, color: '#64748b', textAlign: 'center'},
+  heroCard: {backgroundColor: '#106c4a'},
+  heroEyebrow: {fontSize: 12, fontWeight: '700', color: '#d1fae5'},
+  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, fontWeight: '800', color: '#fff'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d1fae5'},
+  heroBadgeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
+  heroMeta: {marginTop: 16, gap: 6},
+  heroMetaLine: {fontSize: 13, color: '#ecfdf5'},
+  summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
+  summaryItem: {width: '23%', minWidth: 68, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center'},
+  summaryValue: {fontSize: 18, fontWeight: '800', color: '#fff'},
+  summaryLabel: {marginTop: 4, fontSize: 12, color: '#d1fae5', textAlign: 'center'},
+  sectionCard: {gap: 12},
+  sectionTitle: {fontSize: 20, fontWeight: '800', color: '#102a43'},
+  sectionDesc: {marginTop: 6, fontSize: 13, lineHeight: 19, color: '#64748b'},
+  switchRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'center'},
+  switchTextWrap: {flex: 1},
+  inputLabel: {fontSize: 13, fontWeight: '700', color: '#334e68'},
+  input: {borderWidth: 1, borderColor: '#d8e1eb', borderRadius: 12, backgroundColor: '#f8fafc', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#102a43'},
+  skillRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
+  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#edf2f7'},
+  skillChipActive: {backgroundColor: '#d1fae5'},
+  skillChipText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
+  skillChipTextActive: {color: '#047857'},
+  actionRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e2e8f0'},
+  actionTitle: {fontSize: 15, fontWeight: '700', color: '#102a43'},
+  actionArrow: {fontSize: 18, color: '#94a3b8'},
+  primaryButton: {borderRadius: 14, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
+  primaryButtonDisabled: {opacity: 0.6},
+  primaryButtonText: {fontSize: 15, fontWeight: '800', color: '#fff'},
 });

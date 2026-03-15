@@ -11,6 +11,11 @@ import {
   FileTextOutlined,
   TeamOutlined,
   FileDoneOutlined,
+  DeploymentUnitOutlined,
+  InboxOutlined,
+  SendOutlined,
+  RadarChartOutlined,
+  AlertOutlined,
 } from '@ant-design/icons';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
@@ -24,6 +29,11 @@ import ReportList from './pages/Analytics/ReportList';
 import PilotList from './pages/Pilot/PilotList';
 import ClientList from './pages/Client/ClientList';
 import CargoDeclarationList from './pages/Cargo/CargoDeclarationList';
+import DemandList from './pages/Demand/DemandList';
+import SupplyList from './pages/Supply/SupplyList';
+import DispatchTaskList from './pages/Dispatch/DispatchTaskList';
+import FlightRecordList from './pages/Flight/FlightRecordList';
+import MigrationAuditBoard from './pages/Operations/MigrationAuditBoard';
 
 const { Header, Sider, Content } = Layout;
 
@@ -38,6 +48,11 @@ function AdminLayout() {
     { key: '/users', icon: <UserOutlined />, label: '用户管理' },
     { key: '/pilots', icon: <TeamOutlined />, label: '飞手管理' },
     { key: '/clients', icon: <IdcardOutlined />, label: '客户管理' },
+    { key: '/demands', icon: <InboxOutlined />, label: '需求管理' },
+    { key: '/supplies', icon: <DeploymentUnitOutlined />, label: '供给管理' },
+    { key: '/dispatch-tasks', icon: <SendOutlined />, label: '正式派单' },
+    { key: '/flight-records', icon: <RadarChartOutlined />, label: '飞行记录' },
+    { key: '/migration-audits', icon: <AlertOutlined />, label: '迁移审计/异常' },
     { key: '/cargo-declarations', icon: <FileDoneOutlined />, label: '货物申报审核' },
     { key: '/drones', icon: <RocketOutlined />, label: '无人机管理' },
     { key: '/orders', icon: <ShoppingCartOutlined />, label: '订单管理' },
@@ -62,7 +77,7 @@ function AdminLayout() {
       </Sider>
       <Layout>
         <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <a onClick={() => { localStorage.removeItem('admin_token'); window.location.href = '/login'; }}>
+          <a onClick={() => { localStorage.removeItem('admin_token'); localStorage.removeItem('admin_refresh_token'); window.location.href = '/login'; }}>
             退出登录
           </a>
         </Header>
@@ -74,6 +89,11 @@ function AdminLayout() {
             <Route path="/users" element={<UserList />} />
             <Route path="/pilots" element={<PilotList />} />
             <Route path="/clients" element={<ClientList />} />
+            <Route path="/demands" element={<DemandList />} />
+            <Route path="/supplies" element={<SupplyList />} />
+            <Route path="/dispatch-tasks" element={<DispatchTaskList />} />
+            <Route path="/flight-records" element={<FlightRecordList />} />
+            <Route path="/migration-audits" element={<MigrationAuditBoard />} />
             <Route path="/cargo-declarations" element={<CargoDeclarationList />} />
             <Route path="/drones" element={<DroneList />} />
             <Route path="/orders" element={<OrderList />} />

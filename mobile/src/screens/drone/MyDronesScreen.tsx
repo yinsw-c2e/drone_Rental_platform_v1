@@ -1,114 +1,219 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  SafeAreaView, RefreshControl,
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import StatusBadge from '../../components/business/StatusBadge';
 import {droneService} from '../../services/drone';
 import {Drone} from '../../types';
 
+const STATUS_GROUPS = [
+  {key: 'all', label: '全部'},
+  {key: 'available', label: '可用'},
+  {key: 'rented', label: '忙碌'},
+  {key: 'maintenance', label: '维护中'},
+  {key: 'offline', label: '不可用'},
+] as const;
+
+type StatusKey = (typeof STATUS_GROUPS)[number]['key'];
+
+const statusMap: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray' | 'blue'}> = {
+  available: {label: '可用', tone: 'green'},
+  rented: {label: '忙碌中', tone: 'orange'},
+  maintenance: {label: '维护中', tone: 'red'},
+  offline: {label: '不可用', tone: 'gray'},
+};
+
+const verifyTone = (status?: string): 'green' | 'orange' | 'red' | 'gray' => {
+  if (status === 'approved' || status === 'verified') {
+    return 'green';
+  }
+  if (status === 'pending') {
+    return 'orange';
+  }
+  if (status === 'rejected') {
+    return 'red';
+  }
+  return 'gray';
+};
+
+const verifyLabel = (status?: string, fallback = '未提交') => {
+  if (status === 'approved' || status === 'verified') {
+    return '已通过';
+  }
+  if (status === 'pending') {
+    return '审核中';
+  }
+  if (status === 'rejected') {
+    return '未通过';
+  }
+  return fallback;
+};
+
 export default function MyDronesScreen({navigation}: any) {
-  // 设置导航栏右侧按钮
+  const [drones, setDrones] = useState<Drone[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<StatusKey>('all');
+
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity
-          onPress={() => navigation.navigate('AddDrone')}
-          style={{paddingHorizontal: 16}}>
-          <Text style={{fontSize: 24, color: '#1890ff'}}>+</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('AddDrone')} style={{paddingHorizontal: 16}}>
+          <Text style={{fontSize: 26, color: '#175cd3'}}>+</Text>
         </TouchableOpacity>
       ),
     });
   }, [navigation]);
-  const [drones, setDrones] = useState<Drone[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const fetchDrones = useCallback(async () => {
     try {
-      const res = await droneService.myDrones({page: 1, page_size: 50});
+      const res = await droneService.myDrones({page: 1, page_size: 100});
       setDrones(res.data?.list || []);
     } catch (e) {
       console.warn('获取无人机列表失败:', e);
+      setDrones([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { fetchDrones(); }, [fetchDrones]);
+  useEffect(() => {
+    fetchDrones();
+  }, [fetchDrones]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchDrones();
   }, [fetchDrones]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available': return '#52c41a';
-      case 'rented': return '#fa8c16';
-      case 'maintenance': return '#ff4d4f';
-      default: return '#999';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'available': return '可用';
-      case 'rented': return '已出租';
-      case 'maintenance': return '维护中';
-      default: return '离线';
-    }
-  };
-
-  const renderDrone = ({item}: {item: Drone}) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => {
-        console.log('Navigating to DroneDetail with id:', item.id);
-        navigation.navigate('DroneDetail', {id: item.id});
-      }}>
-      <View style={styles.cardTop}>
-        <View style={styles.droneIcon}><Text style={{fontSize: 24}}>🚁</Text></View>
-        <View style={{flex: 1}}>
-          <Text style={styles.droneName}>{item.brand} {item.model}</Text>
-          <Text style={styles.droneMeta}>SN: {item.serial_number || '-'}</Text>
-        </View>
-        <View style={[styles.statusBadge, {backgroundColor: getStatusColor(item.availability_status)}]}>
-          <Text style={styles.statusText}>{getStatusLabel(item.availability_status)}</Text>
-        </View>
-      </View>
-      <View style={styles.cardBottom}>
-        <Text style={styles.spec}>载重 {item.max_load || 0}kg</Text>
-        <Text style={styles.spec}>续航 {item.max_flight_time || 0}min</Text>
-        <Text style={styles.priceText}>¥{(item.daily_price / 100).toFixed(0)}/天</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.certBtn}
-        onPress={(e) => {
-          e.stopPropagation?.();
-          navigation.navigate('DroneCertification', {id: item.id});
-        }}>
-        <Text style={styles.certBtnText}>认证管理</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
+  const filteredDrones = useMemo(
+    () => drones.filter(item => activeGroup === 'all' || (item.availability_status || 'offline') === activeGroup),
+    [activeGroup, drones],
   );
+
+  const summary = useMemo(() => ({
+    available: drones.filter(item => item.availability_status === 'available').length,
+    active: drones.filter(item => item.certification_status === 'approved' || item.certification_status === 'verified').length,
+    suppliesReady: drones.filter(item => item.uom_verified === 'approved' && item.insurance_verified === 'approved' && item.airworthiness_verified === 'approved').length,
+  }), [drones]);
+
+  const renderDrone = ({item}: {item: Drone}) => {
+    const availability = statusMap[item.availability_status || 'offline'] || statusMap.offline;
+    const mtow = item.mtow_kg || 0;
+    const payload = item.max_payload_kg || item.max_load || 0;
+
+    return (
+      <ObjectCard style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.droneName}>{item.brand} {item.model}</Text>
+            <Text style={styles.droneMeta}>SN: {item.serial_number || '-'}</Text>
+          </View>
+          <StatusBadge label={availability.label} tone={availability.tone} />
+        </View>
+
+        <View style={styles.metricRow}>
+          <Text style={styles.metricText}>起飞重量：{mtow}kg</Text>
+          <Text style={styles.metricText}>最大吊重：{payload}kg</Text>
+        </View>
+        <View style={styles.metricRow}>
+          <Text style={styles.metricText}>城市：{item.city || '未设置'}</Text>
+          <Text style={styles.metricText}>状态：{item.availability_status || 'offline'}</Text>
+        </View>
+
+        <View style={styles.badgeRow}>
+          <StatusBadge label={`基础资质 ${verifyLabel(item.certification_status)}`} tone={verifyTone(item.certification_status)} />
+          <StatusBadge label={`UOM ${verifyLabel(item.uom_verified)}`} tone={verifyTone(item.uom_verified)} />
+          <StatusBadge label={`保险 ${verifyLabel(item.insurance_verified)}`} tone={verifyTone(item.insurance_verified)} />
+          <StatusBadge label={`适航 ${verifyLabel(item.airworthiness_verified)}`} tone={verifyTone(item.airworthiness_verified)} />
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('DroneDetail', {id: item.id})}>
+            <Text style={styles.secondaryBtnText}>设备详情</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('DroneCertification', {id: item.id})}>
+            <Text style={styles.secondaryBtnText}>资质管理</Text>
+          </TouchableOpacity>
+        </View>
+      </ObjectCard>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={drones}
+        data={filteredDrones}
         keyExtractor={item => String(item.id)}
         renderItem={renderDrone}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1890ff']} />}
-        contentContainerStyle={{padding: 12}}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🚁</Text>
-            <Text style={styles.emptyText}>{loading ? '加载中...' : '还没有添加无人机'}</Text>
-            <TouchableOpacity style={styles.addBtn} onPress={() => navigation.navigate('AddDrone')}>
-              <Text style={styles.addBtnText}>添加无人机</Text>
-            </TouchableOpacity>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#175cd3']} />}
+        contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.hero}>
+              <Text style={styles.heroEyebrow}>我的无人机</Text>
+              <Text style={styles.heroTitle}>设备、状态、资质在一页看清</Text>
+              <Text style={styles.heroDesc}>机主链路里，无人机不是静态资产，而是后续供给、报价、履约和派单的基础能力。</Text>
+
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{drones.length}</Text>
+                  <Text style={styles.summaryLabel}>总设备</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{summary.available}</Text>
+                  <Text style={styles.summaryLabel}>可用</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{summary.active}</Text>
+                  <Text style={styles.summaryLabel}>基础资质通过</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryValue}>{summary.suppliesReady}</Text>
+                  <Text style={styles.summaryLabel}>可上架准备</Text>
+                </View>
+              </View>
+            </View>
+
+            <ObjectCard style={styles.filterCard}>
+              <Text style={styles.filterTitle}>设备分组</Text>
+              <View style={styles.filterRow}>
+                {STATUS_GROUPS.map(group => (
+                  <TouchableOpacity
+                    key={group.key}
+                    style={[styles.filterChip, activeGroup === group.key && styles.filterChipActive]}
+                    onPress={() => setActiveGroup(group.key)}>
+                    <Text style={[styles.filterChipText, activeGroup === group.key && styles.filterChipTextActive]}>
+                      {group.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ObjectCard>
           </View>
+        }
+        ListEmptyComponent={
+          loading ? null : (
+            <ObjectCard>
+              <EmptyState
+                icon="🛩️"
+                title={activeGroup === 'all' ? '还没有添加无人机' : '这个分组下暂无无人机'}
+                description="先补齐设备与资质，后面发布供给、报价和履约都从这里起步。"
+                actionText="添加无人机"
+                onAction={() => navigation.navigate('AddDrone')}
+              />
+            </ObjectCard>
+          )
         }
       />
     </SafeAreaView>
@@ -116,31 +221,49 @@ export default function MyDronesScreen({navigation}: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  card: {
-    backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 10,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
-  },
-  cardTop: {flexDirection: 'row', alignItems: 'center'},
-  droneIcon: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#e6f7ff',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
-  },
-  droneName: {fontSize: 15, fontWeight: '600', color: '#333'},
-  droneMeta: {fontSize: 12, color: '#999', marginTop: 2},
-  statusBadge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4},
-  statusText: {color: '#fff', fontSize: 11, fontWeight: 'bold'},
-  cardBottom: {flexDirection: 'row', marginTop: 10, alignItems: 'center'},
-  spec: {fontSize: 12, color: '#666', marginRight: 14},
-  priceText: {fontSize: 14, color: '#f5222d', fontWeight: 'bold', marginLeft: 'auto'},
-  emptyContainer: {alignItems: 'center', paddingTop: 80},
-  emptyIcon: {fontSize: 48, marginBottom: 12},
-  emptyText: {fontSize: 16, color: '#999', marginBottom: 20},
-  addBtn: {paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#1890ff', borderRadius: 20},
-  addBtnText: {color: '#fff', fontSize: 14, fontWeight: '600'},
-  certBtn: {
-    marginTop: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0',
+  container: {flex: 1, backgroundColor: '#eef3f8'},
+  content: {padding: 14, paddingBottom: 28},
+  hero: {backgroundColor: '#0f5cab', borderRadius: 24, padding: 20, marginBottom: 12},
+  heroEyebrow: {fontSize: 12, color: '#d6e4ff', fontWeight: '700'},
+  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, color: '#fff', fontWeight: '800'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d6e4ff'},
+  summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
+  summaryItem: {
+    width: '23%',
+    minWidth: 68,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
   },
-  certBtnText: {fontSize: 13, color: '#1890ff', fontWeight: '500'},
+  summaryValue: {fontSize: 18, fontWeight: '800', color: '#fff'},
+  summaryLabel: {marginTop: 4, fontSize: 12, textAlign: 'center', color: '#d6e4ff'},
+  filterCard: {marginBottom: 12},
+  filterTitle: {fontSize: 14, color: '#262626', fontWeight: '700', marginBottom: 12},
+  filterRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  filterChip: {paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#edf2f7'},
+  filterChipActive: {backgroundColor: '#dbeafe'},
+  filterChipText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
+  filterChipTextActive: {color: '#1d4ed8'},
+  card: {marginBottom: 12, gap: 12},
+  cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12},
+  cardHeaderText: {flex: 1},
+  droneName: {fontSize: 18, fontWeight: '800', color: '#102a43'},
+  droneMeta: {marginTop: 4, fontSize: 12, color: '#64748b'},
+  metricRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
+  metricText: {flex: 1, fontSize: 13, color: '#334e68'},
+  badgeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  footer: {flexDirection: 'row', gap: 10},
+  secondaryBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d7e5f5',
+    backgroundColor: '#f8fbff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  secondaryBtnText: {fontSize: 14, fontWeight: '700', color: '#175cd3'},
 });

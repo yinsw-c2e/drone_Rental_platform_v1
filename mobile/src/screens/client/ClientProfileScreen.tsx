@@ -1,85 +1,212 @@
-import React, {useState, useCallback} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
   Alert,
   RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {
-  getClientProfile,
-  requestCreditCheck,
-  Client,
-} from '../../services/client';
+import {useSelector} from 'react-redux';
 
-const STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待审核', color: '#faad14'},
-  verified: {label: '已认证', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
-  approved: {label: '已通过', color: '#52c41a'},
+import AddressInputField from '../../components/AddressInputField';
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import StatusBadge from '../../components/business/StatusBadge';
+import {
+  Client,
+  getClientProfile,
+  registerIndividual,
+  requestCreditCheck,
+  updateClientProfile,
+} from '../../services/client';
+import {RootState} from '../../store/store';
+import {AddressData} from '../../types';
+
+const VERIFY_STATUS_MAP: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray'}> = {
+  approved: {label: '已认证', tone: 'green'},
+  verified: {label: '已认证', tone: 'green'},
+  pending: {label: '审核中', tone: 'orange'},
+  rejected: {label: '未通过', tone: 'red'},
+  unverified: {label: '未认证', tone: 'gray'},
 };
 
-const CLIENT_TYPE_MAP: Record<string, string> = {
-  individual: '个人客户',
-  enterprise: '企业客户',
+const CREDIT_STATUS_MAP: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray'}> = {
+  approved: {label: '已通过', tone: 'green'},
+  verified: {label: '已通过', tone: 'green'},
+  pending: {label: '审核中', tone: 'orange'},
+  rejected: {label: '未通过', tone: 'red'},
+  failed: {label: '未通过', tone: 'red'},
+  unverified: {label: '未查询', tone: 'gray'},
+};
+
+const sceneOptions = ['电网建设', '山区运输', '海岛给养', '应急救援', '高原补给'];
+
+type DraftProfile = {
+  contact_person: string;
+  contact_phone: string;
+  contact_email: string;
+  default_pickup_address: string;
+  default_delivery_address: string;
+  preferred_cargo_types: string[];
+};
+
+const emptyDraft: DraftProfile = {
+  contact_person: '',
+  contact_phone: '',
+  contact_email: '',
+  default_pickup_address: '',
+  default_delivery_address: '',
+  preferred_cargo_types: [],
+};
+
+const buildAddressValue = (text?: string): AddressData | null => {
+  if (!text) {
+    return null;
+  }
+  return {
+    name: text,
+    address: text,
+    latitude: 0,
+    longitude: 0,
+  };
 };
 
 export default function ClientProfileScreen({navigation}: any) {
+  const user = useSelector((state: RootState) => state.auth.user);
   const [client, setClient] = useState<Client | null>(null);
+  const [draft, setDraft] = useState<DraftProfile>(emptyDraft);
+  const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const loadData = async () => {
+  const syncDraft = useCallback((profile: Client) => {
+    setDraft({
+      contact_person: profile.contact_person || '',
+      contact_phone: profile.contact_phone || user?.phone || '',
+      contact_email: profile.contact_email || '',
+      default_pickup_address: profile.default_pickup_address || '',
+      default_delivery_address: profile.default_delivery_address || '',
+      preferred_cargo_types: profile.preferred_cargo_types || [],
+    });
+    setPickupAddress(buildAddressValue(profile.default_pickup_address));
+    setDeliveryAddress(buildAddressValue(profile.default_delivery_address));
+  }, [user?.phone]);
+
+  const loadData = useCallback(async () => {
     try {
-      const data = await getClientProfile();
-      setClient(data);
-    } catch (e: any) {
-      // 未注册的情况
+      let profile: Client;
+      try {
+        profile = await getClientProfile();
+      } catch {
+        await registerIndividual();
+        profile = await getClientProfile();
+      }
+      setClient(profile);
+      syncDraft(profile);
+    } catch {
       setClient(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [syncDraft]);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, []),
+    }, [loadData]),
   );
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
-  };
+  }, [loadData]);
 
-  const handleCreditCheck = async () => {
-    Alert.alert('征信查询', '确定要发起征信查询吗？查询结果将影响您的下单资格。', [
+  const verificationStatus = VERIFY_STATUS_MAP[client?.verification_status || 'unverified'] || VERIFY_STATUS_MAP.unverified;
+  const creditStatus = CREDIT_STATUS_MAP[client?.credit_check_status || 'unverified'] || CREDIT_STATUS_MAP.unverified;
+
+  const summaryItems = useMemo(
+    () => [
+      {label: '需求', value: client?.total_orders || 0},
+      {label: '已完成', value: client?.completed_orders || 0},
+      {label: '总消费', value: client?.total_spending ? `¥${(client.total_spending / 100).toFixed(0)}` : '0'},
+      {label: '评分', value: client?.average_rating?.toFixed(1) || '5.0'},
+    ],
+    [client],
+  );
+
+  const handleSave = useCallback(async () => {
+    if (!client) {
+      return;
+    }
+    if (!draft.contact_person.trim()) {
+      Alert.alert('请补充信息', '请先填写联系人。');
+      return;
+    }
+    if (!draft.contact_phone.trim()) {
+      Alert.alert('请补充信息', '请先填写联系电话。');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const nextProfile = await updateClientProfile({
+        contact_person: draft.contact_person.trim(),
+        contact_phone: draft.contact_phone.trim(),
+        contact_email: draft.contact_email.trim() || undefined,
+        default_pickup_address: draft.default_pickup_address.trim() || undefined,
+        default_delivery_address: draft.default_delivery_address.trim() || undefined,
+        preferred_cargo_types: draft.preferred_cargo_types,
+      });
+      setClient(nextProfile);
+      syncDraft(nextProfile);
+      Alert.alert('保存成功', '客户档案与默认地址已更新。');
+    } catch (e: any) {
+      Alert.alert('保存失败', e?.message || '请稍后重试');
+    } finally {
+      setSaving(false);
+    }
+  }, [client, draft, syncDraft]);
+
+  const handleCreditCheck = useCallback(() => {
+    Alert.alert('发起征信查询', '征信结果会影响部分订单的支付与下单资格，确定继续吗？', [
       {text: '取消', style: 'cancel'},
       {
-        text: '确认查询',
+        text: '继续',
         onPress: async () => {
           try {
             await requestCreditCheck();
-            Alert.alert('提示', '征信查询请求已提交，结果将在1-3个工作日内更新');
+            Alert.alert('已提交', '征信查询请求已提交，稍后可下拉刷新查看状态。');
             loadData();
           } catch (e: any) {
-            Alert.alert('查询失败', e.message);
+            Alert.alert('提交失败', e?.message || '请稍后重试');
           }
         },
       },
     ]);
-  };
+  }, [loadData]);
+
+  const toggleScene = useCallback((scene: string) => {
+    setDraft(prev => ({
+      ...prev,
+      preferred_cargo_types: prev.preferred_cargo_types.includes(scene)
+        ? prev.preferred_cargo_types.filter(item => item !== scene)
+        : [...prev.preferred_cargo_types, scene],
+    }));
+  }, []);
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>加载中...</Text>
+        <View style={styles.loadingWrap}>
+          <Text style={styles.loadingText}>客户档案加载中...</Text>
         </View>
       </SafeAreaView>
     );
@@ -88,84 +215,63 @@ export default function ClientProfileScreen({navigation}: any) {
   if (!client) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>您还不是注册客户</Text>
-          <Text style={styles.emptySubText}>注册后可发布货运需求和下单</Text>
-          <TouchableOpacity
-            style={styles.registerBtn}
-            onPress={() => navigation.navigate('ClientRegister')}>
-            <Text style={styles.registerBtnText}>立即注册</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          title="客户档案暂时不可用"
+          description="系统会默认创建个人客户档案。如果当前没拉到，我们可以直接重试初始化。"
+          actionText="重试初始化"
+          onAction={loadData}
+        />
       </SafeAreaView>
     );
   }
 
-  const verificationStatus = STATUS_MAP[client.verification_status] || STATUS_MAP.pending;
-  const creditStatus = STATUS_MAP[client.credit_check_status] || {label: '未查询', color: '#999'};
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }>
-        {/* 头部 */}
-        <View style={styles.header}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>
-              {client.client_type === 'enterprise'
-                ? client.company_name?.charAt(0) || 'E'
-                : 'P'}
-            </Text>
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        <ObjectCard style={styles.heroCard}>
+          <View style={styles.heroHeader}>
+            <View>
+              <Text style={styles.heroTitle}>客户档案</Text>
+              <Text style={styles.heroSubtitle}>默认个人客户档案已开通，可直接发布需求与直达下单。</Text>
+            </View>
+            <View style={styles.heroBadges}>
+              <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
+              <StatusBadge label={client.client_type === 'enterprise' ? '企业客户' : '个人客户'} tone="blue" />
+            </View>
           </View>
-          <Text style={styles.clientName}>
-            {client.client_type === 'enterprise'
-              ? client.company_name
-              : '个人客户'}
-          </Text>
-          <Text style={styles.clientType}>
-            {CLIENT_TYPE_MAP[client.client_type] || '客户'}
-          </Text>
-          <View style={styles.statusBadge}>
-            <View style={[styles.statusDot, {backgroundColor: verificationStatus.color}]} />
-            <Text style={[styles.statusText, {color: verificationStatus.color}]}>
-              {verificationStatus.label}
-            </Text>
-          </View>
-        </View>
 
-        {/* 统计数据 */}
-        <View style={styles.statsCard}>
-          <View style={styles.statsRow}>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{client.total_orders}</Text>
-              <Text style={styles.statsLabel}>总订单</Text>
-            </View>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{client.completed_orders}</Text>
-              <Text style={styles.statsLabel}>已完成</Text>
-            </View>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>
-                {client.total_spending > 0 ? `¥${(client.total_spending / 100).toFixed(0)}` : '0'}
-              </Text>
-              <Text style={styles.statsLabel}>总消费</Text>
-            </View>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{client.average_rating?.toFixed(1) || '5.0'}</Text>
-              <Text style={styles.statsLabel}>评分</Text>
+          <View style={styles.accountMeta}>
+            <Text style={styles.accountName}>{user?.nickname || '当前账号'}</Text>
+            <Text style={styles.accountPhone}>{draft.contact_phone || user?.phone || '未设置联系电话'}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            {summaryItems.map(item => (
+              <View key={item.label} style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>{item.value}</Text>
+                <Text style={styles.summaryLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>账号与资格</Text>
+              <Text style={styles.sectionDesc}>这里确认的是“客户能力”是否就绪，而不是再次注册。</Text>
             </View>
           </View>
-        </View>
 
-        {/* 征信信息 */}
-        <View style={styles.infoCard}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>征信信息</Text>
-            <TouchableOpacity onPress={handleCreditCheck}>
-              <Text style={styles.cardAction}>发起查询</Text>
-            </TouchableOpacity>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>默认客户档案</Text>
+            <StatusBadge label="已开通" tone="green" />
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>征信状态</Text>
+            <StatusBadge label={creditStatus.label} tone={creditStatus.tone} />
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>平台信用分</Text>
@@ -175,24 +281,94 @@ export default function ClientProfileScreen({navigation}: any) {
             <Text style={styles.infoLabel}>外部征信分</Text>
             <Text style={styles.infoValue}>{client.credit_score || '-'}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>征信状态</Text>
-            <Text style={[styles.infoValue, {color: creditStatus.color}]}>
-              {creditStatus.label}
-            </Text>
-          </View>
-        </View>
 
-        {/* 企业信息 */}
-        {client.client_type === 'enterprise' && (
-          <View style={styles.infoCard}>
-            <Text style={styles.cardTitle}>企业信息</Text>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleCreditCheck}>
+            <Text style={styles.secondaryButtonText}>发起征信查询</Text>
+          </TouchableOpacity>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>联系人信息</Text>
+          <Text style={styles.inputLabel}>联系人</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="填写联系人姓名"
+            value={draft.contact_person}
+            onChangeText={text => setDraft(prev => ({...prev, contact_person: text}))}
+          />
+
+          <Text style={styles.inputLabel}>联系电话</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="填写联系电话"
+            keyboardType="phone-pad"
+            value={draft.contact_phone}
+            onChangeText={text => setDraft(prev => ({...prev, contact_phone: text}))}
+          />
+
+          <Text style={styles.inputLabel}>联系邮箱</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="选填，用于接收企业审核等通知"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={draft.contact_email}
+            onChangeText={text => setDraft(prev => ({...prev, contact_email: text}))}
+          />
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>默认地址</Text>
+          <Text style={styles.sectionDesc}>可作为发布需求、直达下单时的默认起运/送达地址。</Text>
+
+          <Text style={styles.inputLabel}>默认起运地址</Text>
+          <AddressInputField
+            value={pickupAddress}
+            placeholder="点击选择默认起运地址"
+            onSelect={address => {
+              setPickupAddress(address);
+              setDraft(prev => ({...prev, default_pickup_address: address.address || address.name || ''}));
+            }}
+          />
+
+          <Text style={styles.inputLabel}>默认送达地址</Text>
+          <AddressInputField
+            value={deliveryAddress}
+            placeholder="点击选择默认送达地址"
+            onSelect={address => {
+              setDeliveryAddress(address);
+              setDraft(prev => ({...prev, default_delivery_address: address.address || address.name || ''}));
+            }}
+          />
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>常用任务场景</Text>
+          <Text style={styles.sectionDesc}>帮助我们在市场、推荐和筛选里更早给你匹配合适的服务方。</Text>
+          <View style={styles.chipRow}>
+            {sceneOptions.map(scene => {
+              const active = draft.preferred_cargo_types.includes(scene);
+              return (
+                <TouchableOpacity
+                  key={scene}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => toggleScene(scene)}>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{scene}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ObjectCard>
+
+        {client.client_type === 'enterprise' ? (
+          <ObjectCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>企业资质</Text>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>企业名称</Text>
               <Text style={styles.infoValue}>{client.company_name || '-'}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>信用代码</Text>
+              <Text style={styles.infoLabel}>统一社会信用代码</Text>
               <Text style={styles.infoValue}>{client.business_license_no || '-'}</Text>
             </View>
             <View style={styles.infoRow}>
@@ -200,60 +376,33 @@ export default function ClientProfileScreen({navigation}: any) {
               <Text style={styles.infoValue}>{client.legal_representative || '-'}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>联系人</Text>
-              <Text style={styles.infoValue}>{client.contact_person || '-'}</Text>
+              <Text style={styles.infoLabel}>企业审核状态</Text>
+              <StatusBadge
+                label={(VERIFY_STATUS_MAP[client.enterprise_verified] || {label: '未提交', tone: 'gray'}).label}
+                tone={(VERIFY_STATUS_MAP[client.enterprise_verified] || {label: '未提交', tone: 'gray'}).tone as any}
+              />
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>联系电话</Text>
-              <Text style={styles.infoValue}>{client.contact_phone || '-'}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>企业认证</Text>
-              <Text
-                style={[
-                  styles.infoValue,
-                  {color: (STATUS_MAP[client.enterprise_verified] || {color: '#999'}).color},
-                ]}>
-                {(STATUS_MAP[client.enterprise_verified] || {label: '未认证'}).label}
-              </Text>
-            </View>
-          </View>
+          </ObjectCard>
+        ) : (
+          <ObjectCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>企业客户升级</Text>
+            <Text style={styles.sectionDesc}>如果你后续要以公司名义发布需求、管理对公资料和信用主体，可在这里升级企业客户资质。</Text>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => navigation.navigate('ClientRegister', {mode: 'enterprise'})}>
+              <Text style={styles.secondaryButtonText}>去做企业升级</Text>
+            </TouchableOpacity>
+          </ObjectCard>
         )}
 
-        {/* 服务偏好 */}
-        <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>服务偏好</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>默认取货地</Text>
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {client.default_pickup_address || '未设置'}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>默认送达地</Text>
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {client.default_delivery_address || '未设置'}
-            </Text>
-          </View>
-        </View>
-
-        {/* 功能入口 */}
-        <View style={styles.actionCard}>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('CargoDeclaration')}>
-            <Text style={styles.actionText}>货物申报</Text>
-            <Text style={styles.actionArrow}>›</Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.secondaryOutline} onPress={() => navigation.navigate('CargoDeclaration')}>
+            <Text style={styles.secondaryOutlineText}>货物申报</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('MyOrders')}>
-            <Text style={styles.actionText}>我的订单</Text>
-            <Text style={styles.actionArrow}>›</Text>
+          <TouchableOpacity style={[styles.primaryButton, saving && styles.buttonDisabled]} onPress={handleSave} disabled={saving}>
+            <Text style={styles.primaryButtonText}>{saving ? '保存中...' : '保存客户档案'}</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={{height: 24}} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -262,185 +411,199 @@ export default function ClientProfileScreen({navigation}: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#eef3f8',
   },
-  loadingContainer: {
+  content: {
+    padding: 16,
+    paddingBottom: 32,
+    gap: 14,
+  },
+  loadingWrap: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#64748b',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+  heroCard: {
+    backgroundColor: '#0f3f88',
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 20,
-  },
-  registerBtn: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    backgroundColor: '#1890ff',
-    borderRadius: 8,
-  },
-  registerBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  header: {
-    backgroundColor: '#1890ff',
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1890ff',
-  },
-  clientName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 12,
-  },
-  clientType: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  statsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: -20,
-    borderRadius: 12,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  statsRow: {
-    flexDirection: 'row',
-  },
-  statsItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statsValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1890ff',
-  },
-  statsLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  infoCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-  },
-  cardHeader: {
+  heroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  heroSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  heroBadges: {
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  accountMeta: {
+    marginTop: 18,
+  },
+  accountName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  accountPhone: {
+    marginTop: 4,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 18,
+  },
+  summaryItem: {
+    width: '23%',
+    minWidth: 68,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fff',
   },
-  cardAction: {
-    fontSize: 14,
-    color: '#1890ff',
-    fontWeight: '500',
-    marginBottom: 12,
+  summaryLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  sectionCard: {
+    gap: 12,
+  },
+  sectionHeader: {
+    gap: 6,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#102a43',
+  },
+  sectionDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#64748b',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    alignItems: 'center',
+    gap: 12,
   },
   infoLabel: {
+    flex: 1,
     fontSize: 14,
-    color: '#666',
+    color: '#52606d',
   },
   infoValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-    maxWidth: '60%',
+    flex: 1,
     textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#102a43',
   },
-  actionCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334e68',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d8e1eb',
     borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#102a43',
   },
-  actionItem: {
+  chipRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#edf2f7',
+  },
+  chipActive: {
+    backgroundColor: '#dbeafe',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#486581',
+  },
+  chipTextActive: {
+    color: '#1d4ed8',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: '#175cd3',
+    borderRadius: 14,
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'center',
+    paddingVertical: 15,
   },
-  actionText: {
-    fontSize: 16,
-    color: '#333',
+  buttonDisabled: {
+    opacity: 0.6,
   },
-  actionArrow: {
-    fontSize: 20,
-    color: '#ccc',
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  secondaryButton: {
+    borderRadius: 12,
+    backgroundColor: '#e8f1ff',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#175cd3',
+  },
+  secondaryOutline: {
+    minWidth: 124,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+  },
+  secondaryOutlineText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334e68',
   },
 });

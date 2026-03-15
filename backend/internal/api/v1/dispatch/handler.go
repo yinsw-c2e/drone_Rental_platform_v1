@@ -12,21 +12,36 @@ import (
 	"wurenji-backend/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type Handler struct {
-	dispatchService *service.DispatchService
-	clientService   *service.ClientService
-	pilotService    *service.PilotService
-	orderRepo       *repository.OrderRepo
+	dispatchService   *service.DispatchService
+	clientService     *service.ClientService
+	pilotService      *service.PilotService
+	orderRepo         *repository.OrderRepo
+	orderArtifactRepo *repository.OrderArtifactRepo
+	demandDomainRepo  *repository.DemandDomainRepo
+	ownerDomainRepo   *repository.OwnerDomainRepo
 }
 
-func NewHandler(dispatchService *service.DispatchService, clientService *service.ClientService, pilotService *service.PilotService, orderRepo *repository.OrderRepo) *Handler {
+func NewHandler(
+	dispatchService *service.DispatchService,
+	clientService *service.ClientService,
+	pilotService *service.PilotService,
+	orderRepo *repository.OrderRepo,
+	orderArtifactRepo *repository.OrderArtifactRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+) *Handler {
 	return &Handler{
-		dispatchService: dispatchService,
-		clientService:   clientService,
-		pilotService:    pilotService,
-		orderRepo:       orderRepo,
+		dispatchService:   dispatchService,
+		clientService:     clientService,
+		pilotService:      pilotService,
+		orderRepo:         orderRepo,
+		orderArtifactRepo: orderArtifactRepo,
+		demandDomainRepo:  demandDomainRepo,
+		ownerDomainRepo:   ownerDomainRepo,
 	}
 }
 
@@ -366,37 +381,211 @@ func (h *Handler) createOrderForAcceptedTask(candidateID int64, pilot *model.Pil
 		return 0, fmt.Errorf("任务不存在")
 	}
 
+	executionMode := "dispatch_pool"
+	var sourceSupplyID int64
+	if h.ownerDomainRepo != nil {
+		if supply, err := h.ownerDomainRepo.GetPreferredSupplyByOwnerDrone(candidate.OwnerID, candidate.DroneID); err == nil && supply != nil {
+			sourceSupplyID = supply.ID
+		}
+		if binding, err := h.ownerDomainRepo.GetLatestBindableRecord(candidate.OwnerID, pilot.UserID); err == nil && binding != nil && binding.Status == "active" {
+			executionMode = "bound_pilot"
+		}
+	}
+
 	// 检查是否已有关联订单（避免重复创建）
 	existing, _, _ := h.orderRepo.List(1, 1, map[string]interface{}{"order_type": "dispatch", "related_id": task.ID})
 	if len(existing) > 0 {
+		dispatchRepo := repository.NewDispatchRepo(h.orderRepo.DB())
+		formalTask, err := h.ensureFormalDispatchTask(existing[0].ID, task, candidate, pilot, executionMode, dispatchRepo)
+		if err != nil {
+			return existing[0].ID, err
+		}
+		_ = dispatchRepo.UpdateTaskFields(task.ID, map[string]interface{}{"order_id": existing[0].ID})
+		if formalTask != nil && (existing[0].DispatchTaskID == nil || *existing[0].DispatchTaskID != formalTask.ID) {
+			_ = h.orderRepo.UpdateFields(existing[0].ID, map[string]interface{}{"dispatch_task_id": formalTask.ID})
+		}
 		return existing[0].ID, nil
 	}
 
 	now := time.Now()
 	orderNo := fmt.Sprintf("DO%s%d", now.Format("20060102150405"), task.ID)
-	order := &model.Order{
-		OrderNo:          orderNo,
-		OrderType:        "dispatch",
-		RelatedID:        task.ID,
-		DroneID:          candidate.DroneID,
-		OwnerID:          candidate.OwnerID,
-		PilotID:          pilot.ID,
-		Title:            fmt.Sprintf("派单货运: %s → %s", task.PickupAddress, task.DeliveryAddress),
-		ServiceType:      "cargo_delivery",
-		StartTime:        now,
-		EndTime:          now.Add(24 * time.Hour),
-		ServiceLatitude:  task.PickupLatitude,
-		ServiceLongitude: task.PickupLongitude,
-		ServiceAddress:   task.PickupAddress,
-		TotalAmount:      candidate.QuotedPrice,
-		Status:           "confirmed",
+	var demandID int64
+	if h.demandDomainRepo != nil && task.CargoDemandID > 0 {
+		demandID, _ = h.demandDomainRepo.ResolveDemandIDByLegacy("cargo_demand", task.CargoDemandID)
 	}
-	if err := h.orderRepo.Create(order); err != nil {
+	var clientUserID int64
+	if task.ClientID > 0 {
+		client, err := h.clientService.GetByID(task.ClientID)
+		if err == nil && client != nil {
+			clientUserID = client.UserID
+		}
+	}
+	db := h.orderRepo.DB()
+	if db == nil {
+		return 0, fmt.Errorf("订单仓储未初始化数据库连接")
+	}
+
+	var createdOrderID int64
+	err := db.Transaction(func(tx *gorm.DB) error {
+		orderRepo := repository.NewOrderRepo(tx)
+		orderArtifactRepo := repository.NewOrderArtifactRepo(tx)
+		dispatchRepo := repository.NewDispatchRepo(tx)
+
+		order := &model.Order{
+			OrderNo:             orderNo,
+			OrderType:           "dispatch",
+			RelatedID:           task.ID,
+			OrderSource:         "demand_market",
+			DemandID:            demandID,
+			SourceSupplyID:      sourceSupplyID,
+			DroneID:             candidate.DroneID,
+			OwnerID:             candidate.OwnerID,
+			PilotID:             pilot.ID,
+			RenterID:            clientUserID,
+			ClientID:            task.ClientID,
+			ClientUserID:        clientUserID,
+			ProviderUserID:      candidate.OwnerID,
+			DroneOwnerUserID:    candidate.OwnerID,
+			ExecutorPilotUserID: pilot.UserID,
+			DispatchTaskID:      nil,
+			NeedsDispatch:       true,
+			ExecutionMode:       executionMode,
+			Title:               fmt.Sprintf("派单货运: %s → %s", task.PickupAddress, task.DeliveryAddress),
+			ServiceType:         "heavy_cargo_lift_transport",
+			StartTime:           now,
+			EndTime:             now.Add(24 * time.Hour),
+			ServiceLatitude:     task.PickupLatitude,
+			ServiceLongitude:    task.PickupLongitude,
+			ServiceAddress:      task.PickupAddress,
+			TotalAmount:         candidate.QuotedPrice,
+			Status:              "confirmed",
+			ProviderConfirmedAt: &now,
+		}
+		if err := orderRepo.Create(order); err != nil {
+			return err
+		}
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "created",
+			Note:         "派单执行订单已创建",
+			OperatorID:   clientUserID,
+			OperatorType: "system",
+		}); err != nil {
+			return err
+		}
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "confirmed",
+			Note:         "飞手已接受派单任务",
+			OperatorID:   pilot.UserID,
+			OperatorType: "pilot",
+		}); err != nil {
+			return err
+		}
+
+		if err := dispatchRepo.UpdateTaskFields(task.ID, map[string]interface{}{"order_id": order.ID}); err != nil {
+			return err
+		}
+		formalTask, err := h.ensureFormalDispatchTask(order.ID, task, candidate, pilot, executionMode, dispatchRepo)
+		if err != nil {
+			return err
+		}
+		if formalTask != nil {
+			if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{"dispatch_task_id": formalTask.ID}); err != nil {
+				return err
+			}
+			order.DispatchTaskID = &formalTask.ID
+		}
+		var demand *model.Demand
+		if demandID > 0 && h.demandDomainRepo != nil {
+			demand, _ = h.demandDomainRepo.GetDemandByID(demandID)
+		}
+		var supply *model.OwnerSupply
+		if sourceSupplyID > 0 && h.ownerDomainRepo != nil {
+			supply, _ = h.ownerDomainRepo.GetSupplyByID(sourceSupplyID)
+		}
+		if err := repository.UpsertOrderSnapshotBundle(orderArtifactRepo, order, demand, supply); err != nil {
+			return err
+		}
+
+		createdOrderID = order.ID
+		return nil
+	})
+	if err != nil {
 		return 0, err
 	}
-	// 更新 dispatch_task 关联订单（related_id 已在 Order 创建时就设置）
-	h.dispatchService.UpdateTaskOrderID(task.ID, order.ID)
-	return order.ID, nil
+
+	return createdOrderID, nil
+}
+
+func (h *Handler) ensureFormalDispatchTask(
+	orderID int64,
+	task *model.DispatchTask,
+	candidate *model.DispatchCandidate,
+	pilot *model.Pilot,
+	executionMode string,
+	dispatchRepo *repository.DispatchRepo,
+) (*model.FormalDispatchTask, error) {
+	if dispatchRepo == nil || task == nil || candidate == nil || pilot == nil || orderID == 0 {
+		return nil, nil
+	}
+
+	if existing, err := dispatchRepo.GetFormalTaskByOrderID(orderID); err == nil && existing != nil {
+		return existing, nil
+	}
+
+	now := time.Now()
+	dispatchSource := "candidate_pool"
+	if executionMode == "bound_pilot" {
+		dispatchSource = "bound_pilot"
+	}
+
+	formalTask := &model.FormalDispatchTask{
+		DispatchNo:        dispatchRepo.GenerateDispatchNo(),
+		OrderID:           orderID,
+		ProviderUserID:    candidate.OwnerID,
+		TargetPilotUserID: pilot.UserID,
+		DispatchSource:    dispatchSource,
+		RetryCount:        maxInt(task.MatchAttempts-1, 0),
+		Status:            "accepted",
+		Reason:            fmt.Sprintf("由任务池 %s 转换为正式派单", task.TaskNo),
+		SentAt:            candidate.NotifiedAt,
+		RespondedAt:       candidate.RespondedAt,
+	}
+	if formalTask.SentAt == nil {
+		formalTask.SentAt = &now
+	}
+	if formalTask.RespondedAt == nil {
+		formalTask.RespondedAt = &now
+	}
+	if err := dispatchRepo.CreateFormalTask(formalTask); err != nil {
+		return nil, err
+	}
+	if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+		DispatchTaskID: formalTask.ID,
+		ActionType:     "created",
+		OperatorUserID: candidate.OwnerID,
+		Note:           fmt.Sprintf("从任务池 %s 创建正式派单", task.TaskNo),
+	}); err != nil {
+		return nil, err
+	}
+	if err := dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+		DispatchTaskID: formalTask.ID,
+		ActionType:     "accepted",
+		OperatorUserID: pilot.UserID,
+		Note:           "飞手已接受正式派单",
+	}); err != nil {
+		return nil, err
+	}
+
+	return formalTask, nil
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // RejectTask 拒绝任务
