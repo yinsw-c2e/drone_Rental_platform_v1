@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
   Image,
@@ -134,6 +134,9 @@ export default function ProfileScreen({navigation}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const dispatch = useDispatch();
+  const userRef = useRef(user);
+  const roleSummaryRef = useRef(roleSummary);
+  const loadingRef = useRef(false);
 
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -142,8 +145,22 @@ export default function ProfileScreen({navigation}: any) {
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
   const verifyInfo = VERIFY_STATUS_MAP[user?.id_verified || 'unverified'] || VERIFY_STATUS_MAP.unverified;
 
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    roleSummaryRef.current = roleSummary;
+  }, [roleSummary]);
+
   const loadData = useCallback(async () => {
-    const summary = getEffectiveRoleSummary(roleSummary, user);
+    if (loadingRef.current) {
+      setRefreshing(false);
+      return;
+    }
+
+    loadingRef.current = true;
+    const summary = getEffectiveRoleSummary(roleSummaryRef.current, userRef.current);
     try {
       const [profileRes, meRes, orderRes, demandRes, supplyRes, quoteRes, droneRes, bindingRes, dispatchRes, flightRes] = await Promise.all([
         userService.getProfile().catch(() => null),
@@ -190,9 +207,10 @@ export default function ProfileScreen({navigation}: any) {
         flightRecords: Number(flightRes?.meta?.total || 0),
       });
     } finally {
+      loadingRef.current = false;
       setRefreshing(false);
     }
-  }, [dispatch, roleSummary, user]);
+  }, [dispatch]);
 
   useFocusEffect(
     useCallback(() => {

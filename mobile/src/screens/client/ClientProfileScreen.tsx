@@ -232,7 +232,7 @@ export default function ClientProfileScreen({navigation}: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroHeader}>
-            <View>
+            <View style={{flex: 1}}>
               <Text style={styles.heroTitle}>客户档案</Text>
               <Text style={styles.heroSubtitle}>默认个人客户档案已开通，可直接发布需求与直达下单。</Text>
             </View>
@@ -447,6 +447,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.82)',
   },
   heroBadges: {
+    flexDirection: 'column',
     gap: 8,
     alignItems: 'flex-end',
   },
@@ -470,8 +471,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   summaryItem: {
-    width: '23%',
-    minWidth: 68,
+    flex: 1,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
     paddingVertical: 12,

@@ -248,8 +248,7 @@ const styles = StyleSheet.create({
   heroMetaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
-    width: '23%',
-    minWidth: 68,
+    flex: 1,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
     paddingVertical: 12,

@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   heroMeta: {marginTop: 16, gap: 6},
   heroMetaLine: {fontSize: 13, color: '#ecfdf5'},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
-  summaryItem: {width: '23%', minWidth: 68, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center'},
+  summaryItem: {flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center'},
   summaryValue: {fontSize: 18, fontWeight: '800', color: '#fff'},
   summaryLabel: {marginTop: 4, fontSize: 12, color: '#d1fae5', textAlign: 'center'},
   sectionCard: {gap: 12},

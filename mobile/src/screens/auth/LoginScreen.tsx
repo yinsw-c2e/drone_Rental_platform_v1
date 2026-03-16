@@ -12,6 +12,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  StatusBar,
 } from 'react-native';
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
@@ -291,24 +292,24 @@ export default function LoginScreen({navigation}: any) {
 
         {/* 开发模式快速登录 */}
         {/* 配置信息显示（可折叠） */}
-        <TouchableOpacity 
+        {/* <TouchableOpacity 
           style={styles.configToggle}
           onPress={() => setShowConfig(!showConfig)}>
           <Text style={styles.configToggleText}>
             {showConfig ? '🔽' : '🔼'} 配置信息 {showConfig ? '(点击收起)' : '(点击展开)'}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         
-        {showConfig && (
+        {/* {showConfig && (
           <View style={styles.configInfo}>
             <Text style={styles.configText}>API: {API_BASE_URL}</Text>
             <Text style={styles.configText}>WS: {WS_BASE_URL}</Text>
             <Text style={styles.configText}>环境: {APP_CONFIG.env}</Text>
           </View>
-        )}
+        )} */}
 
         {/* 错误信息显示区域 */}
-        {debugError ? (
+        {/* {debugError ? (
           <View style={debugError.includes('✅') ? styles.debugSuccess : styles.debugError}>
             <ScrollView style={{maxHeight: 280}}>
               <Text style={debugError.includes('✅') ? styles.debugSuccessText : styles.debugErrorText}>
@@ -316,7 +317,7 @@ export default function LoginScreen({navigation}: any) {
               </Text>
             </ScrollView>
           </View>
-        ) : null}
+        ) : null} */}
 
         <View style={styles.devSection}>
           <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
@@ -326,7 +327,6 @@ export default function LoginScreen({navigation}: any) {
             {key: 'owner' as DropdownKey, label: '🚁 机主', color: '#0f766e'},
             {key: 'pilot' as DropdownKey, label: '✈️ 飞手', color: '#52c41a'},
             {key: 'composite' as DropdownKey, label: '🧩 复合身份', color: '#fa8c16'},
-            {key: 'admin' as DropdownKey, label: '⚙️ 管理员', color: '#722ed1'},
           ]).map(({key, label, color}) => {
             const acct = selected[key];
             const accounts = QUICK_LOGIN_ACCOUNTS[key];
@@ -406,7 +406,7 @@ export default function LoginScreen({navigation}: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+  container: {flex: 1, backgroundColor: '#fff', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0},
   content: {flex: 1, justifyContent: 'center', padding: 24},
   title: {fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#1890ff'},
   subtitle: {fontSize: 16, textAlign: 'center', color: '#666', marginTop: 8, marginBottom: 40},
