@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   Platform,
+  PermissionsAndroid,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -247,6 +248,13 @@ export default function ProfileScreen({navigation}: any) {
   };
 
   const pickImage = async (source: 'camera' | 'library') => {
+    if (source === 'camera' && Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert('权限不足', '请在设置中允许使用相机');
+        return;
+      }
+    }
     const options = {
       mediaType: 'photo' as const,
       maxWidth: 512,

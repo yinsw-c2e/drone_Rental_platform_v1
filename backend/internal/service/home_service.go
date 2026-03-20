@@ -127,16 +127,40 @@ func NewHomeService(
 	}
 }
 
+func (s *HomeService) collectAllRoleOrders(userID int64, roleSummary *RoleSummary) []model.Order {
+	seen := make(map[int64]bool)
+	var result []model.Order
+
+	roles := []string{"client"}
+	if roleSummary.HasOwnerRole {
+		roles = append(roles, "owner")
+	}
+	if roleSummary.HasPilotRole {
+		roles = append(roles, "pilot")
+	}
+
+	for _, role := range roles {
+		orders, _, err := s.orderService.ListOrders(userID, role, "", 1, homeOrderScanLimit)
+		if err != nil {
+			continue
+		}
+		for i := range orders {
+			if !seen[orders[i].ID] {
+				seen[orders[i].ID] = true
+				result = append(result, orders[i])
+			}
+		}
+	}
+	return result
+}
+
 func (s *HomeService) GetDashboard(userID int64) (*HomeDashboard, error) {
 	roleSummary, err := s.userService.GetRoleSummary(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	allOrders, _, err := s.orderService.ListOrders(userID, "", "", 1, homeOrderScanLimit)
-	if err != nil {
-		return nil, err
-	}
+	allOrders := s.collectAllRoleOrders(userID, roleSummary)
 	summary := buildHomeSummary(allOrders)
 	inProgressOrders := buildHomeOrderCards(allOrders, 3)
 
@@ -290,15 +314,34 @@ func (s *HomeService) buildPilotDashboard(userID int64) (*HomePilotDashboard, er
 	}
 	view.CandidateDemandCount = candidateDemandTotal
 
-	_, acceptedTotal, err := s.pilotService.ListDispatchTasks(userID, "accepted", 1, 1)
+	acceptedTasks, _, err := s.pilotService.ListDispatchTasks(userID, "accepted", 1, 100)
 	if err != nil {
 		return nil, err
 	}
-	_, executingTotal, err := s.pilotService.ListDispatchTasks(userID, "executing", 1, 1)
+	var activeCount int64
+	for i := range acceptedTasks {
+		orderStatus := ""
+		if acceptedTasks[i].Order != nil {
+			orderStatus = normalizeHomeStatus(acceptedTasks[i].Order.Status)
+		}
+		if orderStatus != "completed" && orderStatus != "cancelled" {
+			activeCount++
+		}
+	}
+	executingTasks, _, err := s.pilotService.ListDispatchTasks(userID, "executing", 1, 100)
 	if err != nil {
 		return nil, err
 	}
-	view.ActiveDispatchCount = acceptedTotal + executingTotal
+	for i := range executingTasks {
+		orderStatus := ""
+		if executingTasks[i].Order != nil {
+			orderStatus = normalizeHomeStatus(executingTasks[i].Order.Status)
+		}
+		if orderStatus != "completed" && orderStatus != "cancelled" {
+			activeCount++
+		}
+	}
+	view.ActiveDispatchCount = activeCount
 
 	_, flightTotal, err := s.pilotService.ListFlightRecords(userID, 1, 1)
 	if err != nil {

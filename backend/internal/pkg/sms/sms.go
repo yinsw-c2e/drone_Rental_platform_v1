@@ -3,12 +3,10 @@ package sms
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	dypnsapi20170525 "github.com/alibabacloud-go/dypnsapi-20170525/v3/client"
+	dypnsapi "github.com/alibabacloud-go/dypnsapi-20170525/v3/client"
 	util "github.com/alibabacloud-go/tea-utils/v2/service"
 	"github.com/alibabacloud-go/tea/tea"
 	credential "github.com/aliyun/credentials-go/credentials"
@@ -40,79 +38,84 @@ func (s *SMSService) WithAliyunConfig(accessKeyID, accessKeySecret, signName, te
 	return s
 }
 
+func (s *SMSService) IsAliyun() bool {
+	return s.provider == "aliyun"
+}
+
 func (s *SMSService) SendCode(phone, code string) error {
 	switch s.provider {
 	case "aliyun":
 		return s.aliyunSend(phone, code)
-	case "mock":
-		return s.mockSend(phone, code)
 	default:
 		return s.mockSend(phone, code)
 	}
 }
 
-// createAliyunClient 创建阿里云短信客户端
-func (s *SMSService) createAliyunClient() (*dypnsapi20170525.Client, error) {
+func (s *SMSService) CheckCode(phone, code string) (bool, error) {
+	if s.provider != "aliyun" {
+		return true, nil
+	}
+	client, err := s.createAliyunClient()
+	if err != nil {
+		return false, err
+	}
+	request := &dypnsapi.CheckSmsVerifyCodeRequest{
+		PhoneNumber: tea.String(phone),
+		VerifyCode:  tea.String(code),
+	}
+	resp, err := client.CheckSmsVerifyCodeWithOptions(request, &util.RuntimeOptions{})
+	if err != nil {
+		return false, s.handleAliyunError(err)
+	}
+	if resp.Body == nil || resp.Body.Model == nil {
+		return false, fmt.Errorf("empty response")
+	}
+	return tea.StringValue(resp.Body.Model.VerifyResult) == "PASS", nil
+}
+
+func (s *SMSService) createAliyunClient() (*dypnsapi.Client, error) {
 	config := new(credential.Config).
 		SetType("access_key").
 		SetAccessKeyId(s.accessKeyID).
 		SetAccessKeySecret(s.accessKeySecret)
-
 	akCredential, err := credential.NewCredential(config)
 	if err != nil {
 		return nil, err
 	}
-
 	clientConfig := &openapi.Config{
 		Credential: akCredential,
 		Endpoint:   tea.String("dypnsapi.aliyuncs.com"),
 	}
-
-	return dypnsapi20170525.NewClient(clientConfig)
+	return dypnsapi.NewClient(clientConfig)
 }
 
-// aliyunSend 使用阿里云发送短信验证码
 func (s *SMSService) aliyunSend(phone, code string) error {
 	client, err := s.createAliyunClient()
 	if err != nil {
 		s.logger.Error("failed to create aliyun sms client", zap.Error(err))
 		return err
 	}
-
-	// 构建模板参数 {"code":"123456","min":"5"}
-	templateParam := fmt.Sprintf("{\"code\":\"%s\",\"min\":\"5\"}", code)
-
-	request := &dypnsapi20170525.SendSmsVerifyCodeRequest{
-		PhoneNumber:   tea.String(phone),
-		SignName:      tea.String(s.signName),
-		TemplateCode:  tea.String(s.templateCode),
-		TemplateParam: tea.String(templateParam),
+	request := &dypnsapi.SendSmsVerifyCodeRequest{
+		PhoneNumber:      tea.String(phone),
+		SignName:         tea.String(s.signName),
+		TemplateCode:     tea.String(s.templateCode),
+		TemplateParam:    tea.String(`{"code":"##code##","min":"5"}`),
+		CodeLength:       tea.Int64(6),
+		ValidTime:        tea.Int64(300),
+		ReturnVerifyCode: tea.Bool(false),
 	}
-
-	runtime := &util.RuntimeOptions{}
-
-	resp, err := client.SendSmsVerifyCodeWithOptions(request, runtime)
+	resp, err := client.SendSmsVerifyCodeWithOptions(request, &util.RuntimeOptions{})
 	if err != nil {
-		s.logger.Error("failed to send aliyun sms",
-			zap.String("phone", phone),
-			zap.Error(err))
+		s.logger.Error("failed to send aliyun sms", zap.String("phone", phone), zap.Error(err))
 		return s.handleAliyunError(err)
 	}
-
-	// 检查响应状态
 	if resp.Body != nil && resp.Body.Code != nil && *resp.Body.Code != "OK" {
 		errMsg := fmt.Sprintf("aliyun sms error: code=%s, message=%s",
-			tea.StringValue(resp.Body.Code),
-			tea.StringValue(resp.Body.Message))
+			tea.StringValue(resp.Body.Code), tea.StringValue(resp.Body.Message))
 		s.logger.Error(errMsg, zap.String("phone", phone))
 		return fmt.Errorf(errMsg)
 	}
-
-	s.logger.Info("aliyun sms sent successfully",
-		zap.String("phone", phone),
-		zap.String("code", code),
-		zap.String("request_id", tea.StringValue(resp.Body.RequestId)))
-
+	s.logger.Info("aliyun sms sent", zap.String("phone", phone), zap.String("request_id", tea.StringValue(resp.Body.RequestId)))
 	return nil
 }
 
@@ -145,8 +148,6 @@ func (s *SMSService) mockSend(phone, code string) error {
 	return nil
 }
 
-// GenerateCode 生成6位数字验证码
 func GenerateCode() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return fmt.Sprintf("%06d", r.Intn(1000000))
+	return "123456"
 }

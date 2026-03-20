@@ -82,6 +82,20 @@ func (s *DroneService) Update(userID int64, drone *model.Drone) error {
 	}
 	s.normalizeCapacityFields(drone)
 
+	// 保留不可变字段，防止前端传零值覆盖
+	drone.OwnerID = existing.OwnerID
+	drone.CreatedAt = existing.CreatedAt
+
+	// 核心字段变更时重置审核状态，防止通过审核后篡改关键参数
+	coreFieldChanged := existing.Brand != drone.Brand ||
+		existing.Model != drone.Model ||
+		existing.SerialNumber != drone.SerialNumber ||
+		existing.MTOWKG != drone.MTOWKG ||
+		existing.MaxPayloadKG != drone.MaxPayloadKG
+	if coreFieldChanged && existing.CertificationStatus == "approved" {
+		drone.CertificationStatus = "pending"
+	}
+
 	db := s.droneRepo.DB()
 	if db == nil {
 		return s.droneRepo.Update(drone)

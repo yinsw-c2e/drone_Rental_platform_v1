@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
+  Alert,
   FlatList,
   RefreshControl,
   SafeAreaView,
@@ -13,7 +14,8 @@ import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import {droneService} from '../../services/drone';
-import {Drone} from '../../types';
+import {orderV2Service} from '../../services/orderV2';
+import {Drone, V2OrderSummary} from '../../types';
 
 const STATUS_GROUPS = [
   {key: 'all', label: '全部'},
@@ -58,11 +60,70 @@ const verifyLabel = (status?: string, fallback = '未提交') => {
   return fallback;
 };
 
+const TERMINAL_ORDER_STATUSES = new Set([
+  'completed',
+  'cancelled',
+  'refunded',
+  'provider_rejected',
+  'rejected',
+]);
+
+const getOrderDroneId = (order: V2OrderSummary) => Number(order.drone_id || order.drone?.id || 0);
+
+const isDroneStillOccupiedByOrder = (order: V2OrderSummary) =>
+  !TERMINAL_ORDER_STATUSES.has(String(order.status || '').toLowerCase());
+
 export default function MyDronesScreen({navigation}: any) {
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeGroup, setActiveGroup] = useState<StatusKey>('all');
+
+  const CHANGEABLE_STATUSES = [
+    {key: 'available', label: '可用（可接单）'},
+    {key: 'maintenance', label: '维护中'},
+    {key: 'offline', label: '不可用（下线）'},
+  ];
+
+  const handleChangeStatus = useCallback((drone: Drone) => {
+    const options = CHANGEABLE_STATUSES.filter(s => s.key !== drone.availability_status).map(s => s.label);
+    Alert.alert('更改状态', `当前：${statusMap[drone.availability_status || 'offline']?.label || drone.availability_status}`, [
+      ...CHANGEABLE_STATUSES.filter(s => s.key !== drone.availability_status).map(s => ({
+        text: s.label,
+        onPress: async () => {
+          try {
+            await droneService.updateAvailability(drone.id, s.key);
+            setDrones(prev => prev.map(d => d.id === drone.id ? {...d, availability_status: s.key} : d));
+          } catch (e: any) {
+            Alert.alert('更改失败', e.message || '请稍后重试');
+          }
+        },
+      })),
+      {text: '取消', style: 'cancel'},
+    ]);
+  }, []);
+
+  const handleViewActiveOrder = useCallback(async (droneId: number) => {
+    try {
+      const res = await orderV2Service.list({role: 'owner', page: 1, page_size: 100});
+      const list = res.data?.items || [];
+      const matched = list
+        .filter((order: V2OrderSummary) => getOrderDroneId(order) === droneId && isDroneStillOccupiedByOrder(order))
+        .sort((left, right) => {
+          const leftTime = new Date(left.updated_at || left.created_at).getTime();
+          const rightTime = new Date(right.updated_at || right.created_at).getTime();
+          return rightTime - leftTime;
+        })[0];
+
+      if (matched) {
+        navigation.navigate('OrderDetail', {id: matched.id});
+      } else {
+        Alert.alert('未找到', '当前未找到该无人机的执行中订单，可能已完成或数据延迟。');
+      }
+    } catch (e: any) {
+      Alert.alert('查询失败', e.message || '请稍后重试');
+    }
+  }, [navigation]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -142,9 +203,23 @@ export default function MyDronesScreen({navigation}: any) {
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('DroneDetail', {id: item.id})}>
             <Text style={styles.secondaryBtnText}>设备详情</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('EditDrone', {id: item.id})}>
+            <Text style={styles.secondaryBtnText}>编辑信息</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('DroneCertification', {id: item.id})}>
             <Text style={styles.secondaryBtnText}>资质管理</Text>
           </TouchableOpacity>
+          {item.availability_status === 'rented' ? (
+            <TouchableOpacity
+              style={[styles.secondaryBtn, styles.busyBtn]}
+              onPress={() => handleViewActiveOrder(item.id)}>
+              <Text style={styles.busyBtnText}>执行中订单</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.secondaryBtn, styles.statusBtn]} onPress={() => handleChangeStatus(item)}>
+              <Text style={styles.statusBtnText}>更改状态</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ObjectCard>
     );
@@ -229,7 +304,7 @@ const styles = StyleSheet.create({
   heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d6e4ff'},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
-    width: '23%',
+    width: '48%',
     minWidth: 68,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
@@ -266,4 +341,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   secondaryBtnText: {fontSize: 14, fontWeight: '700', color: '#175cd3'},
+    statusBtn: {borderColor: '#fa8c16'},
+    statusBtnText: {fontSize: 14, fontWeight: '700', color: '#fa8c16'},
+    busyBtn: {borderColor: '#1677ff'},
+    busyBtnText: {fontSize: 14, fontWeight: '700', color: '#1677ff'},
 });

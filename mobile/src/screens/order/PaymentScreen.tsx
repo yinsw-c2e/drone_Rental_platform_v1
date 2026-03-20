@@ -15,6 +15,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import SourceTag from '../../components/business/SourceTag';
+import {getObjectStatusMeta} from '../../components/business/visuals';
 import {orderFinanceV2Service} from '../../services/orderFinanceV2';
 import {orderV2Service} from '../../services/orderV2';
 import {
@@ -202,7 +203,7 @@ export default function PaymentScreen({route, navigation}: any) {
         <View style={styles.hero}>
           <View style={styles.heroTagRow}>
             <SourceTag source="order" />
-            <StatusBadge label="" meta={{label: detail.status || '订单', tone: detail.paid_at ? 'green' : 'orange'}} />
+            <StatusBadge label="" meta={getObjectStatusMeta('order', detail.status)} />
           </View>
           <Text style={styles.heroOrderNo}>{detail.order_no}</Text>
           <Text style={styles.heroAmount}>{formatMoney(totalPay)}</Text>
@@ -218,7 +219,7 @@ export default function PaymentScreen({route, navigation}: any) {
                 <Text style={styles.secondaryBtnText}>关闭结果</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, {flex: 1, marginTop: 0}]}
                 onPress={() => navigation.navigate('OrderDetail', {id: detail.id, orderId: detail.id})}>
                 <Text style={styles.primaryBtnText}>返回订单</Text>
               </TouchableOpacity>
@@ -233,7 +234,7 @@ export default function PaymentScreen({route, navigation}: any) {
           <View style={styles.row}><Text style={styles.rowLabel}>押金</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.deposit_amount)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>已支付</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.paid_amount)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>已退款</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.refunded_amount)}</Text></View>
-          <View style={styles.row}><Text style={styles.rowLabel}>订单状态</Text><Text style={styles.rowValue}>{detail.status}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>订单状态</Text><Text style={styles.rowValue}>{getObjectStatusMeta('order', detail.status).label}</Text></View>
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
@@ -274,7 +275,7 @@ export default function PaymentScreen({route, navigation}: any) {
               <View key={item.id} style={styles.recordItem}>
                 <View style={styles.recordHeader}>
                   <Text style={styles.recordCode}>{item.payment_no}</Text>
-                  <StatusBadge label={item.status || '未知'} tone={getPaymentStatusTone(item.status)} />
+                  <StatusBadge label={({'paid':'已支付','pending':'待处理','refunded':'已退款','failed':'失败'} as Record<string,string>)[item.status || ''] || item.status || '未知'} tone={getPaymentStatusTone(item.status)} />
                 </View>
                 <Text style={styles.recordMeta}>{item.payment_method || '-'} · {formatMoney(item.amount)}</Text>
                 <Text style={styles.recordMeta}>支付时间：{formatDateTime(item.paid_at || item.created_at)}</Text>
@@ -373,7 +374,7 @@ const styles = StyleSheet.create({
   },
   resultActionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: 10,
     marginTop: 14,
   },
@@ -469,12 +470,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   secondaryBtn: {
+    flex: 1,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#d9d9d9',
     paddingHorizontal: 16,
     paddingVertical: 11,
     backgroundColor: '#fff',
+    alignItems: 'center',
   },
   secondaryBtnText: {
     fontSize: 13,

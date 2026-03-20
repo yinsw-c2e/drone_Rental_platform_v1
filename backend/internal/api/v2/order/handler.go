@@ -420,6 +420,8 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"client":                 buildUserSummary(order.Renter, fallbackPositive(order.ClientUserID, order.RenterID), "client"),
 		"provider":               buildUserSummary(order.Owner, fallbackPositive(order.ProviderUserID, order.OwnerID), "owner"),
 		"executor":               buildExecutorSummary(order, nil),
+		"drone_id":               nullableInt64(order.DroneID),
+		"drone":                  buildDroneSummary(order.Drone),
 		"created_at":             order.CreatedAt,
 		"updated_at":             order.UpdatedAt,
 	}
@@ -432,6 +434,21 @@ func fallbackPositive(values ...int64) int64 {
 		}
 	}
 	return 0
+}
+
+func buildDroneSummary(drone *model.Drone) gin.H {
+	if drone == nil {
+		return nil
+	}
+	return gin.H{
+		"id":                  drone.ID,
+		"brand":               drone.Brand,
+		"model":               drone.Model,
+		"serial_number":       drone.SerialNumber,
+		"mtow_kg":             drone.MTOWKG,
+		"max_payload_kg":      drone.MaxPayloadKG,
+		"availability_status": drone.AvailabilityStatus,
+	}
 }
 
 func buildUserSummary(user *model.User, fallbackID int64, role string) gin.H {
@@ -694,4 +711,52 @@ func nullableInt64(value int64) interface{} {
 		return nil
 	}
 	return value
+}
+
+func (h *Handler) UpdateExecutionStatus(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Status string `json:"status" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid execution status payload")
+		return
+	}
+
+	if err := h.orderService.UpdateExecutionStatus(userID, orderID, req.Status); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, gin.H{"status": req.Status})
+}
+
+func (h *Handler) ConfirmReceipt(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	if err := h.orderService.ConfirmReceipt(userID, orderID); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, gin.H{"message": "已确认签收"})
 }

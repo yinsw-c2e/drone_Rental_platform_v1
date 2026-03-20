@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Alert,
-  Platform,
+  Platform, PermissionsAndroid,
 } from 'react-native';
 import {launchCamera, launchImageLibrary, ImagePickerResponse} from 'react-native-image-picker';
 
@@ -9,6 +9,12 @@ let ActionSheetIOS: any;
 if (Platform.OS === 'ios') {
   ActionSheetIOS = require('react-native').ActionSheetIOS;
 }
+
+const requestCameraPermission = async (): Promise<boolean> => {
+  if (Platform.OS !== 'android') return true;
+  const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+  return granted === PermissionsAndroid.RESULTS.GRANTED;
+};
 
 interface ImagePickerProps {
   images: string[];
@@ -45,7 +51,14 @@ export default function ImagePickerGroup({
     }
   };
 
-  const pickImage = (source: 'camera' | 'library') => {
+  const pickImage = async (source: 'camera' | 'library') => {
+    if (source === 'camera') {
+      const ok = await requestCameraPermission();
+      if (!ok) {
+        Alert.alert('权限不足', '请在设置中允许使用相机');
+        return;
+      }
+    }
     const opts = {
       mediaType: 'photo' as const,
       maxWidth: 1280,

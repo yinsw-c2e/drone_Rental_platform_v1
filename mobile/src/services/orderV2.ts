@@ -38,3 +38,11 @@ export const orderV2Service = {
     payload: {dispatch_mode: string; target_pilot_user_id?: number; reason?: string},
   ) => apiV2.post<any, V2ApiResponse<V2DispatchActionResult>>(`/orders/${orderId}/dispatch`, payload),
 };
+
+export const updateExecutionStatus = async (orderId: number, status: string): Promise<void> => {
+  await apiV2.post(`/orders/${orderId}/execution-status`, {status});
+};
+
+export const confirmReceipt = async (orderId: number): Promise<void> => {
+  await apiV2.post(`/orders/${orderId}/confirm-receipt`);
+};

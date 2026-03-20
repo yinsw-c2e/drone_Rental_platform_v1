@@ -43,8 +43,12 @@ export default function DemandDetailScreen({route, navigation}: any) {
   const [quotesLoading, setQuotesLoading] = useState(false);
   const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
   const [selectingQuoteId, setSelectingQuoteId] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const isOwnDemand = demand?.client_user_id === currentUser?.id;
+  const canEditOrCancel = isOwnDemand && ['draft', 'published', 'quoting'].includes(demand?.status || '');
+  const canViewAndSelectQuotes = isOwnDemand && ['published', 'quoting', 'selected'].includes(demand?.status || '');
+  const isConvertedToOrder = isOwnDemand && demand?.status === 'converted_to_order';
   const canQuoteAsOwner = !isOwnDemand && effectiveRoleSummary.has_owner_role;
   const canOperateCandidate = !isOwnDemand && effectiveRoleSummary.has_pilot_role && !!demand?.allows_pilot_candidate;
   const activeCandidate = demand?.my_candidate?.status === 'active';
@@ -127,6 +131,26 @@ export default function DemandDetailScreen({route, navigation}: any) {
     }
   };
 
+  const handleCancel = () => {
+    Alert.alert('确认撤销', '撤销后需求将不可恢复，已有报价也会被拒绝。确定要撤销吗？', [
+      {text: '取消', style: 'cancel'},
+      {
+        text: '确认撤销', style: 'destructive', onPress: async () => {
+          setCancelling(true);
+          try {
+            await demandV2Service.cancel(demandId);
+            Alert.alert('已撤销', '需求已成功撤销。');
+            fetchDemand();
+          } catch (e: any) {
+            Alert.alert('撤销失败', e.message || '请稍后重试');
+          } finally {
+            setCancelling(false);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -168,6 +192,22 @@ export default function DemandDetailScreen({route, navigation}: any) {
             {getDemandSceneLabel(demand.cargo_scene)} · {formatTripCount(demand.estimated_trip_count)} · {resolveDemandPrimaryAddress(demand)}
           </Text>
         </View>
+
+        {canEditOrCancel ? (
+          <View style={styles.ownerActions}>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => navigation.navigate('EditDemand', {demandId: demand.id})}>
+              <Text style={styles.editBtnText}>修改需求</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={handleCancel}
+              disabled={cancelling}>
+              <Text style={styles.cancelBtnText}>{cancelling ? '撤销中...' : '撤销需求'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {canQuoteAsOwner || canOperateCandidate ? (
           <View style={styles.actionPanel}>
@@ -211,10 +251,23 @@ export default function DemandDetailScreen({route, navigation}: any) {
             <Text style={styles.infoLabel}>作业场景</Text>
             <Text style={styles.infoValue}>{getDemandSceneLabel(demand.cargo_scene)}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>服务地址</Text>
-            <Text style={styles.infoValue}>{resolveDemandPrimaryAddress(demand)}</Text>
-          </View>
+          {demand.departure_address?.text || demand.destination_address?.text ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>起点地址</Text>
+                <Text style={styles.infoValue}>{demand.departure_address?.text || '未填写'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>终点地址</Text>
+                <Text style={styles.infoValue}>{demand.destination_address?.text || '未填写'}</Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>服务地址</Text>
+              <Text style={styles.infoValue}>{demand.service_address?.text || resolveDemandPrimaryAddress(demand)}</Text>
+            </View>
+          )}
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>预约时间</Text>
             <Text style={styles.infoValue}>{formatDemandSchedule(demand.scheduled_start_at, demand.scheduled_end_at)}</Text>
@@ -256,14 +309,20 @@ export default function DemandDetailScreen({route, navigation}: any) {
               <Text style={styles.metricLabel}>候选飞手</Text>
             </View>
           </View>
-          {isOwnDemand ? (
+          {canViewAndSelectQuotes ? (
             <TouchableOpacity style={styles.quoteTrigger} onPress={toggleQuotes}>
               <Text style={styles.quoteTriggerText}>{quotesVisible ? '收起报价方案' : '查看报价方案'}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
-        {isOwnDemand && quotesVisible ? (
+        {isConvertedToOrder ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>该需求已转为订单</Text>
+          </View>
+        ) : null}
+
+        {canViewAndSelectQuotes && quotesVisible ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>报价方案</Text>
             {quotesLoading ? (
@@ -352,4 +411,9 @@ const styles = StyleSheet.create({
   },
   selectBtnText: {fontSize: 14, color: '#fff', fontWeight: '700'},
   disabledBtn: {opacity: 0.6},
+  ownerActions: {flexDirection: 'row', gap: 10, marginBottom: 14},
+  editBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: '#1677ff', justifyContent: 'center', alignItems: 'center'},
+  editBtnText: {color: '#fff', fontSize: 15, fontWeight: '700'},
+  cancelBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ff4d4f', justifyContent: 'center', alignItems: 'center'},
+  cancelBtnText: {color: '#ff4d4f', fontSize: 15, fontWeight: '700'},
 });

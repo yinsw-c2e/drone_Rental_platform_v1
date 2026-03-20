@@ -64,7 +64,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
 
   const loadData = useCallback(async () => {
     try {
-      const status = entryMode === 'assigned' ? 'pending_response' : undefined;
+      const status = entryMode === 'assigned' ? 'pending_response' : (entryMode === 'accepted' ? 'accepted' : undefined);
       const res = await dispatchV2Service.list({role: 'pilot', status, page: 1, page_size: 100});
       setTasks(res.data?.items || []);
     } catch (error) {
@@ -84,6 +84,13 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   const visibleTasks = useMemo(() => {
     if (entryMode === 'assigned') {
       return tasks.filter(item => String(item.status || '').toLowerCase() === 'pending_response');
+    }
+    if (entryMode === 'accepted') {
+      return tasks.filter(item => {
+        const s = String(item.status || '').toLowerCase();
+        const os = String(item.order?.status || '').toLowerCase();
+        return s === 'accepted' && os !== 'completed' && os !== 'cancelled';
+      });
     }
     return tasks;
   }, [entryMode, tasks]);
@@ -148,6 +155,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
         contentContainerStyle={styles.content}
         renderItem={({item}) => {
           const canRespond = String(item.status || '').toLowerCase() === 'pending_response';
+          const isAccepted = String(item.status || '').toLowerCase() === 'accepted';
           return (
             <ObjectCard style={[styles.card, canRespond && styles.cardHighlight]} onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
               <View style={styles.cardHeader}>
@@ -189,6 +197,14 @@ export default function PilotTaskListScreen({navigation, route}: any) {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(item)}>
                     <Text style={styles.acceptBtnText}>接受派单</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {isAccepted ? (
+                <View style={styles.actionRow}>
+                  <TouchableOpacity style={styles.executeBtn} onPress={() => navigation.navigate('PilotOrderExecution', {taskId: item.id})}>
+                    <Text style={styles.executeBtnText}>进入执行</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -335,6 +351,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   acceptBtnText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  executeBtn: {
+    borderRadius: 999,
+    backgroundColor: '#1890ff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  executeBtnText: {
     fontSize: 12,
     color: '#fff',
     fontWeight: '700',

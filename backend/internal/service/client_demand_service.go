@@ -92,8 +92,8 @@ func (s *ClientService) UpdateDemand(userID, demandID int64, input *ClientDemand
 	if err != nil {
 		return nil, err
 	}
-	if demand.Status != "draft" {
-		return nil, errors.New("仅草稿需求允许修改")
+	if demand.Status != "draft" && demand.Status != "published" && demand.Status != "quoting" {
+		return nil, errors.New("仅草稿、已发布或询价中的需求允许修改")
 	}
 
 	if err := applyDemandInput(demand, input); err != nil {
@@ -292,8 +292,12 @@ func (s *ClientService) ListDemandQuotes(userID, demandID int64) ([]model.Demand
 	if s.demandDomainRepo == nil {
 		return nil, errors.New("需求域仓储未初始化")
 	}
-	if _, err := s.getOwnedDemand(userID, demandID); err != nil {
+	demand, err := s.getOwnedDemand(userID, demandID)
+	if err != nil {
 		return nil, err
+	}
+	if demand.Status == "converted_to_order" || demand.Status == "cancelled" || demand.Status == "expired" || demand.Status == "closed" {
+		return []model.DemandQuote{}, nil
 	}
 	return s.demandDomainRepo.ListDemandQuotes(demandID)
 }

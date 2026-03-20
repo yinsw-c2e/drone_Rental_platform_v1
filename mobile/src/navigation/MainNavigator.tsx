@@ -23,10 +23,12 @@ import MyQuotesScreen from '../screens/profile/MyQuotesScreen';
 
 import PublishOfferScreen from '../screens/publish/PublishOfferScreen';
 import PublishDemandScreen from '../screens/publish/PublishDemandScreen';
+import EditDemandScreen from '../screens/publish/EditDemandScreen';
 import PublishCargoScreen from '../screens/publish/PublishCargoScreen';
 
 import MyDronesScreen from '../screens/drone/MyDronesScreen';
 import AddDroneScreen from '../screens/drone/AddDroneScreen';
+import EditDroneScreen from '../screens/drone/EditDroneScreen';
 import NearbyDronesScreen from '../screens/drone/NearbyDronesScreen';
 import DroneDetailScreen from '../screens/drone/DroneDetailScreen';
 
@@ -61,6 +63,7 @@ import CreateDispatchTaskScreen from '../screens/dispatch/CreateDispatchTaskScre
 import DispatchTaskListScreen from '../screens/dispatch/DispatchTaskListScreen';
 import DispatchTaskDetailScreen from '../screens/dispatch/DispatchTaskDetailScreen';
 import PilotTaskListScreen from '../screens/dispatch/PilotTaskListScreen';
+import PilotOrderExecutionScreen from '../screens/dispatch/PilotOrderExecutionScreen';
 import FlightMonitoringScreen from '../screens/flight/FlightMonitoringScreen';
 import TrajectoryScreen from '../screens/flight/TrajectoryScreen';
 import MultiPointTaskScreen from '../screens/flight/MultiPointTaskScreen';
@@ -128,8 +131,10 @@ export default function MainNavigator() {
       <RootStack.Screen name="MainTabs" component={MainTabs} options={{headerShown: false}} />
       <RootStack.Screen name="PublishOffer" component={PublishOfferScreen} options={{title: '发布供给'}} />
       <RootStack.Screen name="PublishDemand" component={PublishDemandScreen} options={{title: '发布需求'}} />
+      <RootStack.Screen name="EditDemand" component={EditDemandScreen} options={{title: '修改需求'}} />
       <RootStack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '货运需求'}} />
       <RootStack.Screen name="AddDrone" component={AddDroneScreen} options={{title: '添加无人机'}} />
+      <RootStack.Screen name="EditDrone" component={EditDroneScreen} options={{title: '编辑无人机'}} />
       <RootStack.Screen name="NearbyDrones" component={NearbyDronesScreen} options={{title: '附近无人机'}} />
       <RootStack.Screen name="DroneDetail" component={DroneDetailScreen} options={{headerShown: false}} />
       <RootStack.Screen name="OrderDetail" component={OrderDetailScreen} options={{headerShown: false}} />
@@ -156,6 +161,7 @@ export default function MainNavigator() {
       <RootStack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '正式派单'}} />
       <RootStack.Screen name="DispatchTaskDetail" component={DispatchTaskDetailScreen} options={{title: '正式派单详情'}} />
       <RootStack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '接单派单'}} />
+      <RootStack.Screen name="PilotOrderExecution" component={PilotOrderExecutionScreen} options={{title: '订单执行'}} />
       <RootStack.Screen name="EditProfile" component={EditProfileScreen} options={{title: '编辑资料'}} />
       <RootStack.Screen name="MyDrones" component={MyDronesScreen} options={{title: '我的无人机'}} />
       <RootStack.Screen name="MyOrders" component={OrderListScreen} options={{title: '我的订单'}} />

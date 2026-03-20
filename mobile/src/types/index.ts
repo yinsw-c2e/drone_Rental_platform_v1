@@ -579,6 +579,16 @@ export interface V2OrderSummary {
   provider_user_id?: number | null;
   executor_pilot_user_id?: number | null;
   dispatch_task_id?: number | null;
+  drone_id?: number | null;
+  drone?: {
+    id: number;
+    brand: string;
+    model: string;
+    serial_number?: string;
+    mtow_kg?: number;
+    max_payload_kg?: number;
+    availability_status?: string;
+  } | null;
   service_type?: string;
   service_address?: string;
   dest_address?: string;

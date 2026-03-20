@@ -10,27 +10,28 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {getOrderByTaskId, updateExecutionStatus} from '../../services/dispatch';
+import {getOrderByTaskId} from '../../services/dispatch';
+import {updateExecutionStatus} from '../../services/orderV2';
 
 // 执行状态定义
 const EXEC_STEPS = [
+  {status: 'assigned',          label: '已派单',          desc: '已分配派单，等待确认',                icon: '📨'},
   {status: 'confirmed',         label: '已确认接单',    desc: '接单成功，等待出发',                  icon: '✅'},
   {status: 'airspace_applying', label: '申请空域中',    desc: '正在申请飞行空域许可',                icon: '📋'},
   {status: 'airspace_approved', label: '空域已批准',    desc: '空域许可已获批，准备装货',            icon: '✈️'},
   {status: 'loading',           label: '装货中',        desc: '飞手到达装货点，确认装货',            icon: '📦'},
   {status: 'in_transit',        label: '运输中',        desc: '货物已装载，无人机起飞',              icon: '🚁'},
-  {status: 'delivered',         label: '已送达',        desc: '到达卸货点，完成卸货',                icon: '🏁'},
-  {status: 'completed',         label: '已完成',        desc: '收货人签收，任务完成',                icon: '🎉'},
+  {status: 'delivered',         label: '已送达',        desc: '到达卸货点，等待客户确认签收',        icon: '🏁'},
 ];
 
 // 根据当前状态获取下一步操作
 const NEXT_ACTION: Record<string, {label: string; nextStatus: string; confirmMsg: string}> = {
+  assigned:          {label: '确认接单', nextStatus: 'confirmed', confirmMsg: '确认接受此任务？'},
   confirmed:         {label: '申请空域', nextStatus: 'airspace_applying', confirmMsg: '确认申请空域许可？'},
   airspace_applying: {label: '空域已批准', nextStatus: 'airspace_approved', confirmMsg: '确认空域许可已获批？'},
   airspace_approved: {label: '确认装货', nextStatus: 'loading', confirmMsg: '已到达装货点，确认开始装货？'},
   loading:           {label: '开始运输', nextStatus: 'in_transit', confirmMsg: '货物已装载完毕，确认起飞运输？'},
   in_transit:        {label: '确认送达', nextStatus: 'delivered', confirmMsg: '已到达卸货点，确认卸货完成？'},
-  delivered:         {label: '完成任务', nextStatus: 'completed', confirmMsg: '收货人已签收，确认任务完成？'},
 };
 
 export default function PilotOrderExecutionScreen({route, navigation}: any) {
@@ -116,6 +117,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
   const currentStep = EXEC_STEPS[currentStepIndex];
   const nextAction = NEXT_ACTION[order.status];
   const isCompleted = order.status === 'completed';
+  const isDelivered = order.status === 'delivered';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -207,7 +209,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
         </View>
 
         {/* 操作按钮 */}
-        {!isCompleted && nextAction && (
+        {!isCompleted && !isDelivered && nextAction && (
           <TouchableOpacity
             style={[styles.actionBtn, submitting && styles.actionBtnDisabled]}
             onPress={handleNextStep}
@@ -221,6 +223,13 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
               </>
             )}
           </TouchableOpacity>
+        )}
+
+        {isDelivered && (
+          <View style={styles.waitingBanner}>
+            <Text style={styles.waitingText}>📦 货物已送达</Text>
+            <Text style={styles.waitingSub}>等待客户确认签收</Text>
+          </View>
         )}
 
         {isCompleted && (
@@ -308,4 +317,10 @@ const styles = StyleSheet.create({
   },
   completedText: {fontSize: 20, fontWeight: '700', color: '#52c41a'},
   completedSub: {fontSize: 13, color: '#73d13d', marginTop: 6},
+  waitingBanner: {
+    backgroundColor: '#fffbe6', borderRadius: 12, padding: 24,
+    alignItems: 'center', borderWidth: 1, borderColor: '#ffe58f', marginBottom: 12,
+  },
+  waitingText: {fontSize: 20, fontWeight: '700', color: '#faad14'},
+  waitingSub: {fontSize: 13, color: '#d48806', marginTop: 6},
 });

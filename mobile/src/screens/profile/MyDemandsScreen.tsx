@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   SafeAreaView,
@@ -49,11 +50,22 @@ const matchesStatusGroup = (status: string, group: StatusGroupKey) => {
   return normalized === group;
 };
 
-export default function MyDemandsScreen({navigation}: any) {
+export default function MyDemandsScreen({navigation, route}: any) {
+  const initialGroup = (() => {
+    const param = route?.params?.statusFilter;
+    if (param === 'quoted' || param === 'quoting') {
+      return 'quoting';
+    }
+    const keys = STATUS_GROUPS.map(g => g.key);
+    if (param && keys.includes(param)) {
+      return param as StatusGroupKey;
+    }
+    return 'all';
+  })();
   const [demands, setDemands] = useState<DemandSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeGroup, setActiveGroup] = useState<StatusGroupKey>('all');
+  const [activeGroup, setActiveGroup] = useState<StatusGroupKey>(initialGroup);
 
   const fetchData = useCallback(async () => {
     try {
@@ -87,6 +99,24 @@ export default function MyDemandsScreen({navigation}: any) {
       ? `${item.candidate_pilot_count} 位候选飞手`
       : '不开放飞手候选';
 
+    const canEdit = ['draft', 'published', 'quoting'].includes(item.status);
+    const canShowQuoteButton = ['published', 'quoting', 'selected'].includes(item.status) && item.quote_count > 0;
+
+    const handleCancel = () => {
+      Alert.alert('确认撤销', '撤销后需求将不可恢复，已有报价也会被拒绝。', [
+        {text: '取消', style: 'cancel'},
+        {text: '确认撤销', style: 'destructive', onPress: async () => {
+          try {
+            await demandV2Service.cancel(item.id);
+            Alert.alert('已撤销', '需求已成功撤销。');
+            fetchData();
+          } catch (e: any) {
+            Alert.alert('撤销失败', e.message || '请稍后重试');
+          }
+        }},
+      ]);
+    };
+
     return (
       <ObjectCard
         style={styles.card}
@@ -115,15 +145,24 @@ export default function MyDemandsScreen({navigation}: any) {
         <Text style={styles.schedule}>{formatDemandSchedule(item.scheduled_start_at, item.scheduled_end_at)}</Text>
 
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
-            <Text style={styles.secondaryBtnText}>查看详情</Text>
-          </TouchableOpacity>
+          {canEdit ? (
+            <>
+              <TouchableOpacity
+                style={styles.dangerBtn}
+                onPress={handleCancel}>
+                <Text style={styles.dangerBtnText}>撤销</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                onPress={() => navigation.navigate('EditDemand', {demandId: item.id})}>
+                <Text style={styles.secondaryBtnText}>修改</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
           <TouchableOpacity
             style={styles.primaryBtn}
             onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
-            <Text style={styles.primaryBtnText}>{item.quote_count > 0 ? '查看报价' : '查看进展'}</Text>
+            <Text style={styles.primaryBtnText}>{canShowQuoteButton ? '查看报价' : '查看详情'}</Text>
           </TouchableOpacity>
         </View>
       </ObjectCard>
@@ -338,6 +377,18 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 12,
     color: '#fff',
+    fontWeight: '700',
+  },
+  dangerBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#ff4d4f',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  dangerBtnText: {
+    fontSize: 12,
+    color: '#ff4d4f',
     fontWeight: '700',
   },
 });

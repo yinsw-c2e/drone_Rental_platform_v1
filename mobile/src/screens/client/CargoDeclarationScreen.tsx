@@ -13,6 +13,7 @@ import {
   ScrollView,
   Image,
   Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -70,7 +71,14 @@ export default function CargoDeclarationScreen({navigation}: any) {
   const MAX_IMAGES = 4;
 
   const handleAddImage = () => {
-    const pick = (source: 'camera' | 'library') => {
+    const pick = async (source: 'camera' | 'library') => {
+      if (source === 'camera' && Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('权限不足', '请在设置中允许使用相机');
+          return;
+        }
+      }
       const opts = {mediaType: 'photo' as const, maxWidth: 1280, maxHeight: 1280, quality: 0.8 as const};
       const callback = (res: ImagePickerResponse) => {
         if (res.didCancel || res.errorCode) return;

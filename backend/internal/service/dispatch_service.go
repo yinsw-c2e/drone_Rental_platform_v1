@@ -1126,8 +1126,11 @@ func (s *DispatchService) ReassignFormalTask(dispatchID, providerUserID int64, d
 		if order.ProviderUserID != providerUserID && order.OwnerID != providerUserID && order.DroneOwnerUserID != providerUserID {
 			return errors.New("无权重派该订单")
 		}
-		if task.Status == "finished" {
-			return errors.New("已完成的正式派单不能重派")
+		if task.Status == "finished" || task.Status == "executing" {
+			return errors.New("已完成或执行中的派单不能重派")
+		}
+		if order.Status == "in_transit" || order.Status == "delivered" || order.Status == "completed" {
+			return errors.New("订单已进入执行阶段，不能重派")
 		}
 
 		now := time.Now()

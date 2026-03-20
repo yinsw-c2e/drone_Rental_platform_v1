@@ -85,8 +85,6 @@ const getStatusBucket = (status?: string): StatusFilter => {
       'pending_provider_confirmation',
       'pending_payment',
       'pending_dispatch',
-      'assigned',
-      'confirmed',
       'created',
       'accepted',
       'paid',
@@ -96,10 +94,14 @@ const getStatusBucket = (status?: string): StatusFilter => {
   }
   if (
     [
+      'assigned',
+      'confirmed',
+      'preparing',
       'airspace_applying',
       'airspace_approved',
       'loading',
       'in_transit',
+      'delivered',
     ].includes(normalized)
   ) {
     return 'in_progress';

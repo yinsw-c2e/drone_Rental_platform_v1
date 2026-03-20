@@ -48,9 +48,7 @@ export default function MarketHubScreen({navigation}: any) {
         desc: '查看公开需求，按区域和能力筛选',
         icon: '📋',
         accent: '#1677ff',
-        onPress: () => navigation.navigate('DemandList', {
-          mode: effectiveRoleSummary.has_owner_role ? 'owner' : 'public',
-        }),
+        onPress: () => navigation.navigate('DemandList', {mode: 'public'}),
       },
       {
         key: 'supply-market',

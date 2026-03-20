@@ -641,20 +641,24 @@ func (h *Handler) GetMyActiveOrder(c *gin.Context) {
 	response.Success(c, orders[0])
 }
 
-// GetOrderByTaskID 根据派单任务ID获取订单
-// GET /api/v1/dispatch/task/:id/order
 func (h *Handler) GetOrderByTaskID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
 		return
 	}
-	existing, _, _ := h.orderRepo.List(1, 1, map[string]interface{}{"order_type": "dispatch", "related_id": id})
-	if len(existing) == 0 {
-		response.Success(c, nil)
+
+	if existing, _, _ := h.orderRepo.List(1, 1, map[string]interface{}{"dispatch_task_id": id}); len(existing) > 0 {
+		response.Success(c, existing[0])
 		return
 	}
-	response.Success(c, existing[0])
+
+	if existing, _, _ := h.orderRepo.List(1, 1, map[string]interface{}{"order_type": "dispatch", "related_id": id}); len(existing) > 0 {
+		response.Success(c, existing[0])
+		return
+	}
+
+	response.Success(c, nil)
 }
 
 // UpdateExecutionStatus 更新飞手执行状态
@@ -688,6 +692,7 @@ func (h *Handler) UpdateExecutionStatus(c *gin.Context) {
 
 	// 校验状态流转：confirmed -> airspace_applying -> loading -> in_transit -> delivered -> completed
 	allowedStatuses := map[string]bool{
+		"confirmed":         true,
 		"airspace_applying": true,
 		"airspace_approved": true,
 		"loading":           true,

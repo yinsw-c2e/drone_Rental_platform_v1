@@ -1662,3 +1662,93 @@ func derefFloat64(value *float64) float64 {
 	}
 	return *value
 }
+
+func (s *OrderService) UpdateExecutionStatus(userID int64, orderID int64, status string) error {
+	pilot, err := s.pilotRepo.GetByUserID(userID)
+	if err != nil {
+		return errors.New("请先注册成为飞手")
+	}
+
+	allowedStatuses := map[string]bool{
+		"confirmed":         true,
+		"airspace_applying": true,
+		"airspace_approved": true,
+		"loading":           true,
+		"in_transit":        true,
+		"delivered":         true,
+	}
+	if !allowedStatuses[status] {
+		return errors.New("无效的状态值")
+	}
+
+	extra := map[string]interface{}{}
+	now := time.Now()
+	switch status {
+	case "loading":
+		extra["airspace_status"] = "approved"
+	case "in_transit":
+		extra["loading_confirmed_at"] = now
+		extra["flight_start_time"] = now
+	case "delivered":
+		extra["unloading_confirmed_at"] = now
+		extra["flight_end_time"] = now
+	}
+
+	if err := s.orderRepo.UpdateStatusWithFields(orderID, pilot.ID, status, extra); err != nil {
+		return err
+	}
+
+	statusLabels := map[string]string{
+		"confirmed":         "飞手已确认接单",
+		"airspace_applying": "正在申请空域许可",
+		"airspace_approved": "空域许可已获批",
+		"loading":           "装货确认",
+		"in_transit":        "无人机已起飞",
+		"delivered":         "已到达目的地，完成卸货",
+	}
+	s.orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       status,
+		Note:         statusLabels[status],
+		OperatorID:   pilot.ID,
+		OperatorType: "pilot",
+	})
+	return nil
+}
+
+func (s *OrderService) ConfirmReceipt(userID int64, orderID int64) error {
+	order, err := s.orderRepo.GetByID(orderID)
+	if err != nil {
+		return errors.New("订单不存在")
+	}
+	if order.ClientUserID != userID && order.RenterID != userID {
+		return errors.New("无权确认此订单")
+	}
+	if order.Status != "delivered" {
+		return errors.New("订单状态不允许确认签收")
+	}
+
+	now := time.Now()
+	if err := s.orderRepo.UpdateFields(orderID, map[string]interface{}{
+		"status":       "completed",
+		"completed_at": &now,
+	}); err != nil {
+		return err
+	}
+
+	s.restoreDroneStatusIfNoActiveOrders(order.DroneID, orderID)
+
+	s.orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       "completed",
+		Note:         "客户已确认签收",
+		OperatorID:   userID,
+		OperatorType: "client",
+	})
+
+	if s.eventService != nil {
+		s.eventService.NotifyOrderStatusChanged(order, "order_completed", "订单已完成", fmt.Sprintf("订单\u201c%s\u201d已完成。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
+	}
+
+	return nil
+}

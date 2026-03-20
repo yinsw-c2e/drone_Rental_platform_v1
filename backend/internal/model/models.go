@@ -448,6 +448,11 @@ type Order struct {
 	Status                 string         `gorm:"type:varchar(40);default:created" json:"status"`
 	FlightStartTime        *time.Time     `json:"flight_start_time"`
 	FlightEndTime          *time.Time     `json:"flight_end_time"`
+	AirspaceStatus         string         `gorm:"type:varchar(20);default:not_required" json:"airspace_status"`
+	LoadingConfirmedAt     *time.Time     `json:"loading_confirmed_at"`
+	LoadingConfirmedBy     int64          `json:"loading_confirmed_by"`
+	UnloadingConfirmedAt   *time.Time     `json:"unloading_confirmed_at"`
+	UnloadingConfirmedBy   int64          `json:"unloading_confirmed_by"`
 	ActualFlightDistance   int            `json:"actual_flight_distance"`
 	ActualFlightDuration   int            `json:"actual_flight_duration"`
 	MaxAltitude            int            `json:"max_altitude"`

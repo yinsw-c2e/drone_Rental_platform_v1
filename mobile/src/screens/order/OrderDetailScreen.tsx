@@ -16,7 +16,7 @@ import ObjectCard from '../../components/business/ObjectCard';
 import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
-import {orderV2Service} from '../../services/orderV2';
+import {orderV2Service, confirmReceipt} from '../../services/orderV2';
 import {RootState} from '../../store/store';
 import {
   OrderPartySummary,
@@ -343,6 +343,33 @@ export default function OrderDetailScreen({route, navigation}: any) {
       });
     }
 
+    if (detail.status === 'delivered' && isClient) {
+      buttons.push({
+        label: '确认签收',
+        tone: 'primary',
+        onPress: () => {
+          Alert.alert('确认签收', '确认已收到货物并完成签收？', [
+            {text: '取消', style: 'cancel'},
+            {
+              text: '确认',
+              onPress: async () => {
+                setActionLoading(true);
+                try {
+                  await confirmReceipt(detail.id);
+                  await fetchDetail();
+                  Alert.alert('签收成功', '订单已完成，感谢您的使用！');
+                } catch (error: any) {
+                  Alert.alert('操作失败', error?.response?.data?.message || '请稍后重试');
+                } finally {
+                  setActionLoading(false);
+                }
+              },
+            },
+          ]);
+        },
+      });
+    }
+
     if (detail.current_dispatch?.id) {
       buttons.push({
         label: '查看派单',
@@ -482,6 +509,18 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <DetailRow label="起始地址" value={detail.service_address || '-'} />
           <DetailRow label="目的地址" value={detail.dest_address || '-'} />
         </ObjectCard>
+
+        {detail.drone ? (
+          <ObjectCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>执行设备</Text>
+            <DetailRow label="品牌型号" value={`${detail.drone.brand} ${detail.drone.model}`} />
+            {detail.drone.serial_number ? (
+              <DetailRow label="序列号" value={detail.drone.serial_number} />
+            ) : null}
+            <DetailRow label="起飞重量" value={detail.drone.mtow_kg != null ? `${detail.drone.mtow_kg} kg` : '-'} />
+            <DetailRow label="最大载重" value={detail.drone.max_payload_kg != null ? `${detail.drone.max_payload_kg} kg` : '-'} />
+          </ObjectCard>
+        ) : null}
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>参与方</Text>

@@ -37,7 +37,12 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
         if (!mounted) {
           return;
         }
-        const list = res.data?.list || [];
+        const allDrones = res.data?.list || [];
+        const list = allDrones.filter(
+          (d: any) =>
+            d.certification_status === 'approved' &&
+            d.availability_status === 'available',
+        );
         setDrones(list);
         if (!selectedDroneId && list.length > 0) {
           setSelectedDroneId(list[0].id);
@@ -122,7 +127,7 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
           <Text style={styles.sectionTitle}>选择执行无人机</Text>
           {drones.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>你还没有可选无人机，先完善机队后再报价。</Text>
+              <Text style={styles.emptyText}>没有符合条件的无人机（需资质审核通过且状态可用），请先完善机队。</Text>
             </View>
           ) : (
             drones.map(drone => {

@@ -774,7 +774,7 @@ export default function HomeScreen({ navigation }: any) {
             desc: '先看哪些需求已经进入报价阶段，再决定是否继续推进。',
             badge: currentDashboard.role_views.client.quoted_demand_count,
             actionText: '查看需求',
-            onPress: () => navigation.navigate('MyDemands'),
+            onPress: () => navigation.navigate('MyDemands', {statusFilter: 'quoting'}),
             tone: 'green',
           },
           {
@@ -814,7 +814,7 @@ export default function HomeScreen({ navigation }: any) {
             desc: '履约中的订单会持续出现在首页，避免你再去翻列表。',
             badge: currentDashboard.role_views.client.in_progress_order_count,
             actionText: '查看订单',
-            onPress: () => navigation.navigate('MyOrders'),
+            onPress: () => navigation.navigate('MyOrders', {roleFilter: 'client', statusFilter: 'in_progress'}),
             tone: 'teal',
           },
         ];
@@ -826,7 +826,7 @@ export default function HomeScreen({ navigation }: any) {
             desc: '优先处理当前机队可承接的新需求，缩短获客反应时间。',
             badge: currentDashboard.role_views.owner.recommended_demand_count,
             actionText: '去报价',
-            onPress: () => navigation.navigate('DemandList'),
+            onPress: () => navigation.navigate('DemandList', {mode: 'owner'}),
             tone: 'blue',
           },
           {
@@ -889,7 +889,7 @@ export default function HomeScreen({ navigation }: any) {
             desc: '已接派单和执行中的任务保持在首页，减少来回切换。',
             badge: currentDashboard.role_views.pilot.active_dispatch_count,
             actionText: '查看任务',
-            onPress: () => navigation.navigate('PilotTaskList'),
+            onPress: () => navigation.navigate('PilotTaskList', {entry: 'accepted'}),
             tone: 'blue',
           },
           {
@@ -898,7 +898,7 @@ export default function HomeScreen({ navigation }: any) {
             desc: '公开需求报名不等于抢单成功，但能提前进入后续候选池。',
             badge: currentDashboard.role_views.pilot.candidate_demand_count,
             actionText: '去查看',
-            onPress: () => navigation.navigate('DemandList'),
+            onPress: () => navigation.navigate('DemandList', {mode: 'pilot'}),
             tone: 'purple',
           },
         ];
@@ -926,7 +926,7 @@ export default function HomeScreen({ navigation }: any) {
                     .pending_response_dispatch_count
                 : 0) + currentDashboard.summary.in_progress_order_count,
             actionText: '查看履约',
-            onPress: () => navigation.navigate('MyOrders'),
+            onPress: () => navigation.navigate('MyOrders', {statusFilter: 'in_progress'}),
             tone: 'orange',
           });
         }

@@ -60,8 +60,8 @@ function AdminLayout() {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} style={{ height: '100vh', overflow: 'auto', position: 'fixed', left: 0, top: 0, bottom: 0 }}>
         <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ color: '#fff', fontSize: collapsed ? 16 : 18, fontWeight: 'bold' }}>
             {collapsed ? 'WRJ' : '无人机管理后台'}
@@ -75,13 +75,13 @@ function AdminLayout() {
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
-      <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+      <Layout style={{ marginLeft: collapsed ? 80 : 200, transition: 'margin-left 0.2s' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', position: 'sticky', top: 0, zIndex: 1 }}>
           <a onClick={() => { localStorage.removeItem('admin_token'); localStorage.removeItem('admin_refresh_token'); window.location.href = '/login'; }}>
             退出登录
           </a>
         </Header>
-        <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8, minHeight: 360 }}>
+        <Content style={{ margin: 24, padding: 24, background: '#fff', borderRadius: 8, minHeight: 360, overflow: 'auto' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/analytics" element={<AnalyticsDashboard />} />

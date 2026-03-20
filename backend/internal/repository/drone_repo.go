@@ -29,7 +29,7 @@ func (r *DroneRepo) GetByID(id int64) (*model.Drone, error) {
 }
 
 func (r *DroneRepo) Update(drone *model.Drone) error {
-	return r.db.Save(drone).Error
+	return r.db.Omit("created_at").Save(drone).Error
 }
 
 func (r *DroneRepo) UpdateFields(id int64, fields map[string]interface{}) error {

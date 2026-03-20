@@ -87,27 +87,28 @@ ensureV2:
 }
 
 func (s *AuthService) SendCode(phone string) error {
+	if s.smsService.IsAliyun() {
+		return s.smsService.SendCode(phone, "")
+	}
 	ctx := context.Background()
 	key := fmt.Sprintf("sms:code:%s", phone)
-
-	// Rate limit: 1 code per minute
 	ttl, _ := s.rds.TTL(ctx, key).Result()
 	if ttl > 4*time.Minute {
 		return errors.New("请稍后再试，验证码发送过于频繁")
 	}
-
 	code := sms.GenerateCode()
 	if err := s.rds.Set(ctx, key, code, 5*time.Minute).Err(); err != nil {
 		return fmt.Errorf("failed to cache code: %w", err)
 	}
-
 	return s.smsService.SendCode(phone, code)
 }
 
 func (s *AuthService) VerifyCode(phone, code string) (bool, error) {
+	if s.smsService.IsAliyun() {
+		return s.smsService.CheckCode(phone, code)
+	}
 	ctx := context.Background()
 	key := fmt.Sprintf("sms:code:%s", phone)
-
 	cached, err := s.rds.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return false, errors.New("验证码已过期")
@@ -115,11 +116,9 @@ func (s *AuthService) VerifyCode(phone, code string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	if cached != code {
 		return false, errors.New("验证码错误")
 	}
-
 	s.rds.Del(ctx, key)
 	return true, nil
 }

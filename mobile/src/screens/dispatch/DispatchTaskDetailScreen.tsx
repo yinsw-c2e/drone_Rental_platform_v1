@@ -118,8 +118,9 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
   const canReassign = Boolean(
     isOwner &&
       task?.id &&
-      !['completed', 'finished'].includes(String(task?.status || '').toLowerCase()) &&
-      order?.id,
+      order?.id &&
+      ['pending_response', 'accepted', 'rejected', 'expired', 'exception'].includes(String(task?.status || '').toLowerCase()) &&
+      ['assigned', 'pending_dispatch'].includes(String(order?.status || '').toLowerCase()),
   );
   const canOpenFlightMonitor = Boolean(order?.id && MONITORABLE_ORDER_STATUSES.includes(String(order?.status || '').toLowerCase()));
 

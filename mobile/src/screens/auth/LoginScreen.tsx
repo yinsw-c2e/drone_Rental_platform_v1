@@ -232,7 +232,7 @@ export default function LoginScreen({navigation}: any) {
               onPress={sendCode}
               disabled={countdown > 0}>
               <Text style={styles.codeBtnText}>
-                {countdown > 0 ? `${countdown}s` : '发送验证码'}
+                {countdown > 0 ? `重新发送(${countdown}s)` : '发送验证码'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -414,8 +414,8 @@ const styles = StyleSheet.create({
     height: 48, borderWidth: 1, borderColor: '#ddd', borderRadius: 8,
     paddingHorizontal: 16, fontSize: 16, marginBottom: 16,
   },
-  codeRow: {flexDirection: 'row', alignItems: 'center'},
-  codeInput: {flex: 1, marginRight: 12},
+  codeRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 16},
+  codeInput: {flex: 1, marginRight: 12, marginBottom: 0},
   codeBtn: {
     height: 48, paddingHorizontal: 16, backgroundColor: '#1890ff',
     borderRadius: 8, justifyContent: 'center',
