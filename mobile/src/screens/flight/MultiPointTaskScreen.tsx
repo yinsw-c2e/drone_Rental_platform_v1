@@ -23,19 +23,21 @@ import {
   MultiPointTaskStop,
   CreateMultiPointTaskRequest,
 } from '../../services/flight';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const TASK_STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待开始', color: '#faad14'},
-  in_progress: {label: '进行中', color: '#1890ff'},
-  completed: {label: '已完成', color: '#52c41a'},
-  cancelled: {label: '已取消', color: '#999'},
+const TASK_STATUS_MAP: Record<string, {label: string; colorKey: 'warning' | 'info' | 'success' | 'textHint'}> = {
+  pending: {label: '待开始', colorKey: 'warning'},
+  in_progress: {label: '进行中', colorKey: 'info'},
+  completed: {label: '已完成', colorKey: 'success'},
+  cancelled: {label: '已取消', colorKey: 'textHint'},
 };
 
-const STOP_STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待到达', color: '#d9d9d9'},
-  arrived: {label: '已到达', color: '#faad14'},
-  completed: {label: '已完成', color: '#52c41a'},
-  skipped: {label: '已跳过', color: '#999'},
+const STOP_STATUS_MAP: Record<string, {label: string; colorKey: 'textHint' | 'warning' | 'success'}> = {
+  pending: {label: '待到达', colorKey: 'textHint'},
+  arrived: {label: '已到达', colorKey: 'warning'},
+  completed: {label: '已完成', colorKey: 'success'},
+  skipped: {label: '已跳过', colorKey: 'textHint'},
 };
 
 const ACTION_TYPE_MAP: Record<string, string> = {
@@ -47,6 +49,8 @@ const ACTION_TYPE_MAP: Record<string, string> = {
 };
 
 export default function MultiPointTaskScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const orderId = route?.params?.orderId;
   const taskIdParam = route?.params?.taskId;
 
@@ -226,7 +230,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
   // No task loaded and no param - show create option
   if (!taskIdParam && !task) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centeredContainer}>
           <Text style={styles.noTaskText}>暂无多点任务</Text>
           <Text style={styles.noTaskSubText}>创建多点任务来管理多站点配送</Text>
@@ -246,7 +250,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
   // Loading
   if (loading && !task) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centeredContainer}>
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
@@ -437,7 +441,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
   const taskStatus = TASK_STATUS_MAP[task?.status || 'pending'] || TASK_STATUS_MAP.pending;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -446,8 +450,8 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
         <View style={styles.taskHeader}>
           <View style={styles.taskTitleRow}>
             <Text style={styles.taskName}>{task?.task_name || '多点任务'}</Text>
-            <View style={[styles.taskStatusBadge, {backgroundColor: taskStatus.color + '20'}]}>
-              <Text style={[styles.taskStatusText, {color: taskStatus.color}]}>
+            <View style={[styles.taskStatusBadge, {backgroundColor: theme[taskStatus.colorKey] + '20'}]}>
+              <Text style={[styles.taskStatusText, {color: theme[taskStatus.colorKey]}]}>
                 {taskStatus.label}
               </Text>
             </View>
@@ -524,7 +528,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
                   <View
                     style={[
                       styles.stopDot,
-                      {backgroundColor: stopStatus.color},
+                      {backgroundColor: theme[stopStatus.colorKey]},
                       isCurrent && styles.stopDotCurrent,
                     ]}
                   />
@@ -539,10 +543,10 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
                 </View>
                 <View style={styles.stopContent}>
                   <View style={styles.stopContentHeader}>
-                    <Text style={[styles.stopItemName, isCurrent && {color: '#1890ff'}]}>
+                    <Text style={[styles.stopItemName, isCurrent && {color: theme.primaryText}]}>
                       {stop.stop_name}
                     </Text>
-                    <Text style={[styles.stopItemStatus, {color: stopStatus.color}]}>
+                    <Text style={[styles.stopItemStatus, {color: theme[stopStatus.colorKey]}]}>
                       {stopStatus.label}
                     </Text>
                   </View>
@@ -647,179 +651,178 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   centeredContainer: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20},
-  loadingText: {fontSize: 16, color: '#666'},
-  noTaskText: {fontSize: 18, color: '#333', fontWeight: '600', marginBottom: 8},
-  noTaskSubText: {fontSize: 14, color: '#999', marginBottom: 24},
+  loadingText: {fontSize: 16, color: theme.textSub},
+  noTaskText: {fontSize: 18, color: theme.text, fontWeight: '600', marginBottom: 8},
+  noTaskSubText: {fontSize: 14, color: theme.textSub, marginBottom: 24},
   createBtn: {
-    backgroundColor: '#1890ff', paddingHorizontal: 32, paddingVertical: 14,
+    backgroundColor: theme.primary, paddingHorizontal: 32, paddingVertical: 14,
     borderRadius: 8,
   },
-  createBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  createBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   // Task header
-  taskHeader: {backgroundColor: '#fff', padding: 16, marginBottom: 1},
+  taskHeader: {backgroundColor: theme.card, padding: 16, marginBottom: 1},
   taskTitleRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 16,
   },
-  taskName: {fontSize: 18, fontWeight: '600', color: '#333', flex: 1},
+  taskName: {fontSize: 18, fontWeight: '600', color: theme.text, flex: 1},
   taskStatusBadge: {paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginLeft: 12},
   taskStatusText: {fontSize: 13, fontWeight: '500'},
   progressSection: {},
   progressBarBg: {
-    height: 8, backgroundColor: '#f0f0f0', borderRadius: 4, overflow: 'hidden',
+    height: 8, backgroundColor: theme.divider, borderRadius: 4, overflow: 'hidden',
   },
-  progressBarFill: {height: '100%', backgroundColor: '#52c41a', borderRadius: 4},
-  progressText: {fontSize: 13, color: '#666', marginTop: 8, textAlign: 'center'},
+  progressBarFill: {height: '100%', backgroundColor: theme.success, borderRadius: 4},
+  progressText: {fontSize: 13, color: theme.textSub, marginTop: 8, textAlign: 'center'},
   // Current stop
   currentStopCard: {
-    backgroundColor: '#e6f7ff', margin: 16, marginBottom: 0,
-    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#91d5ff',
+    backgroundColor: theme.primaryBg, margin: 16, marginBottom: 0,
+    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.primary + '44',
   },
-  currentStopLabel: {fontSize: 12, color: '#1890ff', fontWeight: '600', marginBottom: 8},
-  currentStopName: {fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 4},
-  currentStopAddr: {fontSize: 14, color: '#666', marginBottom: 10},
+  currentStopLabel: {fontSize: 12, color: theme.primaryText, fontWeight: '600', marginBottom: 8},
+  currentStopName: {fontSize: 18, fontWeight: '600', color: theme.text, marginBottom: 4},
+  currentStopAddr: {fontSize: 14, color: theme.textSub, marginBottom: 10},
   currentStopMeta: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
   currentStopActionBadge: {
-    backgroundColor: '#1890ff', paddingHorizontal: 8, paddingVertical: 2,
+    backgroundColor: theme.primary, paddingHorizontal: 8, paddingVertical: 2,
     borderRadius: 4, marginRight: 12,
   },
-  currentStopActionText: {color: '#fff', fontSize: 12},
-  currentStopCoord: {fontSize: 12, color: '#999'},
-  currentStopNotes: {fontSize: 13, color: '#666', fontStyle: 'italic', marginBottom: 8},
+  currentStopActionText: {color: theme.btnPrimaryText, fontSize: 12},
+  currentStopCoord: {fontSize: 12, color: theme.textSub},
+  currentStopNotes: {fontSize: 13, color: theme.textSub, fontStyle: 'italic', marginBottom: 8},
   currentStopActions: {marginTop: 12},
   arriveBtn: {
-    backgroundColor: '#faad14', paddingVertical: 14, borderRadius: 8,
+    backgroundColor: theme.warning, paddingVertical: 14, borderRadius: 8,
     alignItems: 'center',
   },
-  arriveBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  arriveBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   completeBtn: {
-    backgroundColor: '#52c41a', paddingVertical: 14, borderRadius: 8,
+    backgroundColor: theme.success, paddingVertical: 14, borderRadius: 8,
     alignItems: 'center',
   },
-  completeBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  completeBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   // Task actions
   taskActionsCard: {margin: 16, marginBottom: 0},
   startTaskBtn: {
-    backgroundColor: '#1890ff', paddingVertical: 16, borderRadius: 8,
+    backgroundColor: theme.primary, paddingVertical: 16, borderRadius: 8,
     alignItems: 'center',
   },
-  startTaskBtnText: {color: '#fff', fontSize: 18, fontWeight: '600'},
+  startTaskBtnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: '600'},
   // Stops list
   stopsCard: {
-    backgroundColor: '#fff', margin: 16, marginBottom: 0, borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, margin: 16, marginBottom: 0, borderRadius: 12, padding: 16,
   },
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 14},
+  cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 14},
   stopItem: {flexDirection: 'row', minHeight: 80},
-  stopItemCurrent: {backgroundColor: '#e6f7ff', marginHorizontal: -8, paddingHorizontal: 8, borderRadius: 8},
+  stopItemCurrent: {backgroundColor: theme.primaryBg, marginHorizontal: -8, paddingHorizontal: 8, borderRadius: 8},
   stopTimeline: {alignItems: 'center', width: 24, marginRight: 12},
   stopDot: {
     width: 12, height: 12, borderRadius: 6, marginTop: 4,
   },
   stopDotCurrent: {
     width: 16, height: 16, borderRadius: 8, marginTop: 2,
-    borderWidth: 3, borderColor: '#1890ff',
+    borderWidth: 3, borderColor: theme.primary,
   },
   stopLine: {
-    width: 2, flex: 1, backgroundColor: '#e8e8e8', marginVertical: 4,
+    width: 2, flex: 1, backgroundColor: theme.divider, marginVertical: 4,
   },
-  stopLineCompleted: {backgroundColor: '#52c41a'},
+  stopLineCompleted: {backgroundColor: theme.success},
   stopContent: {flex: 1, paddingBottom: 16},
   stopContentHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 4,
   },
-  stopItemName: {fontSize: 15, fontWeight: '600', color: '#333'},
+  stopItemName: {fontSize: 15, fontWeight: '600', color: theme.text},
   stopItemStatus: {fontSize: 12, fontWeight: '500'},
-  stopItemAddr: {fontSize: 13, color: '#666', marginBottom: 4},
+  stopItemAddr: {fontSize: 13, color: theme.textSub, marginBottom: 4},
   stopItemMetaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  stopItemAction: {fontSize: 12, color: '#1890ff', fontWeight: '500'},
-  stopItemTime: {fontSize: 12, color: '#999'},
-  stopItemNotes: {fontSize: 12, color: '#666', fontStyle: 'italic', marginTop: 4},
+  stopItemAction: {fontSize: 12, color: theme.primaryText, fontWeight: '500'},
+  stopItemTime: {fontSize: 12, color: theme.textSub},
+  stopItemNotes: {fontSize: 12, color: theme.textSub, fontStyle: 'italic', marginTop: 4},
   // Timing
   timingCard: {
-    backgroundColor: '#fff', margin: 16, borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, margin: 16, borderRadius: 12, padding: 16,
   },
   timingRow: {
     flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
-  timingLabel: {fontSize: 14, color: '#666'},
-  timingValue: {fontSize: 14, color: '#333'},
-  // Create modal
-  modalFullScreen: {flex: 1, backgroundColor: '#fff'},
+  timingLabel: {fontSize: 14, color: theme.textSub},
+  timingValue: {fontSize: 14, color: theme.text},
+  modalFullScreen: {flex: 1, backgroundColor: theme.card},
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
-  modalCancel: {fontSize: 16, color: '#666'},
-  modalHeaderTitle: {fontSize: 17, fontWeight: '600', color: '#333'},
-  modalSave: {fontSize: 16, color: '#1890ff', fontWeight: '600'},
+  modalCancel: {fontSize: 16, color: theme.textSub},
+  modalHeaderTitle: {fontSize: 17, fontWeight: '600', color: theme.text},
+  modalSave: {fontSize: 16, color: theme.primaryText, fontWeight: '600'},
   modalBody: {padding: 16},
-  fieldLabel: {fontSize: 14, color: '#333', marginBottom: 6, fontWeight: '500'},
+  fieldLabel: {fontSize: 14, color: theme.text, marginBottom: 6, fontWeight: '500'},
   input: {
-    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12,
-    paddingVertical: 10, fontSize: 14, backgroundColor: '#fafafa', marginBottom: 16,
+    borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 12,
+    paddingVertical: 10, fontSize: 14, backgroundColor: theme.bgSecondary, marginBottom: 16,
   },
   textArea: {height: 80, textAlignVertical: 'top'},
   stopsHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 12,
   },
-  addStopBtn: {fontSize: 14, color: '#1890ff', fontWeight: '600'},
+  addStopBtn: {fontSize: 14, color: theme.primaryText, fontWeight: '600'},
   emptyStops: {paddingVertical: 30, alignItems: 'center'},
-  emptyStopsText: {fontSize: 14, color: '#999'},
+  emptyStopsText: {fontSize: 14, color: theme.textSub},
   stopPreviewCard: {
-    backgroundColor: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 10,
-    borderWidth: 1, borderColor: '#f0f0f0',
+    backgroundColor: theme.bgSecondary, borderRadius: 8, padding: 12, marginBottom: 10,
+    borderWidth: 1, borderColor: theme.divider,
   },
   stopPreviewHeader: {
     flexDirection: 'row', alignItems: 'center', marginBottom: 6,
   },
   stopSeqBadge: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#1890ff',
+    width: 24, height: 24, borderRadius: 12, backgroundColor: theme.primary,
     justifyContent: 'center', alignItems: 'center', marginRight: 8,
   },
-  stopSeqText: {color: '#fff', fontSize: 12, fontWeight: '600'},
-  stopPreviewName: {fontSize: 15, fontWeight: '600', color: '#333', flex: 1},
+  stopSeqText: {color: theme.btnPrimaryText, fontSize: 12, fontWeight: '600'},
+  stopPreviewName: {fontSize: 15, fontWeight: '600', color: theme.text, flex: 1},
   stopActionBadge: {
-    backgroundColor: '#e6f7ff', paddingHorizontal: 6, paddingVertical: 2,
+    backgroundColor: theme.primaryBg, paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: 4, marginRight: 8,
   },
-  stopActionText: {fontSize: 11, color: '#1890ff'},
-  removeStopText: {fontSize: 13, color: '#ff4d4f'},
-  stopPreviewAddr: {fontSize: 13, color: '#666', marginLeft: 32},
-  stopPreviewCoord: {fontSize: 12, color: '#999', marginLeft: 32, marginTop: 2},
+  stopActionText: {fontSize: 11, color: theme.primaryText},
+  removeStopText: {fontSize: 13, color: theme.danger},
+  stopPreviewAddr: {fontSize: 13, color: theme.textSub, marginLeft: 32},
+  stopPreviewCoord: {fontSize: 12, color: theme.textSub, marginLeft: 32, marginTop: 2},
   // Add stop modal
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center', alignItems: 'center',
   },
-  modalContent: {backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%'},
-  modalTitle: {fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 16},
-  modalSubtitle: {fontSize: 14, color: '#666', marginBottom: 16},
+  modalContent: {backgroundColor: theme.card, borderRadius: 16, padding: 24, width: '90%'},
+  modalTitle: {fontSize: 18, fontWeight: '600', color: theme.text, marginBottom: 16},
+  modalSubtitle: {fontSize: 14, color: theme.textSub, marginBottom: 16},
   coordInputRow: {flexDirection: 'row', gap: 12},
   coordInputItem: {flex: 1},
   actionTypeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16},
   actionTypeChip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
-    borderWidth: 1, borderColor: '#ddd', backgroundColor: '#fafafa',
+    borderWidth: 1, borderColor: theme.divider, backgroundColor: theme.bgSecondary,
   },
-  actionTypeChipActive: {borderColor: '#1890ff', backgroundColor: '#e6f7ff'},
-  actionTypeChipText: {fontSize: 13, color: '#666'},
-  actionTypeChipTextActive: {color: '#1890ff', fontWeight: '500'},
+  actionTypeChipActive: {borderColor: theme.primary, backgroundColor: theme.primaryBg},
+  actionTypeChipText: {fontSize: 13, color: theme.textSub},
+  actionTypeChipTextActive: {color: theme.primaryText, fontWeight: '500'},
   modalActions: {flexDirection: 'row', gap: 12, marginTop: 8},
   modalCancelBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 8,
-    borderWidth: 1, borderColor: '#ddd', alignItems: 'center',
+    borderWidth: 1, borderColor: theme.divider, alignItems: 'center',
   },
-  modalCancelText: {fontSize: 16, color: '#666'},
+  modalCancelText: {fontSize: 16, color: theme.textSub},
   modalConfirmBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 8,
-    backgroundColor: '#1890ff', alignItems: 'center',
+    backgroundColor: theme.primary, alignItems: 'center',
   },
-  modalConfirmText: {fontSize: 16, color: '#fff', fontWeight: '600'},
+  modalConfirmText: {fontSize: 16, color: theme.btnPrimaryText, fontWeight: '600'},
 });

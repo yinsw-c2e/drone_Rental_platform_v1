@@ -1,5 +1,6 @@
 import React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {useTheme} from '../../theme/ThemeContext';
 
 type Props = {
   icon?: string;
@@ -16,14 +17,24 @@ export default function EmptyState({
   actionText,
   onAction,
 }: Props) {
+  const {theme} = useTheme();
   return (
     <View style={styles.wrap}>
       <Text style={styles.icon}>{icon}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {description ? <Text style={styles.desc}>{description}</Text> : null}
+      <Text style={[styles.title, {color: theme.text}]}>{title}</Text>
+      {description ? (
+        <Text style={[styles.desc, {color: theme.textSub}]}>{description}</Text>
+      ) : null}
       {actionText && onAction ? (
-        <TouchableOpacity style={styles.actionBtn} onPress={onAction}>
-          <Text style={styles.actionText}>{actionText}</Text>
+        <TouchableOpacity
+          style={[
+            styles.actionBtn,
+            {backgroundColor: theme.primaryBg, borderColor: theme.primaryBorder},
+          ]}
+          onPress={onAction}>
+          <Text style={[styles.actionText, {color: theme.primaryText}]}>
+            {actionText}
+          </Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -43,7 +54,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    color: '#262626',
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -51,18 +61,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
     textAlign: 'center',
   },
   actionBtn: {
     marginTop: 18,
     borderRadius: 999,
-    backgroundColor: '#1677ff',
+    borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   actionText: {
-    color: '#fff',
     fontSize: 13,
     fontWeight: '700',
   },

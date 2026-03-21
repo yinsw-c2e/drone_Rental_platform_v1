@@ -19,8 +19,12 @@ import {
   getViolationTypeText,
   getViolationLevelText,
 } from '../../services/credit';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const ViolationListScreen: React.FC = () => {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [violations, setViolations] = useState<Violation[]>([]);
@@ -182,7 +186,7 @@ const ViolationListScreen: React.FC = () => {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>扣除信用分</Text>
-              <Text style={[styles.detailValue, { color: '#f5222d' }]}>-{selectedViolation.score_deduction}</Text>
+              <Text style={[styles.detailValue, { color: theme.danger }]}>-{selectedViolation.score_deduction}</Text>
             </View>
             {selectedViolation.freeze_days > 0 && (
               <View style={styles.detailRow}>
@@ -247,7 +251,7 @@ const ViolationListScreen: React.FC = () => {
               disabled={submitting}
             >
               {submitting ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={theme.btnPrimaryText} size="small" />
               ) : (
                 <Text style={styles.submitBtnText}>提交</Text>
               )}
@@ -261,7 +265,7 @@ const ViolationListScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1890ff" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -287,10 +291,10 @@ const ViolationListScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -301,7 +305,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
@@ -318,22 +322,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   levelText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 12,
   },
   violationNo: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   violationType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 4,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
     lineHeight: 20,
     marginBottom: 8,
   },
@@ -344,7 +348,7 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   statusContainer: {
     flexDirection: 'row',
@@ -352,23 +356,23 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginRight: 4,
   },
   statusValue: {
     fontSize: 12,
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   penaltyInfo: {
     flexDirection: 'row',
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
   },
   penaltyText: {
     fontSize: 12,
-    color: '#f5222d',
+    color: theme.danger,
     marginRight: 16,
   },
   emptyContainer: {
@@ -377,37 +381,37 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   closeBtn: {
     fontSize: 16,
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     margin: 16,
     borderRadius: 8,
     padding: 16,
@@ -416,27 +420,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   detailLabel: {
     width: 90,
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   detailValue: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
   },
   appealBtn: {
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     marginHorizontal: 16,
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },
   appealBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -447,26 +451,26 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   appealModal: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
   },
   appealTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   appealTip: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
     textAlign: 'center',
     marginBottom: 16,
   },
   appealInput: {
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     borderRadius: 8,
     padding: 12,
     height: 120,
@@ -476,7 +480,7 @@ const styles = StyleSheet.create({
   charCount: {
     textAlign: 'right',
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 4,
     marginBottom: 16,
   },
@@ -487,19 +491,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
     marginRight: 12,
     alignItems: 'center',
   },
   cancelBtnText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
   },
   submitBtn: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     alignItems: 'center',
   },
   disabledBtn: {
@@ -507,7 +511,7 @@ const styles = StyleSheet.create({
   },
   submitBtnText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
 });
 

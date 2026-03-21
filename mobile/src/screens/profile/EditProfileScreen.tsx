@@ -8,8 +8,12 @@ import {RootState} from '../../store/store';
 import {updateUser} from '../../store/slices/authSlice';
 import {userService} from '../../services/user';
 import {getRoleLabels} from '../../utils/roleSummary';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function EditProfileScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const dispatch = useDispatch();
@@ -53,7 +57,7 @@ export default function EditProfileScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView keyboardShouldPersistTaps="handled">
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>基本信息</Text>
@@ -123,7 +127,7 @@ export default function EditProfileScreen({navigation}: any) {
           onPress={handleSave}
           disabled={saving}>
           {saving ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.btnPrimaryText} />
           ) : (
             <Text style={styles.saveBtnText}>保存修改</Text>
           )}
@@ -133,19 +137,19 @@ export default function EditProfileScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  section: {backgroundColor: '#fff', marginTop: 12, padding: 16},
-  sectionTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4},
-  sectionDesc: {fontSize: 13, color: '#999', marginBottom: 12},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  section: {backgroundColor: theme.card, marginTop: 12, padding: 16},
+  sectionTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 4},
+  sectionDesc: {fontSize: 13, color: theme.textSub, marginBottom: 12},
   field: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
-  label: {fontSize: 15, color: '#333'},
-  readOnly: {fontSize: 15, color: '#999'},
+  label: {fontSize: 15, color: theme.text},
+  readOnly: {fontSize: 15, color: theme.textSub},
   input: {
-    flex: 1, textAlign: 'right', fontSize: 15, color: '#333',
+    flex: 1, textAlign: 'right', fontSize: 15, color: theme.text,
     paddingVertical: 0, marginLeft: 16,
   },
   roleSummaryBox: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 8},
@@ -153,18 +157,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#e6f4ff',
+    backgroundColor: theme.primaryBg,
   },
-  roleChipText: {fontSize: 13, color: '#1677ff', fontWeight: '600'},
-  roleEmptyText: {fontSize: 13, color: '#999'},
+  roleChipText: {fontSize: 13, color: theme.primaryText, fontWeight: '600'},
+  roleEmptyText: {fontSize: 13, color: theme.textSub},
   footer: {
-    backgroundColor: '#fff', padding: 16, paddingBottom: 32,
-    borderTopWidth: 1, borderTopColor: '#e8e8e8',
+    backgroundColor: theme.card, padding: 16, paddingBottom: 32,
+    borderTopWidth: 1, borderTopColor: theme.divider,
   },
   saveBtn: {
-    height: 48, backgroundColor: '#1890ff', borderRadius: 24,
+    height: 48, backgroundColor: theme.primary, borderRadius: 24,
     justifyContent: 'center', alignItems: 'center',
   },
-  saveBtnDisabled: {backgroundColor: '#91caff'},
-  saveBtnText: {color: '#fff', fontSize: 17, fontWeight: '600'},
+  saveBtnDisabled: {backgroundColor: theme.primaryBorder},
+  saveBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '600'},
 });

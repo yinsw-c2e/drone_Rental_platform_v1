@@ -4,8 +4,12 @@ import {
   SafeAreaView, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import {droneService} from '../../services/drone';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function EditDroneScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {id} = route.params;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,14 +98,14 @@ export default function EditDroneScreen({navigation, route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 80}} color="#1890ff" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={{marginTop: 80}} color={theme.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView style={styles.scroll}>
         <View style={styles.warningBox}>
           <Text style={styles.warningText}>⚠️ 修改品牌、型号、序列号、MTOW或最大载重后，基础资质审核将重置为"待审核"，需重新通过审核后方可接单。</Text>
@@ -140,24 +144,24 @@ export default function EditDroneScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   scroll: {padding: 16},
   group: {marginBottom: 16},
-  label: {fontSize: 14, color: '#333', fontWeight: '500', marginBottom: 6},
+  label: {fontSize: 14, color: theme.text, fontWeight: '500', marginBottom: 6},
   input: {
-    backgroundColor: '#fff', borderRadius: 8,
+    backgroundColor: theme.card, borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 15, borderWidth: 1, borderColor: '#e8e8e8',
+    fontSize: 15, borderWidth: 1, borderColor: theme.divider,
   },
   textarea: {height: 100, textAlignVertical: 'top'},
   btn: {
-    backgroundColor: '#1890ff', borderRadius: 8,
+    backgroundColor: theme.primary, borderRadius: 8,
     paddingVertical: 14, alignItems: 'center',
     marginTop: 8, marginBottom: 40,
   },
   btnDisabled: {opacity: 0.6},
-  btnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  warningBox: {backgroundColor: '#fff7e6', borderRadius: 8, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#ffd591'},
-  warningText: {fontSize: 13, color: '#d46b08', lineHeight: 20},
+  btnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
+  warningBox: {backgroundColor: theme.warning + '22', borderRadius: 8, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: theme.warning + '55'},
+  warningText: {fontSize: 13, color: theme.warning, lineHeight: 20},
 });

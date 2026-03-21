@@ -7,8 +7,12 @@ import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 import {demandService} from '../../services/demand';
 import {CargoDemand} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function CargoDetailScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {id} = route.params;
   const [cargo, setCargo] = useState<CargoDemand | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,15 +90,15 @@ export default function CargoDetailScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 100}} color="#fa8c16" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={{marginTop: 100}} color={theme.warning} />
       </SafeAreaView>
     );
   }
 
   if (!cargo) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📦</Text>
           <Text style={styles.emptyText}>货运需求不存在</Text>
@@ -104,7 +108,7 @@ export default function CargoDetailScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* 状态标签 */}
         <View style={[styles.statusBadge, {backgroundColor: getStatusColor(cargo.status) + '20'}]}>
@@ -216,8 +220,8 @@ export default function CargoDetailScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {paddingBottom: 100},
   statusBadge: {
     alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8,
@@ -225,60 +229,60 @@ const styles = StyleSheet.create({
   },
   statusText: {fontSize: 14, fontWeight: '600'},
   card: {
-    backgroundColor: '#fff', marginHorizontal: 16, marginVertical: 8,
+    backgroundColor: theme.card, marginHorizontal: 16, marginVertical: 8,
     borderRadius: 12, padding: 16,
   },
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
-  cardTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12},
+  cardTitle: {fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 12},
   typeBadge: {
-    backgroundColor: '#fff7e6', paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 4, borderWidth: 1, borderColor: '#ffd591',
+    backgroundColor: theme.warning + '22', paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 4, borderWidth: 1, borderColor: theme.warning + '44',
   },
-  typeText: {fontSize: 12, color: '#fa8c16', fontWeight: '600'},
+  typeText: {fontSize: 12, color: theme.warning, fontWeight: '600'},
   infoRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 8},
-  infoLabel: {fontSize: 14, color: '#999', minWidth: 80},
-  infoValue: {fontSize: 14, color: '#333', fontWeight: '500'},
+  infoLabel: {fontSize: 14, color: theme.textSub, minWidth: 80},
+  infoValue: {fontSize: 14, color: theme.text, fontWeight: '500'},
   addressBox: {flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8},
   addressIcon: {width: 24, alignItems: 'center', marginRight: 8},
   addressIconText: {fontSize: 16},
   addressContent: {flex: 1},
-  addressLabel: {fontSize: 12, color: '#999', marginBottom: 4},
-  addressText: {fontSize: 14, color: '#333', lineHeight: 20},
+  addressLabel: {fontSize: 12, color: theme.textSub, marginBottom: 4},
+  addressText: {fontSize: 14, color: theme.text, lineHeight: 20},
   routeLine: {
-    width: 2, height: 20, backgroundColor: '#e8e8e8',
+    width: 2, height: 20, backgroundColor: theme.divider,
     marginLeft: 11, marginBottom: 8,
   },
   priceRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingVertical: 8,
   },
-  priceLabel: {fontSize: 15, color: '#666'},
-  priceValue: {fontSize: 22, color: '#fa8c16', fontWeight: 'bold'},
+  priceLabel: {fontSize: 15, color: theme.textSub},
+  priceValue: {fontSize: 22, color: theme.warning, fontWeight: 'bold'},
   publisherRow: {flexDirection: 'row', alignItems: 'center'},
   avatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: '#fa8c16',
+    width: 48, height: 48, borderRadius: 24, backgroundColor: theme.warning,
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  avatarText: {fontSize: 18, color: '#fff', fontWeight: 'bold'},
+  avatarText: {fontSize: 18, color: theme.btnPrimaryText, fontWeight: 'bold'},
   publisherInfo: {flex: 1},
-  publisherName: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 4},
-  publisherMeta: {fontSize: 12, color: '#999'},
+  publisherName: {fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 4},
+  publisherMeta: {fontSize: 12, color: theme.textSub},
   contactBtn: {
-    paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#fa8c16',
+    paddingHorizontal: 20, paddingVertical: 8, backgroundColor: theme.warning,
     borderRadius: 20,
   },
-  contactBtnText: {color: '#fff', fontSize: 14, fontWeight: '600'},
+  contactBtnText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: '600'},
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#fff', padding: 16, paddingBottom: 24,
-    borderTopWidth: 1, borderTopColor: '#f0f0f0',
+    backgroundColor: theme.card, padding: 16, paddingBottom: 24,
+    borderTopWidth: 1, borderTopColor: theme.divider,
   },
   acceptBtn: {
-    height: 48, backgroundColor: '#fa8c16', borderRadius: 24,
+    height: 48, backgroundColor: theme.warning, borderRadius: 24,
     justifyContent: 'center', alignItems: 'center',
   },
-  acceptBtnText: {color: '#fff', fontSize: 17, fontWeight: 'bold'},
+  acceptBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: 'bold'},
   empty: {alignItems: 'center', paddingTop: 100},
   emptyIcon: {fontSize: 64, marginBottom: 16},
-  emptyText: {fontSize: 16, color: '#999'},
+  emptyText: {fontSize: 16, color: theme.textSub},
 });

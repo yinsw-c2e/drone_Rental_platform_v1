@@ -13,6 +13,8 @@ import {
 import AddressInputField from '../../components/AddressInputField';
 import {demandV2Service} from '../../services/demandV2';
 import {AddressData} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const sceneOptions = [
   {key: 'power_grid', label: '电网建设'},
@@ -50,6 +52,8 @@ const toAddressSnapshot = (value: AddressData | null | undefined) =>
     : undefined;
 
 export default function PublishDemandScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [cargoScene, setCargoScene] = useState(sceneOptions[0].key);
@@ -105,7 +109,7 @@ export default function PublishDemandScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>发布重载吊运需求</Text>
         <Text style={styles.subtitle}>创建的是 v2 需求对象，发布后会进入公开需求市场，供机主报价、飞手候选。</Text>
@@ -164,20 +168,20 @@ export default function PublishDemandScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.card},
   content: {padding: 20, paddingBottom: 40},
-  title: {fontSize: 24, fontWeight: '700', color: '#102a43'},
-  subtitle: {fontSize: 13, lineHeight: 20, color: '#6b7280', marginTop: 8},
-  label: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8, marginTop: 18},
+  title: {fontSize: 24, fontWeight: '700', color: theme.text},
+  subtitle: {fontSize: 13, lineHeight: 20, color: theme.textSub, marginTop: 8},
+  label: {fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 8, marginTop: 18},
   input: {
     borderWidth: 1,
-    borderColor: '#d9e2ec',
+    borderColor: theme.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
   },
   textarea: {height: 96},
   optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
@@ -186,38 +190,38 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#d9e2ec',
+    borderColor: theme.cardBorder,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   optionBtnActive: {
-    borderColor: '#1677ff',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
-  optionText: {fontSize: 13, color: '#475569'},
-  optionTextActive: {color: '#1677ff', fontWeight: '600'},
+  optionText: {fontSize: 13, color: theme.textSub},
+  optionTextActive: {color: theme.primaryText, fontWeight: '600'},
   budgetRow: {flexDirection: 'row', alignItems: 'center'},
   flexInput: {flex: 1},
-  split: {marginHorizontal: 10, color: '#94a3b8'},
+  split: {marginHorizontal: 10, color: theme.textHint},
   tipCard: {
     marginTop: 18,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: theme.info + '18',
     borderWidth: 1,
-    borderColor: '#bae6fd',
+    borderColor: theme.info + '44',
     borderRadius: 14,
     padding: 14,
   },
-  tipTitle: {fontSize: 14, fontWeight: '700', color: '#075985', marginBottom: 6},
-  tipText: {fontSize: 12, lineHeight: 18, color: '#0f766e'},
+  tipTitle: {fontSize: 14, fontWeight: '700', color: theme.info, marginBottom: 6},
+  tipText: {fontSize: 12, lineHeight: 18, color: theme.info},
   submitBtn: {
     marginTop: 28,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#1677ff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: '#fff', fontSize: 17, fontWeight: '700'},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '700'},
 });

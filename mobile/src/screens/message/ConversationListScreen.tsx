@@ -16,6 +16,8 @@ import {messageService} from '../../services/message';
 import {notificationV2Service} from '../../services/notificationV2';
 import {RootState} from '../../store/store';
 import {ConversationSummary, V2NotificationSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type MessageCenterTab = 'notifications' | 'conversations';
 
@@ -130,6 +132,8 @@ function resolveNotificationSubtitle(notification: V2NotificationSummary) {
 }
 
 export default function ConversationListScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const [activeTab, setActiveTab] = useState<MessageCenterTab>('notifications');
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -316,7 +320,7 @@ export default function ConversationListScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>消息</Text>
         <Text style={styles.headerSubtitle}>系统通知承载业务事件，会话消息只用于沟通</Text>
@@ -358,7 +362,7 @@ export default function ConversationListScreen({navigation}: any) {
               <Text style={styles.sectionMeta}>{section.data.filter(item => !item.is_read).length} 未读</Text>
             </View>
           )}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1677ff']} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
           stickySectionHeadersEnabled={false}
           ListEmptyComponent={
             <EmptyState
@@ -374,7 +378,7 @@ export default function ConversationListScreen({navigation}: any) {
           data={conversations}
           keyExtractor={item => item.conversation_id}
           renderItem={renderConversation}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1677ff']} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
           ListHeaderComponent={
             <View style={styles.chatHint}>
               <Text style={styles.chatHintTitle}>聊天只用于沟通</Text>
@@ -395,25 +399,25 @@ export default function ConversationListScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f7fb'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bg},
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     paddingHorizontal: 18,
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#edf1f5',
+    borderBottomColor: theme.divider,
   },
-  headerTitle: {fontSize: 22, fontWeight: '800', color: '#1f1f1f'},
-  headerSubtitle: {marginTop: 6, fontSize: 12, lineHeight: 18, color: '#8c8c8c'},
+  headerTitle: {fontSize: 22, fontWeight: '800', color: theme.text},
+  headerSubtitle: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
   tabWrap: {
     flexDirection: 'row',
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 8,
     padding: 4,
-    backgroundColor: '#eef3fb',
+    backgroundColor: theme.tabBg,
     borderRadius: 999,
   },
   tabBtn: {
@@ -425,26 +429,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   tabBtnActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#1d4ed8',
+    backgroundColor: theme.card,
+    shadowColor: theme.primary,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: {width: 0, height: 2},
     elevation: 1,
   },
-  tabText: {fontSize: 14, fontWeight: '700', color: '#6b7280'},
-  tabTextActive: {color: '#1677ff'},
+  tabText: {fontSize: 14, fontWeight: '700', color: theme.textSub},
+  tabTextActive: {color: theme.primaryText},
   tabBadge: {
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#ff4d4f',
+    backgroundColor: theme.danger,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
     marginLeft: 6,
   },
-  tabBadgeText: {color: '#fff', fontSize: 10, fontWeight: '700'},
+  tabBadgeText: {color: theme.btnPrimaryText, fontSize: 10, fontWeight: '700'},
   listContent: {paddingHorizontal: 16, paddingBottom: 24},
   emptyListContent: {flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24},
   sectionHeader: {
@@ -454,11 +458,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  sectionTitle: {fontSize: 15, fontWeight: '800', color: '#262626'},
-  sectionMeta: {fontSize: 12, color: '#8c8c8c'},
+  sectionTitle: {fontSize: 15, fontWeight: '800', color: theme.text},
+  sectionMeta: {fontSize: 12, color: theme.textSub},
   item: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 14,
     borderRadius: 18,
     marginBottom: 10,
@@ -468,7 +472,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e6f4ff',
+    backgroundColor: theme.primaryBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -476,24 +480,24 @@ const styles = StyleSheet.create({
   avatarText: {fontSize: 22},
   content: {flex: 1},
   topRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  name: {fontSize: 15, fontWeight: '700', color: '#262626', flex: 1, marginRight: 8},
-  time: {fontSize: 12, color: '#8c8c8c'},
+  name: {fontSize: 15, fontWeight: '700', color: theme.text, flex: 1, marginRight: 8},
+  time: {fontSize: 12, color: theme.textSub},
   bottomRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6},
-  lastMsg: {fontSize: 13, color: '#8c8c8c', flex: 1, marginRight: 8},
+  lastMsg: {fontSize: 13, color: theme.textSub, flex: 1, marginRight: 8},
   badge: {
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#ff4d4f',
+    backgroundColor: theme.danger,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 5,
   },
-  badgeText: {color: '#fff', fontSize: 10, fontWeight: '700'},
+  badgeText: {color: theme.btnPrimaryText, fontSize: 10, fontWeight: '700'},
   notificationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 14,
     marginBottom: 10,
@@ -502,29 +506,29 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f3f9ff',
+    backgroundColor: theme.primaryBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   notificationIcon: {fontSize: 20},
   notificationContent: {flex: 1},
-  notificationSubtitle: {marginTop: 2, fontSize: 12, color: '#1677ff', fontWeight: '600'},
-  notificationBody: {marginTop: 4, fontSize: 13, lineHeight: 19, color: '#595959'},
+  notificationSubtitle: {marginTop: 2, fontSize: 12, color: theme.primaryText, fontWeight: '600'},
+  notificationBody: {marginTop: 4, fontSize: 13, lineHeight: 19, color: theme.textSub},
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#ff4d4f',
+    backgroundColor: theme.danger,
     marginLeft: 10,
   },
   chatHint: {
-    backgroundColor: '#fffbe6',
+    backgroundColor: theme.warning + '22',
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
     marginBottom: 12,
   },
-  chatHintTitle: {fontSize: 13, fontWeight: '800', color: '#ad6800'},
-  chatHintText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: '#8c6d1f'},
+  chatHintTitle: {fontSize: 13, fontWeight: '800', color: theme.warning},
+  chatHintText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: theme.warning},
 });

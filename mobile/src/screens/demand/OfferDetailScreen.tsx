@@ -26,8 +26,12 @@ import {
   summarizeFlexibleValue,
   summarizeServiceArea,
 } from '../../utils/supplyMeta';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 function SceneTag({label}: {label: string}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.sceneTag}>
       <Text style={styles.sceneTagText}>{label}</Text>
@@ -36,6 +40,8 @@ function SceneTag({label}: {label: string}) {
 }
 
 export default function OfferDetailScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {id} = route.params;
   const {user, roleSummary} = useSelector((state: RootState) => state.auth);
 
@@ -100,15 +106,15 @@ export default function OfferDetailScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={styles.loading} color="#0f5cab" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={styles.loading} color={theme.primary} />
       </SafeAreaView>
     );
   }
 
   if (!supply) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.emptyWrap}>
           <ObjectCard>
             <EmptyState
@@ -131,7 +137,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
   const pricingRuleText = summarizeFlexibleValue(supply.pricing_rule, '按基础价格执行');
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroTop}>
@@ -225,7 +231,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
         </ObjectCard>
 
         {!supply.accepts_direct_order ? (
-          <ObjectCard highlightColor="#ffd591">
+          <ObjectCard highlightColor={theme.warning + '88'}>
             <Text style={styles.sectionTitle}>下单提醒</Text>
             <Text style={styles.noticeText}>这条供给当前不接受客户直达下单。你可以联系机主沟通需求，或返回市场继续浏览其他供给。</Text>
           </ObjectCard>
@@ -286,27 +292,27 @@ export default function OfferDetailScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#eef3f8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 14, paddingBottom: 96, gap: 12},
   loading: {paddingTop: 120},
   emptyWrap: {padding: 14, paddingTop: 48},
-  heroCard: {backgroundColor: '#0f5cab'},
+  heroCard: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
   heroTop: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12},
   heroTags: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center'},
-  supplyNo: {fontSize: 12, color: '#d6e4ff', fontWeight: '700'},
-  title: {marginTop: 14, fontSize: 26, lineHeight: 32, color: '#ffffff', fontWeight: '800'},
-  price: {marginTop: 10, fontSize: 18, color: '#fff7e6', fontWeight: '800'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d6e4ff'},
-  sectionTitle: {fontSize: 17, fontWeight: '700', color: '#0f172a', marginBottom: 10},
+  supplyNo: {fontSize: 12, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '700'},
+  title: {marginTop: 14, fontSize: 26, lineHeight: 32, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800'},
+  price: {marginTop: 10, fontSize: 18, color: theme.isDark ? '#FFE4C4' : '#fff7e6', fontWeight: '800'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
+  sectionTitle: {fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 10},
   sceneRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10},
-  sceneTag: {backgroundColor: '#eff6ff', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6},
-  sceneTagText: {fontSize: 12, color: '#2563eb', fontWeight: '600'},
+  sceneTag: {backgroundColor: theme.primaryBg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6},
+  sceneTagText: {fontSize: 12, color: theme.primaryText, fontWeight: '600'},
   infoRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginTop: 8},
-  infoLabel: {fontSize: 13, color: '#64748b'},
-  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: '#0f172a', fontWeight: '600'},
-  description: {marginTop: 10, fontSize: 13, lineHeight: 22, color: '#334155'},
-  noticeText: {fontSize: 13, lineHeight: 21, color: '#b45309'},
+  infoLabel: {fontSize: 13, color: theme.textSub},
+  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: theme.text, fontWeight: '600'},
+  description: {marginTop: 10, fontSize: 13, lineHeight: 22, color: theme.text},
+  noticeText: {fontSize: 13, lineHeight: 21, color: theme.warning},
   footer: {
     position: 'absolute',
     left: 0,
@@ -314,9 +320,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: theme.divider,
     flexDirection: 'row',
     gap: 10,
   },
@@ -325,19 +331,19 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: theme.primaryBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.primaryBg,
   },
-  secondaryBtnText: {fontSize: 15, color: '#1d4ed8', fontWeight: '700'},
+  secondaryBtnText: {fontSize: 15, color: theme.primaryText, fontWeight: '700'},
   primaryBtn: {
     height: 46,
     borderRadius: 12,
-    backgroundColor: '#1677ff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  primaryBtnText: {fontSize: 15, color: '#fff', fontWeight: '700'},
+  primaryBtnText: {fontSize: 15, color: theme.btnPrimaryText, fontWeight: '700'},
   disabledBtn: {opacity: 0.5},
 });

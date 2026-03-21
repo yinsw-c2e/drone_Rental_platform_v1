@@ -14,6 +14,8 @@ import AddressInputField from '../../components/AddressInputField';
 import ImagePickerGroup from '../../components/ImagePickerGroup';
 import {demandV2Service} from '../../services/demandV2';
 import {AddressData} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const sceneOptions = [
   {key: 'power_grid', label: '电网建设'},
@@ -51,6 +53,8 @@ const buildDefaultTimes = () => {
 };
 
 export default function PublishCargoScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [cargoScene, setCargoScene] = useState(sceneOptions[0].key);
   const [cargoType, setCargoType] = useState('material');
   const [cargoWeight, setCargoWeight] = useState('');
@@ -106,7 +110,7 @@ export default function PublishCargoScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>发布运输需求</Text>
         <Text style={styles.subtitle}>这里创建的是 v2 公开需求，不再直接生成旧货运订单。</Text>
@@ -167,20 +171,20 @@ export default function PublishCargoScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.card},
   content: {padding: 20, paddingBottom: 40},
-  title: {fontSize: 24, fontWeight: '700', color: '#102a43'},
-  subtitle: {fontSize: 13, lineHeight: 20, color: '#6b7280', marginTop: 8},
-  label: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8, marginTop: 18},
+  title: {fontSize: 24, fontWeight: '700', color: theme.text},
+  subtitle: {fontSize: 13, lineHeight: 20, color: theme.textSub, marginTop: 8},
+  label: {fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 8, marginTop: 18},
   input: {
     borderWidth: 1,
-    borderColor: '#d9e2ec',
+    borderColor: theme.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
   },
   textarea: {height: 96},
   optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
@@ -189,25 +193,25 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#d9e2ec',
+    borderColor: theme.cardBorder,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   optionBtnActive: {
-    borderColor: '#fa8c16',
-    backgroundColor: '#fff7e6',
+    borderColor: theme.warning,
+    backgroundColor: theme.warning + '22',
   },
-  optionText: {fontSize: 13, color: '#475569'},
-  optionTextActive: {color: '#d46b08', fontWeight: '600'},
+  optionText: {fontSize: 13, color: theme.textSub},
+  optionTextActive: {color: theme.warning, fontWeight: '600'},
   submitBtn: {
     marginTop: 28,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#fa8c16',
+    backgroundColor: theme.warning,
     justifyContent: 'center',
     alignItems: 'center',
   },
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: '#fff', fontSize: 17, fontWeight: '700'},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '700'},
 });

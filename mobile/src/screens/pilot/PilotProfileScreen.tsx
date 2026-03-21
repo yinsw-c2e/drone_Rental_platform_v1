@@ -18,6 +18,8 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {dispatchV2Service} from '../../services/dispatchV2';
 import {pilotV2Service} from '../../services/pilotV2';
 import {aggregateFlightRecords, formatHoursFromSeconds} from '../../utils/flightRecords';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const STATUS_MAP: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray'}> = {
   verified: {label: '已认证', tone: 'green'},
@@ -44,6 +46,8 @@ const parseSkills = (skills: any): string[] => {
 };
 
 export default function PilotProfileScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [pilot, setPilot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -175,7 +179,7 @@ export default function PilotProfileScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingWrap}>
           <Text style={styles.loadingText}>飞手档案加载中...</Text>
         </View>
@@ -185,7 +189,7 @@ export default function PilotProfileScreen({navigation}: any) {
 
   if (!pilot) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyTitle}>还没有飞手档案</Text>
           <Text style={styles.emptyDesc}>先完成飞手认证，后面这里才会出现接单状态、服务区域和执行统计。</Text>
@@ -198,7 +202,7 @@ export default function PilotProfileScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <ObjectCard style={styles.heroCard}>
           <Text style={styles.heroEyebrow}>飞手档案</Text>
@@ -300,41 +304,41 @@ export default function PilotProfileScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#eef3f8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 16, paddingBottom: 32, gap: 14},
   loadingWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  loadingText: {fontSize: 15, color: '#64748b'},
+  loadingText: {fontSize: 15, color: theme.textSub},
   emptyWrap: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28},
-  emptyTitle: {fontSize: 22, fontWeight: '800', color: '#102a43', textAlign: 'center'},
-  emptyDesc: {marginTop: 10, fontSize: 14, lineHeight: 22, color: '#64748b', textAlign: 'center'},
-  heroCard: {backgroundColor: '#106c4a'},
-  heroEyebrow: {fontSize: 12, fontWeight: '700', color: '#d1fae5'},
-  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, fontWeight: '800', color: '#fff'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d1fae5'},
+  emptyTitle: {fontSize: 22, fontWeight: '800', color: theme.text, textAlign: 'center'},
+  emptyDesc: {marginTop: 10, fontSize: 14, lineHeight: 22, color: theme.textSub, textAlign: 'center'},
+  heroCard: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
+  heroEyebrow: {fontSize: 12, fontWeight: '700', color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)'},
+  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, fontWeight: '800', color: theme.isDark ? theme.text : '#FFFFFF'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   heroBadgeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
   heroMeta: {marginTop: 16, gap: 6},
-  heroMetaLine: {fontSize: 13, color: '#ecfdf5'},
+  heroMetaLine: {fontSize: 13, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
-  summaryItem: {flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center'},
-  summaryValue: {fontSize: 18, fontWeight: '800', color: '#fff'},
-  summaryLabel: {marginTop: 4, fontSize: 12, color: '#d1fae5', textAlign: 'center'},
+  summaryItem: {flex: 1, backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.12)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center'},
+  summaryValue: {fontSize: 18, fontWeight: '800', color: theme.isDark ? theme.primary : '#FFFFFF'},
+  summaryLabel: {marginTop: 4, fontSize: 12, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)', textAlign: 'center'},
   sectionCard: {gap: 12},
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: '#102a43'},
-  sectionDesc: {marginTop: 6, fontSize: 13, lineHeight: 19, color: '#64748b'},
+  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
+  sectionDesc: {marginTop: 6, fontSize: 13, lineHeight: 19, color: theme.textSub},
   switchRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'center'},
   switchTextWrap: {flex: 1},
-  inputLabel: {fontSize: 13, fontWeight: '700', color: '#334e68'},
-  input: {borderWidth: 1, borderColor: '#d8e1eb', borderRadius: 12, backgroundColor: '#f8fafc', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#102a43'},
+  inputLabel: {fontSize: 13, fontWeight: '700', color: theme.text},
+  input: {borderWidth: 1, borderColor: theme.cardBorder, borderRadius: 12, backgroundColor: theme.bgSecondary, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text},
   skillRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#edf2f7'},
-  skillChipActive: {backgroundColor: '#d1fae5'},
-  skillChipText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
-  skillChipTextActive: {color: '#047857'},
-  actionRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e2e8f0'},
-  actionTitle: {fontSize: 15, fontWeight: '700', color: '#102a43'},
-  actionArrow: {fontSize: 18, color: '#94a3b8'},
-  primaryButton: {borderRadius: 14, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
+  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: theme.primaryBg},
+  skillChipActive: {backgroundColor: theme.success + '22'},
+  skillChipText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
+  skillChipTextActive: {color: theme.success},
+  actionRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.divider},
+  actionTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
+  actionArrow: {fontSize: 18, color: theme.textHint},
+  primaryButton: {borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
   primaryButtonDisabled: {opacity: 0.6},
-  primaryButtonText: {fontSize: 15, fontWeight: '800', color: '#fff'},
+  primaryButtonText: {fontSize: 15, fontWeight: '800', color: theme.btnPrimaryText},
 });

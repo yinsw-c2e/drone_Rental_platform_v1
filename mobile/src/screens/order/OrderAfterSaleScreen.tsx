@@ -26,6 +26,8 @@ import {
   V2RefundSummary,
   V2SettlementSummary,
 } from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const DISPUTE_TYPES = [
   {key: 'general', label: '一般争议'},
@@ -84,6 +86,8 @@ const getDisputeTone = (status?: string | null) => {
 };
 
 export default function OrderAfterSaleScreen({route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const currentUserId = Number(useSelector((state: RootState) => state.auth.user?.id || 0));
   const orderId = Number(route.params?.orderId || route.params?.id || 0);
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
@@ -202,9 +206,9 @@ export default function OrderAfterSaleScreen({route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <ActivityIndicator color="#114178" />
+          <ActivityIndicator color={theme.primary} />
           <Text style={styles.stateText}>正在加载售后信息...</Text>
         </View>
       </SafeAreaView>
@@ -213,7 +217,7 @@ export default function OrderAfterSaleScreen({route}: any) {
 
   if (!detail) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
           <Text style={styles.stateText}>订单信息缺失</Text>
         </View>
@@ -222,7 +226,7 @@ export default function OrderAfterSaleScreen({route}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
@@ -268,7 +272,7 @@ export default function OrderAfterSaleScreen({route}: any) {
           )}
           {canRequestRefund ? (
             <TouchableOpacity style={[styles.primaryBtn, actionLoading && styles.primaryBtnDisabled]} disabled={actionLoading} onPress={handleRefund}>
-              {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>继续处理退款</Text>}
+              {actionLoading ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>继续处理退款</Text>}
             </TouchableOpacity>
           ) : (
             <Text style={styles.sectionHint}>当前订单没有可继续处理的退款动作，或当前账号不是客户侧。</Text>
@@ -309,7 +313,7 @@ export default function OrderAfterSaleScreen({route}: any) {
               />
               <Text style={styles.charCount}>{summary.length}/500</Text>
               <TouchableOpacity style={[styles.primaryBtn, actionLoading && styles.primaryBtnDisabled]} disabled={actionLoading} onPress={handleCreateDispute}>
-                {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>提交售后记录</Text>}
+                {actionLoading ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>提交售后记录</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -351,10 +355,10 @@ export default function OrderAfterSaleScreen({route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   centerState: {
     flex: 1,
@@ -364,7 +368,7 @@ const styles = StyleSheet.create({
   },
   stateText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   content: {
     padding: 14,
@@ -372,40 +376,42 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderRadius: 24,
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroOrderNo: {
     fontSize: 13,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 12,
     fontSize: 28,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroHint: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   sectionCard: {
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
   sectionHint: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#8c8c8c',
+    color: theme.textSub,
     marginBottom: 12,
   },
   row: {
@@ -414,16 +420,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   rowLabel: {
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   rowValue: {
     maxWidth: '62%',
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
     textAlign: 'right',
   },
@@ -431,7 +437,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   typeRow: {
@@ -442,58 +448,58 @@ const styles = StyleSheet.create({
   typeChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   typeChipActive: {
-    borderColor: '#114178',
-    backgroundColor: '#f6fbff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   typeChipText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   typeChipTextActive: {
-    color: '#114178',
+    color: theme.primaryText,
   },
   textArea: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fafafa',
+    borderColor: theme.divider,
+    backgroundColor: theme.bgSecondary,
     padding: 14,
     minHeight: 120,
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
   },
   charCount: {
     marginTop: 8,
     textAlign: 'right',
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   primaryBtn: {
     marginTop: 14,
     borderRadius: 999,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     paddingVertical: 13,
   },
   primaryBtnDisabled: {
-    backgroundColor: '#91a8c2',
+    backgroundColor: theme.textHint,
   },
   primaryBtnText: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   emptyText: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   spacingTop: {
     marginTop: 12,
@@ -501,9 +507,9 @@ const styles = StyleSheet.create({
   recordItem: {
     marginTop: 10,
     borderRadius: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.divider,
     padding: 12,
   },
   recordHeader: {
@@ -513,19 +519,19 @@ const styles = StyleSheet.create({
   },
   recordCode: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   recordContent: {
     marginTop: 8,
     fontSize: 14,
     lineHeight: 20,
-    color: '#1f1f1f',
+    color: theme.text,
   },
   recordMeta: {
     marginTop: 6,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     lineHeight: 18,
   },
 });

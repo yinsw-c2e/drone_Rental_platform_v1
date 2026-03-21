@@ -17,23 +17,27 @@ import {
   NoFlyZone,
   AirspaceCheckResult,
 } from '../../services/airspace';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const ZONE_TYPE_MAP: Record<string, {label: string; color: string}> = {
-  airport: {label: '机场净空区', color: '#ff4d4f'},
-  military: {label: '军事管制区', color: '#722ed1'},
-  government: {label: '政府重要区域', color: '#fa8c16'},
-  nature_reserve: {label: '自然保护区', color: '#52c41a'},
-  temporary: {label: '临时限飞区', color: '#1890ff'},
-  custom: {label: '自定义区域', color: '#666'},
+const ZONE_TYPE_MAP: Record<string, {label: string; colorKey: 'danger' | 'primary' | 'warning' | 'success' | 'info' | 'textHint'}> = {
+  airport: {label: '机场净空区', colorKey: 'danger'},
+  military: {label: '军事管制区', colorKey: 'primary'},
+  government: {label: '政府重要区域', colorKey: 'warning'},
+  nature_reserve: {label: '自然保护区', colorKey: 'success'},
+  temporary: {label: '临时限飞区', colorKey: 'info'},
+  custom: {label: '自定义区域', colorKey: 'textHint'},
 };
 
-const RESTRICTION_MAP: Record<string, {label: string; color: string}> = {
-  no_fly: {label: '禁飞', color: '#ff4d4f'},
-  restricted: {label: '限飞', color: '#faad14'},
-  caution: {label: '注意', color: '#1890ff'},
+const RESTRICTION_MAP: Record<string, {label: string; colorKey: 'danger' | 'warning' | 'info'}> = {
+  no_fly: {label: '禁飞', colorKey: 'danger'},
+  restricted: {label: '限飞', colorKey: 'warning'},
+  caution: {label: '注意', colorKey: 'info'},
 };
 
 export default function NoFlyZoneScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [zones, setZones] = useState<NoFlyZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,8 +88,8 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
   };
 
   const renderZoneCard = (zone: NoFlyZone) => {
-    const typeInfo = ZONE_TYPE_MAP[zone.zone_type] || {label: zone.zone_type, color: '#999'};
-    const restrictInfo = RESTRICTION_MAP[zone.restriction_level] || {label: zone.restriction_level, color: '#999'};
+    const typeInfo = ZONE_TYPE_MAP[zone.zone_type] || {label: zone.zone_type, colorKey: 'textHint' as const};
+    const restrictInfo = RESTRICTION_MAP[zone.restriction_level] || {label: zone.restriction_level, colorKey: 'textHint' as const};
 
     return (
       <View key={zone.id} style={styles.card}>
@@ -93,20 +97,20 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
           <View style={{flex: 1}}>
             <Text style={styles.cardTitle}>{zone.name}</Text>
             <View style={styles.tagRow}>
-              <View style={[styles.tag, {backgroundColor: typeInfo.color + '15'}]}>
-                <Text style={[styles.tagText, {color: typeInfo.color}]}>{typeInfo.label}</Text>
+              <View style={[styles.tag, {backgroundColor: theme[typeInfo.colorKey] + '15'}]}>
+                <Text style={[styles.tagText, {color: theme[typeInfo.colorKey]}]}>{typeInfo.label}</Text>
               </View>
-              <View style={[styles.tag, {backgroundColor: restrictInfo.color + '15'}]}>
-                <Text style={[styles.tagText, {color: restrictInfo.color}]}>{restrictInfo.label}</Text>
+              <View style={[styles.tag, {backgroundColor: theme[restrictInfo.colorKey] + '15'}]}>
+                <Text style={[styles.tagText, {color: theme[restrictInfo.colorKey]}]}>{restrictInfo.label}</Text>
               </View>
               {zone.allowed_with_permit && (
-                <View style={[styles.tag, {backgroundColor: '#1890ff15'}]}>
-                  <Text style={[styles.tagText, {color: '#1890ff'}]}>可申请许可</Text>
+                <View style={[styles.tag, {backgroundColor: theme.primary + '15'}]}>
+                  <Text style={[styles.tagText, {color: theme.primaryText}]}>可申请许可</Text>
                 </View>
               )}
             </View>
           </View>
-          <View style={[styles.restrictionBadge, {backgroundColor: restrictInfo.color}]}>
+          <View style={[styles.restrictionBadge, {backgroundColor: theme[restrictInfo.colorKey]}]}>
             <Text style={styles.restrictionBadgeText}>{restrictInfo.label}</Text>
           </View>
         </View>
@@ -149,14 +153,14 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#1890ff" style={{marginTop: 100}} />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator size="large" color={theme.primary} style={{marginTop: 100}} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* View mode toggle & check button */}
       <View style={styles.toolbar}>
         <View style={styles.toggleRow}>
@@ -208,35 +212,35 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  toolbar: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8'},
-  toggleRow: {flexDirection: 'row', borderRadius: 6, borderWidth: 1, borderColor: '#d9d9d9', overflow: 'hidden'},
-  toggleBtn: {paddingHorizontal: 16, paddingVertical: 6, backgroundColor: '#fff'},
-  toggleBtnActive: {backgroundColor: '#1890ff'},
-  toggleText: {fontSize: 13, color: '#666'},
-  toggleTextActive: {color: '#fff'},
-  checkBtn: {backgroundColor: '#722ed1', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6},
-  checkBtnText: {color: '#fff', fontSize: 13, fontWeight: '500'},
-  checkResultBar: {paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  toolbar: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: theme.card, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider},
+  toggleRow: {flexDirection: 'row', borderRadius: 6, borderWidth: 1, borderColor: theme.divider, overflow: 'hidden'},
+  toggleBtn: {paddingHorizontal: 16, paddingVertical: 6, backgroundColor: theme.card},
+  toggleBtnActive: {backgroundColor: theme.primary},
+  toggleText: {fontSize: 13, color: theme.textSub},
+  toggleTextActive: {color: theme.btnPrimaryText},
+  checkBtn: {backgroundColor: theme.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6},
+  checkBtnText: {color: theme.btnPrimaryText, fontSize: 13, fontWeight: '500'},
+  checkResultBar: {paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider},
   checkResultText: {fontSize: 13, fontWeight: '500'},
   content: {padding: 16},
-  resultCount: {fontSize: 13, color: '#999', marginBottom: 12},
-  card: {backgroundColor: '#fff', borderRadius: 12, marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
+  resultCount: {fontSize: 13, color: theme.textSub, marginBottom: 12},
+  card: {backgroundColor: theme.card, borderRadius: 12, marginBottom: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 16, paddingBottom: 10},
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 8},
+  cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 8},
   tagRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 6},
   tag: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4},
   tagText: {fontSize: 11, fontWeight: '500'},
   restrictionBadge: {paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4, marginLeft: 8},
-  restrictionBadgeText: {color: '#fff', fontSize: 12, fontWeight: '600'},
+  restrictionBadgeText: {color: theme.btnPrimaryText, fontSize: 12, fontWeight: '600'},
   cardBody: {paddingHorizontal: 16, paddingBottom: 16},
-  description: {fontSize: 13, color: '#666', marginBottom: 10, lineHeight: 18},
+  description: {fontSize: 13, color: theme.textSub, marginBottom: 10, lineHeight: 18},
   infoGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   infoItem: {minWidth: '40%'},
-  infoLabel: {fontSize: 11, color: '#999', marginBottom: 2},
-  infoValue: {fontSize: 13, color: '#333', fontWeight: '500'},
-  authorityText: {fontSize: 12, color: '#999', marginTop: 8},
+  infoLabel: {fontSize: 11, color: theme.textSub, marginBottom: 2},
+  infoValue: {fontSize: 13, color: theme.text, fontWeight: '500'},
+  authorityText: {fontSize: 12, color: theme.textSub, marginTop: 8},
   empty: {alignItems: 'center', paddingTop: 60},
-  emptyText: {fontSize: 16, color: '#999'},
+  emptyText: {fontSize: 16, color: theme.textSub},
 });

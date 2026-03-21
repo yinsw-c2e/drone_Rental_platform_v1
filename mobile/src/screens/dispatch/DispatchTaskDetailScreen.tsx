@@ -20,6 +20,8 @@ import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
 import {RootState} from '../../store/store';
 import {V2DispatchTaskDetail, V2DispatchTaskSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type ActionButton = {
   label: string;
@@ -69,6 +71,8 @@ const getPartyName = (task?: V2DispatchTaskSummary['provider'] | V2DispatchTaskS
 };
 
 function DetailRow({label, value}: {label: string; value?: string}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -78,6 +82,8 @@ function DetailRow({label, value}: {label: string; value?: string}) {
 }
 
 export default function DispatchTaskDetailScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const currentUserId = Number(useSelector((state: RootState) => state.auth.user?.id) || 0);
   const dispatchId = Number(route?.params?.id || route?.params?.dispatchId || 0);
   const [detail, setDetail] = useState<V2DispatchTaskDetail | null>(null);
@@ -230,9 +236,9 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#0f766e" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -240,7 +246,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
 
   if (!detail?.dispatch_task) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
           <Text style={styles.emptyText}>正式派单不存在或当前账号没有查看权限。</Text>
         </View>
@@ -252,7 +258,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
   const orderData = detail.order || taskData.order;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
@@ -320,7 +326,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
 
       {actionButtons.length > 0 ? (
         <View style={styles.actionBar}>
-          {actionLoading ? <ActivityIndicator color="#0f766e" style={styles.actionSpinner} /> : null}
+          {actionLoading ? <ActivityIndicator color={theme.primary} style={styles.actionSpinner} /> : null}
           {actionButtons.map(button => (
             <TouchableOpacity
               key={button.label}
@@ -370,10 +376,10 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   centerState: {
     flex: 1,
@@ -384,7 +390,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#8c8c8c',
+    color: theme.textSub,
     textAlign: 'center',
   },
   content: {
@@ -392,7 +398,7 @@ const styles = StyleSheet.create({
     paddingBottom: 132,
   },
   hero: {
-    backgroundColor: '#0f766e',
+    backgroundColor: theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
@@ -408,28 +414,28 @@ const styles = StyleSheet.create({
   },
   heroCode: {
     fontSize: 12,
-    color: '#d1fae5',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
     fontWeight: '600',
   },
   heroTitle: {
     marginTop: 14,
     fontSize: 24,
     lineHeight: 30,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d1fae5',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   sectionCard: {
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
@@ -439,19 +445,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   rowLabel: {
     width: 88,
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   rowValue: {
     flex: 1,
     textAlign: 'right',
     fontSize: 14,
     lineHeight: 20,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '600',
   },
   timelineItem: {
@@ -466,13 +472,13 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#0f766e',
+    backgroundColor: theme.primary,
     marginTop: 4,
   },
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#d9d9d9',
+    backgroundColor: theme.divider,
     marginTop: 4,
   },
   timelineContent: {
@@ -482,27 +488,27 @@ const styles = StyleSheet.create({
   },
   timelineTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
   },
   timelineMeta: {
     marginTop: 4,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   emptyLogs: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   actionBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 14,
@@ -523,41 +529,41 @@ const styles = StyleSheet.create({
     minWidth: 110,
   },
   actionButtonPrimary: {
-    backgroundColor: '#0f766e',
+    backgroundColor: theme.primary,
   },
   actionButtonDanger: {
-    backgroundColor: '#fff1f0',
+    backgroundColor: theme.danger + '22',
     borderWidth: 1,
-    borderColor: '#ffccc7',
+    borderColor: theme.danger + '44',
   },
   actionButtonGhost: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
   },
   actionButtonText: {
     fontSize: 13,
     fontWeight: '700',
   },
   actionButtonTextPrimary: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   actionButtonTextDanger: {
-    color: '#cf1322',
+    color: theme.danger,
   },
   actionButtonTextGhost: {
-    color: '#434343',
+    color: theme.textSub,
   },
   rejectSheet: {
     position: 'absolute',
     left: 14,
     right: 14,
     bottom: 92,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.divider,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -565,20 +571,20 @@ const styles = StyleSheet.create({
   },
   rejectTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
   },
   rejectInput: {
     marginTop: 12,
     minHeight: 100,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     textAlignVertical: 'top',
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
   },
   rejectActions: {
     marginTop: 12,
@@ -587,25 +593,25 @@ const styles = StyleSheet.create({
   },
   sheetGhostBtn: {
     borderRadius: 999,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 10,
   },
   sheetGhostText: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   sheetDangerBtn: {
     borderRadius: 999,
-    backgroundColor: '#cf1322',
+    backgroundColor: theme.danger,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   sheetDangerText: {
     fontSize: 13,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
 });

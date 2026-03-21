@@ -7,10 +7,14 @@ import {useSelector, useDispatch} from 'react-redux';
 import {RootState} from '../../store/store';
 import {updateUser} from '../../store/slices/authSlice';
 import {userService} from '../../services/user';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type VerifyStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
 
 export default function VerificationScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
@@ -84,8 +88,8 @@ export default function VerificationScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 100}} color="#1890ff" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={{marginTop: 100}} color={theme.primary} />
       </SafeAreaView>
     );
   }
@@ -93,9 +97,9 @@ export default function VerificationScreen({navigation}: any) {
   // 已通过认证
   if (status === 'approved') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.resultContainer}>
-          <View style={[styles.resultIcon, {backgroundColor: '#f6ffed'}]}>
+          <View style={[styles.resultIcon, {backgroundColor: theme.success + '22'}]}>
             <Text style={{fontSize: 48}}>{'\u2705'}</Text>
           </View>
           <Text style={styles.resultTitle}>实名认证已通过</Text>
@@ -122,9 +126,9 @@ export default function VerificationScreen({navigation}: any) {
   // 审核中
   if (status === 'pending') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.resultContainer}>
-          <View style={[styles.resultIcon, {backgroundColor: '#e6f7ff'}]}>
+          <View style={[styles.resultIcon, {backgroundColor: theme.info + '22'}]}>
             <Text style={{fontSize: 48}}>{'\u23F3'}</Text>
           </View>
           <Text style={styles.resultTitle}>认证审核中</Text>
@@ -154,7 +158,7 @@ export default function VerificationScreen({navigation}: any) {
   const isRejected = status === 'rejected';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
         {isRejected && (
           <View style={styles.rejectBanner}>
@@ -215,7 +219,7 @@ export default function VerificationScreen({navigation}: any) {
           onPress={handleSubmit}
           disabled={submitting}>
           {submitting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.btnPrimaryText} />
           ) : (
             <Text style={styles.submitBtnText}>
               {isRejected ? '重新提交' : '提交认证'}
@@ -227,8 +231,8 @@ export default function VerificationScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   scroll: {flex: 1},
 
   // 审核结果页
@@ -237,60 +241,60 @@ const styles = StyleSheet.create({
     width: 96, height: 96, borderRadius: 48,
     justifyContent: 'center', alignItems: 'center', marginBottom: 20,
   },
-  resultTitle: {fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 8},
-  resultDesc: {fontSize: 14, color: '#999', textAlign: 'center', lineHeight: 20},
+  resultTitle: {fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 8},
+  resultDesc: {fontSize: 14, color: theme.textSub, textAlign: 'center', lineHeight: 20},
   infoCard: {
-    width: '100%', backgroundColor: '#fff', borderRadius: 12,
+    width: '100%', backgroundColor: theme.card, borderRadius: 12,
     padding: 16, marginTop: 24,
   },
   infoRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
-  infoLabel: {fontSize: 14, color: '#666'},
-  infoValue: {fontSize: 14, color: '#333', fontWeight: '500'},
+  infoLabel: {fontSize: 14, color: theme.textSub},
+  infoValue: {fontSize: 14, color: theme.text, fontWeight: '500'},
   pendingBadge: {
-    backgroundColor: '#e6f7ff', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 4,
+    backgroundColor: theme.primaryBg, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 4,
   },
-  pendingText: {color: '#1890ff', fontSize: 12, fontWeight: '500'},
+  pendingText: {color: theme.primaryText, fontSize: 12, fontWeight: '500'},
 
   // 拒绝横幅
   rejectBanner: {
-    backgroundColor: '#fff1f0', padding: 16, margin: 12, borderRadius: 8,
-    borderLeftWidth: 4, borderLeftColor: '#ff4d4f',
+    backgroundColor: theme.danger + '22', padding: 16, margin: 12, borderRadius: 8,
+    borderLeftWidth: 4, borderLeftColor: theme.danger,
   },
-  rejectTitle: {fontSize: 15, fontWeight: '600', color: '#ff4d4f', marginBottom: 4},
-  rejectReason: {fontSize: 13, color: '#ff7875', lineHeight: 18},
+  rejectTitle: {fontSize: 15, fontWeight: '600', color: theme.danger, marginBottom: 4},
+  rejectReason: {fontSize: 13, color: theme.danger, lineHeight: 18},
 
   // 表单区域
-  section: {backgroundColor: '#fff', margin: 12, borderRadius: 12, padding: 16},
-  sectionTitle: {fontSize: 17, fontWeight: 'bold', color: '#333', marginBottom: 4},
-  sectionDesc: {fontSize: 13, color: '#999', marginBottom: 16},
+  section: {backgroundColor: theme.card, margin: 12, borderRadius: 12, padding: 16},
+  sectionTitle: {fontSize: 17, fontWeight: 'bold', color: theme.text, marginBottom: 4},
+  sectionDesc: {fontSize: 13, color: theme.textSub, marginBottom: 16},
   formGroup: {marginBottom: 16},
-  formLabel: {fontSize: 14, color: '#333', fontWeight: '500', marginBottom: 8},
-  required: {color: '#ff4d4f'},
+  formLabel: {fontSize: 14, color: theme.text, fontWeight: '500', marginBottom: 8},
+  required: {color: theme.danger},
   input: {
-    backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#e8e8e8',
+    backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider,
     borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, color: '#333',
+    fontSize: 15, color: theme.text,
   },
 
   // 提示
   tipSection: {
-    backgroundColor: '#fff', margin: 12, marginTop: 0, borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, margin: 12, marginTop: 0, borderRadius: 12, padding: 16,
   },
-  tipTitle: {fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8},
-  tipText: {fontSize: 13, color: '#999', lineHeight: 22},
+  tipTitle: {fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: 8},
+  tipText: {fontSize: 13, color: theme.textSub, lineHeight: 22},
 
   // 底部按钮
   footer: {
-    backgroundColor: '#fff', padding: 16, paddingBottom: 32,
-    borderTopWidth: 1, borderTopColor: '#e8e8e8',
+    backgroundColor: theme.card, padding: 16, paddingBottom: 32,
+    borderTopWidth: 1, borderTopColor: theme.divider,
   },
   submitBtn: {
-    height: 48, backgroundColor: '#1890ff', borderRadius: 24,
+    height: 48, backgroundColor: theme.primary, borderRadius: 24,
     justifyContent: 'center', alignItems: 'center',
   },
-  submitBtnDisabled: {backgroundColor: '#91caff'},
-  submitBtnText: {color: '#fff', fontSize: 17, fontWeight: '600'},
+  submitBtnDisabled: {backgroundColor: theme.primaryBorder},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '600'},
 });

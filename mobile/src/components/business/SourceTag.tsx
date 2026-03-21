@@ -1,14 +1,16 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {BusinessSourceKind, getSourceMeta, getTonePalette} from './visuals';
+import {useTheme} from '../../theme/ThemeContext';
 
 type Props = {
   source: BusinessSourceKind;
 };
 
 export default function SourceTag({source}: Props) {
+  const {theme} = useTheme();
   const meta = getSourceMeta(source);
-  const palette = getTonePalette(meta.tone);
+  const palette = getTonePalette(meta.tone, theme.isDark);
 
   return (
     <View

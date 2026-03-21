@@ -14,6 +14,8 @@ import {
 import AddressInputField from '../../components/AddressInputField';
 import {demandV2Service} from '../../services/demandV2';
 import {AddressData, DemandDetail} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const sceneOptions = [
   {key: 'power_grid', label: '电网建设'},
@@ -47,6 +49,8 @@ const snapshotToAddressData = (snap: any): AddressData | null => {
 };
 
 export default function EditDemandScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const demandId = Number(route.params?.demandId || 0);
 
   const [loading, setLoading] = useState(true);
@@ -144,14 +148,14 @@ export default function EditDemandScreen({navigation, route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 120}} color="#1677ff" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={{marginTop: 120}} color={theme.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.pageTitle}>修改需求</Text>
 
@@ -213,19 +217,19 @@ export default function EditDemandScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.card},
   content: {padding: 20, paddingBottom: 40},
-  pageTitle: {fontSize: 24, fontWeight: '700', color: '#102a43'},
-  label: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8, marginTop: 18},
+  pageTitle: {fontSize: 24, fontWeight: '700', color: theme.text},
+  label: {fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 8, marginTop: 18},
   input: {
     borderWidth: 1,
-    borderColor: '#d9e2ec',
+    borderColor: theme.cardBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
   },
   textarea: {height: 96},
   optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
@@ -234,25 +238,25 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#d9e2ec',
+    borderColor: theme.cardBorder,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
-  optionBtnActive: {borderColor: '#1677ff', backgroundColor: '#e6f4ff'},
-  optionText: {fontSize: 13, color: '#475569'},
-  optionTextActive: {color: '#1677ff', fontWeight: '600'},
+  optionBtnActive: {borderColor: theme.primary, backgroundColor: theme.primaryBg},
+  optionText: {fontSize: 13, color: theme.textSub},
+  optionTextActive: {color: theme.primaryText, fontWeight: '600'},
   budgetRow: {flexDirection: 'row', alignItems: 'center'},
   flexInput: {flex: 1},
-  split: {marginHorizontal: 10, color: '#94a3b8'},
+  split: {marginHorizontal: 10, color: theme.textHint},
   submitBtn: {
     marginTop: 28,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#1677ff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: '#fff', fontSize: 17, fontWeight: '700'},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '700'},
 });

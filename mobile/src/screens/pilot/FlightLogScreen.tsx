@@ -26,8 +26,12 @@ import {
   formatHoursFromSeconds,
   sortFlightRecords,
 } from '../../utils/flightRecords';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function FlightLogScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [records, setRecords] = useState<V2FlightRecordSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -138,9 +142,9 @@ export default function FlightLogScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color="#1677ff" />
+          <ActivityIndicator color={theme.primary} />
           <Text style={styles.loadingText}>正在同步真实履约飞行记录...</Text>
         </View>
       </SafeAreaView>
@@ -148,7 +152,7 @@ export default function FlightLogScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={records}
         keyExtractor={item => String(item.id)}
@@ -175,10 +179,10 @@ export default function FlightLogScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f6fb',
+    backgroundColor: theme.bg,
   },
   content: {
     padding: 16,
@@ -192,7 +196,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   statsCard: {
     marginBottom: 12,
@@ -200,7 +204,7 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: theme.text,
     marginBottom: 16,
   },
   statsGrid: {
@@ -214,32 +218,32 @@ const styles = StyleSheet.create({
   statsValue: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1677ff',
+    color: theme.primaryText,
   },
   statsLabel: {
     marginTop: 6,
     fontSize: 13,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   tipCard: {
-    backgroundColor: '#f8fbff',
+    backgroundColor: theme.bgSecondary,
     marginBottom: 16,
   },
   tipTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1d4ed8',
+    color: theme.primaryText,
     marginBottom: 8,
   },
   tipText: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#4b5563',
+    color: theme.textSub,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: theme.text,
     marginBottom: 12,
     paddingHorizontal: 2,
   },
@@ -259,11 +263,11 @@ const styles = StyleSheet.create({
   recordCode: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#6b7280',
+    color: theme.textSub,
   },
   recordTime: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: theme.textHint,
   },
   tagRow: {
     flexDirection: 'row',
@@ -275,12 +279,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '800',
-    color: '#111827',
+    color: theme.text,
   },
   recordSubTitle: {
     marginTop: 6,
     fontSize: 13,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   metricRow: {
     flexDirection: 'row',
@@ -289,19 +293,19 @@ const styles = StyleSheet.create({
   },
   metricItem: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 12,
   },
   metricLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSub,
     marginBottom: 6,
   },
   metricValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.text,
   },
 });

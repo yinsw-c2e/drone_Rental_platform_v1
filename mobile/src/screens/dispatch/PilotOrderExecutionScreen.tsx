@@ -12,6 +12,8 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 import {getOrderByTaskId} from '../../services/dispatch';
 import {updateExecutionStatus} from '../../services/orderV2';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 // 执行状态定义
 const EXEC_STEPS = [
@@ -35,6 +37,8 @@ const NEXT_ACTION: Record<string, {label: string; nextStatus: string; confirmMsg
 };
 
 export default function PilotOrderExecutionScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {taskId} = route.params || {};
   const [order, setOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,9 +97,9 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#1890ff" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>加载订单信息...</Text>
         </View>
       </SafeAreaView>
@@ -104,7 +108,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
 
   if (!order) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.center}>
           <Text style={styles.emptyText}>暂无执行订单</Text>
           <Text style={styles.emptySubText}>接受任务后将在此查看执行流程</Text>
@@ -120,14 +124,14 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
   const isDelivered = order.status === 'delivered';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* 订单头部信息 */}
         <View style={styles.orderCard}>
           <View style={styles.orderHeader}>
             <Text style={styles.orderNo}>{order.order_no || '-'}</Text>
-            <View style={[styles.statusBadge, {backgroundColor: isCompleted ? '#52c41a20' : '#1890ff20'}]}>
-              <Text style={[styles.statusText, {color: isCompleted ? '#52c41a' : '#1890ff'}]}>
+            <View style={[styles.statusBadge, {backgroundColor: isCompleted ? theme.success + '20' : theme.primary + '20'}]}>
+              <Text style={[styles.statusText, {color: isCompleted ? theme.success : theme.primary}]}>
                 {currentStep?.label || order.status}
               </Text>
             </View>
@@ -135,12 +139,12 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
           <Text style={styles.orderTitle} numberOfLines={2}>{order.title}</Text>
           <View style={styles.routeInfo}>
             <View style={styles.routeRow}>
-              <View style={[styles.dot, {backgroundColor: '#52c41a'}]} />
+              <View style={[styles.dot, {backgroundColor: theme.success}]} />
               <Text style={styles.routeAddr} numberOfLines={1}>{order.service_address || '取货点'}</Text>
             </View>
             <View style={styles.routeLine} />
             <View style={styles.routeRow}>
-              <View style={[styles.dot, {backgroundColor: '#f5222d'}]} />
+              <View style={[styles.dot, {backgroundColor: theme.danger}]} />
               <Text style={styles.routeAddr} numberOfLines={1}>{order.dest_address || '卸货点'}</Text>
             </View>
           </View>
@@ -215,7 +219,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
             onPress={handleNextStep}
             disabled={submitting}>
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={theme.btnPrimaryText} />
             ) : (
               <>
                 <Text style={styles.actionBtnText}>{nextAction.label}</Text>
@@ -243,84 +247,84 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24},
-  loadingText: {marginTop: 12, color: '#666', fontSize: 14},
-  emptyText: {fontSize: 16, color: '#666', marginBottom: 8},
-  emptySubText: {fontSize: 13, color: '#999'},
+  loadingText: {marginTop: 12, color: theme.textSub, fontSize: 14},
+  emptyText: {fontSize: 16, color: theme.textSub, marginBottom: 8},
+  emptySubText: {fontSize: 13, color: theme.textSub},
   content: {padding: 16, paddingBottom: 32},
 
   orderCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, borderRadius: 12, padding: 16,
     marginBottom: 12, elevation: 2,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4,
   },
   orderHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8},
-  orderNo: {fontSize: 12, color: '#999'},
+  orderNo: {fontSize: 12, color: theme.textSub},
   statusBadge: {paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12},
   statusText: {fontSize: 12, fontWeight: '600'},
-  orderTitle: {fontSize: 14, color: '#333', fontWeight: '600', marginBottom: 12},
+  orderTitle: {fontSize: 14, color: theme.text, fontWeight: '600', marginBottom: 12},
   routeInfo: {marginBottom: 10},
   routeRow: {flexDirection: 'row', alignItems: 'center', marginVertical: 3},
   dot: {width: 8, height: 8, borderRadius: 4, marginRight: 8},
-  routeAddr: {flex: 1, fontSize: 13, color: '#555'},
-  routeLine: {width: 1, height: 12, backgroundColor: '#ddd', marginLeft: 3, marginVertical: 1},
-  rewardText: {fontSize: 16, color: '#f5222d', fontWeight: 'bold', marginTop: 8},
+  routeAddr: {flex: 1, fontSize: 13, color: theme.textSub},
+  routeLine: {width: 1, height: 12, backgroundColor: theme.divider, marginLeft: 3, marginVertical: 1},
+  rewardText: {fontSize: 16, color: theme.danger, fontWeight: 'bold', marginTop: 8},
 
   stepsCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, borderRadius: 12, padding: 16,
     marginBottom: 16, elevation: 2,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4,
   },
-  sectionTitle: {fontSize: 15, fontWeight: '700', color: '#333', marginBottom: 16},
+  sectionTitle: {fontSize: 15, fontWeight: '700', color: theme.text, marginBottom: 16},
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
-  linkText: {fontSize: 14, color: '#333'},
-  linkArrow: {fontSize: 18, color: '#1890ff'},
+  linkText: {fontSize: 14, color: theme.text},
+  linkArrow: {fontSize: 18, color: theme.primaryText},
   stepRow: {flexDirection: 'row', marginBottom: 0},
   stepLeft: {alignItems: 'center', width: 36},
   stepCircle: {
     width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.divider,
   },
-  stepCircleDone: {backgroundColor: '#52c41a'},
-  stepCircleCurrent: {backgroundColor: '#1890ff'},
-  stepCircleFuture: {backgroundColor: '#f0f0f0'},
+  stepCircleDone: {backgroundColor: theme.success},
+  stepCircleCurrent: {backgroundColor: theme.primary},
+  stepCircleFuture: {backgroundColor: theme.divider},
   stepIcon: {fontSize: 14},
-  stepConnector: {width: 2, height: 24, backgroundColor: '#e8e8e8', marginVertical: 2},
-  stepConnectorDone: {backgroundColor: '#52c41a'},
+  stepConnector: {width: 2, height: 24, backgroundColor: theme.divider, marginVertical: 2},
+  stepConnectorDone: {backgroundColor: theme.success},
   stepRight: {flex: 1, paddingLeft: 12, paddingTop: 6, paddingBottom: 20},
-  stepLabel: {fontSize: 14, color: '#999'},
-  stepLabelDone: {color: '#52c41a', fontWeight: '500'},
-  stepLabelCurrent: {color: '#1890ff', fontWeight: '700', fontSize: 15},
-  stepLabelFuture: {color: '#bbb'},
-  stepDesc: {fontSize: 12, color: '#666', marginTop: 3},
+  stepLabel: {fontSize: 14, color: theme.textSub},
+  stepLabelDone: {color: theme.success, fontWeight: '500'},
+  stepLabelCurrent: {color: theme.primaryText, fontWeight: '700', fontSize: 15},
+  stepLabelFuture: {color: theme.textHint},
+  stepDesc: {fontSize: 12, color: theme.textSub, marginTop: 3},
 
   actionBtn: {
-    backgroundColor: '#1890ff', borderRadius: 12, padding: 18,
+    backgroundColor: theme.primary, borderRadius: 12, padding: 18,
     alignItems: 'center', marginBottom: 12,
   },
-  actionBtnDisabled: {backgroundColor: '#aaa'},
-  actionBtnText: {fontSize: 18, color: '#fff', fontWeight: '700'},
+  actionBtnDisabled: {backgroundColor: theme.textHint},
+  actionBtnText: {fontSize: 18, color: theme.btnPrimaryText, fontWeight: '700'},
   actionBtnSub: {fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 4},
 
   completedBanner: {
-    backgroundColor: '#f6ffed', borderRadius: 12, padding: 24,
-    alignItems: 'center', borderWidth: 1, borderColor: '#b7eb8f',
+    backgroundColor: theme.success + '22', borderRadius: 12, padding: 24,
+    alignItems: 'center', borderWidth: 1, borderColor: theme.success + '44',
   },
-  completedText: {fontSize: 20, fontWeight: '700', color: '#52c41a'},
-  completedSub: {fontSize: 13, color: '#73d13d', marginTop: 6},
+  completedText: {fontSize: 20, fontWeight: '700', color: theme.success},
+  completedSub: {fontSize: 13, color: theme.success, marginTop: 6},
   waitingBanner: {
-    backgroundColor: '#fffbe6', borderRadius: 12, padding: 24,
-    alignItems: 'center', borderWidth: 1, borderColor: '#ffe58f', marginBottom: 12,
+    backgroundColor: theme.warning + '22', borderRadius: 12, padding: 24,
+    alignItems: 'center', borderWidth: 1, borderColor: theme.warning + '44', marginBottom: 12,
   },
-  waitingText: {fontSize: 20, fontWeight: '700', color: '#faad14'},
-  waitingSub: {fontSize: 13, color: '#d48806', marginTop: 6},
+  waitingText: {fontSize: 20, fontWeight: '700', color: theme.warning},
+  waitingSub: {fontSize: 13, color: theme.warning, marginTop: 6},
 });

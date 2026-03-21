@@ -6,8 +6,12 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {orderService} from '../../services/order';
 import {Drone} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function CreateOrderScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {drone} = route.params;
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -82,7 +86,7 @@ export default function CreateOrderScreen({route, navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView style={styles.scroll}>
         {/* Drone Info */}
         <View style={styles.droneCard}>
@@ -178,49 +182,49 @@ export default function CreateOrderScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   scroll: {flex: 1},
   droneCard: {
-    backgroundColor: '#fff', padding: 16, marginBottom: 10,
+    backgroundColor: theme.card, padding: 16, marginBottom: 10,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  droneName: {fontSize: 16, fontWeight: 'bold', color: '#333'},
-  dronePrice: {fontSize: 16, color: '#f5222d', fontWeight: '600'},
+  droneName: {fontSize: 16, fontWeight: 'bold', color: theme.text},
+  dronePrice: {fontSize: 16, color: theme.danger, fontWeight: '600'},
   section: {
-    backgroundColor: '#fff', marginBottom: 10, padding: 16,
+    backgroundColor: theme.card, marginBottom: 10, padding: 16,
   },
-  sectionTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12},
+  sectionTitle: {fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 12},
   inputGroup: {marginBottom: 12},
-  label: {fontSize: 14, color: '#666', marginBottom: 6},
+  label: {fontSize: 14, color: theme.textSub, marginBottom: 6},
   input: {
-    borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 8,
+    borderWidth: 1, borderColor: theme.divider, borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 15,
   },
   dateInput: {
-    borderWidth: 1, borderColor: '#e8e8e8', borderRadius: 8,
+    borderWidth: 1, borderColor: theme.divider, borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 14, fontSize: 15,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
-  dateText: {fontSize: 15, color: '#333'},
-  datePlaceholder: {fontSize: 15, color: '#999'},
+  dateText: {fontSize: 15, color: theme.text},
+  datePlaceholder: {fontSize: 15, color: theme.textSub},
   textArea: {height: 80, textAlignVertical: 'top'},
-  daysText: {fontSize: 14, color: '#1890ff', marginTop: 8},
+  daysText: {fontSize: 14, color: theme.primaryText, marginTop: 8},
   priceRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
-  priceLabel: {fontSize: 14, color: '#666'},
-  priceValue: {fontSize: 14, color: '#333'},
+  priceLabel: {fontSize: 14, color: theme.textSub},
+  priceValue: {fontSize: 14, color: theme.text},
   totalRow: {borderBottomWidth: 0, marginTop: 8, paddingTop: 8},
-  totalLabel: {fontSize: 16, fontWeight: 'bold', color: '#333'},
-  totalValue: {fontSize: 18, fontWeight: 'bold', color: '#f5222d'},
+  totalLabel: {fontSize: 16, fontWeight: 'bold', color: theme.text},
+  totalValue: {fontSize: 18, fontWeight: 'bold', color: theme.danger},
   footer: {
-    backgroundColor: '#fff', padding: 12, borderTopWidth: 1, borderTopColor: '#e8e8e8',
+    backgroundColor: theme.card, padding: 12, borderTopWidth: 1, borderTopColor: theme.divider,
   },
   submitBtn: {
-    backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14, alignItems: 'center',
+    backgroundColor: theme.primary, borderRadius: 8, paddingVertical: 14, alignItems: 'center',
   },
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
 });

@@ -16,6 +16,8 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {droneService} from '../../services/drone';
 import {orderV2Service} from '../../services/orderV2';
 import {Drone, V2OrderSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const STATUS_GROUPS = [
   {key: 'all', label: '全部'},
@@ -74,6 +76,8 @@ const isDroneStillOccupiedByOrder = (order: V2OrderSummary) =>
   !TERMINAL_ORDER_STATUSES.has(String(order.status || '').toLowerCase());
 
 export default function MyDronesScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,7 +133,7 @@ export default function MyDronesScreen({navigation}: any) {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity onPress={() => navigation.navigate('AddDrone')} style={{paddingHorizontal: 16}}>
-          <Text style={{fontSize: 26, color: '#175cd3'}}>+</Text>
+          <Text style={{fontSize: 26, color: theme.primaryText}}>+</Text>
         </TouchableOpacity>
       ),
     });
@@ -226,12 +230,12 @@ export default function MyDronesScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={filteredDrones}
         keyExtractor={item => String(item.id)}
         renderItem={renderDrone}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#175cd3']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
@@ -295,54 +299,54 @@ export default function MyDronesScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#eef3f8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 14, paddingBottom: 28},
-  hero: {backgroundColor: '#0f5cab', borderRadius: 24, padding: 20, marginBottom: 12},
-  heroEyebrow: {fontSize: 12, color: '#d6e4ff', fontWeight: '700'},
-  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, color: '#fff', fontWeight: '800'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d6e4ff'},
+  hero: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderRadius: 24, padding: 20, marginBottom: 12, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
+  heroEyebrow: {fontSize: 12, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '700'},
+  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
     width: '48%',
     minWidth: 68,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.12)',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
   },
-  summaryValue: {fontSize: 18, fontWeight: '800', color: '#fff'},
-  summaryLabel: {marginTop: 4, fontSize: 12, textAlign: 'center', color: '#d6e4ff'},
+  summaryValue: {fontSize: 18, fontWeight: '800', color: theme.isDark ? theme.primary : '#FFFFFF'},
+  summaryLabel: {marginTop: 4, fontSize: 12, textAlign: 'center', color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)'},
   filterCard: {marginBottom: 12},
-  filterTitle: {fontSize: 14, color: '#262626', fontWeight: '700', marginBottom: 12},
+  filterTitle: {fontSize: 14, color: theme.text, fontWeight: '700', marginBottom: 12},
   filterRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  filterChip: {paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#edf2f7'},
-  filterChipActive: {backgroundColor: '#dbeafe'},
-  filterChipText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
-  filterChipTextActive: {color: '#1d4ed8'},
+  filterChip: {paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.primaryBg},
+  filterChipActive: {backgroundColor: theme.primaryBg},
+  filterChipText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
+  filterChipTextActive: {color: theme.primaryText},
   card: {marginBottom: 12, gap: 12},
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12},
   cardHeaderText: {flex: 1},
-  droneName: {fontSize: 18, fontWeight: '800', color: '#102a43'},
-  droneMeta: {marginTop: 4, fontSize: 12, color: '#64748b'},
+  droneName: {fontSize: 18, fontWeight: '800', color: theme.text},
+  droneMeta: {marginTop: 4, fontSize: 12, color: theme.textSub},
   metricRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
-  metricText: {flex: 1, fontSize: 13, color: '#334e68'},
+  metricText: {flex: 1, fontSize: 13, color: theme.text},
   badgeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
   footer: {flexDirection: 'row', gap: 10},
   secondaryBtn: {
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#d7e5f5',
-    backgroundColor: '#f8fbff',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.bgSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
   },
-  secondaryBtnText: {fontSize: 14, fontWeight: '700', color: '#175cd3'},
-    statusBtn: {borderColor: '#fa8c16'},
-    statusBtnText: {fontSize: 14, fontWeight: '700', color: '#fa8c16'},
-    busyBtn: {borderColor: '#1677ff'},
-    busyBtnText: {fontSize: 14, fontWeight: '700', color: '#1677ff'},
+  secondaryBtnText: {fontSize: 14, fontWeight: '700', color: theme.primaryText},
+    statusBtn: {borderColor: theme.warning},
+    statusBtnText: {fontSize: 14, fontWeight: '700', color: theme.warning},
+    busyBtn: {borderColor: theme.primary},
+    busyBtnText: {fontSize: 14, fontWeight: '700', color: theme.primaryText},
 });

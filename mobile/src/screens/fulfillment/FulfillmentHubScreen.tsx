@@ -11,6 +11,8 @@ import {
 import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 import {getEffectiveRoleSummary, getRoleDisplayText} from '../../utils/roleSummary';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type FulfillmentAction = {
   key: string;
@@ -22,6 +24,8 @@ type FulfillmentAction = {
 };
 
 function ActionCard({action}: {action: FulfillmentAction}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <TouchableOpacity
       style={[styles.actionCard, {borderColor: action.accent}]}
@@ -37,6 +41,8 @@ function ActionCard({action}: {action: FulfillmentAction}) {
 }
 
 export default function FulfillmentHubScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
@@ -99,7 +105,7 @@ export default function FulfillmentHubScreen({navigation}: any) {
   }, [effectiveRoleSummary, navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.heroEyebrow}>履约</Text>
@@ -135,32 +141,32 @@ export default function FulfillmentHubScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f4f7fb'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bg},
   content: {padding: 16, paddingBottom: 28},
   hero: {
-    backgroundColor: '#0f766e',
+    backgroundColor: theme.isDark ? '#0D4F4A' : '#0f766e',
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
   },
   heroEyebrow: {
     fontSize: 13,
-    color: '#ccfbf1',
+    color: theme.isDark ? '#A7F3D0' : '#ccfbf1',
     marginBottom: 8,
     fontWeight: '600',
   },
   heroTitle: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
     marginBottom: 8,
   },
   heroDesc: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#ccfbf1',
+    color: theme.isDark ? '#A7F3D0' : '#ccfbf1',
   },
   rolePill: {
     alignSelf: 'flex-start',
@@ -172,23 +178,23 @@ const styles = StyleSheet.create({
   },
   rolePillText: {
     fontSize: 13,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '600',
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 16,
   },
   sectionTitle: {
     fontSize: 20,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   sectionDesc: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
     marginTop: 6,
     marginBottom: 14,
   },
@@ -201,7 +207,7 @@ const styles = StyleSheet.create({
     width: '48%',
     minHeight: 148,
     borderRadius: 18,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
     padding: 14,
   },
@@ -216,32 +222,32 @@ const styles = StyleSheet.create({
   actionIcon: {fontSize: 20},
   actionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
     marginBottom: 6,
   },
   actionDesc: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   tipCard: {
     marginTop: 16,
     borderRadius: 18,
-    backgroundColor: '#f6ffed',
+    backgroundColor: theme.success + '22',
     borderWidth: 1,
-    borderColor: '#b7eb8f',
+    borderColor: theme.success + '55',
     padding: 16,
   },
   tipTitle: {
     fontSize: 15,
-    color: '#237804',
+    color: theme.success,
     fontWeight: '700',
     marginBottom: 6,
   },
   tipText: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#3f8600',
+    color: theme.success,
   },
 });

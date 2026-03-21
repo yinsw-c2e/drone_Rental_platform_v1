@@ -10,6 +10,8 @@ import {
   TextInput,
 } from 'react-native';
 import {requestWithdrawal} from '../../services/settlement';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const METHODS = [
   {key: 'bank_card', label: '银行卡'},
@@ -18,6 +20,8 @@ const METHODS = [
 ];
 
 export default function WithdrawalScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [method, setMethod] = useState('bank_card');
   const [amountStr, setAmountStr] = useState('');
   const [bankName, setBankName] = useState('');
@@ -70,7 +74,7 @@ export default function WithdrawalScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>提现金额</Text>
         <View style={styles.amountRow}>
@@ -141,21 +145,21 @@ export default function WithdrawalScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   form: {flex: 1, padding: 16},
-  sectionTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginTop: 16, marginBottom: 8},
-  amountRow: {flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8},
-  amountPrefix: {fontSize: 28, fontWeight: '700', color: '#333', marginRight: 4},
-  amountInput: {flex: 1, fontSize: 28, fontWeight: '600', color: '#333', padding: 0},
-  hint: {fontSize: 12, color: '#999', marginTop: 6},
+  sectionTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginTop: 16, marginBottom: 8},
+  amountRow: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8},
+  amountPrefix: {fontSize: 28, fontWeight: '700', color: theme.text, marginRight: 4},
+  amountInput: {flex: 1, fontSize: 28, fontWeight: '600', color: theme.text, padding: 0},
+  hint: {fontSize: 12, color: theme.textSub, marginTop: 6},
   methodRow: {flexDirection: 'row', gap: 10, marginBottom: 8},
-  methodChip: {flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9d9d9', alignItems: 'center'},
-  methodChipActive: {backgroundColor: '#e6f7ff', borderColor: '#1890ff'},
-  methodText: {fontSize: 14, color: '#666'},
-  methodTextActive: {color: '#1890ff', fontWeight: '600'},
-  label: {fontSize: 13, color: '#666', marginBottom: 4, marginTop: 10},
-  input: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9d9d9', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#333'},
-  submitBtn: {backgroundColor: '#1890ff', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 24},
-  submitBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  methodChip: {flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.divider, alignItems: 'center'},
+  methodChipActive: {backgroundColor: theme.primaryBg, borderColor: theme.primary},
+  methodText: {fontSize: 14, color: theme.textSub},
+  methodTextActive: {color: theme.primaryText, fontWeight: '600'},
+  label: {fontSize: 13, color: theme.textSub, marginBottom: 4, marginTop: 10},
+  input: {backgroundColor: theme.card, borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.text},
+  submitBtn: {backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 24},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
 });

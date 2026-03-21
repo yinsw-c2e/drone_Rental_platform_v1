@@ -20,6 +20,8 @@ import {RootState} from '../../store/store';
 import {DemandSummary} from '../../types';
 import {getDemandSceneLabel, formatDemandBudget, formatDemandSchedule, resolveDemandPrimaryAddress} from '../../utils/demandMeta';
 import {EMPTY_ROLE_SUMMARY, getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type MarketDemandMode = 'public' | 'owner' | 'pilot';
 
@@ -47,6 +49,8 @@ const MODE_META: Record<MarketDemandMode, {label: string; desc: string; tone: Re
 };
 
 export default function DemandListScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const authUser = useSelector((state: RootState) => state.auth.user);
   const authRoleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const roleSummary = useMemo(
@@ -237,7 +241,7 @@ export default function DemandListScreen({navigation, route}: any) {
   const modeMeta = MODE_META[mode];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={[styles.hero, {backgroundColor: modeMeta.tone.bg, borderColor: modeMeta.tone.border}]}>
         <Text style={[styles.heroTitle, {color: modeMeta.tone.text}]}>{modeMeta.label}</Text>
         <Text style={styles.heroDesc}>{modeMeta.desc}</Text>
@@ -250,7 +254,7 @@ export default function DemandListScreen({navigation, route}: any) {
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1677ff']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
@@ -269,8 +273,8 @@ export default function DemandListScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f4f7fb'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bg},
   hero: {
     margin: 16,
     marginBottom: 10,
@@ -279,12 +283,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   heroTitle: {fontSize: 18, fontWeight: '700', marginBottom: 6},
-  heroDesc: {fontSize: 13, lineHeight: 20, color: '#595959'},
+  heroDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub},
   modeTabs: {
     flexDirection: 'row',
     marginHorizontal: 16,
     marginBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 6,
     gap: 8,
@@ -295,17 +299,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
   },
-  modeTabActive: {backgroundColor: '#e6f4ff'},
-  modeTabText: {fontSize: 13, color: '#8c8c8c', fontWeight: '600'},
-  modeTabTextActive: {color: '#1677ff'},
+  modeTabActive: {backgroundColor: theme.primaryBg},
+  modeTabText: {fontSize: 13, color: theme.textSub, fontWeight: '600'},
+  modeTabTextActive: {color: theme.primaryText},
   listContent: {paddingHorizontal: 16, paddingBottom: 24},
   cardHeader: {marginBottom: 10},
   cardHeaderMain: {flex: 1},
-  title: {fontSize: 17, lineHeight: 24, color: '#1f1f1f', fontWeight: '700'},
+  title: {fontSize: 17, lineHeight: 24, color: theme.text, fontWeight: '700'},
   tagRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10},
-  budget: {fontSize: 18, color: '#cf1322', fontWeight: '700', marginBottom: 10},
+  budget: {fontSize: 18, color: theme.danger, fontWeight: '700', marginBottom: 10},
   metaBlock: {gap: 6},
-  metaText: {fontSize: 13, lineHeight: 19, color: '#595959'},
+  metaText: {fontSize: 13, lineHeight: 19, color: theme.textSub},
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -313,7 +317,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   counterGroup: {flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap'},
-  counterText: {fontSize: 12, color: '#8c8c8c'},
-  counterDot: {marginHorizontal: 6, color: '#bfbfbf'},
+  counterText: {fontSize: 12, color: theme.textSub},
+  counterDot: {marginHorizontal: 6, color: theme.textHint},
   actionHint: {fontSize: 12, fontWeight: '700'},
 });

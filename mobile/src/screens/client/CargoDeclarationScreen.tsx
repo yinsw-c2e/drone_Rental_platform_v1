@@ -27,6 +27,8 @@ import {
   CargoDeclaration,
   CreateCargoDeclarationRequest,
 } from '../../services/client';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 let ActionSheetIOS: any;
 if (Platform.OS === 'ios') {
@@ -42,13 +44,15 @@ const CARGO_CATEGORIES = [
   {label: '医疗用品', value: 'medical'},
 ];
 
-const COMPLIANCE_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待审核', color: '#faad14'},
-  approved: {label: '已通过', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
+const COMPLIANCE_MAP: Record<string, {label: string; colorKey: 'warning' | 'success' | 'danger'}> = {
+  pending: {label: '待审核', colorKey: 'warning'},
+  approved: {label: '已通过', colorKey: 'success'},
+  rejected: {label: '已拒绝', colorKey: 'danger'},
 };
 
 export default function CargoDeclarationScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [declarations, setDeclarations] = useState<CargoDeclaration[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -203,8 +207,8 @@ export default function CargoDeclarationScreen({navigation}: any) {
             <Text style={styles.cargoName}>{item.cargo_name}</Text>
             <Text style={styles.declarationNo}>{item.declaration_no}</Text>
           </View>
-          <View style={[styles.statusBadge, {backgroundColor: compliance.color + '20'}]}>
-            <Text style={[styles.statusText, {color: compliance.color}]}>
+          <View style={[styles.statusBadge, {backgroundColor: theme[compliance.colorKey] + '20'}]}>
+            <Text style={[styles.statusText, {color: theme[compliance.colorKey]}]}>
               {compliance.label}
             </Text>
           </View>
@@ -257,7 +261,7 @@ export default function CargoDeclarationScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
@@ -266,7 +270,7 @@ export default function CargoDeclarationScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={declarations}
         renderItem={renderItem}
@@ -459,10 +463,10 @@ export default function CargoDeclarationScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -471,7 +475,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
   },
   listContent: {
     paddingBottom: 24,
@@ -480,7 +484,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -488,12 +492,12 @@ const styles = StyleSheet.create({
   },
   addBtnIcon: {
     fontSize: 20,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     marginRight: 8,
   },
   addBtnText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -502,15 +506,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 12,
@@ -528,11 +532,11 @@ const styles = StyleSheet.create({
   cargoName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   declarationNo: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 2,
   },
   statusBadge: {
@@ -546,7 +550,7 @@ const styles = StyleSheet.create({
   },
   cardBody: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     paddingTop: 12,
   },
   infoRow: {
@@ -558,12 +562,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginBottom: 2,
   },
   infoValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     fontWeight: '500',
   },
   sizeRow: {
@@ -571,11 +575,11 @@ const styles = StyleSheet.create({
   },
   sizeText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.textSub,
   },
   cardDate: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 8,
     textAlign: 'right',
   },
@@ -585,7 +589,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
@@ -596,16 +600,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   modalClose: {
     fontSize: 28,
-    color: '#999',
+    color: theme.textSub,
   },
   modalBody: {
     padding: 16,
@@ -613,18 +617,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
     marginTop: 14,
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   textArea: {
     height: 80,
@@ -647,7 +651,7 @@ const styles = StyleSheet.create({
   },
   sizeX: {
     fontSize: 16,
-    color: '#999',
+    color: theme.textSub,
     marginHorizontal: 8,
   },
   categoryContainer: {
@@ -658,20 +662,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 16,
     marginRight: 8,
   },
   categoryOptionActive: {
-    backgroundColor: '#1890ff',
-    borderColor: '#1890ff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   categoryText: {
     fontSize: 13,
-    color: '#666',
+    color: theme.textSub,
   },
   categoryTextActive: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -682,28 +686,28 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   checkboxActive: {
-    backgroundColor: '#1890ff',
-    borderColor: '#1890ff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   checkboxMark: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 14,
     fontWeight: 'bold',
   },
   checkboxLabel: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
   },
   submitBtn: {
     height: 50,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -711,10 +715,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   submitBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.cardBorder,
   },
   submitBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -731,7 +735,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.divider,
   },
   imageRemoveBtn: {
     position: 'absolute',
@@ -740,12 +744,12 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#ff4d4f',
+    backgroundColor: theme.danger,
     justifyContent: 'center',
     alignItems: 'center',
   },
   imageRemoveText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 13,
     fontWeight: 'bold',
     lineHeight: 18,
@@ -755,19 +759,19 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   imageAddIcon: {
     fontSize: 24,
-    color: '#999',
+    color: theme.textSub,
   },
   imageAddText: {
     fontSize: 11,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 2,
   },
 });

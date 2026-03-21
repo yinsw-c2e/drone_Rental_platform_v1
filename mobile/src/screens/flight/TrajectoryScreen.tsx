@@ -26,16 +26,20 @@ import {
   FlightWaypoint,
   SavedRoute,
 } from '../../services/flight';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type TabKey = 'recording' | 'myRoutes' | 'publicRoutes';
 
-const TRAJECTORY_STATUS_MAP: Record<string, {label: string; color: string}> = {
-  recording: {label: '记录中', color: '#52c41a'},
-  completed: {label: '已完成', color: '#1890ff'},
-  cancelled: {label: '已取消', color: '#999'},
+const TRAJECTORY_STATUS_MAP: Record<string, {label: string; colorKey: 'success' | 'info' | 'textHint'}> = {
+  recording: {label: '记录中', colorKey: 'success'},
+  completed: {label: '已完成', colorKey: 'info'},
+  cancelled: {label: '已取消', colorKey: 'textHint'},
 };
 
 export default function TrajectoryScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const orderId = route?.params?.orderId;
 
   const [activeTab, setActiveTab] = useState<TabKey>('recording');
@@ -203,12 +207,12 @@ export default function TrajectoryScreen({route, navigation}: any) {
                 <View
                   style={[
                     styles.statusBadge,
-                    {backgroundColor: (TRAJECTORY_STATUS_MAP[trajectory.status] || TRAJECTORY_STATUS_MAP.completed).color + '20'},
+                    {backgroundColor: theme[(TRAJECTORY_STATUS_MAP[trajectory.status] || TRAJECTORY_STATUS_MAP.completed).colorKey] + '20'},
                   ]}>
                   <Text
                     style={[
                       styles.statusBadgeText,
-                      {color: (TRAJECTORY_STATUS_MAP[trajectory.status] || TRAJECTORY_STATUS_MAP.completed).color},
+                      {color: theme[(TRAJECTORY_STATUS_MAP[trajectory.status] || TRAJECTORY_STATUS_MAP.completed).colorKey]},
                     ]}>
                     {(TRAJECTORY_STATUS_MAP[trajectory.status] || TRAJECTORY_STATUS_MAP.completed).label}
                   </Text>
@@ -414,7 +418,7 @@ export default function TrajectoryScreen({route, navigation}: any) {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* Tab bar */}
       <View style={styles.tabBar}>
         {TABS.map(tab => (
@@ -491,134 +495,134 @@ export default function TrajectoryScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   tabBar: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', backgroundColor: theme.card,
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
   tabItem: {flex: 1, paddingVertical: 14, alignItems: 'center'},
-  tabItemActive: {borderBottomWidth: 2, borderBottomColor: '#1890ff'},
-  tabText: {fontSize: 15, color: '#666'},
-  tabTextActive: {color: '#1890ff', fontWeight: '600'},
+  tabItemActive: {borderBottomWidth: 2, borderBottomColor: theme.primary},
+  tabText: {fontSize: 15, color: theme.textSub},
+  tabTextActive: {color: theme.primaryText, fontWeight: '600'},
   tabContent: {flex: 1},
   listContent: {padding: 16, paddingBottom: 24},
   recordingCard: {
-    backgroundColor: '#fff', margin: 16, marginBottom: 0, borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, margin: 16, marginBottom: 0, borderRadius: 12, padding: 16,
   },
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 14},
+  cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 14},
   trajectoryInfo: {},
   statusRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 16,
   },
-  statusLabel: {fontSize: 14, color: '#666'},
+  statusLabel: {fontSize: 14, color: theme.textSub},
   statusBadge: {paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12},
   statusBadgeText: {fontSize: 13, fontWeight: '500'},
   statsGrid: {flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12},
   statsItem: {width: '50%', alignItems: 'center', paddingVertical: 10},
-  statsValue: {fontSize: 20, fontWeight: 'bold', color: '#1890ff'},
-  statsLabel: {fontSize: 12, color: '#666', marginTop: 4},
+  statsValue: {fontSize: 20, fontWeight: 'bold', color: theme.primaryText},
+  statsLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
   extraStats: {
-    borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: theme.divider, paddingTop: 12,
   },
-  extraStatsText: {fontSize: 13, color: '#666', lineHeight: 20},
+  extraStatsText: {fontSize: 13, color: theme.textSub, lineHeight: 20},
   recordActions: {marginTop: 16},
   stopBtn: {
-    backgroundColor: '#ff4d4f', paddingVertical: 14, borderRadius: 8,
+    backgroundColor: theme.danger, paddingVertical: 14, borderRadius: 8,
     alignItems: 'center',
   },
-  stopBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  stopBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   completedActions: {flexDirection: 'row', gap: 12},
   saveRouteBtn: {
-    flex: 2, backgroundColor: '#1890ff', paddingVertical: 14,
+    flex: 2, backgroundColor: theme.primary, paddingVertical: 14,
     borderRadius: 8, alignItems: 'center',
   },
-  saveRouteBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  saveRouteBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   newRecordBtn: {
-    flex: 1, borderWidth: 1, borderColor: '#1890ff', paddingVertical: 14,
+    flex: 1, borderWidth: 1, borderColor: theme.primary, paddingVertical: 14,
     borderRadius: 8, alignItems: 'center',
   },
-  newRecordBtnText: {color: '#1890ff', fontSize: 16, fontWeight: '600'},
+  newRecordBtnText: {color: theme.primaryText, fontSize: 16, fontWeight: '600'},
   noRecordContainer: {alignItems: 'center', paddingVertical: 24},
-  noRecordText: {fontSize: 14, color: '#999', marginBottom: 20},
+  noRecordText: {fontSize: 14, color: theme.textSub, marginBottom: 20},
   startBtn: {
-    backgroundColor: '#52c41a', paddingHorizontal: 40, paddingVertical: 14,
+    backgroundColor: theme.success, paddingHorizontal: 40, paddingVertical: 14,
     borderRadius: 8,
   },
-  startBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  startBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   waypointsCard: {
-    backgroundColor: '#fff', margin: 16, borderRadius: 12, padding: 16,
+    backgroundColor: theme.card, margin: 16, borderRadius: 12, padding: 16,
   },
   waypointItem: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
   waypointSeq: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: '#e6f7ff',
+    width: 28, height: 28, borderRadius: 14, backgroundColor: theme.primaryBg,
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  waypointSeqText: {fontSize: 12, fontWeight: '600', color: '#1890ff'},
+  waypointSeqText: {fontSize: 12, fontWeight: '600', color: theme.primaryText},
   waypointInfo: {flex: 1},
-  waypointCoord: {fontSize: 13, color: '#333', fontWeight: '500'},
-  waypointMeta: {fontSize: 12, color: '#666', marginTop: 2},
-  waypointTime: {fontSize: 11, color: '#999'},
-  moreText: {textAlign: 'center', color: '#999', fontSize: 13, paddingVertical: 12},
+  waypointCoord: {fontSize: 13, color: theme.text, fontWeight: '500'},
+  waypointMeta: {fontSize: 12, color: theme.textSub, marginTop: 2},
+  waypointTime: {fontSize: 11, color: theme.textSub},
+  moreText: {textAlign: 'center', color: theme.textSub, fontSize: 13, paddingVertical: 12},
   routeCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12,
+    backgroundColor: theme.card, borderRadius: 12, padding: 16, marginBottom: 12,
   },
   routeHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 8,
   },
-  routeName: {fontSize: 16, fontWeight: '600', color: '#333', flex: 1},
+  routeName: {fontSize: 16, fontWeight: '600', color: theme.text, flex: 1},
   publicBadge: {
-    backgroundColor: '#e6f7ff', paddingHorizontal: 8, paddingVertical: 2,
+    backgroundColor: theme.primaryBg, paddingHorizontal: 8, paddingVertical: 2,
     borderRadius: 4, marginLeft: 8,
   },
-  publicBadgeText: {fontSize: 11, color: '#1890ff'},
-  routeDesc: {fontSize: 13, color: '#666', marginBottom: 10, lineHeight: 18},
+  publicBadgeText: {fontSize: 11, color: theme.primaryText},
+  routeDesc: {fontSize: 13, color: theme.textSub, marginBottom: 10, lineHeight: 18},
   routeStatsRow: {flexDirection: 'row', gap: 20, marginBottom: 6},
-  routeStat: {fontSize: 13, color: '#333'},
+  routeStat: {fontSize: 13, color: theme.text},
   routeMetaRow: {marginBottom: 8},
-  routeAddr: {fontSize: 12, color: '#999'},
+  routeAddr: {fontSize: 12, color: theme.textSub},
   routeFooter: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: '#f5f5f5', paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: theme.divider, paddingTop: 10,
   },
-  routeUseCount: {fontSize: 12, color: '#999'},
-  deleteText: {fontSize: 13, color: '#ff4d4f'},
+  routeUseCount: {fontSize: 12, color: theme.textSub},
+  deleteText: {fontSize: 13, color: theme.danger},
   emptyContainer: {paddingTop: 60, alignItems: 'center'},
-  emptyText: {fontSize: 16, color: '#666', marginBottom: 8},
-  emptySubText: {fontSize: 14, color: '#999'},
+  emptyText: {fontSize: 16, color: theme.textSub, marginBottom: 8},
+  emptySubText: {fontSize: 14, color: theme.textSub},
   // Modal
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center', alignItems: 'center',
   },
-  modalContent: {backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '85%'},
-  modalTitle: {fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 20},
-  fieldLabel: {fontSize: 14, color: '#333', marginBottom: 6, fontWeight: '500'},
+  modalContent: {backgroundColor: theme.card, borderRadius: 16, padding: 24, width: '85%'},
+  modalTitle: {fontSize: 18, fontWeight: '600', color: theme.text, marginBottom: 20},
+  fieldLabel: {fontSize: 14, color: theme.text, marginBottom: 6, fontWeight: '500'},
   input: {
-    borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 12,
-    paddingVertical: 10, fontSize: 14, backgroundColor: '#fafafa', marginBottom: 16,
+    borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 12,
+    paddingVertical: 10, fontSize: 14, backgroundColor: theme.bgSecondary, marginBottom: 16,
   },
   textArea: {height: 80, textAlignVertical: 'top'},
   switchRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: 4,
   },
-  switchLabel: {fontSize: 14, color: '#333'},
-  switchHint: {fontSize: 12, color: '#999', marginBottom: 20},
+  switchLabel: {fontSize: 14, color: theme.text},
+  switchHint: {fontSize: 12, color: theme.textSub, marginBottom: 20},
   modalActions: {flexDirection: 'row', gap: 12},
   modalCancelBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 8,
-    borderWidth: 1, borderColor: '#ddd', alignItems: 'center',
+    borderWidth: 1, borderColor: theme.divider, alignItems: 'center',
   },
-  modalCancelText: {fontSize: 16, color: '#666'},
+  modalCancelText: {fontSize: 16, color: theme.textSub},
   modalConfirmBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 8,
-    backgroundColor: '#1890ff', alignItems: 'center',
+    backgroundColor: theme.primary, alignItems: 'center',
   },
-  modalConfirmText: {fontSize: 16, color: '#fff', fontWeight: '600'},
+  modalConfirmText: {fontSize: 16, color: theme.btnPrimaryText, fontWeight: '600'},
 });

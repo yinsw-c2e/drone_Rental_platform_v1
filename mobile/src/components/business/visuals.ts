@@ -36,17 +36,28 @@ type TonePalette = {
   text: string;
 };
 
-const TONE_MAP: Record<VisualTone, TonePalette> = {
-  blue: {bg: '#e6f4ff', border: '#91caff', text: '#0958d9'},
-  green: {bg: '#f6ffed', border: '#b7eb8f', text: '#389e0d'},
+const DARK_TONE_MAP: Record<VisualTone, TonePalette> = {
+  blue:   {bg: 'rgba(0,132,255,0.12)',   border: 'rgba(0,132,255,0.3)',   text: '#4DA8FF'},
+  green:  {bg: 'rgba(0,200,100,0.12)',   border: 'rgba(0,200,100,0.3)',   text: '#00E57A'},
+  orange: {bg: 'rgba(255,160,0,0.12)',   border: 'rgba(255,160,0,0.3)',   text: '#FFB340'},
+  red:    {bg: 'rgba(255,80,80,0.12)',    border: 'rgba(255,80,80,0.3)',    text: '#FF6B6B'},
+  gray:   {bg: 'rgba(255,255,255,0.07)', border: 'rgba(255,255,255,0.15)', text: '#8A9BC0'},
+  teal:   {bg: 'rgba(0,212,255,0.10)',   border: 'rgba(0,212,255,0.28)',   text: '#00D4FF'},
+  purple: {bg: 'rgba(123,97,255,0.12)',  border: 'rgba(123,97,255,0.3)',   text: '#A78BFF'},
+};
+
+const LIGHT_TONE_MAP: Record<VisualTone, TonePalette> = {
+  blue:   {bg: '#e6f4ff', border: '#91caff', text: '#0958d9'},
+  green:  {bg: '#f6ffed', border: '#b7eb8f', text: '#389e0d'},
   orange: {bg: '#fff7e6', border: '#ffd591', text: '#d46b08'},
-  red: {bg: '#fff1f0', border: '#ffccc7', text: '#cf1322'},
-  gray: {bg: '#f5f5f5', border: '#d9d9d9', text: '#595959'},
-  teal: {bg: '#e6fffb', border: '#87e8de', text: '#08979c'},
+  red:    {bg: '#fff1f0', border: '#ffccc7', text: '#cf1322'},
+  gray:   {bg: '#f5f5f5', border: '#d9d9d9', text: '#595959'},
+  teal:   {bg: '#e6fffb', border: '#87e8de', text: '#08979c'},
   purple: {bg: '#f9f0ff', border: '#d3adf7', text: '#722ed1'},
 };
 
-export const getTonePalette = (tone: VisualTone): TonePalette => TONE_MAP[tone];
+export const getTonePalette = (tone: VisualTone, isDark = true): TonePalette =>
+  isDark ? DARK_TONE_MAP[tone] : LIGHT_TONE_MAP[tone];
 
 const DEMAND_STATUS: Record<string, BadgeMeta> = {
   draft: {label: '草稿', tone: 'gray'},

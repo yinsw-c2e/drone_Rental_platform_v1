@@ -17,6 +17,8 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {ownerService} from '../../services/owner';
 import {DemandQuoteSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const STATUS_GROUPS = [
   {key: 'all', label: '全部'},
@@ -31,6 +33,8 @@ type StatusGroupKey = (typeof STATUS_GROUPS)[number]['key'];
 const formatQuoteAmount = (amount?: number) => `¥${((amount || 0) / 100).toFixed(2)}`;
 
 export default function MyQuotesScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -108,13 +112,13 @@ export default function MyQuotesScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={filteredQuotes}
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f5cab']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />
         }
         contentContainerStyle={styles.content}
         ListHeaderComponent={
@@ -153,7 +157,7 @@ export default function MyQuotesScreen({navigation}: any) {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loading} color="#0f5cab" />
+            <ActivityIndicator style={styles.loading} color={theme.primary} />
           ) : (
             <ObjectCard>
               <EmptyState
@@ -171,45 +175,45 @@ export default function MyQuotesScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
     paddingBottom: 28,
   },
   hero: {
-    backgroundColor: '#5b3ab7',
+    backgroundColor: theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#f4e8ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#f4e8ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
   },
   filterCard: {
     marginBottom: 12,
   },
   filterTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
     marginBottom: 12,
   },
@@ -221,22 +225,22 @@ const styles = StyleSheet.create({
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   filterChipActive: {
-    borderColor: '#5b3ab7',
-    backgroundColor: '#f9f0ff',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryBg,
   },
   filterChipText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '600',
   },
   filterChipTextActive: {
-    color: '#5b3ab7',
+    color: theme.primaryText,
   },
   loading: {
     paddingVertical: 48,
@@ -256,20 +260,20 @@ const styles = StyleSheet.create({
   },
   code: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '600',
   },
   title: {
     marginTop: 14,
     fontSize: 17,
     lineHeight: 24,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   subTitle: {
     marginTop: 6,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   metricRow: {
     marginTop: 12,
@@ -279,24 +283,24 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
   },
   metricValue: {
     fontSize: 18,
-    color: '#5b3ab7',
+    color: theme.primaryText,
     fontWeight: '800',
   },
   metricText: {
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   plan: {
     marginTop: 12,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   footer: {
     marginTop: 16,
@@ -305,13 +309,13 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     borderRadius: 999,
-    backgroundColor: '#5b3ab7',
+    backgroundColor: theme.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   primaryBtnText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
 });

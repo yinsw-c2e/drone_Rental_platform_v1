@@ -7,11 +7,15 @@ import {launchImageLibrary} from 'react-native-image-picker';
 import {droneService} from '../../services/drone';
 import api from '../../services/api';
 import {API_BASE_URL} from '../../constants';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 // 图片访问基础地址（去掉 /api/v1 后缀）
 const IMAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
 
 export default function AddDroneScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
@@ -117,7 +121,7 @@ export default function AddDroneScreen({navigation}: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView style={styles.scroll}>
         {renderInput('品牌 *', 'brand', '如：DJI、大疆')}
         {renderInput('型号 *', 'model', '如：Mavic 3 Pro')}
@@ -148,7 +152,7 @@ export default function AddDroneScreen({navigation}: any) {
                 onPress={handlePickImage}
                 disabled={uploading}>
                 {uploading ? (
-                  <ActivityIndicator color="#1890ff" />
+                  <ActivityIndicator color={theme.primary} />
                 ) : (
                   <>
                     <Text style={styles.addImageIcon}>+</Text>
@@ -183,42 +187,42 @@ export default function AddDroneScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   scroll: {padding: 16},
   inputGroup: {marginBottom: 16},
-  label: {fontSize: 14, color: '#333', marginBottom: 8, fontWeight: '500'},
+  label: {fontSize: 14, color: theme.text, marginBottom: 8, fontWeight: '500'},
   input: {
-    backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 15, borderWidth: 1, borderColor: '#e8e8e8',
+    backgroundColor: theme.card, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 15, borderWidth: 1, borderColor: theme.divider,
   },
   textArea: {height: 100, textAlignVertical: 'top'},
   submitBtn: {
-    backgroundColor: '#1890ff', borderRadius: 8, paddingVertical: 14,
+    backgroundColor: theme.primary, borderRadius: 8, paddingVertical: 14,
     alignItems: 'center', marginTop: 8, marginBottom: 32,
   },
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
   // 照片相关
   imageRow: {flexDirection: 'row', flexWrap: 'wrap'},
   imageWrapper: {
     width: 88, height: 88, marginRight: 10, marginBottom: 10, position: 'relative',
   },
   thumbnail: {
-    width: 88, height: 88, borderRadius: 8, backgroundColor: '#e8e8e8',
+    width: 88, height: 88, borderRadius: 8, backgroundColor: theme.divider,
   },
   removeBtn: {
     position: 'absolute', top: -6, right: -6,
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#ff4d4f', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: theme.danger, justifyContent: 'center', alignItems: 'center',
   },
-  removeBtnText: {color: '#fff', fontSize: 14, fontWeight: 'bold', lineHeight: 20},
+  removeBtnText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: 'bold', lineHeight: 20},
   addImageBtn: {
     width: 88, height: 88, borderRadius: 8, borderWidth: 1.5,
-    borderColor: '#d9d9d9', borderStyle: 'dashed',
-    backgroundColor: '#fafafa', justifyContent: 'center', alignItems: 'center',
+    borderColor: theme.divider, borderStyle: 'dashed',
+    backgroundColor: theme.bgSecondary, justifyContent: 'center', alignItems: 'center',
     marginRight: 10, marginBottom: 10,
   },
-  addImageIcon: {fontSize: 24, color: '#bbb'},
-  addImageText: {fontSize: 12, color: '#999', marginTop: 2},
+  addImageIcon: {fontSize: 24, color: theme.textHint},
+  addImageText: {fontSize: 12, color: theme.textSub, marginTop: 2},
 });

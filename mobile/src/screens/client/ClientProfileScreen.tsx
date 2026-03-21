@@ -26,6 +26,8 @@ import {
 } from '../../services/client';
 import {RootState} from '../../store/store';
 import {AddressData} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const VERIFY_STATUS_MAP: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray'}> = {
   approved: {label: '已认证', tone: 'green'},
@@ -77,6 +79,8 @@ const buildAddressValue = (text?: string): AddressData | null => {
 };
 
 export default function ClientProfileScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const [client, setClient] = useState<Client | null>(null);
   const [draft, setDraft] = useState<DraftProfile>(emptyDraft);
@@ -204,7 +208,7 @@ export default function ClientProfileScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingWrap}>
           <Text style={styles.loadingText}>客户档案加载中...</Text>
         </View>
@@ -214,7 +218,7 @@ export default function ClientProfileScreen({navigation}: any) {
 
   if (!client) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <EmptyState
           title="客户档案暂时不可用"
           description="系统会默认创建个人客户档案。如果当前没拉到，我们可以直接重试初始化。"
@@ -226,7 +230,7 @@ export default function ClientProfileScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
@@ -408,10 +412,10 @@ export default function ClientProfileScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 16,
@@ -425,10 +429,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 15,
-    color: '#64748b',
+    color: theme.textSub,
   },
   heroCard: {
-    backgroundColor: '#0f3f88',
+    backgroundColor: theme.primary,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -438,7 +442,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   heroSubtitle: {
     marginTop: 6,
@@ -457,7 +461,7 @@ const styles = StyleSheet.create({
   accountName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   accountPhone: {
     marginTop: 4,
@@ -481,7 +485,7 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   summaryLabel: {
     marginTop: 4,
@@ -497,12 +501,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#102a43',
+    color: theme.text,
   },
   sectionDesc: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#64748b',
+    color: theme.textSub,
   },
   infoRow: {
     flexDirection: 'row',
@@ -513,29 +517,29 @@ const styles = StyleSheet.create({
   infoLabel: {
     flex: 1,
     fontSize: 14,
-    color: '#52606d',
+    color: theme.textSub,
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
     fontSize: 14,
     fontWeight: '600',
-    color: '#102a43',
+    color: theme.text,
   },
   inputLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#334e68',
+    color: theme.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d8e1eb',
+    borderColor: theme.cardBorder,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#102a43',
+    color: theme.text,
   },
   chipRow: {
     flexDirection: 'row',
@@ -546,18 +550,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#edf2f7',
+    backgroundColor: theme.primaryBg,
   },
   chipActive: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: theme.primaryBg,
   },
   chipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#486581',
+    color: theme.textSub,
   },
   chipTextActive: {
-    color: '#1d4ed8',
+    color: theme.primaryText,
   },
   actionRow: {
     flexDirection: 'row',
@@ -565,7 +569,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#175cd3',
+    backgroundColor: theme.primary,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -577,33 +581,33 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   secondaryButton: {
     borderRadius: 12,
-    backgroundColor: '#e8f1ff',
+    backgroundColor: theme.primaryBg,
     paddingVertical: 12,
     alignItems: 'center',
   },
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#175cd3',
+    color: theme.primaryText,
   },
   secondaryOutline: {
     minWidth: 124,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: theme.divider,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
     paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   secondaryOutlineText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334e68',
+    color: theme.text,
   },
 });

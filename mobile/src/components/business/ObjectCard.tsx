@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   StyleProp,
-  StyleSheet,
   TouchableOpacity,
   View,
   ViewStyle,
 } from 'react-native';
+import {useTheme} from '../../theme/ThemeContext';
 
 type Props = {
   onPress?: () => void;
@@ -22,12 +22,18 @@ export default function ObjectCard({
   highlightColor,
   backgroundColor,
 }: Props) {
+  const {theme} = useTheme();
   const content = (
     <View
       style={[
-        styles.card,
-        backgroundColor ? {backgroundColor} : null,
-        highlightColor ? {borderColor: highlightColor, borderWidth: 1.5} : null,
+        {
+          backgroundColor: backgroundColor ?? theme.card,
+          borderRadius: 18,
+          padding: 16,
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: highlightColor ?? theme.cardBorder,
+        },
         style,
       ]}>
       {children}
@@ -44,17 +50,3 @@ export default function ObjectCard({
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#102a43',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: {width: 0, height: 4},
-    elevation: 3,
-  },
-});

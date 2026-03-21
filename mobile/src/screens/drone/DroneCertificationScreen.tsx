@@ -20,16 +20,20 @@ import {launchImageLibrary} from 'react-native-image-picker';
 import {droneService} from '../../services/drone';
 import api from '../../services/api';
 import {Drone} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const VERIFY_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待审核', color: '#faad14'},
-  verified: {label: '已通过', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
+const VERIFY_MAP: Record<string, {label: string; colorKey: 'warning' | 'success' | 'danger' | 'textHint'}> = {
+  pending: {label: '待审核', colorKey: 'warning'},
+  verified: {label: '已通过', colorKey: 'success'},
+  rejected: {label: '已拒绝', colorKey: 'danger'},
 };
 
 type CertType = 'uom' | 'insurance' | 'airworthiness';
 
 export default function DroneCertificationScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const droneId = route.params?.id;
   const [drone, setDrone] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -237,12 +241,13 @@ export default function DroneCertificationScreen({route, navigation}: any) {
   };
 
   const getVerifyStatus = (status: string) => {
-    return VERIFY_MAP[status] || {label: '未提交', color: '#999'};
+    const entry = VERIFY_MAP[status] || {label: '未提交', colorKey: 'textHint' as const};
+    return {label: entry.label, color: theme[entry.colorKey]};
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
@@ -252,7 +257,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
 
   if (!drone) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>无人机不存在</Text>
         </View>
@@ -266,7 +271,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
   const overallStatus = getVerifyStatus(drone.certification_status);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -552,10 +557,10 @@ export default function DroneCertificationScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -565,12 +570,12 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
   },
   droneHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 16,
     marginBottom: 12,
   },
@@ -578,7 +583,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e6f7ff',
+    backgroundColor: theme.primaryBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -586,7 +591,7 @@ const styles = StyleSheet.create({
   droneIconText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   droneInfo: {
     flex: 1,
@@ -594,11 +599,11 @@ const styles = StyleSheet.create({
   droneName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   droneSerial: {
     fontSize: 13,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 2,
   },
   overallBadge: {
@@ -611,7 +616,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   certCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,
@@ -626,7 +631,7 @@ const styles = StyleSheet.create({
   certTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -639,7 +644,7 @@ const styles = StyleSheet.create({
   },
   certBody: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     paddingTop: 12,
   },
   certRow: {
@@ -649,35 +654,35 @@ const styles = StyleSheet.create({
   },
   certLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
   },
   certValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     fontWeight: '500',
   },
   emptyHint: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
     paddingVertical: 8,
   },
   certAction: {
     marginTop: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     alignItems: 'center',
   },
   certActionText: {
     fontSize: 14,
-    color: '#1890ff',
+    color: theme.primaryText,
     fontWeight: '500',
   },
   maintenanceEntry: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,
@@ -689,16 +694,16 @@ const styles = StyleSheet.create({
   maintenanceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   maintenanceSub: {
     fontSize: 13,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 4,
   },
   maintenanceArrow: {
     fontSize: 24,
-    color: '#ccc',
+    color: theme.textHint,
   },
   modalOverlay: {
     flex: 1,
@@ -706,7 +711,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '85%',
@@ -717,16 +722,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   modalClose: {
     fontSize: 28,
-    color: '#999',
+    color: theme.textSub,
   },
   modalBody: {
     padding: 16,
@@ -734,23 +739,23 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
     marginTop: 14,
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   imageUpload: {
     height: 150,
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderStyle: 'dashed',
     borderRadius: 12,
     overflow: 'hidden',
@@ -759,16 +764,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   uploadIcon: {
     fontSize: 36,
-    color: '#ccc',
+    color: theme.textHint,
     marginBottom: 8,
   },
   uploadText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   uploadedImage: {
     width: '100%',
@@ -777,7 +782,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     height: 50,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -785,10 +790,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   submitBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.cardBorder,
   },
   submitBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 18,
     fontWeight: 'bold',
   },

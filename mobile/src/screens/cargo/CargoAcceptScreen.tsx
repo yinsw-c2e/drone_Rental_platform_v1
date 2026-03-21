@@ -8,8 +8,12 @@ import {RootState} from '../../store/store';
 import {droneService} from '../../services/drone';
 import {orderService} from '../../services/order';
 import {Drone, CargoDemand} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function CargoAcceptScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {cargoId, cargoData} = route.params as {cargoId: number; cargoData: CargoDemand};
   const [drones, setDrones] = useState<Drone[]>([]);
   const [selectedDrone, setSelectedDrone] = useState<Drone | null>(null);
@@ -105,14 +109,14 @@ export default function CargoAcceptScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#fa8c16" style={{marginTop: 100}} />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator size="large" color={theme.warning} style={{marginTop: 100}} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* 货运信息卡片 */}
       <View style={styles.cargoCard}>
         <Text style={styles.cardTitle}>货运信息</Text>
@@ -178,61 +182,61 @@ export default function CargoAcceptScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   cargoCard: {
-    backgroundColor: '#fff', margin: 16, padding: 16,
-    borderRadius: 12, borderWidth: 1, borderColor: '#ffe7d3',
+    backgroundColor: theme.card, margin: 16, padding: 16,
+    borderRadius: 12, borderWidth: 1, borderColor: theme.warning + '44',
   },
-  cardTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12},
+  cardTitle: {fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 12},
   routeRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 4},
   routeIcon: {fontSize: 16, marginRight: 8},
-  routeText: {flex: 1, fontSize: 14, color: '#333'},
-  routeLine: {width: 2, height: 16, backgroundColor: '#e8e8e8', marginLeft: 7, marginBottom: 4},
+  routeText: {flex: 1, fontSize: 14, color: theme.text},
+  routeLine: {width: 2, height: 16, backgroundColor: theme.divider, marginLeft: 7, marginBottom: 4},
   infoRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginTop: 8, paddingTop: 8,
-    borderTopWidth: 1, borderTopColor: '#f0f0f0',
+    borderTopWidth: 1, borderTopColor: theme.divider,
   },
-  infoLabel: {fontSize: 14, color: '#666'},
-  infoValue: {fontSize: 14, color: '#333', fontWeight: '500'},
-  priceValue: {fontSize: 18, color: '#fa8c16', fontWeight: 'bold'},
-  section: {flex: 1, backgroundColor: '#fff', margin: 16, marginTop: 0, borderRadius: 12, padding: 16},
-  sectionTitle: {fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 12},
+  infoLabel: {fontSize: 14, color: theme.textSub},
+  infoValue: {fontSize: 14, color: theme.text, fontWeight: '500'},
+  priceValue: {fontSize: 18, color: theme.warning, fontWeight: 'bold'},
+  section: {flex: 1, backgroundColor: theme.card, margin: 16, marginTop: 0, borderRadius: 12, padding: 16},
+  sectionTitle: {fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 12},
   droneList: {paddingBottom: 16},
   droneItem: {
     flexDirection: 'row', alignItems: 'center', padding: 12,
-    borderRadius: 8, borderWidth: 2, borderColor: '#e8e8e8',
-    marginBottom: 12, backgroundColor: '#fafafa',
+    borderRadius: 8, borderWidth: 2, borderColor: theme.divider,
+    marginBottom: 12, backgroundColor: theme.bgSecondary,
   },
-  droneItemSelected: {borderColor: '#fa8c16', backgroundColor: '#fff7e6'},
+  droneItemSelected: {borderColor: theme.warning, backgroundColor: theme.warning + '22'},
   droneIcon: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff',
+    width: 48, height: 48, borderRadius: 24, backgroundColor: theme.card,
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
   droneIconText: {fontSize: 24},
   droneInfo: {flex: 1},
-  droneName: {fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 4},
-  droneSpecs: {fontSize: 12, color: '#999'},
+  droneName: {fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 4},
+  droneSpecs: {fontSize: 12, color: theme.textSub},
   checkMark: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#fa8c16',
+    width: 24, height: 24, borderRadius: 12, backgroundColor: theme.warning,
     justifyContent: 'center', alignItems: 'center',
   },
-  checkMarkText: {color: '#fff', fontSize: 16, fontWeight: 'bold'},
+  checkMarkText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: 'bold'},
   empty: {alignItems: 'center', paddingVertical: 40},
-  emptyText: {fontSize: 14, color: '#999', marginBottom: 16},
+  emptyText: {fontSize: 14, color: theme.textSub, marginBottom: 16},
   addBtn: {
-    paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#fa8c16',
+    paddingHorizontal: 24, paddingVertical: 10, backgroundColor: theme.warning,
     borderRadius: 20,
   },
-  addBtnText: {color: '#fff', fontSize: 14, fontWeight: '600'},
+  addBtnText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: '600'},
   footer: {
-    backgroundColor: '#fff', padding: 16, paddingBottom: 24,
-    borderTopWidth: 1, borderTopColor: '#f0f0f0',
+    backgroundColor: theme.card, padding: 16, paddingBottom: 24,
+    borderTopWidth: 1, borderTopColor: theme.divider,
   },
   confirmBtn: {
-    height: 48, backgroundColor: '#fa8c16', borderRadius: 24,
+    height: 48, backgroundColor: theme.warning, borderRadius: 24,
     justifyContent: 'center', alignItems: 'center',
   },
-  confirmBtnText: {color: '#fff', fontSize: 17, fontWeight: 'bold'},
+  confirmBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: 'bold'},
 });

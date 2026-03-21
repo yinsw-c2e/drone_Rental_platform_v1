@@ -24,6 +24,8 @@ import {
   V2OrderDetail,
   V2OrderTimelineItem,
 } from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type ActionButton = {
   label: string;
@@ -132,6 +134,8 @@ const getSourceTitle = (detail?: V2OrderDetail | null) => {
 };
 
 function DetailRow({label, value, highlight = false}: {label: string; value?: string; highlight?: boolean}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -153,6 +157,8 @@ function ParticipantCard({
   isSelf?: boolean;
   fallback: string;
 }) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.participantCard}>
       <View style={[styles.participantAvatar, {backgroundColor: accent}]}> 
@@ -171,6 +177,8 @@ function ParticipantCard({
 }
 
 function DispatchPreview({task}: {task?: V2DispatchTaskSummary | null}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   if (!task) {
     return (
       <View style={styles.noticeBox}>
@@ -197,6 +205,8 @@ function DispatchPreview({task}: {task?: V2DispatchTaskSummary | null}) {
 }
 
 function TimelineSection({items}: {items?: V2OrderTimelineItem[]}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   if (!items || items.length === 0) {
     return (
       <ObjectCard style={styles.sectionCard}>
@@ -232,6 +242,8 @@ function TimelineSection({items}: {items?: V2OrderTimelineItem[]}) {
 }
 
 export default function OrderDetailScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const orderId = Number(route?.params?.orderId || route?.params?.id || 0);
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
@@ -427,7 +439,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>{'<'} 返回</Text>
@@ -436,7 +448,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <View style={styles.headerRight} />
         </View>
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#114178" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -444,7 +456,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
 
   if (!detail) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>{'<'} 返回</Text>
@@ -463,7 +475,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
   const financial = detail.financial_summary;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>{'<'} 返回</Text>
@@ -569,7 +581,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
 
       {actionButtons.length > 0 ? (
         <View style={styles.actionBar}>
-          {actionLoading ? <ActivityIndicator color="#114178" style={styles.actionSpinner} /> : null}
+          {actionLoading ? <ActivityIndicator color={theme.primary} style={styles.actionSpinner} /> : null}
           {actionButtons.map(button => (
             <TouchableOpacity
               key={button.label}
@@ -598,10 +610,10 @@ export default function OrderDetailScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -609,21 +621,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e8edf3',
+    borderBottomColor: theme.divider,
   },
   backBtn: {
     width: 64,
   },
   backText: {
     fontSize: 16,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '600',
   },
   headerTitle: {
     fontSize: 18,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   headerRight: {
@@ -637,7 +649,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#8c8c8c',
+    color: theme.textSub,
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -647,9 +659,11 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderRadius: 24,
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -662,27 +676,27 @@ const styles = StyleSheet.create({
   },
   heroOrderNo: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '600',
   },
   heroTitle: {
     marginTop: 14,
     fontSize: 24,
     lineHeight: 30,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroRoute: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   heroSummaryRow: {
     flexDirection: 'row',
     marginTop: 18,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.12)',
+    borderTopColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.12)',
     paddingTop: 16,
   },
   heroMetric: {
@@ -690,18 +704,18 @@ const styles = StyleSheet.create({
   },
   heroMetricLabel: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.7)',
   },
   heroMetricValue: {
     marginTop: 6,
     fontSize: 24,
-    color: '#fff',
+    color: theme.isDark ? theme.primary : '#FFFFFF',
     fontWeight: '800',
   },
   heroMetricSecondary: {
     marginTop: 8,
     fontSize: 14,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '700',
   },
   sectionCard: {
@@ -709,13 +723,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
   sectionHint: {
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
     lineHeight: 20,
   },
   row: {
@@ -724,11 +738,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   rowLabel: {
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
     width: 88,
   },
   rowValue: {
@@ -736,11 +750,11 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 14,
     lineHeight: 20,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '600',
   },
   rowValueHighlight: {
-    color: '#cf1322',
+    color: theme.danger,
     fontWeight: '800',
   },
   participantCard: {
@@ -748,7 +762,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   participantAvatar: {
     width: 40,
@@ -759,7 +773,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   participantAvatarText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -768,54 +782,54 @@ const styles = StyleSheet.create({
   },
   participantLabel: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '700',
   },
   participantName: {
     marginTop: 4,
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   participantMeta: {
     marginTop: 4,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   dispatchSection: {
     marginTop: 14,
   },
   subsectionTitle: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
     marginBottom: 10,
   },
   noticeBox: {
     borderRadius: 16,
-    backgroundColor: '#f7faff',
+    backgroundColor: theme.bgSecondary,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#d6e4ff',
+    borderColor: theme.primaryBg,
   },
   noticeTitle: {
     fontSize: 14,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   noticeDesc: {
     marginTop: 6,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   dispatchBox: {
     borderRadius: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.divider,
   },
   dispatchHeader: {
     flexDirection: 'row',
@@ -825,7 +839,7 @@ const styles = StyleSheet.create({
   },
   dispatchNo: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   timelineItem: {
@@ -845,7 +859,7 @@ const styles = StyleSheet.create({
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#d9d9d9',
+    backgroundColor: theme.divider,
     marginTop: 4,
   },
   timelineContent: {
@@ -855,13 +869,13 @@ const styles = StyleSheet.create({
   },
   timelineTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
   },
   timelineMeta: {
     marginTop: 4,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   actionBar: {
     position: 'absolute',
@@ -872,9 +886,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: '#e8edf3',
+    borderTopColor: theme.divider,
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 28,
@@ -893,28 +907,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionButtonPrimary: {
-    backgroundColor: '#114178',
-    borderColor: '#114178',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   actionButtonDanger: {
-    backgroundColor: '#fff1f0',
-    borderColor: '#ffccc7',
+    backgroundColor: theme.danger + '22',
+    borderColor: theme.danger + '44',
   },
   actionButtonGhost: {
-    backgroundColor: '#fff',
-    borderColor: '#d9d9d9',
+    backgroundColor: theme.card,
+    borderColor: theme.divider,
   },
   actionButtonText: {
     fontSize: 13,
     fontWeight: '700',
   },
   actionButtonTextPrimary: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   actionButtonTextDanger: {
-    color: '#cf1322',
+    color: theme.danger,
   },
   actionButtonTextGhost: {
-    color: '#114178',
+    color: theme.primaryText,
   },
 });

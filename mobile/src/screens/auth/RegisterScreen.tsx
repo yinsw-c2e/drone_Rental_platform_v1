@@ -6,8 +6,12 @@ import {
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function RegisterScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const dispatch = useDispatch();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -57,13 +61,13 @@ export default function RegisterScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.content}>
         <Text style={styles.title}>注册新账号</Text>
         <TextInput style={styles.input} placeholder="手机号" keyboardType="phone-pad" maxLength={11} value={phone} onChangeText={setPhone} />
         <View style={styles.codeRow}>
           <TextInput style={[styles.input, {flex: 1, marginRight: 12}]} placeholder="验证码" keyboardType="number-pad" maxLength={6} value={code} onChangeText={setCode} />
-          <TouchableOpacity style={[styles.codeBtn, countdown > 0 && {backgroundColor: '#ccc'}]} onPress={sendCode} disabled={countdown > 0}>
+          <TouchableOpacity style={[styles.codeBtn, countdown > 0 && {backgroundColor: theme.textHint}]} onPress={sendCode} disabled={countdown > 0}>
             <Text style={styles.codeBtnText}>{countdown > 0 ? `${countdown}s` : '发送验证码'}</Text>
           </TouchableOpacity>
         </View>
@@ -73,21 +77,21 @@ export default function RegisterScreen({navigation}: any) {
           <Text style={styles.btnText}>注册</Text>
         </TouchableOpacity>
         <TouchableOpacity style={{marginTop: 16, alignItems: 'center'}} onPress={() => navigation.goBack()}>
-          <Text style={{color: '#1890ff'}}>已有账号？去登录</Text>
+          <Text style={{color: theme.primaryText}}>已有账号？去登录</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.card},
   content: {flex: 1, justifyContent: 'center', padding: 24},
   title: {fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 32},
-  input: {height: 48, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, paddingHorizontal: 16, fontSize: 16, marginBottom: 16},
+  input: {height: 48, borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 16, fontSize: 16, marginBottom: 16},
   codeRow: {flexDirection: 'row', alignItems: 'center'},
-  codeBtn: {height: 48, paddingHorizontal: 16, backgroundColor: '#1890ff', borderRadius: 8, justifyContent: 'center'},
-  codeBtnText: {color: '#fff', fontSize: 14},
-  btn: {height: 48, backgroundColor: '#1890ff', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: 8},
-  btnText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
+  codeBtn: {height: 48, paddingHorizontal: 16, backgroundColor: theme.primary, borderRadius: 8, justifyContent: 'center'},
+  codeBtnText: {color: theme.btnPrimaryText, fontSize: 14},
+  btn: {height: 48, backgroundColor: theme.primary, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: 8},
+  btnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: 'bold'},
 });

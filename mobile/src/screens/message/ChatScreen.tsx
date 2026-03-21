@@ -4,8 +4,12 @@ import {messageService} from '../../services/message';
 import {Message} from '../../types';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function ChatScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {peerId, peerName} = route.params;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -52,14 +56,14 @@ export default function ChatScreen({route, navigation}: any) {
     return (
       <View style={[styles.msgRow, isMine && styles.msgRowRight]}>
         <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-          <Text style={[styles.msgText, isMine && {color: '#fff'}]}>{item.content}</Text>
+          <Text style={[styles.msgText, isMine && {color: theme.btnPrimaryText}]}>{item.content}</Text>
         </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* Header with back button */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -100,37 +104,37 @@ export default function ChatScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#e8e8e8',
+    backgroundColor: theme.card, paddingHorizontal: 12, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
   backBtn: {paddingHorizontal: 8, paddingVertical: 4},
-  backText: {fontSize: 16, color: '#1890ff'},
-  headerTitle: {fontSize: 17, fontWeight: '600', color: '#333', flex: 1, textAlign: 'center'},
+  backText: {fontSize: 16, color: theme.primaryText},
+  headerTitle: {fontSize: 17, fontWeight: '600', color: theme.text, flex: 1, textAlign: 'center'},
   listBtn: {paddingHorizontal: 8, paddingVertical: 4},
-  listText: {fontSize: 15, color: '#1890ff'},
+  listText: {fontSize: 15, color: theme.primaryText},
   noticeBanner: {
     marginHorizontal: 12,
     marginTop: 12,
     marginBottom: 4,
-    backgroundColor: '#fffbe6',
+    backgroundColor: theme.warning + '22',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  noticeTitle: {fontSize: 13, fontWeight: '700', color: '#ad6800'},
-  noticeText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: '#8c6d1f'},
+  noticeTitle: {fontSize: 13, fontWeight: '700', color: theme.warning},
+  noticeText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: theme.warning},
   msgRow: {flexDirection: 'row', marginBottom: 12},
   msgRowRight: {justifyContent: 'flex-end'},
   bubble: {maxWidth: '75%', padding: 12, borderRadius: 12},
-  bubbleMine: {backgroundColor: '#1890ff', borderBottomRightRadius: 4},
-  bubbleOther: {backgroundColor: '#fff', borderBottomLeftRadius: 4},
-  msgText: {fontSize: 15, color: '#333'},
-  inputBar: {flexDirection: 'row', padding: 8, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee'},
-  input: {flex: 1, height: 40, backgroundColor: '#f5f5f5', borderRadius: 20, paddingHorizontal: 16, fontSize: 15},
-  sendBtn: {width: 60, height: 40, backgroundColor: '#1890ff', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 8},
-  sendText: {color: '#fff', fontSize: 15, fontWeight: 'bold'},
+  bubbleMine: {backgroundColor: theme.primary, borderBottomRightRadius: 4},
+  bubbleOther: {backgroundColor: theme.card, borderBottomLeftRadius: 4},
+  msgText: {fontSize: 15, color: theme.text},
+  inputBar: {flexDirection: 'row', padding: 8, backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.divider},
+  input: {flex: 1, height: 40, backgroundColor: theme.bgSecondary, borderRadius: 20, paddingHorizontal: 16, fontSize: 15},
+  sendBtn: {width: 60, height: 40, backgroundColor: theme.primary, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 8},
+  sendText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: 'bold'},
 });

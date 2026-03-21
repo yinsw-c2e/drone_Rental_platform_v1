@@ -5,8 +5,12 @@ import {
 } from 'react-native';
 import {demandService} from '../../services/demand';
 import {CargoDemand} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function CargoListScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [cargos, setCargos] = useState<CargoDemand[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,19 +95,19 @@ export default function CargoListScreen({navigation}: any) {
 
   if (loading && cargos.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={{marginTop: 100}} color="#fa8c16" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={{marginTop: 100}} color={theme.warning} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={cargos}
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#fa8c16']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.3}
         ListEmptyComponent={
@@ -117,28 +121,28 @@ export default function CargoListScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   item: {
-    backgroundColor: '#fff', marginHorizontal: 12, marginVertical: 6,
-    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#ffe7d3',
+    backgroundColor: theme.card, marginHorizontal: 12, marginVertical: 6,
+    borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.warning + '44',
   },
   content: {flex: 1},
   header: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8},
   typeBadge: {
-    backgroundColor: '#fff7e6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4,
-    borderWidth: 1, borderColor: '#ffd591',
+    backgroundColor: theme.warning + '22', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4,
+    borderWidth: 1, borderColor: theme.warning + '44',
   },
-  typeText: {fontSize: 12, color: '#fa8c16', fontWeight: '600'},
-  weight: {fontSize: 14, color: '#666', fontWeight: '600'},
-  description: {fontSize: 14, color: '#333', marginBottom: 8, lineHeight: 20},
+  typeText: {fontSize: 12, color: theme.warning, fontWeight: '600'},
+  weight: {fontSize: 14, color: theme.textSub, fontWeight: '600'},
+  description: {fontSize: 14, color: theme.text, marginBottom: 8, lineHeight: 20},
   addressRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 4},
-  addressLabel: {fontSize: 12, color: '#999', width: 40},
-  address: {flex: 1, fontSize: 12, color: '#666'},
-  footer: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0'},
-  price: {fontSize: 16, color: '#fa8c16', fontWeight: 'bold'},
-  distance: {fontSize: 12, color: '#999'},
+  addressLabel: {fontSize: 12, color: theme.textSub, width: 40},
+  address: {flex: 1, fontSize: 12, color: theme.textSub},
+  footer: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.divider},
+  price: {fontSize: 16, color: theme.warning, fontWeight: 'bold'},
+  distance: {fontSize: 12, color: theme.textSub},
   empty: {alignItems: 'center', paddingTop: 100},
   emptyIcon: {fontSize: 64, marginBottom: 16},
-  emptyText: {fontSize: 16, color: '#999'},
+  emptyText: {fontSize: 16, color: theme.textSub},
 });

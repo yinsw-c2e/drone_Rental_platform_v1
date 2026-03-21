@@ -21,6 +21,8 @@ import {orderV2Service} from '../../services/orderV2';
 import {RootState} from '../../store/store';
 import {RoleSummary, V2OrderSummary} from '../../types';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type RoleFilter = 'all' | 'client' | 'owner' | 'pilot';
 type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
@@ -147,6 +149,8 @@ const getExactStatusLabel = (status?: string) => {
 };
 
 export default function OrderListScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
@@ -250,39 +254,39 @@ export default function OrderListScreen({navigation, route}: any) {
             <SourceTag source={sourceKind} />
             <StatusBadge label="" meta={getObjectStatusMeta('order', item.order.status)} />
           </View>
-          <Text style={styles.code}>{item.order.order_no}</Text>
+          <Text style={[styles.code, {color: theme.textHint}]}>{item.order.order_no}</Text>
         </View>
 
-        <Text style={styles.title}>{item.order.title}</Text>
-        <Text style={styles.address} numberOfLines={2}>
+        <Text style={[styles.title, {color: theme.text}]}>{item.order.title}</Text>
+        <Text style={[styles.address, {color: theme.textSub}]} numberOfLines={2}>
           {item.order.service_address || '未设置起点'}
           {item.order.dest_address ? ` -> ${item.order.dest_address}` : ''}
         </Text>
 
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>承接方：{summarizeParty(item.order.provider, '未分配机主')}</Text>
-          <Text style={styles.metaText}>执行方：{summarizeParty(item.order.executor, item.order.execution_mode === 'self_execute' ? '机主自执行' : '待派单')}</Text>
+          <Text style={[styles.metaText, {color: theme.textSub}]}>承接方：{summarizeParty(item.order.provider, '未分配机主')}</Text>
+          <Text style={[styles.metaText, {color: theme.textSub}]}>执行方：{summarizeParty(item.order.executor, item.order.execution_mode === 'self_execute' ? '机主自执行' : '待派单')}</Text>
         </View>
 
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>客户：{summarizeParty(item.order.client, '客户')}</Text>
-          <Text style={styles.metaText}>{formatDateRange(item.order.start_time, item.order.end_time)}</Text>
+          <Text style={[styles.metaText, {color: theme.textSub}]}>客户：{summarizeParty(item.order.client, '客户')}</Text>
+          <Text style={[styles.metaText, {color: theme.textSub}]}>{formatDateRange(item.order.start_time, item.order.end_time)}</Text>
         </View>
 
         {roleHints.length > 0 ? (
           <View style={styles.roleHintRow}>
             {roleHints.map(label => (
-              <View key={label} style={styles.roleHintChip}>
-                <Text style={styles.roleHintText}>{label}</Text>
+              <View key={label} style={[styles.roleHintChip, {backgroundColor: theme.badgeBg}]}>
+                <Text style={[styles.roleHintText, {color: theme.textSub}]}>{label}</Text>
               </View>
             ))}
           </View>
         ) : null}
 
         <View style={styles.footer}>
-          <Text style={styles.amount}>{formatAmount(item.order.total_amount)}</Text>
-          <TouchableOpacity style={styles.detailBtn} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
-            <Text style={styles.detailBtnText}>查看订单</Text>
+          <Text style={[styles.amount, {color: theme.danger}]}>{formatAmount(item.order.total_amount)}</Text>
+          <TouchableOpacity style={[styles.detailBtn, {backgroundColor: theme.btnPrimary}]} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
+            <Text style={[styles.detailBtnText, {color: theme.btnPrimaryText}]}>查看订单</Text>
           </TouchableOpacity>
         </View>
       </ObjectCard>
@@ -296,12 +300,12 @@ export default function OrderListScreen({navigation, route}: any) {
       : {text: '去供给市场', onPress: () => navigation.navigate('OfferList')};
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={filteredItems}
         keyExtractor={item => String(item.order.id)}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f5cab']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
@@ -314,38 +318,38 @@ export default function OrderListScreen({navigation, route}: any) {
             </View>
 
             <ObjectCard style={styles.filterCard}>
-              <Text style={styles.filterTitle}>身份视角</Text>
+              <Text style={[styles.filterTitle, {color: theme.text}]}>身份视角</Text>
               <View style={styles.filterRow}>
                 {roleTabs.map(tab => (
                   <TouchableOpacity
                     key={tab.key}
-                    style={[styles.filterChip, activeRole === tab.key && styles.filterChipActive]}
+                    style={[styles.filterChip, {backgroundColor: theme.inputBg, borderColor: theme.inputBorder}, activeRole === tab.key && {borderColor: theme.primary, backgroundColor: theme.primaryBg}]}
                     onPress={() => setActiveRole(tab.key)}>
-                    <Text style={[styles.filterChipText, activeRole === tab.key && styles.filterChipTextActive]}>{tab.label}</Text>
+                    <Text style={[styles.filterChipText, {color: theme.textSub}, activeRole === tab.key && {color: theme.primaryText}]}>{tab.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={[styles.filterTitle, {marginTop: 16}]}>状态分组</Text>
+              <Text style={[styles.filterTitle, {marginTop: 16, color: theme.text}]}>状态分组</Text>
               <View style={styles.filterRow}>
                 {STATUS_TABS.map(tab => (
                   <TouchableOpacity
                     key={tab.key}
-                    style={[styles.filterChip, activeStatus === tab.key && styles.filterChipActive]}
+                    style={[styles.filterChip, {backgroundColor: theme.inputBg, borderColor: theme.inputBorder}, activeStatus === tab.key && {borderColor: theme.primary, backgroundColor: theme.primaryBg}]}
                     onPress={() => {
                       setActiveStatus(tab.key);
                       setExactStatusFilter('');
                     }}>
-                    <Text style={[styles.filterChipText, activeStatus === tab.key && styles.filterChipTextActive]}>{tab.label}</Text>
+                    <Text style={[styles.filterChipText, {color: theme.textSub}, activeStatus === tab.key && {color: theme.primaryText}]}>{tab.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
               {exactStatusFilter ? (
                 <View style={styles.exactStatusHint}>
-                  <Text style={styles.exactStatusHintText}>当前精确筛选：{getExactStatusLabel(exactStatusFilter)}</Text>
+                  <Text style={[styles.exactStatusHintText, {color: theme.textSub}]}>当前精确筛选：{getExactStatusLabel(exactStatusFilter)}</Text>
                   <TouchableOpacity onPress={() => setExactStatusFilter('')}>
-                    <Text style={styles.exactStatusClear}>清除</Text>
+                    <Text style={[styles.exactStatusClear, {color: theme.primary}]}>清除</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -354,7 +358,7 @@ export default function OrderListScreen({navigation, route}: any) {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loading} color="#0f5cab" />
+            <ActivityIndicator style={styles.loading} color={theme.refreshColor} />
           ) : (
             <ObjectCard>
               <EmptyState
@@ -372,45 +376,47 @@ export default function OrderListScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
     paddingBottom: 28,
   },
   hero: {
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   filterCard: {
     marginBottom: 12,
   },
   filterTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
     marginBottom: 12,
   },
@@ -422,40 +428,40 @@ const styles = StyleSheet.create({
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   filterChipActive: {
-    borderColor: '#114178',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   filterChipText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '600',
   },
   filterChipTextActive: {
-    color: '#114178',
+    color: theme.primaryText,
   },
   exactStatusHint: {
     marginTop: 14,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   exactStatusHintText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '600',
   },
   exactStatusClear: {
     fontSize: 12,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   loading: {
@@ -476,21 +482,21 @@ const styles = StyleSheet.create({
   },
   code: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '600',
   },
   title: {
     marginTop: 14,
     fontSize: 17,
     lineHeight: 24,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   address: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#595959',
+    color: theme.textSub,
   },
   metaRow: {
     marginTop: 10,
@@ -502,7 +508,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   roleHintRow: {
     marginTop: 12,
@@ -512,13 +518,13 @@ const styles = StyleSheet.create({
   },
   roleHintChip: {
     borderRadius: 999,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   roleHintText: {
     fontSize: 11,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   footer: {
@@ -530,18 +536,18 @@ const styles = StyleSheet.create({
   },
   amount: {
     fontSize: 22,
-    color: '#cf1322',
+    color: theme.danger,
     fontWeight: '800',
   },
   detailBtn: {
     borderRadius: 999,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   detailBtnText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
 });

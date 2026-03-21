@@ -9,17 +9,21 @@ import {RootState} from '../../store/store';
 import {droneService} from '../../services/drone';
 import {reviewService} from '../../services/review';
 import {Drone, Review} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
-const AVAILABILITY_MAP: Record<string, {label: string; color: string}> = {
-  available: {label: '可接单', color: '#52c41a'},
-  rented: {label: '执行中', color: '#faad14'},
-  maintenance: {label: '维护中', color: '#ff4d4f'},
-  offline: {label: '已下线', color: '#999'},
+const AVAILABILITY_MAP: Record<string, {label: string; colorKey: 'success' | 'warning' | 'danger' | 'textHint'}> = {
+  available: {label: '可接单', colorKey: 'success'},
+  rented: {label: '执行中', colorKey: 'warning'},
+  maintenance: {label: '维护中', colorKey: 'danger'},
+  offline: {label: '已下线', colorKey: 'textHint'},
 };
 
 export default function DroneDetailScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {id} = route.params;
   console.log('[DroneDetailScreen] Mounted with params:', route.params, 'id:', id);
   
@@ -80,7 +84,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>{'<'} 返回</Text>
@@ -89,7 +93,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
           <View style={{width: 60}} />
         </View>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#1890ff" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -97,7 +101,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
 
   if (!drone) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backText}>{'<'} 返回</Text>
@@ -112,14 +116,15 @@ export default function DroneDetailScreen({route, navigation}: any) {
     );
   }
 
-  const availability = AVAILABILITY_MAP[drone.availability_status] || {label: drone.availability_status, color: '#999'};
+  const availability = AVAILABILITY_MAP[drone.availability_status] || {label: drone.availability_status, colorKey: 'textHint' as const};
+    const availColor = theme[availability.colorKey];
   const images = drone.images?.length ? drone.images : [];
 
   const renderStars = (rating: number) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
       stars.push(
-        <Text key={i} style={{color: i <= rating ? '#faad14' : '#ddd', fontSize: 14}}>
+        <Text key={i} style={{color: i <= rating ? theme.warning : theme.divider, fontSize: 14}}>
           {'\u2605'}
         </Text>,
       );
@@ -128,7 +133,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>{'<'} 返回</Text>
@@ -179,7 +184,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
         <View style={styles.card}>
           <View style={styles.titleRow}>
             <Text style={styles.droneName}>{drone.brand} {drone.model}</Text>
-            <View style={[styles.statusBadge, {backgroundColor: availability.color}]}>
+            <View style={[styles.statusBadge, {backgroundColor: availColor}]}>
               <Text style={styles.statusText}>{availability.label}</Text>
             </View>
           </View>
@@ -211,7 +216,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
             )}
             {drone.deposit > 0 && (
               <View style={styles.priceItem}>
-                <Text style={[styles.priceValue, {color: '#faad14'}]}>{'¥'}{(drone.deposit / 100).toFixed(0)}</Text>
+                <Text style={[styles.priceValue, {color: theme.warning}]}>{'¥'}{(drone.deposit / 100).toFixed(0)}</Text>
                 <Text style={styles.priceLabel}>押金</Text>
               </View>
             )}
@@ -325,102 +330,102 @@ export default function DroneDetailScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#e8e8e8',
+    backgroundColor: theme.card, paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
   backBtn: {width: 60},
-  backText: {fontSize: 16, color: '#1890ff'},
-  headerTitle: {fontSize: 18, fontWeight: '600', color: '#333'},
+  backText: {fontSize: 16, color: theme.primaryText},
+  headerTitle: {fontSize: 18, fontWeight: '600', color: theme.text},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  emptyText: {fontSize: 16, color: '#999'},
+  emptyText: {fontSize: 16, color: theme.textSub},
   scrollContent: {flex: 1},
 
   // Image gallery
-  imageSlide: {width: SCREEN_WIDTH, height: 240, backgroundColor: '#e6f7ff'},
+  imageSlide: {width: SCREEN_WIDTH, height: 240, backgroundColor: theme.primaryBg},
   imagePlaceholder: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  imageUri: {fontSize: 12, color: '#999', marginTop: 8, paddingHorizontal: 20},
-  imageDots: {flexDirection: 'row', justifyContent: 'center', paddingVertical: 8, backgroundColor: '#fff'},
-  dot: {width: 6, height: 6, borderRadius: 3, backgroundColor: '#ddd', marginHorizontal: 3},
-  dotActive: {backgroundColor: '#1890ff', width: 16},
-  noImage: {height: 200, backgroundColor: '#e6f7ff', justifyContent: 'center', alignItems: 'center'},
-  noImageText: {fontSize: 14, color: '#999', marginTop: 8},
+  imageUri: {fontSize: 12, color: theme.textSub, marginTop: 8, paddingHorizontal: 20},
+  imageDots: {flexDirection: 'row', justifyContent: 'center', paddingVertical: 8, backgroundColor: theme.card},
+  dot: {width: 6, height: 6, borderRadius: 3, backgroundColor: theme.divider, marginHorizontal: 3},
+  dotActive: {backgroundColor: theme.primary, width: 16},
+  noImage: {height: 200, backgroundColor: theme.primaryBg, justifyContent: 'center', alignItems: 'center'},
+  noImageText: {fontSize: 14, color: theme.textSub, marginTop: 8},
 
   // Cards
-  card: {backgroundColor: '#fff', padding: 16, marginBottom: 10},
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12},
+  card: {backgroundColor: theme.card, padding: 16, marginBottom: 10},
+  cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 12},
 
   // Title
   titleRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  droneName: {fontSize: 20, fontWeight: 'bold', color: '#333', flex: 1},
+  droneName: {fontSize: 20, fontWeight: 'bold', color: theme.text, flex: 1},
   statusBadge: {paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12},
-  statusText: {color: '#fff', fontSize: 12, fontWeight: '500'},
-  description: {fontSize: 14, color: '#666', marginTop: 8, lineHeight: 20},
+  statusText: {color: theme.btnPrimaryText, fontSize: 12, fontWeight: '500'},
+  description: {fontSize: 14, color: theme.textSub, marginTop: 8, lineHeight: 20},
   ratingRow: {flexDirection: 'row', alignItems: 'center', marginTop: 10},
-  ratingText: {fontSize: 14, color: '#faad14', fontWeight: '600', marginLeft: 6},
-  orderCount: {fontSize: 12, color: '#999', marginLeft: 12},
+  ratingText: {fontSize: 14, color: theme.warning, fontWeight: '600', marginLeft: 6},
+  orderCount: {fontSize: 12, color: theme.textSub, marginLeft: 12},
 
   // Price
   priceRow: {flexDirection: 'row', justifyContent: 'space-around'},
   priceItem: {alignItems: 'center'},
-  priceValue: {fontSize: 20, fontWeight: 'bold', color: '#f5222d'},
-  priceLabel: {fontSize: 12, color: '#999', marginTop: 4},
+  priceValue: {fontSize: 20, fontWeight: 'bold', color: theme.danger},
+  priceLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
 
   // Specs
   specGrid: {flexDirection: 'row', justifyContent: 'space-around', marginBottom: 12},
   specItem: {alignItems: 'center'},
-  specValue: {fontSize: 16, fontWeight: '600', color: '#333'},
-  specLabel: {fontSize: 12, color: '#999', marginTop: 4},
+  specValue: {fontSize: 16, fontWeight: '600', color: theme.text},
+  specLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
   featureRow: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 4},
   featureTag: {
-    backgroundColor: '#e6f7ff', paddingHorizontal: 10, paddingVertical: 4,
+    backgroundColor: theme.primaryBg, paddingHorizontal: 10, paddingVertical: 4,
     borderRadius: 12, marginRight: 8, marginBottom: 6,
   },
-  featureText: {fontSize: 12, color: '#1890ff'},
+  featureText: {fontSize: 12, color: theme.primaryText},
 
   // Owner
   ownerRow: {flexDirection: 'row', alignItems: 'center'},
   ownerAvatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#1890ff',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: theme.primary,
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  ownerAvatarText: {fontSize: 18, color: '#fff', fontWeight: 'bold'},
-  ownerName: {fontSize: 15, fontWeight: '600', color: '#333'},
-  ownerMeta: {fontSize: 12, color: '#999', marginTop: 2},
+  ownerAvatarText: {fontSize: 18, color: theme.btnPrimaryText, fontWeight: 'bold'},
+  ownerName: {fontSize: 15, fontWeight: '600', color: theme.text},
+  ownerMeta: {fontSize: 12, color: theme.textSub, marginTop: 2},
   contactBtn: {
-    borderWidth: 1, borderColor: '#1890ff', paddingHorizontal: 14,
+    borderWidth: 1, borderColor: theme.primary, paddingHorizontal: 14,
     paddingVertical: 6, borderRadius: 16,
   },
-  contactBtnText: {color: '#1890ff', fontSize: 13},
+  contactBtnText: {color: theme.primaryText, fontSize: 13},
 
   // Location
-  address: {fontSize: 14, color: '#666'},
+  address: {fontSize: 14, color: theme.textSub},
 
   // Reviews
-  reviewItem: {paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f5'},
+  reviewItem: {paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.divider},
   reviewHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  reviewDate: {fontSize: 12, color: '#999'},
-  reviewContent: {fontSize: 14, color: '#333', marginTop: 6, lineHeight: 20},
-  emptyReview: {textAlign: 'center', color: '#999', paddingVertical: 16},
+  reviewDate: {fontSize: 12, color: theme.textSub},
+  reviewContent: {fontSize: 14, color: theme.text, marginTop: 6, lineHeight: 20},
+  emptyReview: {textAlign: 'center', color: theme.textSub, paddingVertical: 16},
 
   // Bottom bar
   bottomBar: {
-    flexDirection: 'row', backgroundColor: '#fff', padding: 12,
-    borderTopWidth: 1, borderTopColor: '#e8e8e8',
+    flexDirection: 'row', backgroundColor: theme.card, padding: 12,
+    borderTopWidth: 1, borderTopColor: theme.divider,
     paddingBottom: 24,
   },
   bottomContactBtn: {
-    flex: 1, height: 44, borderWidth: 1, borderColor: '#1890ff',
+    flex: 1, height: 44, borderWidth: 1, borderColor: theme.primary,
     borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  bottomContactText: {color: '#1890ff', fontSize: 16, fontWeight: '600'},
+  bottomContactText: {color: theme.primaryText, fontSize: 16, fontWeight: '600'},
   bottomRentBtn: {
-    flex: 2, height: 44, backgroundColor: '#1890ff',
+    flex: 2, height: 44, backgroundColor: theme.primary,
     borderRadius: 22, justifyContent: 'center', alignItems: 'center',
   },
-  bottomRentText: {color: '#fff', fontSize: 16, fontWeight: '600'},
-  bottomBtnDisabled: {backgroundColor: '#ccc'},
+  bottomRentText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
+  bottomBtnDisabled: {backgroundColor: theme.cardBorder},
 });

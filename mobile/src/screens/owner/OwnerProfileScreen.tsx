@@ -19,8 +19,12 @@ import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {RootState} from '../../store/store';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function OwnerProfileScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
@@ -109,7 +113,7 @@ export default function OwnerProfileScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingWrap}>
           <Text style={styles.loadingText}>机主档案加载中...</Text>
         </View>
@@ -118,7 +122,7 @@ export default function OwnerProfileScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
@@ -236,64 +240,64 @@ export default function OwnerProfileScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#eef3f8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 16, paddingBottom: 32, gap: 14},
   loadingWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  loadingText: {fontSize: 15, color: '#64748b'},
-  heroCard: {backgroundColor: '#0f5cab'},
-  heroEyebrow: {fontSize: 12, fontWeight: '700', color: '#dbeafe'},
-  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, fontWeight: '800', color: '#fff'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#dbeafe'},
+  loadingText: {fontSize: 15, color: theme.textSub},
+  heroCard: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
+  heroEyebrow: {fontSize: 12, fontWeight: '700', color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)'},
+  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, fontWeight: '800', color: theme.isDark ? theme.text : '#FFFFFF'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   heroMetaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.12)',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
   },
-  summaryValue: {fontSize: 18, fontWeight: '800', color: '#fff'},
-  summaryLabel: {marginTop: 4, fontSize: 12, textAlign: 'center', color: '#dbeafe'},
+  summaryValue: {fontSize: 18, fontWeight: '800', color: theme.isDark ? theme.primary : '#FFFFFF'},
+  summaryLabel: {marginTop: 4, fontSize: 12, textAlign: 'center', color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)'},
   sectionCard: {gap: 12},
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: '#102a43'},
-  inputLabel: {fontSize: 13, fontWeight: '700', color: '#334e68'},
+  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
+  inputLabel: {fontSize: 13, fontWeight: '700', color: theme.text},
   input: {
     borderWidth: 1,
-    borderColor: '#d8e1eb',
+    borderColor: theme.cardBorder,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#102a43',
+    color: theme.text,
   },
   multilineInput: {minHeight: 108},
   capabilityRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'center'},
   capabilityTextWrap: {flex: 1},
-  capabilityTitle: {fontSize: 15, fontWeight: '700', color: '#102a43'},
-  capabilityDesc: {marginTop: 4, fontSize: 13, lineHeight: 19, color: '#64748b'},
+  capabilityTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
+  capabilityDesc: {marginTop: 4, fontSize: 13, lineHeight: 19, color: theme.textSub},
   quickGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   quickCard: {
     width: '47%',
     borderRadius: 18,
     padding: 16,
-    backgroundColor: '#f8fbff',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#d7e5f5',
+    borderColor: theme.primaryBorder,
   },
   quickIcon: {fontSize: 24},
-  quickTitle: {marginTop: 10, fontSize: 15, fontWeight: '700', color: '#102a43'},
-  quickDesc: {marginTop: 6, fontSize: 12, lineHeight: 18, color: '#64748b'},
+  quickTitle: {marginTop: 10, fontSize: 15, fontWeight: '700', color: theme.text},
+  quickDesc: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
   saveButton: {
     borderRadius: 14,
-    backgroundColor: '#175cd3',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
   },
   saveButtonDisabled: {opacity: 0.6},
-  saveButtonText: {fontSize: 15, fontWeight: '800', color: '#fff'},
+  saveButtonText: {fontSize: 15, fontWeight: '800', color: theme.btnPrimaryText},
 });

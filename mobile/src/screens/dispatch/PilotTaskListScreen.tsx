@@ -20,6 +20,8 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
 import {V2DispatchTaskSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const formatMoney = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
 
@@ -54,6 +56,8 @@ const getPilotEntryMeta = (entryMode: string) => {
 };
 
 export default function PilotTaskListScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [tasks, setTasks] = useState<V2DispatchTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -139,7 +143,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.banner}>
         <Text style={styles.bannerTitle}>{entryMeta.title}</Text>
         <Text style={styles.bannerHint}>{entryMeta.hint}</Text>
@@ -151,7 +155,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
           setRefreshing(true);
           loadData();
-        }} colors={['#b45309']} />}
+        }} colors={[theme.refreshColor]} />}
         contentContainerStyle={styles.content}
         renderItem={({item}) => {
           const canRespond = String(item.status || '').toLowerCase() === 'pending_response';
@@ -213,7 +217,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
         }}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loading} color="#b45309" />
+            <ActivityIndicator style={styles.loading} color={theme.warning} />
           ) : (
             <ObjectCard>
               <EmptyState
@@ -252,26 +256,26 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff7ed',
+    backgroundColor: theme.bg,
   },
   banner: {
-    backgroundColor: '#b45309',
+    backgroundColor: theme.warning,
     paddingHorizontal: 16,
     paddingVertical: 18,
   },
   bannerTitle: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   bannerHint: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#ffedd5',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
   },
   content: {
     padding: 14,
@@ -285,7 +289,7 @@ const styles = StyleSheet.create({
   },
   cardHighlight: {
     borderWidth: 1,
-    borderColor: '#f59e0b',
+    borderColor: theme.warning,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -298,21 +302,21 @@ const styles = StyleSheet.create({
   },
   code: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '600',
   },
   title: {
     marginTop: 14,
     fontSize: 17,
     lineHeight: 24,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   route: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#595959',
+    color: theme.textSub,
   },
   metaRow: {
     marginTop: 10,
@@ -323,7 +327,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   actionRow: {
     flexDirection: 'row',
@@ -333,37 +337,37 @@ const styles = StyleSheet.create({
   rejectBtn: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#ffccc7',
-    backgroundColor: '#fff1f0',
+    borderColor: theme.danger + '44',
+    backgroundColor: theme.danger + '22',
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 10,
   },
   rejectBtnText: {
     fontSize: 12,
-    color: '#cf1322',
+    color: theme.danger,
     fontWeight: '700',
   },
   acceptBtn: {
     borderRadius: 999,
-    backgroundColor: '#b45309',
+    backgroundColor: theme.warning,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   acceptBtnText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
   executeBtn: {
     borderRadius: 999,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   executeBtnText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
   rejectSheet: {
@@ -372,10 +376,10 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 16,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: theme.warning + '44',
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowOffset: {width: 0, height: 4},
@@ -384,7 +388,7 @@ const styles = StyleSheet.create({
   },
   rejectTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
   },
   rejectInput: {
@@ -392,8 +396,8 @@ const styles = StyleSheet.create({
     minHeight: 88,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#f3d3b2',
-    backgroundColor: '#fffaf5',
+    borderColor: theme.warning + '44',
+    backgroundColor: theme.warning + '11',
     paddingHorizontal: 12,
     paddingVertical: 10,
     textAlignVertical: 'top',
@@ -406,26 +410,26 @@ const styles = StyleSheet.create({
   sheetGhostBtn: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 10,
   },
   sheetGhostText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   sheetDangerBtn: {
     borderRadius: 999,
-    backgroundColor: '#cf1322',
+    backgroundColor: theme.danger,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   sheetDangerText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
 });

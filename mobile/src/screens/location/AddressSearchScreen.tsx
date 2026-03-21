@@ -5,8 +5,12 @@ import {
 } from 'react-native';
 import {locationService} from '../../services/location';
 import {POIItem, AddressData} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function AddressSearchScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
   const city: string = route.params?.city || '';
 
@@ -69,7 +73,7 @@ export default function AddressSearchScreen({navigation, route}: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.searchBar}>
         <View style={styles.inputWrap}>
           <Text style={styles.searchIcon}>&#128269;</Text>
@@ -94,7 +98,7 @@ export default function AddressSearchScreen({navigation, route}: any) {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#1890ff" style={{marginTop: 60}} />
+        <ActivityIndicator size="large" color={theme.primary} style={{marginTop: 60}} />
       ) : results.length > 0 ? (
         <FlatList
           data={results}
@@ -115,29 +119,29 @@ export default function AddressSearchScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.card},
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider,
   },
   inputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#f5f5f5', borderRadius: 8, paddingHorizontal: 10, height: 40,
+    backgroundColor: theme.bgSecondary, borderRadius: 8, paddingHorizontal: 10, height: 40,
   },
-  searchIcon: {fontSize: 16, marginRight: 6, color: '#999'},
-  input: {flex: 1, fontSize: 15, padding: 0, color: '#333'},
-  clearBtn: {fontSize: 14, color: '#999', paddingLeft: 8},
+  searchIcon: {fontSize: 16, marginRight: 6, color: theme.textSub},
+  input: {flex: 1, fontSize: 15, padding: 0, color: theme.text},
+  clearBtn: {fontSize: 14, color: theme.textSub, paddingLeft: 8},
   cancelBtn: {paddingLeft: 12},
-  cancelText: {fontSize: 15, color: '#1890ff'},
+  cancelText: {fontSize: 15, color: theme.primaryText},
   item: {
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#f0f0f0',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider,
   },
-  itemName: {fontSize: 15, color: '#333', fontWeight: '500'},
-  itemAddr: {fontSize: 13, color: '#999', marginTop: 4},
+  itemName: {fontSize: 15, color: theme.text, fontWeight: '500'},
+  itemAddr: {fontSize: 13, color: theme.textSub, marginTop: 4},
   emptyWrap: {alignItems: 'center', paddingTop: 80},
-  emptyText: {fontSize: 14, color: '#999'},
-  hintText: {fontSize: 14, color: '#bbb'},
+  emptyText: {fontSize: 14, color: theme.textSub},
+  hintText: {fontSize: 14, color: theme.textHint},
 });

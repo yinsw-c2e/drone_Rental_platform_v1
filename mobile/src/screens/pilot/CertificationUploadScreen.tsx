@@ -24,11 +24,13 @@ import {
   SubmitCertificationRequest,
 } from '../../services/pilot';
 import api from '../../services/api';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待审核', color: '#faad14'},
-  verified: {label: '已认证', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
+const STATUS_MAP: Record<string, {label: string; colorKey: 'warning' | 'success' | 'danger'}> = {
+  pending: {label: '待审核', colorKey: 'warning'},
+  verified: {label: '已认证', colorKey: 'success'},
+  rejected: {label: '已拒绝', colorKey: 'danger'},
 };
 
 const CERT_TYPES = [
@@ -43,6 +45,8 @@ const CERT_TYPES = [
 ];
 
 export default function CertificationUploadScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [certifications, setCertifications] = useState<PilotCertification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -208,7 +212,7 @@ export default function CertificationUploadScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
@@ -217,7 +221,7 @@ export default function CertificationUploadScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -242,12 +246,13 @@ export default function CertificationUploadScreen({navigation}: any) {
         ) : (
           certifications.map(cert => {
             const status = STATUS_MAP[cert.verification_status] || STATUS_MAP.pending;
+            const statusColor = theme[status.colorKey];
             return (
               <View key={cert.id} style={styles.certCard}>
                 <View style={styles.certHeader}>
                   <Text style={styles.certType}>{getCertTypeLabel(cert.cert_type)}</Text>
-                  <View style={[styles.statusBadge, {backgroundColor: status.color + '20'}]}>
-                    <Text style={[styles.statusText, {color: status.color}]}>
+                  <View style={[styles.statusBadge, {backgroundColor: statusColor + '20'}]}>
+                    <Text style={[styles.statusText, {color: statusColor}]}>
                       {status.label}
                     </Text>
                   </View>
@@ -416,10 +421,10 @@ export default function CertificationUploadScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -429,13 +434,13 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
   },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -443,12 +448,12 @@ const styles = StyleSheet.create({
   },
   addBtnIcon: {
     fontSize: 20,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     marginRight: 8,
   },
   addBtnText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -457,15 +462,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   certCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
@@ -481,7 +486,7 @@ const styles = StyleSheet.create({
   certType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -494,7 +499,7 @@ const styles = StyleSheet.create({
   },
   certBody: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     paddingTop: 12,
   },
   certRow: {
@@ -504,11 +509,11 @@ const styles = StyleSheet.create({
   },
   certLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
   },
   certValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     fontWeight: '500',
   },
   certImage: {
@@ -523,7 +528,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
@@ -534,16 +539,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   modalClose: {
     fontSize: 28,
-    color: '#999',
+    color: theme.textSub,
   },
   modalBody: {
     padding: 16,
@@ -551,18 +556,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
     marginTop: 16,
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   typeContainer: {
     flexDirection: 'row',
@@ -572,31 +577,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 16,
     marginRight: 8,
   },
   typeOptionActive: {
-    backgroundColor: '#1890ff',
-    borderColor: '#1890ff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   typeOptionText: {
     fontSize: 13,
-    color: '#666',
+    color: theme.textSub,
   },
   typeOptionTextActive: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   tipText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
     marginTop: 16,
     lineHeight: 22,
   },
   imageUpload: {
     height: 150,
     borderWidth: 2,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderStyle: 'dashed',
     borderRadius: 12,
     overflow: 'hidden',
@@ -605,16 +610,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   uploadIcon: {
     fontSize: 36,
-    color: '#ccc',
+    color: theme.textHint,
     marginBottom: 8,
   },
   uploadText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   uploadedImage: {
     width: '100%',
@@ -623,7 +628,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     height: 50,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -631,10 +636,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   submitBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.cardBorder,
   },
   submitBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 18,
     fontWeight: 'bold',
   },

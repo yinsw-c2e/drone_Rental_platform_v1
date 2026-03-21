@@ -7,8 +7,12 @@ import {useSelector, useDispatch} from 'react-redux';
 import {RootState} from '../../store/store';
 import {logout, updateUser} from '../../store/slices/authSlice';
 import {userService} from '../../services/user';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function SettingsScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
 
@@ -64,7 +68,7 @@ export default function SettingsScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView>
         {/* 账户信息 */}
         <View style={styles.sectionHeader}>
@@ -109,8 +113,8 @@ export default function SettingsScreen({navigation}: any) {
             <Switch
               value={pushEnabled}
               onValueChange={setPushEnabled}
-              trackColor={{false: '#d9d9d9', true: '#1890ff'}}
-              thumbColor="#fff"
+              trackColor={{false: theme.inputBorder, true: theme.primary}}
+              thumbColor={theme.isDark ? theme.text : '#fff'}
             />
           </View>
           <View style={styles.row}>
@@ -118,8 +122,8 @@ export default function SettingsScreen({navigation}: any) {
             <Switch
               value={messageNotify}
               onValueChange={setMessageNotify}
-              trackColor={{false: '#d9d9d9', true: '#1890ff'}}
-              thumbColor="#fff"
+              trackColor={{false: theme.inputBorder, true: theme.primary}}
+              thumbColor={theme.isDark ? theme.text : '#fff'}
             />
           </View>
           <View style={[styles.row, {borderBottomWidth: 0}]}>
@@ -127,8 +131,8 @@ export default function SettingsScreen({navigation}: any) {
             <Switch
               value={orderNotify}
               onValueChange={setOrderNotify}
-              trackColor={{false: '#d9d9d9', true: '#1890ff'}}
-              thumbColor="#fff"
+              trackColor={{false: theme.inputBorder, true: theme.primary}}
+              thumbColor={theme.isDark ? theme.text : '#fff'}
             />
           </View>
         </View>
@@ -174,24 +178,24 @@ export default function SettingsScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   sectionHeader: {paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8},
-  sectionTitle: {fontSize: 13, color: '#999', fontWeight: '500'},
-  section: {backgroundColor: '#fff'},
+  sectionTitle: {fontSize: 13, color: theme.textSub, fontWeight: '500'},
+  section: {backgroundColor: theme.card},
   row: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
-  rowLabel: {fontSize: 15, color: '#333'},
+  rowLabel: {fontSize: 15, color: theme.text},
   rowRight: {flexDirection: 'row', alignItems: 'center'},
-  rowValue: {fontSize: 15, color: '#999'},
-  rowArrow: {fontSize: 16, color: '#ccc', marginLeft: 8},
+  rowValue: {fontSize: 15, color: theme.textSub},
+  rowArrow: {fontSize: 16, color: theme.textHint, marginLeft: 8},
   logoutBtn: {
-    margin: 24, height: 48, backgroundColor: '#fff', borderRadius: 8,
+    margin: 24, height: 48, backgroundColor: theme.card, borderRadius: 8,
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1, borderColor: '#ff4d4f',
+    borderWidth: 1, borderColor: theme.danger,
   },
-  logoutText: {color: '#ff4d4f', fontSize: 16, fontWeight: '500'},
+  logoutText: {color: theme.danger, fontSize: 16, fontWeight: '500'},
 });

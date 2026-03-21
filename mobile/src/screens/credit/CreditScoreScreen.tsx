@@ -16,8 +16,12 @@ import {
   getScoreLevelText,
   getScoreLevelColor,
 } from '../../services/credit';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const CreditScoreScreen: React.FC = () => {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [creditScore, setCreditScore] = useState<CreditScore | null>(null);
@@ -188,7 +192,7 @@ const CreditScoreScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1890ff" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -246,10 +250,10 @@ const CreditScoreScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -259,7 +263,7 @@ const styles = StyleSheet.create({
   scoreCircle: {
     alignItems: 'center',
     paddingVertical: 30,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   scoreRing: {
     width: 150,
@@ -275,7 +279,7 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 4,
   },
   levelBadge: {
@@ -285,39 +289,39 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   levelText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 14,
     fontWeight: '500',
   },
   warningBanner: {
-    backgroundColor: '#fff7e6',
+    backgroundColor: theme.warning + '22',
     padding: 12,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#faad14',
+    borderLeftColor: theme.warning,
   },
   warningText: {
-    color: '#d48806',
+    color: theme.warning,
     fontSize: 14,
   },
   dangerBanner: {
-    backgroundColor: '#fff1f0',
+    backgroundColor: theme.danger + '22',
     padding: 12,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#f5222d',
+    borderLeftColor: theme.danger,
   },
   dangerText: {
-    color: '#cf1322',
+    color: theme.danger,
     fontSize: 14,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginTop: 12,
     marginHorizontal: 16,
     borderRadius: 8,
@@ -330,18 +334,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   activeTab: {
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
   },
   tabText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
   },
   activeTabText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '500',
   },
   dimensionsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     margin: 16,
     padding: 16,
     borderRadius: 8,
@@ -349,7 +353,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 16,
   },
   dimensionRow: {
@@ -357,7 +361,7 @@ const styles = StyleSheet.create({
   },
   dimensionLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
     marginBottom: 6,
   },
   progressContainer: {
@@ -367,23 +371,23 @@ const styles = StyleSheet.create({
   progressBg: {
     flex: 1,
     height: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.divider,
     borderRadius: 4,
     marginRight: 12,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 4,
   },
   dimensionScore: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     width: 60,
     textAlign: 'right',
   },
   statsCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
@@ -401,18 +405,18 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   statLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 4,
   },
   logsContainer: {
     padding: 16,
   },
   logItem: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
@@ -424,7 +428,7 @@ const styles = StyleSheet.create({
   },
   logReason: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     flex: 1,
   },
   logChange: {
@@ -438,11 +442,11 @@ const styles = StyleSheet.create({
   },
   logTime: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   logScore: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   emptyContainer: {
     padding: 40,
@@ -450,7 +454,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
 });
 

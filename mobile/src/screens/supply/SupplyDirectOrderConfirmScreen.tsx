@@ -27,6 +27,8 @@ import {
   formatSupplyPricing,
   getSupplySceneLabel,
 } from '../../utils/supplyMeta';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 function formatDateTime(date: Date): string {
   const year = date.getFullYear();
@@ -62,6 +64,8 @@ function toAddressSnapshot(address: AddressData) {
 }
 
 export default function SupplyDirectOrderConfirmScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {supply} = route.params as {supply: SupplyDetail};
   const {user, roleSummary} = useSelector((state: RootState) => state.auth);
 
@@ -163,7 +167,7 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
 
   if (createdOrder) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <ScrollView contentContainerStyle={styles.content}>
           <ObjectCard style={styles.successHero}>
             <Text style={styles.successEyebrow}>直达下单已提交</Text>
@@ -226,7 +230,7 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         {!canCreateOrder ? (
           <ObjectCard>
@@ -407,10 +411,10 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
@@ -418,25 +422,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   successHero: {
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   successEyebrow: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   successTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#ffffff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   successDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#e6f4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   successBadgeRow: {
     marginTop: 14,
@@ -444,7 +450,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
@@ -452,7 +458,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
     fontSize: 13,
-    color: '#475569',
+    color: theme.textSub,
     fontWeight: '700',
   },
   chipRow: {
@@ -463,46 +469,46 @@ const styles = StyleSheet.create({
   },
   sceneChip: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#ffffff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   sceneChipActive: {
-    backgroundColor: '#e6f4ff',
-    borderColor: '#91caff',
+    backgroundColor: theme.primaryBg,
+    borderColor: theme.primaryBorder,
   },
   sceneChipText: {
     fontSize: 12,
-    color: '#475569',
+    color: theme.textSub,
     fontWeight: '700',
   },
   sceneChipTextActive: {
-    color: '#0958d9',
+    color: theme.primaryText,
   },
   dateInput: {
     borderWidth: 1,
-    borderColor: '#dbe3ec',
+    borderColor: theme.divider,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 13,
     marginBottom: 12,
   },
   dateText: {
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#dbe3ec',
+    borderColor: theme.divider,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     marginBottom: 12,
   },
   textArea: {
@@ -519,25 +525,25 @@ const styles = StyleSheet.create({
   infoLabel: {
     width: 88,
     fontSize: 13,
-    color: '#64748b',
+    color: theme.textSub,
   },
   infoValue: {
     flex: 1,
     textAlign: 'right',
     fontSize: 14,
     lineHeight: 20,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '600',
   },
   tipText: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#64748b',
+    color: theme.textSub,
   },
   bodyText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#475569',
+    color: theme.textSub,
   },
   actionStack: {
     marginTop: 14,
@@ -548,14 +554,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: theme.divider,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   primaryBtn: {
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.primary,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -563,21 +569,21 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontSize: 15,
-    color: '#ffffff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   secondaryBtn: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: theme.divider,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
   },
   secondaryBtnText: {
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '700',
   },
   fullWidthBtn: {

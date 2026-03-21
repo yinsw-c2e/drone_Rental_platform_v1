@@ -18,6 +18,8 @@ import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {AddressData, Drone, SupplyDetail} from '../../types';
 import {summarizeFlexibleValue, summarizeServiceArea} from '../../utils/supplyMeta';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const SCENE_OPTIONS = [
   {key: 'power_grid', label: '电网建设'},
@@ -72,6 +74,8 @@ const parseAddressData = (snapshot: any): AddressData | null => {
 };
 
 export default function PublishOfferScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const supplyId = Number(route?.params?.supplyId || route?.params?.id || 0) || 0;
   const isEditing = supplyId > 0;
 
@@ -205,15 +209,15 @@ export default function PublishOfferScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={styles.loading} color="#0f5cab" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={styles.loading} color={theme.primary} />
       </SafeAreaView>
     );
   }
 
   if (drones.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyIcon}>🛩️</Text>
           <Text style={styles.emptyTitle}>还没有可用无人机</Text>
@@ -227,7 +231,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.heroEyebrow}>机主供给</Text>
@@ -385,10 +389,10 @@ export default function PublishOfferScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   loading: {
     marginTop: 120,
@@ -399,31 +403,33 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hero: {
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     borderRadius: 24,
     padding: 20,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
@@ -431,18 +437,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
     fontSize: 13,
-    color: '#434343',
+    color: theme.text,
     fontWeight: '700',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    backgroundColor: '#fafafa',
-    color: '#262626',
+    backgroundColor: theme.bgSecondary,
+    color: theme.text,
   },
   multilineInput: {
     minHeight: 88,
@@ -454,23 +460,23 @@ const styles = StyleSheet.create({
     width: 170,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     padding: 14,
   },
   droneCardActive: {
-    borderColor: '#0f5cab',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   droneTitle: {
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
   },
   droneMeta: {
     marginTop: 6,
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
   },
   chipRow: {
     flexDirection: 'row',
@@ -480,22 +486,22 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   chipActive: {
-    borderColor: '#0f5cab',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   chipText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   chipTextActive: {
-    color: '#0f5cab',
+    color: theme.primaryText,
   },
   switchRow: {
     marginTop: 10,
@@ -505,24 +511,24 @@ const styles = StyleSheet.create({
   },
   switchTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
   },
   switchDesc: {
     marginTop: 6,
     fontSize: 12,
     lineHeight: 18,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   summaryTitle: {
     fontSize: 15,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 10,
   },
   summaryLine: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     lineHeight: 22,
   },
   footerActions: {
@@ -534,14 +540,14 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   secondaryActionText: {
     fontSize: 14,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '800',
   },
   primaryAction: {
@@ -549,11 +555,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.primary,
   },
   primaryActionText: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   actionDisabled: {
@@ -571,13 +577,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#262626',
+    color: theme.text,
   },
   emptyDesc: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
     textAlign: 'center',
     marginBottom: 20,
   },

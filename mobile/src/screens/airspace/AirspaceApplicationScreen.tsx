@@ -23,14 +23,16 @@ import {
 import {getPilotProfile} from '../../services/pilot';
 import AddressInputField from '../../components/AddressInputField';
 import {AddressData} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const STATUS_MAP: Record<string, {label: string; color: string}> = {
-  draft: {label: '草稿', color: '#999'},
-  pending_review: {label: '待审核', color: '#faad14'},
-  approved: {label: '已批准', color: '#52c41a'},
-  rejected: {label: '已拒绝', color: '#ff4d4f'},
-  submitted_to_uom: {label: '已提交UOM', color: '#1890ff'},
-  cancelled: {label: '已取消', color: '#999'},
+const STATUS_MAP: Record<string, {label: string; colorKey: 'textHint' | 'warning' | 'success' | 'danger' | 'info'}> = {
+  draft: {label: '草稿', colorKey: 'textHint'},
+  pending_review: {label: '待审核', colorKey: 'warning'},
+  approved: {label: '已批准', colorKey: 'success'},
+  rejected: {label: '已拒绝', colorKey: 'danger'},
+  submitted_to_uom: {label: '已提交UOM', colorKey: 'info'},
+  cancelled: {label: '已取消', colorKey: 'textHint'},
 };
 
 const PURPOSE_OPTIONS = [
@@ -43,6 +45,8 @@ const PURPOSE_OPTIONS = [
 ];
 
 export default function AirspaceApplicationScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [mode, setMode] = useState<'list' | 'create'>('list');
   const [applications, setApplications] = useState<AirspaceApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,15 +187,15 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   };
 
   const renderApplicationItem = ({item}: {item: AirspaceApplication}) => {
-    const statusInfo = STATUS_MAP[item.status] || {label: item.status, color: '#999'};
+    const statusInfo = STATUS_MAP[item.status] || {label: item.status, colorKey: 'textHint' as const};
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={() => navigation.navigate('ComplianceCheck', {applicationId: item.id, pilotId, droneId: item.drone_id})}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.flight_plan_name || '未命名飞行计划'}</Text>
-          <View style={[styles.statusBadge, {backgroundColor: statusInfo.color + '20'}]}>
-            <Text style={[styles.statusText, {color: statusInfo.color}]}>{statusInfo.label}</Text>
+          <View style={[styles.statusBadge, {backgroundColor: theme[statusInfo.colorKey] + '20'}]}>
+            <Text style={[styles.statusText, {color: theme[statusInfo.colorKey]}]}>{statusInfo.label}</Text>
           </View>
         </View>
 
@@ -239,7 +243,7 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
 
   if (mode === 'create') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
           <Text style={styles.sectionTitle}>飞行计划信息</Text>
 
@@ -305,7 +309,7 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>空域申请管理</Text>
         <TouchableOpacity style={styles.createBtn} onPress={() => setMode('create')}>
@@ -331,54 +335,54 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8'},
-  headerTitle: {fontSize: 18, fontWeight: '600', color: '#333'},
-  createBtn: {backgroundColor: '#1890ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6},
-  createBtnText: {color: '#fff', fontSize: 14, fontWeight: '500'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: theme.card, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider},
+  headerTitle: {fontSize: 18, fontWeight: '600', color: theme.text},
+  createBtn: {backgroundColor: theme.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6},
+  createBtnText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: '500'},
   listContent: {padding: 16},
-  card: {backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
+  card: {backgroundColor: theme.card, borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10},
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#333', flex: 1, marginRight: 8},
+  cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text, flex: 1, marginRight: 8},
   statusBadge: {paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4},
   statusText: {fontSize: 12, fontWeight: '500'},
   cardBody: {marginBottom: 10},
-  cardInfo: {fontSize: 13, color: '#666', marginBottom: 4},
-  cardFooter: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#f0f0f0', paddingTop: 10},
-  timeText: {fontSize: 12, color: '#999'},
+  cardInfo: {fontSize: 13, color: theme.textSub, marginBottom: 4},
+  cardFooter: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.divider, paddingTop: 10},
+  timeText: {fontSize: 12, color: theme.textSub},
   actionButtons: {flexDirection: 'row', gap: 8},
   actionBtn: {paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4},
-  submitBtn: {backgroundColor: '#1890ff'},
-  submitBtnText: {color: '#fff', fontSize: 12, fontWeight: '500'},
-  cancelBtn: {backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#d9d9d9'},
-  cancelBtnText: {color: '#666', fontSize: 12},
+  submitBtn: {backgroundColor: theme.primary},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 12, fontWeight: '500'},
+  cancelBtn: {backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider},
+  cancelBtnText: {color: theme.textSub, fontSize: 12},
   empty: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  emptyText: {fontSize: 16, color: '#999', marginBottom: 8},
-  emptySubText: {fontSize: 13, color: '#ccc'},
+  emptyText: {fontSize: 16, color: theme.textSub, marginBottom: 8},
+  emptySubText: {fontSize: 13, color: theme.textHint},
 
   // Form styles
   form: {flex: 1, padding: 16},
-  sectionTitle: {fontSize: 16, fontWeight: '600', color: '#333', marginTop: 16, marginBottom: 8},
-  label: {fontSize: 13, color: '#666', marginBottom: 4, marginTop: 8},
-  input: {backgroundColor: '#fff', borderWidth: 1, borderColor: '#d9d9d9', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: '#333'},
+  sectionTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginTop: 16, marginBottom: 8},
+  label: {fontSize: 13, color: theme.textSub, marginBottom: 4, marginTop: 8},
+  input: {backgroundColor: theme.card, borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.text},
   textArea: {minHeight: 80, textAlignVertical: 'top'},
   optionRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4},
-  optionChip: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#d9d9d9'},
-  optionChipActive: {backgroundColor: '#e6f7ff', borderColor: '#1890ff'},
-  optionChipText: {fontSize: 13, color: '#666'},
-  optionChipTextActive: {color: '#1890ff'},
+  optionChip: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider},
+  optionChipActive: {backgroundColor: theme.primaryBg, borderColor: theme.primary},
+  optionChipText: {fontSize: 13, color: theme.textSub},
+  optionChipTextActive: {color: theme.primaryText},
   addrField: {
-    borderWidth: 1, borderColor: '#d9d9d9', borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 14, backgroundColor: '#fff',
+    borderWidth: 1, borderColor: theme.divider, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 14, backgroundColor: theme.card,
     justifyContent: 'center', minHeight: 46,
   },
   coordRow: {flexDirection: 'row', gap: 12},
   coordInput: {flex: 1},
   formButtons: {flexDirection: 'row', gap: 12, marginTop: 24},
   formBtn: {flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center'},
-  formBtnCancel: {backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: '#d9d9d9'},
-  formBtnCancelText: {color: '#666', fontSize: 15, fontWeight: '500'},
-  formBtnSubmit: {backgroundColor: '#1890ff'},
-  formBtnSubmitText: {color: '#fff', fontSize: 15, fontWeight: '500'},
+  formBtnCancel: {backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider},
+  formBtnCancelText: {color: theme.textSub, fontSize: 15, fontWeight: '500'},
+  formBtnSubmit: {backgroundColor: theme.primary},
+  formBtnSubmitText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '500'},
 });

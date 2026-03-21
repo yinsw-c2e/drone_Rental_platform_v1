@@ -16,12 +16,16 @@ import {
   getPolicyStatusColor,
   formatAmount,
 } from '../../services/insurance';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 interface Props {
   navigation: any;
 }
 
 const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [policies, setPolicies] = useState<InsurancePolicy[]>([]);
@@ -110,7 +114,7 @@ const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1890ff" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -143,10 +147,10 @@ const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -157,19 +161,19 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   purchaseBtn: {
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 16,
   },
   purchaseBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   typeContainer: {
     flexDirection: 'row',
@@ -195,17 +199,17 @@ const styles = StyleSheet.create({
   policyType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   mandatoryBadge: {
-    backgroundColor: '#ff4d4f',
+    backgroundColor: theme.danger,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: 8,
   },
   mandatoryText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 10,
   },
   statusBadge: {
@@ -214,7 +218,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 12,
   },
   cardBody: {
@@ -227,15 +231,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   value: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
   },
   amount: {
     fontWeight: '600',
-    color: '#f5222d',
+    color: theme.danger,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -243,20 +247,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
   },
   dateText: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   claimBtn: {
-    backgroundColor: '#ff7a45',
+    backgroundColor: theme.warning,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 16,
   },
   claimBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -270,12 +274,12 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
 });
 

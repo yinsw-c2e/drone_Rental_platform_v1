@@ -6,10 +6,12 @@ import {RootState} from '../store/store';
 import {markMeInitialized, setMeSummary} from '../store/slices/authSlice';
 import {sessionService} from '../services/session';
 import {wsService} from '../services/websocket';
+import {useTheme} from '../theme/ThemeContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 
 export default function AppNavigator() {
+  const {theme} = useTheme();
   const dispatch = useDispatch();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const meInitialized = useSelector((state: RootState) => state.auth.meInitialized);
@@ -66,7 +68,7 @@ export default function AppNavigator() {
     <NavigationContainer key={navigatorKey}>
       {isAuthenticated && bootstrapping ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1677ff" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       ) : null}
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
@@ -80,6 +82,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.82)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
 });

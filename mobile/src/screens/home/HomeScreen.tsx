@@ -34,6 +34,8 @@ import {
 import { homeService } from '../../services/home';
 import { RootState } from '../../store/store';
 import { HomeDashboard, HomeFeedItem } from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type RoleView = 'all' | 'client' | 'owner' | 'pilot';
 
@@ -131,6 +133,8 @@ function MetricTile({
   theme: HeroTheme;
   width?: DimensionValue;
 }) {
+  const {theme: appTheme} = useTheme();
+  const styles = getStyles(appTheme);
   return (
     <View
       style={[
@@ -157,6 +161,8 @@ function ActionPill({
   primary?: boolean;
   theme: HeroTheme;
 }) {
+  const {theme: appTheme} = useTheme();
+  const styles = getStyles(appTheme);
   return (
     <TouchableOpacity
       activeOpacity={0.88}
@@ -164,7 +170,7 @@ function ActionPill({
       style={[
         styles.heroActionBtn,
         primary
-          ? { backgroundColor: '#ffffff' }
+          ? { backgroundColor: 'rgba(255,255,255,0.92)' }
           : {
               backgroundColor: 'rgba(255,255,255,0.12)',
               borderColor: 'rgba(255,255,255,0.22)',
@@ -184,10 +190,12 @@ function ActionPill({
 }
 
 function QuickActionCard({ action }: { action: DashboardAction }) {
-  const palette = getTonePalette(action.tone);
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
+  const palette = getTonePalette(action.tone, theme.isDark);
   return (
     <TouchableOpacity
-      style={styles.quickActionCard}
+      style={[styles.quickActionCard, {backgroundColor: theme.card, borderWidth: 1, borderColor: theme.cardBorder}]}
       onPress={action.onPress}
       activeOpacity={0.88}
     >
@@ -206,8 +214,8 @@ function QuickActionCard({ action }: { action: DashboardAction }) {
           </View>
         ) : null}
       </View>
-      <Text style={styles.quickActionTitle}>{action.title}</Text>
-      <Text style={styles.quickActionDesc}>{action.desc}</Text>
+      <Text style={[styles.quickActionTitle, {color: theme.text}]}>{action.title}</Text>
+      <Text style={[styles.quickActionDesc, {color: theme.textSub}]}>{action.desc}</Text>
     </TouchableOpacity>
   );
 }
@@ -254,6 +262,8 @@ function getHeroTheme(role: RoleView): HeroTheme {
 }
 
 export default function HomeScreen({ navigation }: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const authRoleSummary = useSelector(
     (state: RootState) => state.auth.roleSummary,
   );
@@ -1006,7 +1016,20 @@ export default function HomeScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.rootWrap}>
+      <LinearGradient
+        colors={theme.isDark ? ['#060B18', '#0A1025', '#111D35'] : [theme.bg, theme.bg, theme.bg]}
+        style={StyleSheet.absoluteFill}
+        start={{x: 0.5, y: 0}}
+        end={{x: 0.5, y: 1}}
+      />
+      {theme.isDark && (
+        <>
+          <View style={[styles.glowOrb, {top: -60, right: -80, backgroundColor: 'rgba(0,212,255,0.06)'}]} />
+          <View style={[styles.glowOrb, {top: 360, left: -100, backgroundColor: 'rgba(0,100,255,0.04)'}]} />
+        </>
+      )}
+      <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -1017,25 +1040,27 @@ export default function HomeScreen({ navigation }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#0f5cab']}
+            colors={[theme.refreshColor]}
+            tintColor={theme.refreshColor}
           />
         }
       >
         <View style={styles.contentRail}>
-          <View style={styles.tabsWrap}>
+          <View style={[styles.tabsWrap, {backgroundColor: theme.tabBg}]}>
             {roleTabs.map(tab => (
               <TouchableOpacity
                 key={tab.key}
                 style={[
                   styles.roleTab,
-                  activeRole === tab.key && styles.roleTabActive,
+                  activeRole === tab.key && {backgroundColor: theme.tabActiveBg},
                 ]}
                 onPress={() => setActiveRole(tab.key)}
               >
                 <Text
                   style={[
                     styles.roleTabText,
-                    activeRole === tab.key && styles.roleTabTextActive,
+                    {color: theme.tabText},
+                    activeRole === tab.key && {color: theme.tabActiveText},
                   ]}
                 >
                   {tab.label}
@@ -1112,11 +1137,11 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>紧急待办</Text>
-              <Text style={styles.sectionHint}>先做现在最重要的事</Text>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>紧急待办</Text>
+              <Text style={[styles.sectionHint, {color: theme.textHint}]}>先做现在最重要的事</Text>
             </View>
             {todoItems.map(item => {
-              const palette = getTonePalette(item.tone || 'blue');
+              const palette = getTonePalette(item.tone || 'blue', theme.isDark);
               return (
                 <ObjectCard
                   key={item.key}
@@ -1124,7 +1149,7 @@ export default function HomeScreen({ navigation }: any) {
                   highlightColor={palette.border}
                 >
                   <View style={styles.todoHeader}>
-                    <Text style={styles.todoTitle}>{item.title}</Text>
+                    <Text style={[styles.todoTitle, {color: theme.text}]}>{item.title}</Text>
                     {typeof item.badge === 'number' && item.badge > 0 ? (
                       <View
                         style={[
@@ -1146,7 +1171,7 @@ export default function HomeScreen({ navigation }: any) {
                       </View>
                     ) : null}
                   </View>
-                  <Text style={styles.todoDesc}>{item.desc}</Text>
+                  <Text style={[styles.todoDesc, {color: theme.textSub}]}>{item.desc}</Text>
                   <TouchableOpacity
                     style={[
                       styles.todoActionBtn,
@@ -1165,8 +1190,8 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>快捷入口</Text>
-              <Text style={styles.sectionHint}>按当前视图展示优先动作</Text>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>快捷入口</Text>
+              <Text style={[styles.sectionHint, {color: theme.textHint}]}>按当前视图展示优先动作</Text>
             </View>
             <View style={styles.quickGrid}>
               {quickActions.map(action => (
@@ -1179,16 +1204,16 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>
                 {activeRole === 'pilot' ? '当前执行订单' : '进行中任务'}
               </Text>
               <TouchableOpacity onPress={() => navigation.navigate('MyOrders')}>
-                <Text style={styles.linkText}>查看全部</Text>
+                <Text style={[styles.linkText, {color: theme.primary}]}>查看全部</Text>
               </TouchableOpacity>
             </View>
 
             {loading ? (
-              <ActivityIndicator style={styles.loading} color="#0f5cab" />
+              <ActivityIndicator style={styles.loading} color={theme.refreshColor} />
             ) : currentDashboard.in_progress_orders.length > 0 ? (
               currentDashboard.in_progress_orders.map(order => (
                 <ObjectCard
@@ -1198,17 +1223,17 @@ export default function HomeScreen({ navigation }: any) {
                   }
                 >
                   <View style={styles.orderHeader}>
-                    <Text style={styles.orderNo}>{order.order_no}</Text>
+                    <Text style={[styles.orderNo, {color: theme.textHint}]}>{order.order_no}</Text>
                     <StatusBadge
                       label=""
                       meta={getObjectStatusMeta('order', order.status)}
                     />
                   </View>
-                  <Text style={styles.orderTitle} numberOfLines={2}>
+                  <Text style={[styles.orderTitle, {color: theme.text}]} numberOfLines={2}>
                     {order.title}
                   </Text>
                   <View style={styles.orderFooter}>
-                    <Text style={styles.orderMeta}>
+                    <Text style={[styles.orderMeta, {color: theme.textSub}]}>
                       {order.created_at?.slice(0, 10)}
                     </Text>
                     <Text style={styles.orderAmount}>
@@ -1238,8 +1263,8 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{feedConfig.title}</Text>
-              <Text style={styles.sectionHint}>{feedConfig.hint}</Text>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>{feedConfig.title}</Text>
+              <Text style={[styles.sectionHint, {color: theme.textHint}]}>{feedConfig.hint}</Text>
             </View>
 
             {feedConfig.items.length > 0 ? (
@@ -1255,10 +1280,10 @@ export default function HomeScreen({ navigation }: any) {
                       }
                     />
                   </View>
-                  <Text style={styles.feedTitle} numberOfLines={1}>
+                  <Text style={[styles.feedTitle, {color: theme.text}]} numberOfLines={1}>
                     {item.title}
                   </Text>
-                  <Text style={styles.feedSubtitle} numberOfLines={2}>
+                  <Text style={[styles.feedSubtitle, {color: theme.textSub}]} numberOfLines={2}>
                     {item.subtitle}
                   </Text>
                 </ObjectCard>
@@ -1283,14 +1308,23 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  rootWrap: {
+    flex: 1,
+  },
+  glowOrb: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
   },
   scrollContent: {
     paddingBottom: 28,
@@ -1300,15 +1334,16 @@ const styles = StyleSheet.create({
   },
   tabsWrap: {
     marginTop: 10,
-    backgroundColor: '#ffffff',
     borderRadius: 18,
     padding: 5,
     flexDirection: 'row',
-    shadowColor: '#102a43',
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.isDark ? 'rgba(255,255,255,0.06)' : theme.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: theme.isDark ? 0 : 0.04,
+    shadowRadius: theme.isDark ? 0 : 8,
+    elevation: theme.isDark ? 0 : 2,
   },
   roleTab: {
     flex: 1,
@@ -1317,24 +1352,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 14,
   },
-  roleTabActive: {
-    backgroundColor: '#e6f4ff',
-  },
+  roleTabActive: {},
   roleTabText: {
     fontSize: 14,
-    color: '#667085',
     fontWeight: '700',
   },
-  roleTabTextActive: {
-    color: '#0f5cab',
-  },
+  roleTabTextActive: {},
   hero: {
     marginTop: 12,
     borderRadius: 26,
-    // paddingHorizontal: HERO_SIDE_PADDING,
     paddingTop: 18,
     paddingBottom: 20,
     overflow: 'hidden',
+    shadowColor: theme.isDark ? 'rgba(0,212,255,0.3)' : '#000',
+    shadowOffset: {width: 0, height: theme.isDark ? 0 : 4},
+    shadowOpacity: theme.isDark ? 0.5 : 0.08,
+    shadowRadius: theme.isDark ? 20 : 12,
+    elevation: 6,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1354,8 +1388,11 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 4,
   },
   heroSubtitle: {
     marginTop: 8,
@@ -1373,14 +1410,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   alertPillValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#fff7e6',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 3,
   },
   alertPillLabel: {
     marginTop: 4,
     fontSize: 11,
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   heroActionRow: {
@@ -1401,7 +1441,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   heroActionTextGhost: {
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
   metricGrid: {
     marginTop: 18,
@@ -1418,26 +1458,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 16,
     minHeight: 126,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   metricTileFull: {
     width: '100%',
   },
   metricValue: {
-    fontSize: 24,
-    color: '#ffffff',
+    fontSize: 26,
+    color: '#FFFFFF',
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   metricLabel: {
     marginTop: 6,
     fontSize: 13,
-    color: '#ffffff',
+    color: 'rgba(255,255,255,0.95)',
     fontWeight: '700',
   },
   metricHint: {
     marginTop: 4,
     fontSize: 11,
     lineHeight: 16,
-    color: 'rgba(255,255,255,0.82)',
+    color: 'rgba(255,255,255,0.65)',
   },
   sectionWrap: {
     marginTop: 14,
@@ -1449,17 +1492,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 17,
-    color: '#0f172a',
+    fontSize: 18,
+    color: theme.text,
     fontWeight: '800',
+    letterSpacing: 0.3,
   },
   sectionHint: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: theme.textHint,
   },
   linkText: {
     fontSize: 12,
-    color: '#0f5cab',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   todoCard: {
@@ -1473,7 +1517,7 @@ const styles = StyleSheet.create({
   todoTitle: {
     flex: 1,
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '800',
     paddingRight: 10,
   },
@@ -1493,18 +1537,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#64748b',
+    color: theme.textSub,
   },
   todoActionBtn: {
     marginTop: 12,
     alignSelf: 'flex-start',
     borderRadius: 999,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   todoActionText: {
     fontSize: 12,
-    color: '#ffffff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   quickGrid: {
@@ -1516,13 +1565,12 @@ const styles = StyleSheet.create({
     width: '48%',
     marginBottom: 10,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
     padding: 14,
-    shadowColor: '#102a43',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowColor: theme.isDark ? 'rgba(0,212,255,0.15)' : '#000',
+    shadowOffset: {width: 0, height: theme.isDark ? 0 : 3},
+    shadowOpacity: theme.isDark ? 0.4 : 0.06,
+    shadowRadius: theme.isDark ? 12 : 10,
+    elevation: theme.isDark ? 0 : 3,
   },
   quickActionIconWrap: {
     width: 44,
@@ -1549,20 +1597,18 @@ const styles = StyleSheet.create({
   },
   quickActionBadgeText: {
     fontSize: 10,
-    color: '#ffffff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   quickActionTitle: {
     marginTop: 12,
     fontSize: 15,
-    color: '#0f172a',
     fontWeight: '800',
   },
   quickActionDesc: {
     marginTop: 6,
     fontSize: 12,
     lineHeight: 18,
-    color: '#64748b',
   },
   loading: {
     paddingVertical: 28,
@@ -1574,14 +1620,14 @@ const styles = StyleSheet.create({
   },
   orderNo: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: theme.textHint,
     fontWeight: '700',
   },
   orderTitle: {
     marginTop: 10,
     fontSize: 16,
     lineHeight: 23,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '700',
   },
   orderFooter: {
@@ -1592,12 +1638,13 @@ const styles = StyleSheet.create({
   },
   orderMeta: {
     fontSize: 12,
-    color: '#64748b',
+    color: theme.textSub,
   },
   orderAmount: {
-    fontSize: 15,
-    color: '#dc2626',
+    fontSize: 16,
+    color: theme.danger,
     fontWeight: '800',
+    letterSpacing: 0.3,
   },
   feedHeader: {
     marginBottom: 10,
@@ -1607,13 +1654,13 @@ const styles = StyleSheet.create({
   },
   feedTitle: {
     fontSize: 15,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '800',
   },
   feedSubtitle: {
     marginTop: 6,
     fontSize: 13,
     lineHeight: 20,
-    color: '#64748b',
+    color: theme.textSub,
   },
 });

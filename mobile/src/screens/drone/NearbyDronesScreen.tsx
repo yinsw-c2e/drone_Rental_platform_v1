@@ -7,6 +7,8 @@ import {droneService} from '../../services/drone';
 import {Drone} from '../../types';
 import {getCurrentPosition} from '../../utils/LocationService';
 import {DEV_DEFAULT_LOCATION} from '../../config/mockData';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 // 开发模式配置
 const DEV_MODE = __DEV__;
@@ -17,6 +19,8 @@ const DEV_DEFAULT_COORDS = {
 };
 
 export default function NearbyDronesScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,7 +102,7 @@ export default function NearbyDronesScreen({navigation}: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* 开发模式提示 */}
       {DEV_MODE && locationError && (
         <View style={styles.devBanner}>
@@ -121,12 +125,12 @@ export default function NearbyDronesScreen({navigation}: any) {
         data={drones}
         keyExtractor={item => String(item.id)}
         renderItem={renderDrone}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1890ff']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
         contentContainerStyle={{padding: 12}}
         ListEmptyComponent={
           <View style={{alignItems: 'center', paddingTop: 80}}>
             <Text style={{fontSize: 48, marginBottom: 12}}>📍</Text>
-            <Text style={{fontSize: 16, color: '#999'}}>
+            <Text style={{fontSize: 16, color: theme.textSub}}>
               {loading ? '搜索中...' : locationError ? '定位失败，无法查询附近无人机' : '附近暂无可用无人机'}
             </Text>
             {locationError && !DEV_MODE && (
@@ -147,43 +151,43 @@ export default function NearbyDronesScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   devBanner: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: theme.warning + '22',
     padding: 8,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#ffc107',
+    borderBottomColor: theme.warning + '55',
   },
-  devText: {fontSize: 12, color: '#856404'},
+  devText: {fontSize: 12, color: theme.warning},
   locationBanner: {
-    backgroundColor: '#e6f7ff',
+    backgroundColor: theme.primaryBg,
     padding: 8,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#91d5ff',
+    borderBottomColor: theme.primaryBorder,
   },
-  locationText: {fontSize: 11, color: '#0050b3'},
+  locationText: {fontSize: 11, color: theme.primaryText},
   card: {
-    flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10,
+    flexDirection: 'row', backgroundColor: theme.card, borderRadius: 10,
     padding: 14, marginBottom: 10, alignItems: 'center',
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   droneIcon: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: '#e6f7ff',
+    width: 48, height: 48, borderRadius: 24, backgroundColor: theme.primaryBg,
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  name: {fontSize: 15, fontWeight: '600', color: '#333'},
-  meta: {fontSize: 12, color: '#999', marginTop: 3},
-  address: {fontSize: 12, color: '#999', marginTop: 2},
-  price: {fontSize: 14, color: '#f5222d', fontWeight: 'bold'},
+  name: {fontSize: 15, fontWeight: '600', color: theme.text},
+  meta: {fontSize: 12, color: theme.textSub, marginTop: 3},
+  address: {fontSize: 12, color: theme.textSub, marginTop: 2},
+  price: {fontSize: 14, color: theme.danger, fontWeight: 'bold'},
   retryButton: {
     marginTop: 16,
     paddingVertical: 10,
     paddingHorizontal: 24,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 6,
   },
-  retryText: {fontSize: 14, color: '#fff', fontWeight: '600'},
+  retryText: {fontSize: 14, color: theme.btnPrimaryText, fontWeight: '600'},
 });

@@ -20,8 +20,12 @@ import {
   getClaimStatusColor,
   formatAmount,
 } from '../../services/insurance';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const ClaimListScreen: React.FC = () => {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [claims, setClaims] = useState<InsuranceClaim[]>([]);
@@ -101,7 +105,7 @@ const ClaimListScreen: React.FC = () => {
           {item.approved_amount > 0 && (
             <View style={styles.amountInfo}>
               <Text style={styles.amountLabel}>核定金额</Text>
-              <Text style={[styles.amountValue, { color: '#52c41a' }]}>
+              <Text style={[styles.amountValue, { color: theme.success }]}>
                 {formatAmount(item.approved_amount)}
               </Text>
             </View>
@@ -109,7 +113,7 @@ const ClaimListScreen: React.FC = () => {
           {item.paid_amount > 0 && (
             <View style={styles.amountInfo}>
               <Text style={styles.amountLabel}>已赔付</Text>
-              <Text style={[styles.amountValue, { color: '#1890ff' }]}>
+              <Text style={[styles.amountValue, { color: theme.primaryText }]}>
                 {formatAmount(item.paid_amount)}
               </Text>
             </View>
@@ -234,7 +238,7 @@ const ClaimListScreen: React.FC = () => {
                   {selectedClaim.approved_amount > 0 && (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>核定金额</Text>
-                      <Text style={[styles.detailValue, { color: '#52c41a' }]}>
+                      <Text style={[styles.detailValue, { color: theme.success }]}>
                         {formatAmount(selectedClaim.approved_amount)}
                       </Text>
                     </View>
@@ -248,7 +252,7 @@ const ClaimListScreen: React.FC = () => {
                   {selectedClaim.paid_amount > 0 && (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>已赔付</Text>
-                      <Text style={[styles.detailValue, { color: '#1890ff', fontWeight: '600' }]}>
+                      <Text style={[styles.detailValue, { color: theme.primaryText, fontWeight: '600' }]}>
                         {formatAmount(selectedClaim.paid_amount)}
                       </Text>
                     </View>
@@ -314,7 +318,7 @@ const ClaimListScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1890ff" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -340,10 +344,10 @@ const ClaimListScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -354,7 +358,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -367,7 +371,7 @@ const styles = StyleSheet.create({
   },
   claimNo: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -375,7 +379,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 12,
   },
   cardBody: {
@@ -390,35 +394,35 @@ const styles = StyleSheet.create({
   incidentType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   incidentTime: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
     lineHeight: 20,
   },
   cardFooter: {
     flexDirection: 'row',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
   },
   amountInfo: {
     marginRight: 24,
   },
   amountLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginBottom: 2,
   },
   amountValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
+    color: theme.text,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -430,38 +434,38 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   closeBtn: {
     fontSize: 16,
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   progressContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 20,
     marginBottom: 12,
   },
@@ -474,27 +478,27 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.divider,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
   },
   stepCircleActive: {
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
   },
   stepNumber: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   stepNumberActive: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   stepLabel: {
     fontSize: 10,
-    color: '#999',
+    color: theme.textSub,
   },
   stepLabelActive: {
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   stepLine: {
     position: 'absolute',
@@ -502,54 +506,54 @@ const styles = StyleSheet.create({
     left: '60%',
     right: '-40%',
     height: 2,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.divider,
   },
   stepLineActive: {
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 16,
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 12,
   },
   detailRow: {
     flexDirection: 'row',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: theme.divider,
   },
   detailLabel: {
     width: 80,
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   detailValue: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
   },
   rejectSection: {
-    backgroundColor: '#fff1f0',
+    backgroundColor: theme.danger + '22',
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#f5222d',
+    borderLeftColor: theme.danger,
   },
   rejectTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#cf1322',
+    color: theme.danger,
     marginBottom: 8,
   },
   rejectText: {
     fontSize: 14,
-    color: '#cf1322',
+    color: theme.danger,
   },
   timelineItem: {
     flexDirection: 'row',
@@ -560,7 +564,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     marginTop: 6,
   },
   timelineLine: {
@@ -569,7 +573,7 @@ const styles = StyleSheet.create({
     top: 18,
     bottom: 0,
     width: 2,
-    backgroundColor: '#e8e8e8',
+    backgroundColor: theme.divider,
   },
   timelineContent: {
     flex: 1,
@@ -578,16 +582,16 @@ const styles = StyleSheet.create({
   },
   timelineAction: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     marginBottom: 4,
   },
   timelineTime: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   timelineOperator: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 2,
   },
 });

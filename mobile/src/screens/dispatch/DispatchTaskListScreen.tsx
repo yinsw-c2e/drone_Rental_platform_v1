@@ -18,6 +18,8 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
 import {V2DispatchTaskSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const STATUS_TABS = [
   {key: 'all', label: '全部'},
@@ -69,6 +71,8 @@ const getPilotLabel = (task: V2DispatchTaskSummary) => {
 };
 
 export default function DispatchTaskListScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [tasks, setTasks] = useState<V2DispatchTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,7 +102,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={filteredTasks}
         keyExtractor={item => String(item.id)}
@@ -135,7 +139,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
           setRefreshing(true);
           loadData();
-        }} colors={['#0f766e']} />}
+        }} colors={[theme.refreshColor]} />}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
@@ -164,7 +168,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loading} color="#0f766e" />
+            <ActivityIndicator style={styles.loading} color={theme.primary} />
           ) : (
             <ObjectCard>
               <EmptyState
@@ -182,45 +186,45 @@ export default function DispatchTaskListScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
     paddingBottom: 28,
   },
   hero: {
-    backgroundColor: '#0f766e',
+    backgroundColor: theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#ccfbf1',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d1fae5',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
   },
   filterCard: {
     marginBottom: 12,
   },
   filterTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
     marginBottom: 12,
   },
@@ -231,24 +235,24 @@ const styles = StyleSheet.create({
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginRight: 8,
     marginBottom: 8,
   },
   filterChipActive: {
-    borderColor: '#0f766e',
-    backgroundColor: '#ecfdf5',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryBg,
   },
   filterChipText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '600',
   },
   filterChipTextActive: {
-    color: '#0f766e',
+    color: theme.primaryText,
   },
   loading: {
     paddingVertical: 48,
@@ -267,21 +271,21 @@ const styles = StyleSheet.create({
   },
   code: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '600',
   },
   title: {
     marginTop: 14,
     fontSize: 17,
     lineHeight: 24,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   route: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#595959',
+    color: theme.textSub,
   },
   metaRow: {
     marginTop: 10,
@@ -292,6 +296,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
 });

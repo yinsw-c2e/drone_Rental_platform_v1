@@ -19,27 +19,31 @@ import {
   WalletTransaction,
   OrderSettlement,
 } from '../../services/settlement';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const TX_TYPE_MAP: Record<string, {label: string; color: string; sign: string}> = {
-  income: {label: '收入', color: '#52c41a', sign: '+'},
-  withdraw: {label: '提现', color: '#ff4d4f', sign: '-'},
-  freeze: {label: '冻结', color: '#faad14', sign: '-'},
-  unfreeze: {label: '解冻', color: '#1890ff', sign: '+'},
-  deduct: {label: '扣款', color: '#ff4d4f', sign: '-'},
-  refund: {label: '退款', color: '#52c41a', sign: '+'},
+const TX_TYPE_MAP: Record<string, {label: string; colorKey: 'success' | 'danger' | 'warning' | 'info'; sign: string}> = {
+  income: {label: '收入', colorKey: 'success', sign: '+'},
+  withdraw: {label: '提现', colorKey: 'danger', sign: '-'},
+  freeze: {label: '冻结', colorKey: 'warning', sign: '-'},
+  unfreeze: {label: '解冻', colorKey: 'info', sign: '+'},
+  deduct: {label: '扣款', colorKey: 'danger', sign: '-'},
+  refund: {label: '退款', colorKey: 'success', sign: '+'},
 };
 
-const SETTLEMENT_STATUS_MAP: Record<string, {label: string; color: string}> = {
-  pending: {label: '待计算', color: '#999'},
-  calculated: {label: '已计算', color: '#faad14'},
-  confirmed: {label: '已确认', color: '#1890ff'},
-  settled: {label: '已结算', color: '#52c41a'},
-  disputed: {label: '争议中', color: '#ff4d4f'},
+const SETTLEMENT_STATUS_MAP: Record<string, {label: string; colorKey: 'textHint' | 'warning' | 'primary' | 'success' | 'danger'}> = {
+  pending: {label: '待计算', colorKey: 'textHint'},
+  calculated: {label: '已计算', colorKey: 'warning'},
+  confirmed: {label: '已确认', colorKey: 'primary'},
+  settled: {label: '已结算', colorKey: 'success'},
+  disputed: {label: '争议中', colorKey: 'danger'},
 };
 
 type TabType = 'wallet' | 'transactions' | 'settlements';
 
 export default function WalletScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [activeTab, setActiveTab] = useState<TabType>('wallet');
   const [wallet, setWallet] = useState<UserWallet | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -89,7 +93,7 @@ export default function WalletScreen({navigation}: any) {
           <View style={styles.walletDivider} />
           <View style={styles.walletItem}>
             <Text style={styles.walletItemLabel}>累计收入</Text>
-            <Text style={[styles.walletItemValue, {color: '#52c41a'}]}>{formatAmount(wallet.total_income)}</Text>
+            <Text style={[styles.walletItemValue, {color: theme.success}]}>{formatAmount(wallet.total_income)}</Text>
           </View>
           <View style={styles.walletDivider} />
           <View style={styles.walletItem}>
@@ -107,14 +111,14 @@ export default function WalletScreen({navigation}: any) {
   };
 
   const renderTransactionItem = ({item}: {item: WalletTransaction}) => {
-    const typeInfo = TX_TYPE_MAP[item.type] || {label: item.type, color: '#999', sign: ''};
+    const typeInfo = TX_TYPE_MAP[item.type] || {label: item.type, colorKey: 'textHint' as const, sign: ''};
     return (
       <View style={styles.txItem}>
         <View style={styles.txLeft}>
           <Text style={styles.txDesc}>{item.description || typeInfo.label}</Text>
           <Text style={styles.txTime}>{item.created_at ? new Date(item.created_at).toLocaleString() : ''}</Text>
         </View>
-        <Text style={[styles.txAmount, {color: typeInfo.color}]}>
+        <Text style={[styles.txAmount, {color: theme[typeInfo.colorKey]}]}>
           {typeInfo.sign}{formatAmount(Math.abs(item.amount))}
         </Text>
       </View>
@@ -122,13 +126,13 @@ export default function WalletScreen({navigation}: any) {
   };
 
   const renderSettlementItem = ({item}: {item: OrderSettlement}) => {
-    const statusInfo = SETTLEMENT_STATUS_MAP[item.status] || {label: item.status, color: '#999'};
+    const statusInfo = SETTLEMENT_STATUS_MAP[item.status] || {label: item.status, colorKey: 'textHint' as const};
     return (
       <TouchableOpacity style={styles.settleCard}>
         <View style={styles.settleHeader}>
           <Text style={styles.settleOrderNo}>订单 {item.order_no}</Text>
-          <View style={[styles.settleBadge, {backgroundColor: statusInfo.color + '20'}]}>
-            <Text style={[styles.settleBadgeText, {color: statusInfo.color}]}>{statusInfo.label}</Text>
+          <View style={[styles.settleBadge, {backgroundColor: theme[statusInfo.colorKey] + '20'}]}>
+            <Text style={[styles.settleBadgeText, {color: theme[statusInfo.colorKey]}]}>{statusInfo.label}</Text>
           </View>
         </View>
         <View style={styles.settleBody}>
@@ -138,24 +142,24 @@ export default function WalletScreen({navigation}: any) {
           </View>
           <View style={styles.settleRow}>
             <Text style={styles.settleLabel}>平台服务费({(item.platform_fee_rate * 100).toFixed(0)}%)</Text>
-            <Text style={[styles.settleValue, {color: '#ff4d4f'}]}>-{formatAmount(item.platform_fee)}</Text>
+            <Text style={[styles.settleValue, {color: theme.danger}]}>-{formatAmount(item.platform_fee)}</Text>
           </View>
           {item.pilot_fee > 0 && (
             <View style={styles.settleRow}>
               <Text style={styles.settleLabel}>飞手劳务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text>
-              <Text style={[styles.settleValue, {color: '#52c41a'}]}>{formatAmount(item.pilot_fee)}</Text>
+              <Text style={[styles.settleValue, {color: theme.success}]}>{formatAmount(item.pilot_fee)}</Text>
             </View>
           )}
           {item.owner_fee > 0 && (
             <View style={styles.settleRow}>
               <Text style={styles.settleLabel}>机主设备费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text>
-              <Text style={[styles.settleValue, {color: '#52c41a'}]}>{formatAmount(item.owner_fee)}</Text>
+              <Text style={[styles.settleValue, {color: theme.success}]}>{formatAmount(item.owner_fee)}</Text>
             </View>
           )}
           {item.insurance_deduction > 0 && (
             <View style={styles.settleRow}>
               <Text style={styles.settleLabel}>保险代扣</Text>
-              <Text style={[styles.settleValue, {color: '#faad14'}]}>-{formatAmount(item.insurance_deduction)}</Text>
+              <Text style={[styles.settleValue, {color: theme.warning}]}>-{formatAmount(item.insurance_deduction)}</Text>
             </View>
           )}
         </View>
@@ -165,7 +169,7 @@ export default function WalletScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {renderWalletCard()}
 
       <View style={styles.tabs}>
@@ -230,14 +234,14 @@ export default function WalletScreen({navigation}: any) {
 
           <Text style={styles.sectionTitle}>最近流水</Text>
           {transactions.slice(0, 5).map(tx => {
-            const typeInfo = TX_TYPE_MAP[tx.type] || {label: tx.type, color: '#999', sign: ''};
+            const typeInfo = TX_TYPE_MAP[tx.type] || {label: tx.type, colorKey: 'textHint' as const, sign: ''};
             return (
               <View key={tx.id} style={styles.txItem}>
                 <View style={styles.txLeft}>
                   <Text style={styles.txDesc}>{tx.description || typeInfo.label}</Text>
                   <Text style={styles.txTime}>{tx.created_at ? new Date(tx.created_at).toLocaleString() : ''}</Text>
                 </View>
-                <Text style={[styles.txAmount, {color: typeInfo.color}]}>
+                <Text style={[styles.txAmount, {color: theme[typeInfo.colorKey]}]}>
                   {typeInfo.sign}{formatAmount(Math.abs(tx.amount))}
                 </Text>
               </View>
@@ -251,48 +255,48 @@ export default function WalletScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
-  walletCard: {backgroundColor: '#1890ff', padding: 20, paddingBottom: 16},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  walletCard: {backgroundColor: theme.primary, padding: 20, paddingBottom: 16},
   walletLabel: {fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 4},
-  walletBalance: {fontSize: 36, fontWeight: '700', color: '#fff', marginBottom: 16},
+  walletBalance: {fontSize: 36, fontWeight: '700', color: theme.btnPrimaryText, marginBottom: 16},
   walletRow: {flexDirection: 'row', alignItems: 'center'},
   walletItem: {flex: 1, alignItems: 'center'},
   walletItemLabel: {fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2},
-  walletItemValue: {fontSize: 15, fontWeight: '600', color: '#fff'},
+  walletItemValue: {fontSize: 15, fontWeight: '600', color: theme.btnPrimaryText},
   walletDivider: {width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.2)'},
   withdrawBtn: {marginTop: 16, backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 10, borderRadius: 8, alignItems: 'center'},
-  withdrawBtnText: {color: '#fff', fontSize: 15, fontWeight: '600'},
+  withdrawBtnText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '600'},
 
-  tabs: {flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8'},
+  tabs: {flexDirection: 'row', backgroundColor: theme.card, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider},
   tab: {flex: 1, paddingVertical: 12, alignItems: 'center'},
-  tabActive: {borderBottomWidth: 2, borderBottomColor: '#1890ff'},
-  tabText: {fontSize: 14, color: '#999'},
-  tabTextActive: {color: '#1890ff', fontWeight: '600'},
+  tabActive: {borderBottomWidth: 2, borderBottomColor: theme.primary},
+  tabText: {fontSize: 14, color: theme.textSub},
+  tabTextActive: {color: theme.primaryText, fontWeight: '600'},
 
   listContent: {padding: 16},
-  txItem: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 14, borderRadius: 8, marginBottom: 8},
+  txItem: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, padding: 14, borderRadius: 8, marginBottom: 8},
   txLeft: {flex: 1, marginRight: 12},
-  txDesc: {fontSize: 14, color: '#333', marginBottom: 4},
-  txTime: {fontSize: 11, color: '#999'},
+  txDesc: {fontSize: 14, color: theme.text, marginBottom: 4},
+  txTime: {fontSize: 11, color: theme.textSub},
   txAmount: {fontSize: 16, fontWeight: '600'},
 
-  settleCard: {backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 10},
+  settleCard: {backgroundColor: theme.card, borderRadius: 10, padding: 14, marginBottom: 10},
   settleHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10},
-  settleOrderNo: {fontSize: 14, fontWeight: '600', color: '#333'},
+  settleOrderNo: {fontSize: 14, fontWeight: '600', color: theme.text},
   settleBadge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4},
   settleBadgeText: {fontSize: 11, fontWeight: '500'},
   settleBody: {},
   settleRow: {flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4},
-  settleLabel: {fontSize: 13, color: '#666'},
-  settleValue: {fontSize: 13, fontWeight: '500', color: '#333'},
-  settleTime: {fontSize: 11, color: '#ccc', marginTop: 6},
+  settleLabel: {fontSize: 13, color: theme.textSub},
+  settleValue: {fontSize: 13, fontWeight: '500', color: theme.text},
+  settleTime: {fontSize: 11, color: theme.textHint, marginTop: 6},
 
   overview: {flex: 1},
-  quickActions: {flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 16, marginBottom: 10},
+  quickActions: {flexDirection: 'row', backgroundColor: theme.card, paddingVertical: 16, marginBottom: 10},
   actionItem: {flex: 1, alignItems: 'center'},
   actionIcon: {fontSize: 24, marginBottom: 4},
-  actionLabel: {fontSize: 12, color: '#666'},
-  sectionTitle: {fontSize: 15, fontWeight: '600', color: '#333', paddingHorizontal: 16, paddingVertical: 10},
-  emptyText: {textAlign: 'center', color: '#ccc', fontSize: 14, paddingTop: 40},
+  actionLabel: {fontSize: 12, color: theme.textSub},
+  sectionTitle: {fontSize: 15, fontWeight: '600', color: theme.text, paddingHorizontal: 16, paddingVertical: 10},
+  emptyText: {textAlign: 'center', color: theme.textHint, fontSize: 14, paddingTop: 40},
 });

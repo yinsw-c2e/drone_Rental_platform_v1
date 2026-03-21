@@ -16,12 +16,14 @@ import {
   ComplianceCheck,
   ComplianceCheckItem,
 } from '../../services/airspace';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const RESULT_CONFIG: Record<string, {label: string; color: string; bg: string; icon: string}> = {
-  passed: {label: '通过', color: '#52c41a', bg: '#f6ffed', icon: 'V'},
-  failed: {label: '未通过', color: '#ff4d4f', bg: '#fff2f0', icon: 'X'},
-  warning: {label: '警告', color: '#faad14', bg: '#fffbe6', icon: '!'},
-  pending: {label: '检查中', color: '#1890ff', bg: '#e6f7ff', icon: '?'},
+const RESULT_CONFIG: Record<string, {label: string; colorKey: 'success' | 'danger' | 'warning' | 'info'; icon: string}> = {
+  passed: {label: '通过', colorKey: 'success', icon: 'V'},
+  failed: {label: '未通过', colorKey: 'danger', icon: 'X'},
+  warning: {label: '警告', colorKey: 'warning', icon: '!'},
+  pending: {label: '检查中', colorKey: 'info', icon: '?'},
 };
 
 const CATEGORY_MAP: Record<string, string> = {
@@ -31,13 +33,15 @@ const CATEGORY_MAP: Record<string, string> = {
   airspace: '空域检查',
 };
 
-const SEVERITY_MAP: Record<string, {label: string; color: string}> = {
-  error: {label: '严重', color: '#ff4d4f'},
-  warning: {label: '警告', color: '#faad14'},
-  info: {label: '提示', color: '#1890ff'},
+const SEVERITY_MAP: Record<string, {label: string; colorKey: 'danger' | 'warning' | 'info'}> = {
+  error: {label: '严重', colorKey: 'danger'},
+  warning: {label: '警告', colorKey: 'warning'},
+  info: {label: '提示', colorKey: 'info'},
 };
 
 export default function ComplianceCheckScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const {pilotId, droneId, orderId, applicationId, checkId} = route?.params || {};
   const [check, setCheck] = useState<ComplianceCheck | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,30 +106,30 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
     const config = RESULT_CONFIG[check.overall_result] || RESULT_CONFIG.pending;
 
     return (
-      <View style={[styles.overallCard, {backgroundColor: config.bg, borderColor: config.color}]}>
-        <View style={[styles.resultIconCircle, {backgroundColor: config.color}]}>
+      <View style={[styles.overallCard, {backgroundColor: theme[config.colorKey] + '22', borderColor: theme[config.colorKey]}]}>
+        <View style={[styles.resultIconCircle, {backgroundColor: theme[config.colorKey]}]}>
           <Text style={styles.resultIcon}>{config.icon}</Text>
         </View>
         <View style={styles.overallInfo}>
-          <Text style={[styles.overallTitle, {color: config.color}]}>
+          <Text style={[styles.overallTitle, {color: theme[config.colorKey]}]}>
             合规检查{config.label}
           </Text>
           <Text style={styles.overallNotes}>{check.notes}</Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statNum, {color: '#52c41a'}]}>{check.passed_items}</Text>
+              <Text style={[styles.statNum, {color: theme.success}]}>{check.passed_items}</Text>
               <Text style={styles.statLabel}>通过</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={[styles.statNum, {color: '#ff4d4f'}]}>{check.failed_items}</Text>
+              <Text style={[styles.statNum, {color: theme.danger}]}>{check.failed_items}</Text>
               <Text style={styles.statLabel}>失败</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={[styles.statNum, {color: '#faad14'}]}>{check.warning_items}</Text>
+              <Text style={[styles.statNum, {color: theme.warning}]}>{check.warning_items}</Text>
               <Text style={styles.statLabel}>警告</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={[styles.statNum, {color: '#333'}]}>{check.total_items}</Text>
+              <Text style={[styles.statNum, {color: theme.text}]}>{check.total_items}</Text>
               <Text style={styles.statLabel}>总计</Text>
             </View>
           </View>
@@ -137,7 +141,7 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
   const renderCategorySection = (category: string, items: ComplianceCheckItem[]) => {
     const allPassed = items.every(i => i.result === 'passed');
     const hasFailed = items.some(i => i.result === 'failed');
-    const headerColor = hasFailed ? '#ff4d4f' : allPassed ? '#52c41a' : '#faad14';
+    const headerColor = hasFailed ? theme.danger : allPassed ? theme.success : theme.warning;
 
     return (
       <View key={category} style={styles.categorySection}>
@@ -153,11 +157,11 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
           const resultCfg = RESULT_CONFIG[item.result] || RESULT_CONFIG.pending;
           const severityCfg = SEVERITY_MAP[item.severity] || SEVERITY_MAP.info;
           return (
-            <View key={idx} style={[styles.checkItem, {borderLeftColor: resultCfg.color}]}>
+            <View key={idx} style={[styles.checkItem, {borderLeftColor: theme[resultCfg.colorKey]}]}>
               <View style={styles.checkItemHeader}>
                 <Text style={styles.checkItemName}>{item.check_name}</Text>
-                <View style={[styles.checkItemBadge, {backgroundColor: resultCfg.bg}]}>
-                  <Text style={[styles.checkItemBadgeText, {color: resultCfg.color}]}>{resultCfg.label}</Text>
+                <View style={[styles.checkItemBadge, {backgroundColor: theme[resultCfg.colorKey] + '22'}]}>
+                  <Text style={[styles.checkItemBadgeText, {color: theme[resultCfg.colorKey]}]}>{resultCfg.label}</Text>
                 </View>
               </View>
               <Text style={styles.checkItemMsg}>{item.message}</Text>
@@ -168,9 +172,9 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
                 </View>
               )}
               <View style={styles.checkItemFooter}>
-                {item.is_blocking && <Text style={[styles.tagText, {color: '#ff4d4f'}]}>阻断项</Text>}
-                {item.is_required && <Text style={[styles.tagText, {color: '#1890ff'}]}>必检项</Text>}
-                <Text style={[styles.tagText, {color: severityCfg.color}]}>{severityCfg.label}</Text>
+                {item.is_blocking && <Text style={[styles.tagText, {color: theme.danger}]}>阻断项</Text>}
+                {item.is_required && <Text style={[styles.tagText, {color: theme.primaryText}]}>必检项</Text>}
+                <Text style={[styles.tagText, {color: theme[severityCfg.colorKey]}]}>{severityCfg.label}</Text>
               </View>
             </View>
           );
@@ -191,14 +195,14 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#1890ff" style={{marginTop: 100}} />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator size="large" color={theme.primary} style={{marginTop: 100}} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Run / Re-run button */}
         <TouchableOpacity
@@ -222,9 +226,9 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
                 if (!val) return null;
                 const cfg = RESULT_CONFIG[val] || RESULT_CONFIG.pending;
                 return (
-                  <View key={cat} style={[styles.summaryItem, {backgroundColor: cfg.bg}]}>
-                    <Text style={[styles.summaryLabel, {color: cfg.color}]}>{CATEGORY_MAP[cat]}</Text>
-                    <Text style={[styles.summaryValue, {color: cfg.color}]}>{cfg.label}</Text>
+                  <View key={cat} style={[styles.summaryItem, {backgroundColor: theme[cfg.colorKey] + '22'}]}>
+                    <Text style={[styles.summaryLabel, {color: theme[cfg.colorKey]}]}>{CATEGORY_MAP[cat]}</Text>
+                    <Text style={[styles.summaryValue, {color: theme[cfg.colorKey]}]}>{cfg.label}</Text>
                   </View>
                 );
               })}
@@ -255,50 +259,50 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f5f5f5'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 16},
-  runBtn: {backgroundColor: '#1890ff', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16},
+  runBtn: {backgroundColor: theme.primary, paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginBottom: 16},
   runBtnDisabled: {opacity: 0.6},
-  runBtnText: {color: '#fff', fontSize: 16, fontWeight: '600'},
+  runBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
 
   overallCard: {borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center'},
   resultIconCircle: {width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 12},
-  resultIcon: {color: '#fff', fontSize: 24, fontWeight: '700'},
+  resultIcon: {color: theme.btnPrimaryText, fontSize: 24, fontWeight: '700'},
   overallInfo: {flex: 1},
   overallTitle: {fontSize: 18, fontWeight: '700', marginBottom: 4},
-  overallNotes: {fontSize: 13, color: '#666', marginBottom: 8},
+  overallNotes: {fontSize: 13, color: theme.textSub, marginBottom: 8},
   statsRow: {flexDirection: 'row', gap: 16},
   statItem: {alignItems: 'center'},
   statNum: {fontSize: 18, fontWeight: '700'},
-  statLabel: {fontSize: 11, color: '#999', marginTop: 2},
+  statLabel: {fontSize: 11, color: theme.textSub, marginTop: 2},
 
   complianceSummary: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16},
   summaryItem: {flex: 1, minWidth: '45%', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center'},
   summaryLabel: {fontSize: 12, marginBottom: 2},
   summaryValue: {fontSize: 14, fontWeight: '600'},
 
-  categorySection: {backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12},
+  categorySection: {backgroundColor: theme.card, borderRadius: 12, padding: 16, marginBottom: 12},
   categoryHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 12},
   categoryDot: {width: 8, height: 8, borderRadius: 4, marginRight: 8},
-  categoryTitle: {fontSize: 15, fontWeight: '600', color: '#333', flex: 1},
+  categoryTitle: {fontSize: 15, fontWeight: '600', color: theme.text, flex: 1},
   categoryResult: {fontSize: 13, fontWeight: '500'},
 
-  checkItem: {backgroundColor: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 8, borderLeftWidth: 3},
+  checkItem: {backgroundColor: theme.bgSecondary, borderRadius: 8, padding: 12, marginBottom: 8, borderLeftWidth: 3},
   checkItemHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6},
-  checkItemName: {fontSize: 14, fontWeight: '500', color: '#333'},
+  checkItemName: {fontSize: 14, fontWeight: '500', color: theme.text},
   checkItemBadge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4},
   checkItemBadgeText: {fontSize: 11, fontWeight: '500'},
-  checkItemMsg: {fontSize: 13, color: '#666', marginBottom: 4},
+  checkItemMsg: {fontSize: 13, color: theme.textSub, marginBottom: 4},
   checkItemValues: {flexDirection: 'row', gap: 16, marginBottom: 4},
-  valueText: {fontSize: 12, color: '#999'},
+  valueText: {fontSize: 12, color: theme.textSub},
   checkItemFooter: {flexDirection: 'row', gap: 8},
   tagText: {fontSize: 11, fontWeight: '500'},
 
-  metaSection: {backgroundColor: '#fff', borderRadius: 12, padding: 16, marginTop: 4},
-  metaText: {fontSize: 12, color: '#999', marginBottom: 4},
+  metaSection: {backgroundColor: theme.card, borderRadius: 12, padding: 16, marginTop: 4},
+  metaText: {fontSize: 12, color: theme.textSub, marginBottom: 4},
 
   emptyState: {alignItems: 'center', paddingTop: 60},
-  emptyTitle: {fontSize: 16, color: '#999', marginBottom: 8},
-  emptyDesc: {fontSize: 13, color: '#ccc', textAlign: 'center', lineHeight: 20, paddingHorizontal: 20},
+  emptyTitle: {fontSize: 16, color: theme.textSub, marginBottom: 8},
+  emptyDesc: {fontSize: 13, color: theme.textHint, textAlign: 'center', lineHeight: 20, paddingHorizontal: 20},
 });

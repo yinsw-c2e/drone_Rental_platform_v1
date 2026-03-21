@@ -21,6 +21,8 @@ import {orderFinanceV2Service} from '../../services/orderFinanceV2';
 import {orderV2Service} from '../../services/orderV2';
 import {RootState} from '../../store/store';
 import {OrderPartySummary, V2OrderDetail, V2ReviewSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 type ReviewTarget = {
   userId: number;
@@ -78,6 +80,8 @@ const buildReviewTargets = (detail: V2OrderDetail | null, currentUserId: number)
 };
 
 export default function ReviewScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const currentUserId = Number(useSelector((state: RootState) => state.auth.user?.id || 0));
   const orderId = Number(route.params?.orderId || route.params?.id || route.params?.order?.id || 0);
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
@@ -159,9 +163,9 @@ export default function ReviewScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <ActivityIndicator color="#114178" />
+          <ActivityIndicator color={theme.primary} />
           <Text style={styles.stateText}>正在加载订单评价信息...</Text>
         </View>
       </SafeAreaView>
@@ -170,7 +174,7 @@ export default function ReviewScreen({route, navigation}: any) {
 
   if (!detail) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
           <Text style={styles.stateText}>订单信息缺失</Text>
         </View>
@@ -179,7 +183,7 @@ export default function ReviewScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
@@ -262,7 +266,7 @@ export default function ReviewScreen({route, navigation}: any) {
                 style={[styles.primaryBtn, (submitting || !selectedTarget) && styles.primaryBtnDisabled]}
                 disabled={submitting || !selectedTarget}
                 onPress={handleSubmit}>
-                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>提交评价</Text>}
+                {submitting ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>提交评价</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -290,10 +294,10 @@ export default function ReviewScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   centerState: {
     flex: 1,
@@ -303,7 +307,7 @@ const styles = StyleSheet.create({
   },
   stateText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   content: {
     padding: 14,
@@ -311,33 +315,35 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderRadius: 24,
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroOrderNo: {
     fontSize: 13,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 12,
     fontSize: 28,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroHint: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   sectionCard: {
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
@@ -347,16 +353,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   rowLabel: {
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   rowValue: {
     maxWidth: '62%',
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
     textAlign: 'right',
   },
@@ -364,7 +370,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   targetGrid: {
@@ -373,27 +379,27 @@ const styles = StyleSheet.create({
   targetChip: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   targetChipActive: {
-    borderColor: '#114178',
-    backgroundColor: '#f6fbff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   targetChipLabel: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#1f1f1f',
+    color: theme.text,
   },
   targetChipDesc: {
     marginTop: 4,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   targetChipLabelActive: {
-    color: '#114178',
+    color: theme.primaryText,
   },
   starRow: {
     flexDirection: 'row',
@@ -406,53 +412,53 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: 34,
-    color: '#d9d9d9',
+    color: theme.divider,
   },
   starActive: {
-    color: '#faad14',
+    color: theme.warning,
   },
   textArea: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fafafa',
+    borderColor: theme.divider,
+    backgroundColor: theme.bgSecondary,
     padding: 14,
     minHeight: 128,
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
   },
   charCount: {
     marginTop: 8,
     textAlign: 'right',
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   primaryBtn: {
     marginTop: 14,
     borderRadius: 999,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     paddingVertical: 13,
   },
   primaryBtnDisabled: {
-    backgroundColor: '#91a8c2',
+    backgroundColor: theme.textHint,
   },
   primaryBtnText: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   emptyText: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   reviewItem: {
     marginTop: 10,
     borderRadius: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.divider,
     padding: 12,
   },
   reviewHeader: {
@@ -462,18 +468,18 @@ const styles = StyleSheet.create({
   },
   reviewTitle: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   reviewContent: {
     marginTop: 10,
     fontSize: 14,
     lineHeight: 20,
-    color: '#1f1f1f',
+    color: theme.text,
   },
   reviewMeta: {
     marginTop: 8,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
 });

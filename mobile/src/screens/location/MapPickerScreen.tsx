@@ -9,8 +9,12 @@ import type {NativeSyntheticEvent} from 'react-native';
 import {locationService} from '../../services/location';
 import {POIItem, AddressData} from '../../types';
 import {getCurrentPosition} from '../../utils/LocationService';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function MapPickerScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
   const initialLat: number | undefined = route.params?.latitude;
   const initialLng: number | undefined = route.params?.longitude;
@@ -185,12 +189,12 @@ export default function MapPickerScreen({navigation, route}: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* 高德地图区域 */}
       <View style={styles.mapContainer}>
         {loading ? (
           <View style={styles.mapLoading}>
-            <ActivityIndicator size="large" color="#1890ff" />
+            <ActivityIndicator size="large" color={theme.primary} />
             <Text style={styles.mapLoadingText}>正在定位...</Text>
           </View>
         ) : (
@@ -256,14 +260,14 @@ export default function MapPickerScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.card},
   mapContainer: {height: 280, position: 'relative'},
   mapLoading: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#e8f4fd',
+    backgroundColor: theme.primaryBg,
   },
-  mapLoadingText: {fontSize: 13, color: '#999', marginTop: 8},
+  mapLoadingText: {fontSize: 13, color: theme.textSub, marginTop: 8},
   map: {flex: 1},
   centerPin: {
     position: 'absolute', top: '50%', left: '50%',
@@ -273,38 +277,38 @@ const styles = StyleSheet.create({
   relocateBtn: {
     position: 'absolute', bottom: 12, right: 12,
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: theme.card, justifyContent: 'center', alignItems: 'center',
     shadowColor: '#000', shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.15, shadowRadius: 4, elevation: 4,
   },
-  relocateIcon: {fontSize: 20, color: '#1890ff'},
+  relocateIcon: {fontSize: 20, color: theme.primaryText},
   currentBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8',
-    backgroundColor: '#fafffe',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider,
+    backgroundColor: theme.bgSecondary,
   },
   locIcon: {marginRight: 12},
-  locIconText: {fontSize: 20, color: '#1890ff'},
-  currentLabel: {fontSize: 15, fontWeight: '600', color: '#333'},
-  currentAddr: {fontSize: 13, color: '#999', marginTop: 2},
-  useBtn: {fontSize: 14, color: '#1890ff', fontWeight: '500', paddingLeft: 12},
+  locIconText: {fontSize: 20, color: theme.primaryText},
+  currentLabel: {fontSize: 15, fontWeight: '600', color: theme.text},
+  currentAddr: {fontSize: 13, color: theme.textSub, marginTop: 2},
+  useBtn: {fontSize: 14, color: theme.primaryText, fontWeight: '500', paddingLeft: 12},
   nearbyHeader: {
     paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: '#fafafa',
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e8e8e8',
+    backgroundColor: theme.bgSecondary,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider,
   },
-  nearbyTitle: {fontSize: 13, color: '#999', fontWeight: '500'},
+  nearbyTitle: {fontSize: 13, color: theme.textSub, fontWeight: '500'},
   poiItem: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#f0f0f0',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider,
   },
-  poiItemActive: {backgroundColor: '#e6f7ff'},
+  poiItemActive: {backgroundColor: theme.primaryBg},
   poiInfo: {flex: 1},
-  poiName: {fontSize: 15, color: '#333', fontWeight: '500'},
-  poiAddr: {fontSize: 13, color: '#999', marginTop: 3},
-  poiDist: {fontSize: 12, color: '#bbb', marginLeft: 10},
+  poiName: {fontSize: 15, color: theme.text, fontWeight: '500'},
+  poiAddr: {fontSize: 13, color: theme.textSub, marginTop: 3},
+  poiDist: {fontSize: 12, color: theme.textHint, marginLeft: 10},
   emptyWrap: {alignItems: 'center', paddingTop: 40},
-  emptyText: {fontSize: 14, color: '#999'},
+  emptyText: {fontSize: 14, color: theme.textSub},
 });

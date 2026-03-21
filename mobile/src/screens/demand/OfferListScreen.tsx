@@ -21,6 +21,8 @@ import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
 import {SupplySummary} from '../../types';
 import {formatSupplyPricing, getSupplySceneLabel} from '../../utils/supplyMeta';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const SCENE_FILTERS = [
   {key: '', label: '全部场景'},
@@ -32,6 +34,8 @@ const SCENE_FILTERS = [
 ];
 
 function SceneTag({label}: {label: string}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.sceneTag}>
       <Text style={styles.sceneTagText}>{label}</Text>
@@ -40,6 +44,8 @@ function SceneTag({label}: {label: string}) {
 }
 
 export default function OfferListScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
   const [supplies, setSupplies] = useState<SupplySummary[]>([]);
@@ -160,13 +166,13 @@ export default function OfferListScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={supplies}
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f5cab']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />
         }
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.35}
@@ -219,7 +225,7 @@ export default function OfferListScreen({navigation}: any) {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loading} color="#0f5cab" />
+            <ActivityIndicator style={styles.loading} color={theme.primary} />
           ) : (
             <ObjectCard>
               <EmptyState
@@ -234,7 +240,7 @@ export default function OfferListScreen({navigation}: any) {
         }
         ListFooterComponent={
           hasMore && supplies.length > 0 ? (
-            <ActivityIndicator style={styles.footerLoading} color="#0f5cab" />
+            <ActivityIndicator style={styles.footerLoading} color={theme.primary} />
           ) : null
         }
       />
@@ -242,10 +248,10 @@ export default function OfferListScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
@@ -253,47 +259,49 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hero: {
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#ffffff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   filterCard: {
     marginBottom: 12,
   },
   filterTitle: {
     fontSize: 16,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#dbe3ec',
+    borderColor: theme.inputBorder,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#0f172a',
+    color: theme.text,
   },
   filterChipRow: {
     flexDirection: 'row',
@@ -303,34 +311,34 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: theme.inputBorder,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
   },
   filterChipActive: {
-    borderColor: '#91caff',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryBg,
   },
   filterChipText: {
     fontSize: 12,
-    color: '#475569',
+    color: theme.textSub,
     fontWeight: '700',
   },
   filterChipTextActive: {
-    color: '#0958d9',
+    color: theme.primaryText,
   },
   searchBtn: {
     marginTop: 12,
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.primary,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   searchBtnText: {
     fontSize: 14,
-    color: '#ffffff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   card: {
@@ -350,28 +358,28 @@ const styles = StyleSheet.create({
   },
   directPill: {
     borderRadius: 999,
-    backgroundColor: '#ecfdf3',
+    backgroundColor: theme.success + '18',
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: theme.success + '44',
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   directPillText: {
     fontSize: 11,
-    color: '#047857',
+    color: theme.success,
     fontWeight: '800',
   },
   supplyNo: {
     marginTop: 12,
     fontSize: 12,
-    color: '#94a3b8',
+    color: theme.textHint,
     fontWeight: '700',
   },
   title: {
     marginTop: 6,
     fontSize: 17,
     lineHeight: 24,
-    color: '#0f172a',
+    color: theme.text,
     fontWeight: '800',
   },
   sceneRow: {
@@ -381,16 +389,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sceneTag: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#dbe3ec',
+    borderColor: theme.inputBorder,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   sceneTagText: {
     fontSize: 11,
-    color: '#334155',
+    color: theme.text,
     fontWeight: '700',
   },
   metricRow: {
@@ -401,7 +409,7 @@ const styles = StyleSheet.create({
   },
   metricText: {
     fontSize: 12,
-    color: '#64748b',
+    color: theme.textSub,
   },
   cardFooter: {
     marginTop: 14,
@@ -413,27 +421,27 @@ const styles = StyleSheet.create({
   price: {
     flex: 1,
     fontSize: 16,
-    color: '#dc2626',
+    color: theme.danger,
     fontWeight: '800',
   },
   detailBtn: {
     borderRadius: 999,
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   detailBtnOwner: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: '#0f5cab',
+    borderColor: theme.primary,
   },
   detailBtnText: {
     fontSize: 12,
-    color: '#ffffff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   detailBtnTextOwner: {
-    color: '#0f5cab',
+    color: theme.primaryText,
   },
   loading: {
     paddingVertical: 36,

@@ -8,8 +8,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { getMyDeposit, Deposit } from '../../services/credit';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const DepositScreen: React.FC = () => {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deposit, setDeposit] = useState<Deposit | null>(null);
@@ -73,7 +77,7 @@ const DepositScreen: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1890ff" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -132,7 +136,7 @@ const DepositScreen: React.FC = () => {
           </View>
           <View style={styles.amountItem}>
             <Text style={styles.amountLabel}>已缴金额</Text>
-            <Text style={[styles.amountValue, { color: '#52c41a' }]}>
+            <Text style={[styles.amountValue, { color: theme.success }]}>
               ¥{formatAmount(deposit.paid_amount)}
             </Text>
           </View>
@@ -141,7 +145,7 @@ const DepositScreen: React.FC = () => {
         <View style={styles.amountSection}>
           <View style={styles.amountItem}>
             <Text style={styles.amountLabel}>冻结金额</Text>
-            <Text style={[styles.amountValue, { color: '#f5222d' }]}>
+            <Text style={[styles.amountValue, { color: theme.danger }]}>
               ¥{formatAmount(deposit.frozen_amount)}
             </Text>
           </View>
@@ -227,10 +231,10 @@ const DepositScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -245,7 +249,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#f5222d',
+    color: theme.danger,
   },
   emptyContainer: {
     padding: 24,
@@ -255,7 +259,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0f5ff',
+    backgroundColor: theme.primaryBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -266,16 +270,16 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
   },
   emptyDesc: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
     marginBottom: 24,
   },
   tipCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 8,
     padding: 16,
     width: '100%',
@@ -283,16 +287,16 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 12,
   },
   tipText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
     lineHeight: 22,
   },
   mainCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     margin: 16,
     borderRadius: 12,
     padding: 20,
@@ -307,13 +311,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   statusBadgeText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 14,
     fontWeight: '500',
   },
   depositNo: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginBottom: 20,
   },
   amountSection: {
@@ -325,25 +329,25 @@ const styles = StyleSheet.create({
   },
   amountLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginBottom: 4,
   },
   amountValue: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   progressSection: {
     marginTop: 8,
   },
   progressLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginBottom: 8,
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: theme.divider,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -353,12 +357,12 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: '#1890ff',
+    color: theme.primaryText,
     textAlign: 'right',
     marginTop: 4,
   },
   detailCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     borderRadius: 8,
     padding: 16,
@@ -367,43 +371,43 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 16,
   },
   detailRow: {
     flexDirection: 'row',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   detailLabel: {
     width: 80,
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   detailValue: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
   },
   infoCard: {
-    backgroundColor: '#fffbe6',
+    backgroundColor: theme.warning + '22',
     marginHorizontal: 16,
     borderRadius: 8,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#ffe58f',
+    borderColor: theme.warning + '44',
   },
   infoTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#d48806',
+    color: theme.warning,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 13,
-    color: '#d48806',
+    color: theme.warning,
     lineHeight: 22,
   },
 });

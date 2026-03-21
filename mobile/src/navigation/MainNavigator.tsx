@@ -2,6 +2,7 @@ import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {Text} from 'react-native';
+import {useTheme} from '../theme/ThemeContext';
 
 import HomeScreen from '../screens/home/HomeScreen';
 import MarketHubScreen from '../screens/market/MarketHubScreen';
@@ -108,13 +109,15 @@ const tabIcon = (name: string, focused: boolean) => {
 };
 
 function MainTabs() {
+  const {theme} = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({route}) => ({
         headerShown: false,
         tabBarIcon: ({focused}) => tabIcon(route.name, focused),
-        tabBarActiveTintColor: '#1890ff',
-        tabBarInactiveTintColor: '#999',
+        tabBarActiveTintColor: theme.navIconActive,
+        tabBarInactiveTintColor: theme.navIconInactive,
+        tabBarStyle: {backgroundColor: theme.navBg, borderTopColor: theme.navBorder},
       })}>
       <Tab.Screen name="Home" component={HomeScreen} options={{tabBarLabel: '首页'}} />
       <Tab.Screen name="Market" component={MarketHubScreen} options={{tabBarLabel: '市场'}} />

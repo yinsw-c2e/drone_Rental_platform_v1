@@ -16,6 +16,8 @@ import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import {pilotV2Service} from '../../services/pilotV2';
 import {OwnerPilotBindingSummary} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const FILTERS = [
   {key: 'all', label: '全部'},
@@ -37,6 +39,8 @@ const statusMeta: Record<string, {label: string; tone: 'green' | 'orange' | 'gra
 };
 
 export default function PilotOwnerBindingsScreen() {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [bindings, setBindings] = useState<OwnerPilotBindingSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -155,12 +159,12 @@ export default function PilotOwnerBindingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={bindings}
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#047857']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
@@ -208,34 +212,34 @@ export default function PilotOwnerBindingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#eef3f8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 14, paddingBottom: 28},
-  hero: {backgroundColor: '#047857', borderRadius: 24, padding: 20, marginBottom: 12},
-  heroEyebrow: {fontSize: 12, color: '#d1fae5', fontWeight: '700'},
-  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, color: '#fff', fontWeight: '800'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: '#d1fae5'},
+  hero: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderRadius: 24, padding: 20, marginBottom: 12, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
+  heroEyebrow: {fontSize: 12, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '700'},
+  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800'},
+  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   formCard: {marginBottom: 12, gap: 12},
-  formTitle: {fontSize: 18, fontWeight: '800', color: '#102a43'},
-  formDesc: {fontSize: 13, lineHeight: 20, color: '#64748b'},
-  input: {borderWidth: 1, borderColor: '#d8e1eb', borderRadius: 12, backgroundColor: '#f8fafc', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#102a43'},
+  formTitle: {fontSize: 18, fontWeight: '800', color: theme.text},
+  formDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub},
+  input: {borderWidth: 1, borderColor: theme.cardBorder, borderRadius: 12, backgroundColor: theme.bgSecondary, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text},
   noteInput: {minHeight: 88},
   filterCard: {marginBottom: 12},
-  filterTitle: {fontSize: 14, color: '#262626', fontWeight: '700', marginBottom: 12},
+  filterTitle: {fontSize: 14, color: theme.text, fontWeight: '700', marginBottom: 12},
   filterRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  filterChip: {paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#edf2f7'},
-  filterChipActive: {backgroundColor: '#d1fae5'},
-  filterChipText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
-  filterChipTextActive: {color: '#047857'},
+  filterChip: {paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.primaryBg},
+  filterChipActive: {backgroundColor: theme.success + '22'},
+  filterChipText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
+  filterChipTextActive: {color: theme.primaryText},
   card: {marginBottom: 12, gap: 12},
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12},
-  cardTitle: {fontSize: 18, fontWeight: '800', color: '#102a43'},
-  cardMeta: {marginTop: 4, fontSize: 12, color: '#64748b'},
-  noteText: {fontSize: 14, lineHeight: 20, color: '#334e68'},
+  cardTitle: {fontSize: 18, fontWeight: '800', color: theme.text},
+  cardMeta: {marginTop: 4, fontSize: 12, color: theme.textSub},
+  noteText: {fontSize: 14, lineHeight: 20, color: theme.text},
   footer: {flexDirection: 'row', gap: 10},
-  primaryBtn: {flex: 1, borderRadius: 12, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingVertical: 12},
-  primaryBtnText: {fontSize: 14, fontWeight: '700', color: '#fff'},
-  secondaryBtn: {flex: 1, borderRadius: 12, borderWidth: 1, borderColor: '#cde7da', backgroundColor: '#f4fbf8', alignItems: 'center', justifyContent: 'center', paddingVertical: 12},
-  secondaryBtnText: {fontSize: 14, fontWeight: '700', color: '#047857'},
+  primaryBtn: {flex: 1, borderRadius: 12, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 12},
+  primaryBtnText: {fontSize: 14, fontWeight: '700', color: theme.btnPrimaryText},
+  secondaryBtn: {flex: 1, borderRadius: 12, borderWidth: 1, borderColor: theme.primaryBorder, backgroundColor: theme.primaryBg, alignItems: 'center', justifyContent: 'center', paddingVertical: 12},
+  secondaryBtnText: {fontSize: 14, fontWeight: '700', color: theme.primaryText},
   disabledBtn: {opacity: 0.6},
 });

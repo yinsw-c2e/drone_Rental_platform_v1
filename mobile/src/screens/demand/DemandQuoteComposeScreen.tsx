@@ -13,11 +13,15 @@ import {
 import {droneService} from '../../services/drone';
 import {demandV2Service} from '../../services/demandV2';
 import {DemandQuoteSummary, Drone} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const toDisplayAmount = (amount?: number | null) =>
   amount && amount > 0 ? String((amount / 100).toFixed(2)) : '';
 
 export default function DemandQuoteComposeScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const demandId = Number(route.params?.demandId || route.params?.id || 0);
   const demandTitle = String(route.params?.demandTitle || '需求');
   const existingQuote = (route.params?.existingQuote || null) as DemandQuoteSummary | null;
@@ -106,14 +110,14 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={styles.loader} color="#1677ff" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={styles.loader} color={theme.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>{existingQuote ? '更新报价' : '提交报价'}</Text>
@@ -202,82 +206,84 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f4f7fb'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bg},
   content: {padding: 16, paddingBottom: 120},
   loader: {marginTop: 120},
   hero: {
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     borderRadius: 22,
     padding: 18,
     marginBottom: 14,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
-  eyebrow: {fontSize: 13, color: '#d6e4ff', fontWeight: '600', marginBottom: 8},
-  title: {fontSize: 24, lineHeight: 30, color: '#fff', fontWeight: '700'},
-  desc: {marginTop: 8, fontSize: 13, lineHeight: 20, color: '#d6e4ff'},
+  eyebrow: {fontSize: 13, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '600', marginBottom: 8},
+  title: {fontSize: 24, lineHeight: 30, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '700'},
+  desc: {marginTop: 8, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 16,
     marginBottom: 12,
   },
-  sectionTitle: {fontSize: 17, color: '#1f1f1f', fontWeight: '700', marginBottom: 12},
+  sectionTitle: {fontSize: 17, color: theme.text, fontWeight: '700', marginBottom: 12},
   droneCard: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.divider,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
   },
   droneCardActive: {
-    borderColor: '#1677ff',
-    backgroundColor: '#f0f7ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   droneHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8},
-  droneName: {fontSize: 15, color: '#1f1f1f', fontWeight: '700', flex: 1, marginRight: 12},
-  droneMeta: {fontSize: 12, lineHeight: 18, color: '#8c8c8c'},
+  droneName: {fontSize: 15, color: theme.text, fontWeight: '700', flex: 1, marginRight: 12},
+  droneMeta: {fontSize: 12, lineHeight: 18, color: theme.textSub},
   selectBadge: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   selectBadgeActive: {
-    borderColor: '#1677ff',
-    backgroundColor: '#1677ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primary,
   },
-  selectBadgeText: {fontSize: 12, color: '#8c8c8c', fontWeight: '600'},
-  selectBadgeTextActive: {color: '#fff'},
+  selectBadgeText: {fontSize: 12, color: theme.textSub, fontWeight: '600'},
+  selectBadgeTextActive: {color: theme.btnPrimaryText},
   input: {
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#1f1f1f',
-    backgroundColor: '#fafafa',
+    color: theme.text,
+    backgroundColor: theme.bgSecondary,
   },
   multilineInput: {minHeight: 110},
-  helpText: {marginTop: 8, fontSize: 12, lineHeight: 18, color: '#8c8c8c'},
+  helpText: {marginTop: 8, fontSize: 12, lineHeight: 18, color: theme.textSub},
   summaryCard: {
-    backgroundColor: '#fffbe6',
+    backgroundColor: theme.warning + '22',
     borderWidth: 1,
-    borderColor: '#ffe58f',
+    borderColor: theme.warning + '44',
     borderRadius: 18,
     padding: 16,
   },
-  summaryTitle: {fontSize: 15, color: '#ad6800', fontWeight: '700', marginBottom: 8},
-  summaryText: {fontSize: 13, color: '#8c5a00', lineHeight: 20},
+  summaryTitle: {fontSize: 15, color: theme.warning, fontWeight: '700', marginBottom: 8},
+  summaryText: {fontSize: 13, color: theme.warning, lineHeight: 20},
   emptyBox: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ffe58f',
-    backgroundColor: '#fffbe6',
+    borderColor: theme.warning + '44',
+    backgroundColor: theme.warning + '22',
     padding: 14,
   },
-  emptyText: {fontSize: 13, lineHeight: 20, color: '#ad6800'},
+  emptyText: {fontSize: 13, lineHeight: 20, color: theme.warning},
   footer: {
     position: 'absolute',
     left: 0,
@@ -285,16 +291,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    borderTopColor: theme.divider,
+    backgroundColor: theme.card,
   },
   submitBtn: {
     borderRadius: 16,
-    backgroundColor: '#1677ff',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
   },
   submitBtnDisabled: {opacity: 0.5},
-  submitBtnText: {fontSize: 16, color: '#fff', fontWeight: '700'},
+  submitBtnText: {fontSize: 16, color: theme.btnPrimaryText, fontWeight: '700'},
 });

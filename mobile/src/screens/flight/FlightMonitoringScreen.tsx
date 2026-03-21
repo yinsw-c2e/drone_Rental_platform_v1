@@ -24,12 +24,14 @@ import {
   V2OrderMonitor,
   V2OrderTimelineItem,
 } from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const ALERT_LEVEL_META: Record<string, {label: string; color: string; bg: string}> = {
-  info: {label: '信息', color: '#1677ff', bg: '#e6f4ff'},
-  warning: {label: '警告', color: '#d46b08', bg: '#fff7e6'},
-  danger: {label: '危险', color: '#cf1322', bg: '#fff1f0'},
-  critical: {label: '严重', color: '#a8071a', bg: '#fff1f0'},
+const ALERT_LEVEL_META: Record<string, {label: string; colorKey: 'info' | 'warning' | 'danger'}> = {
+  info: {label: '信息', colorKey: 'info'},
+  warning: {label: '警告', colorKey: 'warning'},
+  danger: {label: '危险', colorKey: 'danger'},
+  critical: {label: '严重', colorKey: 'danger'},
 };
 
 const ACTIVE_EXECUTION_STATUSES = [
@@ -91,6 +93,8 @@ const formatSpeed = (speed?: number) => {
 };
 
 function DetailRow({label, value}: {label: string; value?: string}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -100,6 +104,8 @@ function DetailRow({label, value}: {label: string; value?: string}) {
 }
 
 function DispatchSection({task}: {task?: V2DispatchTaskSummary | null}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   if (!task) {
     return (
       <View style={styles.noticeBox}>
@@ -123,6 +129,8 @@ function DispatchSection({task}: {task?: V2DispatchTaskSummary | null}) {
 }
 
 function AlertSection({alerts}: {alerts?: V2FlightAlertSummary[]}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   if (!alerts || alerts.length === 0) {
     return <Text style={styles.emptyHint}>当前没有活跃告警。</Text>;
   }
@@ -132,9 +140,9 @@ function AlertSection({alerts}: {alerts?: V2FlightAlertSummary[]}) {
       {alerts.map(alert => {
         const meta = ALERT_LEVEL_META[String(alert.alert_level || '').toLowerCase()] || ALERT_LEVEL_META.info;
         return (
-          <View key={alert.id} style={[styles.alertItem, {backgroundColor: meta.bg, borderColor: meta.color}]}> 
+          <View key={alert.id} style={[styles.alertItem, {backgroundColor: theme[meta.colorKey] + '22', borderColor: theme[meta.colorKey]}]}> 
             <View style={styles.alertHeader}>
-              <Text style={[styles.alertLevel, {color: meta.color}]}>{meta.label}</Text>
+              <Text style={[styles.alertLevel, {color: theme[meta.colorKey]}]}>{meta.label}</Text>
               <Text style={styles.alertTime}>{formatDateTime(alert.triggered_at)}</Text>
             </View>
             <Text style={styles.alertTitle}>{alert.title || alert.alert_type || '告警'}</Text>
@@ -147,6 +155,8 @@ function AlertSection({alerts}: {alerts?: V2FlightAlertSummary[]}) {
 }
 
 function PositionSection({position}: {position?: V2FlightPositionSummary | null}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   if (!position) {
     return <Text style={styles.emptyHint}>当前还没有位置上报数据。</Text>;
   }
@@ -193,6 +203,8 @@ function PositionSection({position}: {position?: V2FlightPositionSummary | null}
 }
 
 function TimelineSection({items}: {items?: V2OrderTimelineItem[]}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   if (!items || items.length === 0) {
     return <Text style={styles.emptyHint}>当前还没有可展示的履约时间线。</Text>;
   }
@@ -222,6 +234,8 @@ function TimelineSection({items}: {items?: V2OrderTimelineItem[]}) {
 }
 
 export default function FlightMonitoringScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const initialOrderId = Number(route?.params?.orderId || 0);
   const dispatchId = Number(route?.params?.dispatchId || 0);
   const [resolvedOrderId, setResolvedOrderId] = useState<number>(initialOrderId);
@@ -304,9 +318,9 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#114178" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -314,7 +328,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
 
   if (!resolvedOrderId || !order) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
           <Text style={styles.emptyText}>请从订单详情或正式派单详情进入飞行监控。</Text>
         </View>
@@ -323,7 +337,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
@@ -415,10 +429,10 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   centerState: {
     flex: 1,
@@ -429,7 +443,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#8c8c8c',
+    color: theme.textSub,
     textAlign: 'center',
   },
   content: {
@@ -437,7 +451,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   hero: {
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
@@ -453,21 +467,21 @@ const styles = StyleSheet.create({
   },
   heroOrderNo: {
     fontSize: 12,
-    color: '#dbeafe',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
     fontWeight: '600',
   },
   heroTitle: {
     marginTop: 14,
     fontSize: 24,
     lineHeight: 30,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   heroRoute: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#dbeafe',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   heroActionRow: {
     marginTop: 14,
@@ -489,11 +503,11 @@ const styles = StyleSheet.create({
   },
   liveChipText: {
     fontSize: 12,
-    color: '#dbeafe',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
     fontWeight: '700',
   },
   liveChipTextActive: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   secondaryBtn: {
     borderRadius: 999,
@@ -503,7 +517,7 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
   sectionCard: {
@@ -511,7 +525,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
@@ -521,24 +535,24 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   rowLabel: {
     width: 92,
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   rowValue: {
     flex: 1,
     textAlign: 'right',
     fontSize: 14,
     lineHeight: 20,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '600',
   },
   noticeBox: {
     borderRadius: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
     padding: 12,
   },
   dispatchTopRow: {
@@ -548,19 +562,19 @@ const styles = StyleSheet.create({
   },
   noticeTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
   },
   noticeDesc: {
     marginTop: 6,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   emptyHint: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   coordRow: {
     flexDirection: 'row',
@@ -570,17 +584,17 @@ const styles = StyleSheet.create({
   coordItem: {
     flex: 1,
     borderRadius: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
     padding: 12,
   },
   coordLabel: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   coordValue: {
     marginTop: 6,
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
   },
   metricGrid: {
@@ -592,23 +606,23 @@ const styles = StyleSheet.create({
   metricItem: {
     width: '48%',
     borderRadius: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
     padding: 12,
   },
   metricLabel: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   metricValue: {
     marginTop: 6,
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
   },
   latestTime: {
     marginTop: 10,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   alertItem: {
     borderRadius: 16,
@@ -627,31 +641,31 @@ const styles = StyleSheet.create({
   },
   alertTime: {
     fontSize: 11,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   alertTitle: {
     marginTop: 8,
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
   },
   alertDesc: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   linkButton: {
     marginTop: 14,
     alignSelf: 'flex-start',
     borderRadius: 999,
-    backgroundColor: '#e6f4ff',
+    backgroundColor: theme.primaryBg,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   linkButtonText: {
     fontSize: 12,
-    color: '#0958d9',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   timelineItem: {
@@ -666,13 +680,13 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     marginTop: 4,
   },
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#d9d9d9',
+    backgroundColor: theme.divider,
     marginTop: 4,
   },
   timelineContent: {
@@ -682,12 +696,12 @@ const styles = StyleSheet.create({
   },
   timelineTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
   },
   timelineMeta: {
     marginTop: 4,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
 });

@@ -24,6 +24,8 @@ import {
   getDemandSceneLabel,
   resolveDemandPrimaryAddress,
 } from '../../utils/demandMeta';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const STATUS_GROUPS = [
   {key: 'all', label: '全部'},
@@ -51,6 +53,8 @@ const matchesStatusGroup = (status: string, group: StatusGroupKey) => {
 };
 
 export default function MyDemandsScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const initialGroup = (() => {
     const param = route?.params?.statusFilter;
     if (param === 'quoted' || param === 'quoting') {
@@ -170,13 +174,13 @@ export default function MyDemandsScreen({navigation, route}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={filteredDemands}
         keyExtractor={item => String(item.id)}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f5cab']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />
         }
         contentContainerStyle={styles.content}
         ListHeaderComponent={
@@ -215,7 +219,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator style={styles.loading} color="#0f5cab" />
+            <ActivityIndicator style={styles.loading} color={theme.primary} />
           ) : (
             <ObjectCard>
               <EmptyState
@@ -233,45 +237,47 @@ export default function MyDemandsScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
     paddingBottom: 28,
   },
   hero: {
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 28,
     lineHeight: 34,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   filterCard: {
     marginBottom: 12,
   },
   filterTitle: {
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '700',
     marginBottom: 12,
   },
@@ -283,22 +289,22 @@ const styles = StyleSheet.create({
   filterChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   filterChipActive: {
-    borderColor: '#0f5cab',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   filterChipText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '600',
   },
   filterChipTextActive: {
-    color: '#0f5cab',
+    color: theme.primaryText,
   },
   loading: {
     paddingVertical: 48,
@@ -318,21 +324,21 @@ const styles = StyleSheet.create({
   },
   code: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '600',
   },
   title: {
     marginTop: 14,
     fontSize: 17,
     lineHeight: 24,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   address: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#595959',
+    color: theme.textSub,
   },
   metaRow: {
     marginTop: 10,
@@ -343,12 +349,12 @@ const styles = StyleSheet.create({
   metaText: {
     flex: 1,
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
   },
   schedule: {
     marginTop: 12,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   footer: {
     marginTop: 16,
@@ -359,36 +365,36 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   secondaryBtnText: {
     fontSize: 12,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   primaryBtn: {
     borderRadius: 999,
-    backgroundColor: '#0f5cab',
+    backgroundColor: theme.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   primaryBtnText: {
     fontSize: 12,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '700',
   },
   dangerBtn: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#ff4d4f',
+    borderColor: theme.danger,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   dangerBtnText: {
     fontSize: 12,
-    color: '#ff4d4f',
+    color: theme.danger,
     fontWeight: '700',
   },
 });

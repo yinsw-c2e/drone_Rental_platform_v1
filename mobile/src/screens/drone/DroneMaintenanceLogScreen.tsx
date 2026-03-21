@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import api from '../../services/api';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 interface MaintenanceLog {
   id: number;
@@ -37,6 +39,8 @@ const MAINTENANCE_TYPES = [
 ];
 
 export default function DroneMaintenanceLogScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const droneId = route.params?.id;
   const [logs, setLogs] = useState<MaintenanceLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,7 +166,7 @@ export default function DroneMaintenanceLogScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
@@ -171,7 +175,7 @@ export default function DroneMaintenanceLogScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={logs}
         renderItem={renderItem}
@@ -299,10 +303,10 @@ export default function DroneMaintenanceLogScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -311,7 +315,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
   },
   listContent: {
     paddingBottom: 24,
@@ -320,7 +324,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -328,12 +332,12 @@ const styles = StyleSheet.create({
   },
   addBtnIcon: {
     fontSize: 20,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     marginRight: 8,
   },
   addBtnText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -342,15 +346,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   logCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 12,
@@ -365,22 +369,22 @@ const styles = StyleSheet.create({
   logDate: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   typeBadge: {
-    backgroundColor: '#e6f7ff',
+    backgroundColor: theme.primaryBg,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
   typeText: {
     fontSize: 12,
-    color: '#1890ff',
+    color: theme.primaryText,
     fontWeight: '500',
   },
   logDescription: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     lineHeight: 20,
   },
   logFooter: {
@@ -390,16 +394,16 @@ const styles = StyleSheet.create({
   },
   logMeta: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
   },
   logCost: {
     fontSize: 13,
-    color: '#f5222d',
+    color: theme.danger,
     fontWeight: '500',
   },
   nextDate: {
     fontSize: 12,
-    color: '#1890ff',
+    color: theme.primaryText,
     marginTop: 8,
   },
   modalOverlay: {
@@ -408,7 +412,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '85%',
@@ -419,16 +423,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   modalClose: {
     fontSize: 28,
-    color: '#999',
+    color: theme.textSub,
   },
   modalBody: {
     padding: 16,
@@ -436,18 +440,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
     marginTop: 14,
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
   },
   textArea: {
     height: 80,
@@ -462,24 +466,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 16,
     marginRight: 8,
   },
   typeOptionActive: {
-    backgroundColor: '#1890ff',
-    borderColor: '#1890ff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   typeOptionText: {
     fontSize: 13,
-    color: '#666',
+    color: theme.textSub,
   },
   typeOptionTextActive: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   submitBtn: {
     height: 50,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -487,10 +491,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   submitBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.cardBorder,
   },
   submitBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 18,
     fontWeight: 'bold',
   },

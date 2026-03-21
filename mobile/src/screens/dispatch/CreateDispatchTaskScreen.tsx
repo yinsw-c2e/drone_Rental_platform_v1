@@ -19,6 +19,8 @@ import {dispatchV2Service} from '../../services/dispatchV2';
 import {orderV2Service} from '../../services/orderV2';
 import {ownerService} from '../../services/owner';
 import {OwnerPilotBindingSummary, V2OrderDetail} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const MODE_OPTIONS = [
   {
@@ -73,6 +75,8 @@ const getBindingPilotName = (binding: OwnerPilotBindingSummary) => {
 const getDispatchResultId = (payload: any) => Number(payload?.dispatch_task?.id || 0);
 
 export default function CreateDispatchTaskScreen({navigation, route}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const orderId = Number(route?.params?.orderId || route?.params?.id || 0);
   const dispatchId = Number(route?.params?.dispatchId || 0);
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
@@ -195,9 +199,9 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#114178" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -205,7 +209,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
 
   if (!detail) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
           <Text style={styles.emptyText}>订单不存在，或当前账号无法对它发起正式派单。</Text>
         </View>
@@ -214,7 +218,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.heroEyebrow}>{isReassign ? '正式派单重派' : '发起正式派单'}</Text>
@@ -326,17 +330,17 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
           style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
           disabled={!canSubmit || submitting}
           onPress={submit}>
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{isReassign ? '确认重派' : '确认发起正式派单'}</Text>}
+          {submitting ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.submitBtnText}>{isReassign ? '确认重派' : '确认发起正式派单'}</Text>}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   centerState: {
     flex: 1,
@@ -347,7 +351,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#8c8c8c',
+    color: theme.textSub,
     textAlign: 'center',
   },
   content: {
@@ -355,42 +359,42 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   hero: {
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     borderRadius: 24,
     padding: 20,
     marginBottom: 12,
   },
   heroEyebrow: {
     fontSize: 12,
-    color: '#dbeafe',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
     fontWeight: '700',
   },
   heroTitle: {
     marginTop: 8,
     fontSize: 26,
     lineHeight: 32,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   heroDesc: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#dbeafe',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
   },
   sectionCard: {
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
   sectionHint: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#8c8c8c',
+    color: theme.textSub,
     marginBottom: 10,
   },
   orderHeader: {
@@ -404,21 +408,21 @@ const styles = StyleSheet.create({
   },
   orderNo: {
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     fontWeight: '600',
   },
   orderTitle: {
     marginTop: 12,
     fontSize: 18,
     lineHeight: 24,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
   },
   orderRoute: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#595959',
+    color: theme.textSub,
   },
   metricRow: {
     marginTop: 10,
@@ -430,32 +434,32 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   noticeBox: {
     marginTop: 12,
     borderRadius: 16,
-    backgroundColor: '#f6ffed',
+    backgroundColor: theme.success + '22',
     borderWidth: 1,
-    borderColor: '#b7eb8f',
+    borderColor: theme.success + '44',
     padding: 12,
   },
   noticeTitle: {
     fontSize: 13,
-    color: '#237804',
+    color: theme.success,
     fontWeight: '700',
   },
   noticeText: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    color: '#3f8600',
+    color: theme.success,
   },
   modeCard: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     padding: 14,
     marginBottom: 10,
   },
@@ -469,7 +473,7 @@ const styles = StyleSheet.create({
   },
   modeTitle: {
     fontSize: 15,
-    color: '#262626',
+    color: theme.text,
     fontWeight: '800',
   },
   modeDot: {
@@ -481,25 +485,25 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   modeHint: {
     marginTop: 6,
     fontSize: 12,
-    color: '#cf1322',
+    color: theme.danger,
     fontWeight: '600',
   },
   bindingCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     padding: 14,
     marginBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   bindingCardActive: {
-    borderColor: '#1677ff',
-    backgroundColor: '#e6f4ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
   },
   bindingHeader: {
     flexDirection: 'row',
@@ -508,36 +512,36 @@ const styles = StyleSheet.create({
   },
   bindingName: {
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
   },
   bindingMeta: {
     fontSize: 12,
-    color: '#1677ff',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   bindingNote: {
     marginTop: 6,
     fontSize: 12,
     lineHeight: 18,
-    color: '#595959',
+    color: theme.textSub,
   },
   emptyInline: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   textInput: {
     minHeight: 110,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
-    backgroundColor: '#fff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     paddingHorizontal: 14,
     paddingVertical: 12,
     textAlignVertical: 'top',
     fontSize: 14,
-    color: '#262626',
+    color: theme.text,
   },
   footer: {
     position: 'absolute',
@@ -546,23 +550,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
   },
   submitBtn: {
     borderRadius: 999,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
   },
   submitBtnDisabled: {
-    backgroundColor: '#91a3b0',
+    backgroundColor: theme.textHint,
   },
   submitBtnText: {
     fontSize: 15,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
 });

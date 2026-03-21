@@ -15,12 +15,14 @@ import {
   unbindDrone,
   PilotDroneBinding,
 } from '../../services/pilot';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
-const BINDING_STATUS_MAP: Record<string, {label: string; color: string}> = {
-  active: {label: '生效中', color: '#52c41a'},
-  pending: {label: '待确认', color: '#faad14'},
-  expired: {label: '已过期', color: '#999'},
-  cancelled: {label: '已取消', color: '#ff4d4f'},
+const BINDING_STATUS_MAP: Record<string, {label: string; colorKey: 'success' | 'warning' | 'textHint' | 'danger'}> = {
+  active: {label: '生效中', colorKey: 'success'},
+  pending: {label: '待确认', colorKey: 'warning'},
+  expired: {label: '已过期', colorKey: 'textHint'},
+  cancelled: {label: '已取消', colorKey: 'danger'},
 };
 
 const BINDING_TYPE_MAP: Record<string, string> = {
@@ -31,6 +33,8 @@ const BINDING_TYPE_MAP: Record<string, string> = {
 };
 
 export default function BoundDronesScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [bindings, setBindings] = useState<PilotDroneBinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,6 +87,7 @@ export default function BoundDronesScreen({navigation}: any) {
 
   const renderItem = ({item}: {item: PilotDroneBinding}) => {
     const status = BINDING_STATUS_MAP[item.status] || BINDING_STATUS_MAP.pending;
+    const statusColor = theme[status.colorKey];
     const bindingType = BINDING_TYPE_MAP[item.binding_type] || item.binding_type;
 
     return (
@@ -101,8 +106,8 @@ export default function BoundDronesScreen({navigation}: any) {
               </Text>
             </View>
           </View>
-          <View style={[styles.statusBadge, {backgroundColor: status.color + '20'}]}>
-            <Text style={[styles.statusText, {color: status.color}]}>{status.label}</Text>
+          <View style={[styles.statusBadge, {backgroundColor: statusColor + '20'}]}>
+            <Text style={[styles.statusText, {color: statusColor}]}>{status.label}</Text>
           </View>
         </View>
 
@@ -163,7 +168,7 @@ export default function BoundDronesScreen({navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>加载中...</Text>
         </View>
@@ -172,7 +177,7 @@ export default function BoundDronesScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <FlatList
         data={bindings}
         renderItem={renderItem}
@@ -195,10 +200,10 @@ export default function BoundDronesScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -207,7 +212,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
   },
   listContent: {
     paddingBottom: 24,
@@ -216,7 +221,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -224,12 +229,12 @@ const styles = StyleSheet.create({
   },
   addBtnIcon: {
     fontSize: 20,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     marginRight: 8,
   },
   addBtnText: {
     fontSize: 16,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -238,15 +243,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.textSub,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: theme.textSub,
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
@@ -258,7 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   droneInfo: {
     flexDirection: 'row',
@@ -269,7 +274,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#e6f7ff',
+    backgroundColor: theme.primaryBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -277,7 +282,7 @@ const styles = StyleSheet.create({
   droneIconText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   droneDetail: {
     flex: 1,
@@ -285,11 +290,11 @@ const styles = StyleSheet.create({
   droneName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   droneSerial: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 2,
   },
   statusBadge: {
@@ -311,11 +316,11 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
   },
   infoValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.text,
     fontWeight: '500',
   },
   specRow: {
@@ -323,7 +328,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
   },
   specItem: {
     flex: 1,
@@ -332,16 +337,16 @@ const styles = StyleSheet.create({
   specValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   specLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 4,
   },
   cardActions: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
     padding: 12,
     alignItems: 'flex-end',
   },
@@ -350,10 +355,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#ff4d4f',
+    borderColor: theme.danger,
   },
   unbindBtnText: {
     fontSize: 14,
-    color: '#ff4d4f',
+    color: theme.danger,
   },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {BadgeMeta, getTonePalette, VisualTone} from './visuals';
+import {useTheme} from '../../theme/ThemeContext';
 
 type Props = {
   label: string;
@@ -9,9 +10,10 @@ type Props = {
 };
 
 export default function StatusBadge({label, tone, meta}: Props) {
+  const {theme} = useTheme();
   const finalTone = meta?.tone || tone || 'gray';
   const finalLabel = meta?.label || label;
-  const palette = getTonePalette(finalTone);
+  const palette = getTonePalette(finalTone, theme.isDark);
 
   return (
     <View

@@ -18,6 +18,8 @@ import StatusBadge from '../../components/business/StatusBadge';
 import api from '../../services/api';
 import {submitCriminalCheck, submitHealthCheck} from '../../services/pilot';
 import {pilotV2Service} from '../../services/pilotV2';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const CAAC_TYPES = [
   {label: 'VLOS（视距内）', value: 'VLOS'},
@@ -28,6 +30,8 @@ const CAAC_TYPES = [
 const skillOptions = ['电网吊运', '山区运输', '应急救援', '海岛补给', '高原补给'];
 
 export default function PilotRegisterScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [licenseType, setLicenseType] = useState('VLOS');
   const [licenseNo, setLicenseNo] = useState('');
   const [licenseExpireDate, setLicenseExpireDate] = useState('');
@@ -142,7 +146,7 @@ export default function PilotRegisterScreen({navigation}: any) {
           <Image source={{uri: value}} style={styles.uploadedImage} />
         ) : (
           <View style={styles.uploadPlaceholder}>
-            {uploading ? <ActivityIndicator color="#0f5cab" /> : <>
+            {uploading ? <ActivityIndicator color={theme.primary} /> : <>
               <Text style={styles.uploadIcon}>+</Text>
               <Text style={styles.uploadText}>点击上传{label}</Text>
             </>}
@@ -153,7 +157,7 @@ export default function PilotRegisterScreen({navigation}: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroHeader}>
@@ -226,34 +230,34 @@ export default function PilotRegisterScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#eef3f8'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 16, paddingBottom: 32, gap: 14},
-  heroCard: {backgroundColor: '#0f5cab'},
+  heroCard: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
   heroHeader: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
-  heroTitle: {fontSize: 24, fontWeight: '800', color: '#fff'},
-  heroSubtitle: {marginTop: 6, fontSize: 13, lineHeight: 20, color: '#dbeafe'},
+  heroTitle: {fontSize: 24, fontWeight: '800', color: theme.isDark ? theme.text : '#FFFFFF'},
+  heroSubtitle: {marginTop: 6, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   sectionCard: {gap: 12},
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: '#102a43'},
-  sectionDesc: {fontSize: 13, lineHeight: 20, color: '#64748b'},
-  label: {fontSize: 13, fontWeight: '700', color: '#334e68'},
-  input: {borderWidth: 1, borderColor: '#d8e1eb', borderRadius: 12, backgroundColor: '#f8fafc', paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#102a43'},
+  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
+  sectionDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub},
+  label: {fontSize: 13, fontWeight: '700', color: theme.text},
+  input: {borderWidth: 1, borderColor: theme.cardBorder, borderRadius: 12, backgroundColor: theme.bgSecondary, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text},
   typeContainer: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  typeOption: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#edf2f7'},
-  typeOptionActive: {backgroundColor: '#dbeafe'},
-  typeOptionText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
-  typeOptionTextActive: {color: '#1d4ed8'},
+  typeOption: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: theme.primaryBg},
+  typeOptionActive: {backgroundColor: theme.primaryBg},
+  typeOptionText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
+  typeOptionTextActive: {color: theme.primaryText},
   skillRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#edf2f7'},
-  skillChipActive: {backgroundColor: '#d1fae5'},
-  skillChipText: {fontSize: 13, fontWeight: '600', color: '#52606d'},
-  skillChipTextActive: {color: '#047857'},
-  imageUpload: {minHeight: 180, borderRadius: 14, borderWidth: 1, borderColor: '#d8e1eb', overflow: 'hidden', backgroundColor: '#f8fafc'},
+  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: theme.primaryBg},
+  skillChipActive: {backgroundColor: theme.success + '22'},
+  skillChipText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
+  skillChipTextActive: {color: theme.success},
+  imageUpload: {minHeight: 180, borderRadius: 14, borderWidth: 1, borderColor: theme.cardBorder, overflow: 'hidden', backgroundColor: theme.bgSecondary},
   uploadPlaceholder: {minHeight: 180, alignItems: 'center', justifyContent: 'center'},
-  uploadIcon: {fontSize: 36, color: '#94a3b8'},
-  uploadText: {marginTop: 8, fontSize: 14, color: '#64748b'},
+  uploadIcon: {fontSize: 36, color: theme.textHint},
+  uploadText: {marginTop: 8, fontSize: 14, color: theme.textSub},
   uploadedImage: {width: '100%', height: 220, resizeMode: 'cover'},
-  submitButton: {borderRadius: 14, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
-  submitButtonText: {fontSize: 15, fontWeight: '800', color: '#fff'},
+  submitButton: {borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
+  submitButtonText: {fontSize: 15, fontWeight: '800', color: theme.btnPrimaryText},
   buttonDisabled: {opacity: 0.6},
 });

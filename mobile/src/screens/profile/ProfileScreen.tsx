@@ -30,6 +30,8 @@ import {orderV2Service} from '../../services/orderV2';
 import {ownerService} from '../../services/owner';
 import {pilotV2Service} from '../../services/pilotV2';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 let ActionSheetIOS: any;
 if (Platform.OS === 'ios') {
@@ -132,6 +134,8 @@ const capabilityCatalog = [
 ] as const;
 
 export default function ProfileScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const dispatch = useDispatch();
@@ -431,7 +435,7 @@ export default function ProfileScreen({navigation}: any) {
   const canApplySelfExecute = effectiveRoleSummary.can_publish_supply && effectiveRoleSummary.can_accept_dispatch;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -566,10 +570,10 @@ export default function ProfileScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 14,
@@ -577,9 +581,11 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderRadius: 28,
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroTop: {
     flexDirection: 'row',
@@ -592,7 +598,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: '#d6e4ff',
+    backgroundColor: theme.primaryBg,
   },
   avatarFallback: {
     width: 84,
@@ -605,20 +611,20 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 30,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   avatarBadge: {
     position: 'absolute',
     right: -4,
     bottom: -4,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   avatarBadgeText: {
     fontSize: 10,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '800',
   },
   heroBody: {
@@ -627,13 +633,13 @@ const styles = StyleSheet.create({
   },
   heroName: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroPhone: {
     marginTop: 6,
     fontSize: 13,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   heroBadgeRow: {
     flexDirection: 'row',
@@ -646,7 +652,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 18,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.12)',
+    borderTopColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.12)',
     paddingTop: 16,
   },
   heroStatItem: {
@@ -655,13 +661,13 @@ const styles = StyleSheet.create({
   },
   heroStatValue: {
     fontSize: 24,
-    color: '#fff',
+    color: theme.isDark ? theme.primary : '#FFFFFF',
     fontWeight: '800',
   },
   heroStatLabel: {
     marginTop: 6,
     fontSize: 12,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   sectionCard: {
     marginBottom: 12,
@@ -679,24 +685,24 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    color: '#111827',
+    color: theme.text,
     fontWeight: '800',
   },
   sectionLink: {
     fontSize: 13,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   sectionDesc: {
     marginTop: 6,
     fontSize: 13,
     lineHeight: 20,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   accountHint: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   roleBadgeWrap: {
     flexDirection: 'row',
@@ -715,13 +721,13 @@ const styles = StyleSheet.create({
   },
   identityTitle: {
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
     fontWeight: '800',
   },
   identityStatusText: {
     marginTop: 6,
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   identityMetrics: {
     marginTop: 14,
@@ -730,21 +736,21 @@ const styles = StyleSheet.create({
   identityMetricText: {
     fontSize: 13,
     lineHeight: 19,
-    color: '#374151',
+    color: theme.textSub,
   },
   secondaryAction: {
     alignSelf: 'flex-start',
     marginTop: 16,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   secondaryActionText: {
     fontSize: 12,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '800',
   },
   capabilityRow: {
@@ -754,34 +760,34 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   capabilityCopy: {
     flex: 1,
   },
   capabilityLabel: {
     fontSize: 14,
-    color: '#111827',
+    color: theme.text,
     fontWeight: '800',
   },
   capabilityDesc: {
     marginTop: 5,
     fontSize: 12,
     lineHeight: 18,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   capabilityNotice: {
     marginTop: 14,
     borderRadius: 16,
-    backgroundColor: '#f8fbff',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#d6e4ff',
+    borderColor: theme.primaryBg,
     padding: 12,
   },
   capabilityNoticeText: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#114178',
+    color: theme.primaryText,
   },
   shortcutGrid: {
     flexDirection: 'row',
@@ -791,7 +797,7 @@ const styles = StyleSheet.create({
   shortcutCard: {
     width: '48.3%',
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#102a43',
@@ -806,27 +812,27 @@ const styles = StyleSheet.create({
   shortcutTitle: {
     marginTop: 14,
     fontSize: 15,
-    color: '#111827',
+    color: theme.text,
     fontWeight: '800',
   },
   shortcutDesc: {
     marginTop: 8,
     fontSize: 12,
     lineHeight: 18,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   logoutBtn: {
     marginTop: 4,
     borderRadius: 999,
-    backgroundColor: '#fff1f0',
+    backgroundColor: theme.danger + '22',
     borderWidth: 1,
-    borderColor: '#ffccc7',
+    borderColor: theme.danger + '44',
     paddingVertical: 14,
     alignItems: 'center',
   },
   logoutText: {
     fontSize: 14,
-    color: '#cf1322',
+    color: theme.danger,
     fontWeight: '800',
   },
 });

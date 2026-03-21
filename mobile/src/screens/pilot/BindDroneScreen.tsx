@@ -16,6 +16,8 @@ import {
 } from '../../services/pilot';
 import {droneService} from '../../services/drone';
 import {Drone} from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const BINDING_TYPES = [
   {label: '自有无人机', value: 'owner'},
@@ -25,6 +27,8 @@ const BINDING_TYPES = [
 ];
 
 export default function BindDroneScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<Drone[]>([]);
   const [searching, setSearching] = useState(false);
@@ -143,7 +147,7 @@ export default function BindDroneScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* 搜索区域 */}
         <Text style={styles.sectionTitle}>搜索无人机</Text>
@@ -245,10 +249,10 @@ export default function BindDroneScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 16,
@@ -257,7 +261,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginTop: 16,
     marginBottom: 12,
   },
@@ -269,27 +273,27 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   searchBtn: {
     height: 48,
     paddingHorizontal: 20,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   searchBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   droneCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   droneCardSelected: {
-    borderColor: '#1890ff',
+    borderColor: theme.primary,
   },
   droneHeader: {
     flexDirection: 'row',
@@ -307,7 +311,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#e6f7ff',
+    backgroundColor: theme.primaryBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -315,7 +319,7 @@ const styles = StyleSheet.create({
   droneIconText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   droneInfo: {
     flex: 1,
@@ -323,23 +327,23 @@ const styles = StyleSheet.create({
   droneName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
   },
   droneSerial: {
     fontSize: 13,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 2,
   },
   checkMark: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkMarkText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -348,7 +352,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: theme.divider,
   },
   specItem: {
     flex: 1,
@@ -357,11 +361,11 @@ const styles = StyleSheet.create({
   specValue: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1890ff',
+    color: theme.primaryText,
   },
   specLabel: {
     fontSize: 12,
-    color: '#999',
+    color: theme.textSub,
     marginTop: 4,
   },
   bindingForm: {
@@ -369,8 +373,8 @@ const styles = StyleSheet.create({
   },
   selectedInfo: {
     fontSize: 14,
-    color: '#1890ff',
-    backgroundColor: '#e6f7ff',
+    color: theme.primaryText,
+    backgroundColor: theme.primaryBg,
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
@@ -378,18 +382,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: theme.text,
     marginBottom: 8,
     marginTop: 14,
   },
   input: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 8,
     paddingHorizontal: 16,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
   },
   typeContainer: {
     flexDirection: 'row',
@@ -399,35 +403,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.divider,
     borderRadius: 20,
     marginRight: 8,
     marginBottom: 8,
   },
   typeOptionActive: {
-    backgroundColor: '#1890ff',
-    borderColor: '#1890ff',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   typeOptionText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.textSub,
   },
   typeOptionTextActive: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   submitBtn: {
     height: 50,
-    backgroundColor: '#1890ff',
+    backgroundColor: theme.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 24,
   },
   submitBtnDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.cardBorder,
   },
   submitBtnText: {
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontSize: 18,
     fontWeight: 'bold',
   },

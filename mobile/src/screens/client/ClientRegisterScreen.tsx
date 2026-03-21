@@ -16,8 +16,12 @@ import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import {registerEnterprise, RegisterEnterpriseRequest} from '../../services/client';
 import api from '../../services/api';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function ClientRegisterScreen({navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const [loading, setLoading] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [licenseNo, setLicenseNo] = useState('');
@@ -105,7 +109,7 @@ export default function ClientRegisterScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroHeader}>
@@ -216,10 +220,10 @@ export default function ClientRegisterScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   content: {
     padding: 16,
@@ -227,7 +231,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   heroCard: {
-    backgroundColor: '#123b7a',
+    backgroundColor: theme.primary,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -237,7 +241,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   heroSubtitle: {
     marginTop: 6,
@@ -251,12 +255,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#102a43',
+    color: theme.text,
   },
   sectionDesc: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#64748b',
+    color: theme.textSub,
   },
   bulletList: {
     gap: 10,
@@ -264,30 +268,30 @@ const styles = StyleSheet.create({
   bulletItem: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#334e68',
+    color: theme.text,
   },
   label: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#334e68',
+    color: theme.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d8e1eb',
+    borderColor: theme.cardBorder,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#102a43',
+    color: theme.text,
   },
   imageUpload: {
     minHeight: 180,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#d8e1eb',
+    borderColor: theme.cardBorder,
     overflow: 'hidden',
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.bgSecondary,
   },
   uploadPlaceholder: {
     minHeight: 180,
@@ -296,12 +300,12 @@ const styles = StyleSheet.create({
   },
   uploadIcon: {
     fontSize: 36,
-    color: '#94a3b8',
+    color: theme.textHint,
   },
   uploadText: {
     marginTop: 8,
     fontSize: 14,
-    color: '#64748b',
+    color: theme.textSub,
   },
   uploadedImage: {
     width: '100%',
@@ -316,8 +320,8 @@ const styles = StyleSheet.create({
     minWidth: 120,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#fff',
+    borderColor: theme.divider,
+    backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
@@ -326,12 +330,12 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#334e68',
+    color: theme.text,
   },
   submitButton: {
     flex: 1,
     borderRadius: 14,
-    backgroundColor: '#175cd3',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
@@ -339,7 +343,7 @@ const styles = StyleSheet.create({
   submitText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#fff',
+    color: theme.btnPrimaryText,
   },
   buttonDisabled: {
     opacity: 0.6,

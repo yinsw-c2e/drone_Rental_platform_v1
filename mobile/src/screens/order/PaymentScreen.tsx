@@ -23,6 +23,8 @@ import {
   V2PaymentSummary,
   V2RefundSummary,
 } from '../../types';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 const METHODS = [
   {key: 'wechat', label: '微信支付', icon: '📱', desc: '生成支付单后等待外部支付完成'},
@@ -86,6 +88,8 @@ const getRefundStatusTone = (status?: string | null) => {
 };
 
 export default function PaymentScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const orderId = Number(route.params?.orderId || route.params?.id || route.params?.order?.id || 0);
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
   const [payments, setPayments] = useState<V2PaymentSummary[]>([]);
@@ -172,9 +176,9 @@ export default function PaymentScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <ActivityIndicator color="#114178" />
+          <ActivityIndicator color={theme.primary} />
           <Text style={styles.stateText}>正在加载订单支付信息...</Text>
         </View>
       </SafeAreaView>
@@ -183,7 +187,7 @@ export default function PaymentScreen({route, navigation}: any) {
 
   if (!detail) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
           <Text style={styles.stateText}>订单信息缺失</Text>
         </View>
@@ -192,7 +196,7 @@ export default function PaymentScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
@@ -259,7 +263,7 @@ export default function PaymentScreen({route, navigation}: any) {
             style={[styles.primaryBtn, (!canPay || paying) && styles.primaryBtnDisabled]}
             disabled={!canPay || paying}
             onPress={handlePay}>
-            {paying ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>确认支付 {formatMoney(totalPay)}</Text>}
+            {paying ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>确认支付 {formatMoney(totalPay)}</Text>}
           </TouchableOpacity>
           {!canPay ? (
             <Text style={styles.sectionHint}>当前订单状态不是待支付，不能重复发起支付。</Text>
@@ -306,10 +310,10 @@ export default function PaymentScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef3f8',
+    backgroundColor: theme.bgSecondary,
   },
   centerState: {
     flex: 1,
@@ -319,7 +323,7 @@ const styles = StyleSheet.create({
   },
   stateText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSub,
   },
   content: {
     padding: 14,
@@ -327,9 +331,11 @@ const styles = StyleSheet.create({
   },
   hero: {
     borderRadius: 24,
-    backgroundColor: '#114178',
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
     padding: 20,
     marginBottom: 12,
+    borderWidth: theme.isDark ? 1 : 0,
+    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
   heroTagRow: {
     flexDirection: 'row',
@@ -339,38 +345,38 @@ const styles = StyleSheet.create({
   heroOrderNo: {
     marginTop: 12,
     fontSize: 13,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
     fontWeight: '700',
   },
   heroAmount: {
     marginTop: 14,
     fontSize: 32,
-    color: '#fff',
+    color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroHint: {
     marginTop: 10,
     fontSize: 13,
     lineHeight: 20,
-    color: '#d6e4ff',
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   sectionCard: {
     marginBottom: 12,
   },
   resultCard: {
     marginBottom: 12,
-    backgroundColor: '#f6ffed',
+    backgroundColor: theme.success + '22',
   },
   resultTitle: {
     fontSize: 17,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
   },
   resultDesc: {
     marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
-    color: '#595959',
+    color: theme.textSub,
   },
   resultActionRow: {
     flexDirection: 'row',
@@ -380,14 +386,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '800',
     marginBottom: 12,
   },
   sectionHint: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#8c8c8c',
+    color: theme.textSub,
     marginBottom: 12,
   },
   row: {
@@ -396,15 +402,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   rowLabel: {
     fontSize: 13,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   rowValue: {
     fontSize: 14,
-    color: '#1f1f1f',
+    color: theme.text,
     fontWeight: '700',
   },
   methodItem: {
@@ -412,10 +418,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.divider,
   },
   methodItemActive: {
-    backgroundColor: '#f6fbff',
+    backgroundColor: theme.primaryBg,
   },
   methodIcon: {
     fontSize: 22,
@@ -427,68 +433,68 @@ const styles = StyleSheet.create({
   methodLabel: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1f1f1f',
+    color: theme.text,
   },
   methodDesc: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
   radio: {
     width: 20,
     height: 20,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioActive: {
-    borderColor: '#114178',
+    borderColor: theme.primary,
   },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 999,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
   },
   primaryBtn: {
     alignSelf: 'stretch',
     marginTop: 14,
     borderRadius: 999,
-    backgroundColor: '#114178',
+    backgroundColor: theme.primary,
     paddingVertical: 13,
     alignItems: 'center',
   },
   primaryBtnDisabled: {
-    backgroundColor: '#91a8c2',
+    backgroundColor: theme.textHint,
   },
   primaryBtnText: {
     fontSize: 14,
-    color: '#fff',
+    color: theme.btnPrimaryText,
     fontWeight: '800',
   },
   secondaryBtn: {
     flex: 1,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#d9d9d9',
+    borderColor: theme.divider,
     paddingHorizontal: 16,
     paddingVertical: 11,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     alignItems: 'center',
   },
   secondaryBtnText: {
     fontSize: 13,
-    color: '#114178',
+    color: theme.primaryText,
     fontWeight: '700',
   },
   recordItem: {
     borderRadius: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: theme.divider,
     padding: 12,
     marginTop: 10,
   },
@@ -499,18 +505,18 @@ const styles = StyleSheet.create({
   },
   recordCode: {
     fontSize: 13,
-    color: '#595959',
+    color: theme.textSub,
     fontWeight: '700',
   },
   recordMeta: {
     marginTop: 6,
     fontSize: 12,
-    color: '#8c8c8c',
+    color: theme.textSub,
     lineHeight: 18,
   },
   emptyText: {
     fontSize: 13,
     lineHeight: 20,
-    color: '#8c8c8c',
+    color: theme.textSub,
   },
 });

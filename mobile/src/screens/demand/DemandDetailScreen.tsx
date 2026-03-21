@@ -26,8 +26,12 @@ import {
 } from '../../utils/demandMeta';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 import {formatAmountYuan, summarizeFlexibleValue} from '../../utils/supplyMeta';
+import {useTheme} from '../../theme/ThemeContext';
+import type {AppTheme} from '../../theme/index';
 
 export default function DemandDetailScreen({route, navigation}: any) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
   const demandId = Number(route.params?.id || route.params?.demandId || 0);
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
@@ -153,15 +157,15 @@ export default function DemandDetailScreen({route, navigation}: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator style={styles.loader} color="#1677ff" />
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ActivityIndicator style={styles.loader} color={theme.primary} />
       </SafeAreaView>
     );
   }
 
   if (!demand) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.emptyBox}>
           <Text style={styles.emptyIcon}>📋</Text>
           <Text style={styles.emptyTitle}>需求不存在</Text>
@@ -172,7 +176,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
@@ -326,7 +330,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>报价方案</Text>
             {quotesLoading ? (
-              <ActivityIndicator color="#1677ff" />
+              <ActivityIndicator color={theme.primary} />
             ) : quotes.length === 0 ? (
               <Text style={styles.emptyText}>还没有机主提交报价。</Text>
             ) : (
@@ -355,65 +359,65 @@ export default function DemandDetailScreen({route, navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#f3f7fb'},
+const getStyles = (theme: AppTheme) => StyleSheet.create({
+  container: {flex: 1, backgroundColor: theme.bg},
   content: {padding: 16, paddingBottom: 28},
   loader: {marginTop: 120},
-  emptyBox: {margin: 18, marginTop: 48, padding: 28, backgroundColor: '#fff', borderRadius: 20, alignItems: 'center'},
+  emptyBox: {margin: 18, marginTop: 48, padding: 28, backgroundColor: theme.card, borderRadius: 20, alignItems: 'center'},
   emptyIcon: {fontSize: 36},
-  emptyTitle: {fontSize: 18, fontWeight: '700', color: '#102a43', marginTop: 12},
-  emptyDesc: {fontSize: 13, color: '#64748b', marginTop: 8, textAlign: 'center', lineHeight: 20},
-  hero: {backgroundColor: '#0f5cab', borderRadius: 24, padding: 18, marginBottom: 14},
+  emptyTitle: {fontSize: 18, fontWeight: '700', color: theme.text, marginTop: 12},
+  emptyDesc: {fontSize: 13, color: theme.textSub, marginTop: 8, textAlign: 'center', lineHeight: 20},
+  hero: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
   heroHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12},
   heroTitleWrap: {flex: 1},
-  demandNo: {fontSize: 12, color: '#d6e4ff', fontWeight: '700'},
-  title: {fontSize: 24, lineHeight: 30, color: '#fff', fontWeight: '800', marginTop: 8},
+  demandNo: {fontSize: 12, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '700'},
+  title: {fontSize: 24, lineHeight: 30, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800', marginTop: 8},
   tagRow: {flexDirection: 'row', gap: 8, marginTop: 14},
-  budget: {fontSize: 18, color: '#fff7e6', fontWeight: '800', marginTop: 14},
-  heroDesc: {fontSize: 13, lineHeight: 20, color: '#d6e4ff', marginTop: 8},
-  card: {backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14},
-  sectionTitle: {fontSize: 18, fontWeight: '700', color: '#102a43'},
-  actionPanel: {backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14},
+  budget: {fontSize: 18, color: theme.isDark ? '#FFE4C4' : '#fff7e6', fontWeight: '800', marginTop: 14},
+  heroDesc: {fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)', marginTop: 8},
+  card: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 14},
+  sectionTitle: {fontSize: 18, fontWeight: '700', color: theme.text},
+  actionPanel: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 14},
   primaryBtn: {height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 12},
-  ownerBtn: {backgroundColor: '#1677ff'},
-  pilotBtn: {backgroundColor: '#fa8c16'},
-  ghostBtn: {backgroundColor: '#fff7e6', borderWidth: 1, borderColor: '#ffd591'},
-  primaryBtnText: {color: '#fff', fontSize: 15, fontWeight: '700'},
-  ghostBtnText: {color: '#d46b08'},
-  helperText: {fontSize: 12, lineHeight: 18, color: '#64748b', marginTop: 10},
+  ownerBtn: {backgroundColor: theme.primary},
+  pilotBtn: {backgroundColor: theme.warning},
+  ghostBtn: {backgroundColor: theme.warning + '22', borderWidth: 1, borderColor: theme.warning + '55'},
+  primaryBtnText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '700'},
+  ghostBtnText: {color: theme.warning},
+  helperText: {fontSize: 12, lineHeight: 18, color: theme.textSub, marginTop: 10},
   infoRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginTop: 12},
-  infoLabel: {fontSize: 13, color: '#64748b'},
-  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: '#102a43', fontWeight: '600'},
-  description: {fontSize: 13, lineHeight: 21, color: '#334155', marginTop: 14},
-  noteBox: {backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginTop: 12},
-  noteLabel: {fontSize: 12, color: '#64748b', marginBottom: 4},
-  noteText: {fontSize: 13, lineHeight: 20, color: '#0f172a'},
+  infoLabel: {fontSize: 13, color: theme.textSub},
+  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: theme.text, fontWeight: '600'},
+  description: {fontSize: 13, lineHeight: 21, color: theme.text, marginTop: 14},
+  noteBox: {backgroundColor: theme.bgSecondary, borderRadius: 14, padding: 12, marginTop: 12},
+  noteLabel: {fontSize: 12, color: theme.textSub, marginBottom: 4},
+  noteText: {fontSize: 13, lineHeight: 20, color: theme.text},
   metricRow: {flexDirection: 'row', gap: 12, marginTop: 14},
-  metricCard: {flex: 1, backgroundColor: '#f8fafc', borderRadius: 16, padding: 14, alignItems: 'center'},
-  metricValue: {fontSize: 24, fontWeight: '800', color: '#1677ff'},
-  metricLabel: {fontSize: 12, color: '#64748b', marginTop: 6},
+  metricCard: {flex: 1, backgroundColor: theme.bgSecondary, borderRadius: 16, padding: 14, alignItems: 'center'},
+  metricValue: {fontSize: 24, fontWeight: '800', color: theme.primaryText},
+  metricLabel: {fontSize: 12, color: theme.textSub, marginTop: 6},
   quoteTrigger: {marginTop: 14, alignSelf: 'flex-start'},
-  quoteTriggerText: {fontSize: 14, color: '#1677ff', fontWeight: '700'},
-  emptyText: {fontSize: 13, color: '#64748b', marginTop: 14},
-  quoteCard: {borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 14, marginTop: 12},
+  quoteTriggerText: {fontSize: 14, color: theme.primaryText, fontWeight: '700'},
+  emptyText: {fontSize: 13, color: theme.textSub, marginTop: 14},
+  quoteCard: {borderWidth: 1, borderColor: theme.divider, borderRadius: 16, padding: 14, marginTop: 12},
   quoteHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8},
-  quoteOwner: {fontSize: 15, fontWeight: '700', color: '#102a43'},
-  quotePrice: {fontSize: 18, fontWeight: '800', color: '#cf1322', marginTop: 10},
-  quoteDesc: {fontSize: 13, color: '#475569', lineHeight: 20, marginTop: 8},
-  quoteMeta: {fontSize: 12, color: '#64748b', marginTop: 8},
+  quoteOwner: {fontSize: 15, fontWeight: '700', color: theme.text},
+  quotePrice: {fontSize: 18, fontWeight: '800', color: theme.danger, marginTop: 10},
+  quoteDesc: {fontSize: 13, color: theme.textSub, lineHeight: 20, marginTop: 8},
+  quoteMeta: {fontSize: 12, color: theme.textSub, marginTop: 8},
   selectBtn: {
     marginTop: 12,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#1677ff',
+    backgroundColor: theme.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  selectBtnText: {fontSize: 14, color: '#fff', fontWeight: '700'},
+  selectBtnText: {fontSize: 14, color: theme.btnPrimaryText, fontWeight: '700'},
   disabledBtn: {opacity: 0.6},
   ownerActions: {flexDirection: 'row', gap: 10, marginBottom: 14},
-  editBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: '#1677ff', justifyContent: 'center', alignItems: 'center'},
-  editBtnText: {color: '#fff', fontSize: 15, fontWeight: '700'},
-  cancelBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#ff4d4f', justifyContent: 'center', alignItems: 'center'},
-  cancelBtnText: {color: '#ff4d4f', fontSize: 15, fontWeight: '700'},
+  editBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: theme.primary, justifyContent: 'center', alignItems: 'center'},
+  editBtnText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '700'},
+  cancelBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.danger, justifyContent: 'center', alignItems: 'center'},
+  cancelBtnText: {color: theme.danger, fontSize: 15, fontWeight: '700'},
 });
