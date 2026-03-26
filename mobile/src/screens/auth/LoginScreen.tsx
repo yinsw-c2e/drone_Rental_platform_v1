@@ -180,7 +180,7 @@ export default function LoginScreen({navigation}: any) {
           contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24}]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>无人机租赁平台</Text>
+          <Text style={styles.title}>无人机服务</Text>
           <Text style={styles.subtitle}>登录 / 注册</Text>
 
           <View style={styles.formCard}>
