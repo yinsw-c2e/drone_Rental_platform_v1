@@ -16,5 +16,6 @@ export default defineConfig({
   server: {
     port: 3100,
     open: true,
+    allowedHosts: ['dronerentalplatweb.cpolar.top'],
   },
 })

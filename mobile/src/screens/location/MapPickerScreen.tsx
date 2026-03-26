@@ -26,6 +26,7 @@ export default function MapPickerScreen({navigation, route}: any) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [geoInfo, setGeoInfo] = useState<{province?: string; city?: string; district?: string}>({});
+  const isMountedRef = useRef(true);
   const mapRef = useRef<any>(null);
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 保存地图 SDK 上报的用户实时位置（GCJ-02 坐标，比 GPS 更准更快）
@@ -35,6 +36,14 @@ export default function MapPickerScreen({navigation, route}: any) {
 
   useEffect(() => {
     initLocation();
+    return () => {
+      isMountedRef.current = false;
+      // 清理定时器
+      if (fetchTimerRef.current) {
+        clearTimeout(fetchTimerRef.current);
+        fetchTimerRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -53,17 +62,22 @@ export default function MapPickerScreen({navigation, route}: any) {
           // 定位失败，使用默认位置（广州市中心）让地图先显示出来
           lat = 23.129163;
           lng = 113.264435;
+          if (!isMountedRef.current) { return; }
           setCurrentAddr('定位失败，已显示默认位置，可拖动地图选点');
         }
       }
 
+      if (!isMountedRef.current) { return; }
       setLatitude(lat);
       setLongitude(lng);
       await fetchAddressAndNearby(lng, lat);
     } catch (e: any) {
+      if (!isMountedRef.current) { return; }
       setCurrentAddr('获取地址失败');
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -74,6 +88,7 @@ export default function MapPickerScreen({navigation, route}: any) {
         locationService.searchNearby({lng, lat, radius: 1000, page_size: 20}),
       ]);
 
+      if (!isMountedRef.current) { return; }
       if (geoRes.data) {
         setCurrentAddr(geoRes.data.formatted_address);
         setGeoInfo({
@@ -84,6 +99,7 @@ export default function MapPickerScreen({navigation, route}: any) {
       }
       setNearbyPOIs(nearbyRes.data?.list || []);
     } catch {
+      if (!isMountedRef.current) { return; }
       setCurrentAddr('获取地址失败');
     }
   };
@@ -128,7 +144,11 @@ export default function MapPickerScreen({navigation, route}: any) {
     }
     setLatitude(loc.latitude);
     setLongitude(loc.longitude);
-    // 强制 MapView 重新挂载，以新坐标为中心
+    // 清理旧定时器，强制 MapView 重新挂载，以新坐标为中心
+    if (fetchTimerRef.current) {
+      clearTimeout(fetchTimerRef.current);
+      fetchTimerRef.current = null;
+    }
     setMapKey(prev => prev + 1);
     await fetchAddressAndNearby(loc.longitude, loc.latitude);
   };
