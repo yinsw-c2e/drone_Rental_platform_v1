@@ -149,6 +149,7 @@ export default function ProfileScreen({navigation}: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [stats, setStats] = useState<ProfileStats>(emptyStats);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
   const verifyInfo = VERIFY_STATUS_MAP[user?.id_verified || 'unverified'] || VERIFY_STATUS_MAP.unverified;
@@ -381,7 +382,7 @@ export default function ProfileScreen({navigation}: any) {
   const quickEntries = useMemo<ShortcutItem[]>(() => {
     const items: ShortcutItem[] = [
       {key: 'client-profile', title: '客户档案', desc: '联系人、地址、需求统计', icon: '👔', screen: 'ClientProfile'},
-      {key: 'orders', title: '我的订单', desc: '统一查看订单履约与财务', icon: '📋', screen: 'MyOrders'},
+      {key: 'orders', title: '我的订单', desc: '统一查看订单进度与财务', icon: '📋', screen: 'MyOrders'},
       {key: 'verify', title: '实名认证', desc: '完善账号实名与资料校验', icon: '🔒', screen: 'Verification'},
       {key: 'settings', title: '设置', desc: '账号与通知偏好设置', icon: '⚙️', screen: 'Settings'},
     ];
@@ -490,69 +491,9 @@ export default function ProfileScreen({navigation}: any) {
           </View>
         </View>
 
-        <ObjectCard style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>账号卡</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
-              <Text style={styles.sectionLink}>编辑资料</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.accountHint}>这里先确认你是谁，再往下看你已经拥有哪些身份和能力。</Text>
-          <View style={styles.roleBadgeWrap}>
-            {roleBadges.map(item => (
-              <StatusBadge key={item.label} label={item.label} tone={item.tone} />
-            ))}
-          </View>
-        </ObjectCard>
-
+        {/* 常用入口 - 提升到首屏 */}
         <View style={styles.sectionHeaderLoose}>
-          <Text style={styles.sectionTitle}>身份卡</Text>
-          <Text style={styles.sectionDesc}>客户 / 机主 / 飞手分开看，避免再被模糊 `user_type` 误导。</Text>
-        </View>
-        {identityCards.map(card => (
-          <ObjectCard key={card.key} style={styles.identityCard}>
-            <View style={styles.identityHeader}>
-              <View>
-                <Text style={styles.identityTitle}>{card.label}</Text>
-                <Text style={styles.identityStatusText}>{card.hasRole ? '当前已具备对应身份' : '当前还不能直接使用这一身份链路'}</Text>
-              </View>
-              <StatusBadge label={card.statusLabel} tone={card.statusTone} />
-            </View>
-            <View style={styles.identityMetrics}>
-              {card.lines.map(line => (
-                <Text key={line} style={styles.identityMetricText}>{line}</Text>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate(card.screen)}>
-              <Text style={styles.secondaryActionText}>{card.actionLabel}</Text>
-            </TouchableOpacity>
-          </ObjectCard>
-        ))}
-
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>能力卡</Text>
-          <Text style={styles.sectionDesc}>能力不是身份名词，而是当前账号能不能真正完成某个动作。</Text>
-          {capabilityItems.map(item => (
-            <View key={item.key} style={styles.capabilityRow}>
-              <View style={styles.capabilityCopy}>
-                <Text style={styles.capabilityLabel}>{item.label}</Text>
-                <Text style={styles.capabilityDesc}>{item.desc}</Text>
-              </View>
-              <StatusBadge label={item.enabled ? '可用' : '未就绪'} tone={item.enabled ? 'green' : 'gray'} />
-            </View>
-          ))}
-          <View style={styles.capabilityNotice}>
-            <Text style={styles.capabilityNoticeText}>
-              {canApplySelfExecute
-                ? '当前账号已经具备机主与飞手双能力，后续订单可走自执行链路。'
-                : '要实现机主自执行，需要同时具备发布供给和接正式派单两种能力。'}
-            </Text>
-          </View>
-        </ObjectCard>
-
-        <View style={styles.sectionHeaderLoose}>
-          <Text style={styles.sectionTitle}>快捷入口</Text>
-          <Text style={styles.sectionDesc}>先把最常用的档案、资产和履约入口放到前面，减少来回找页面。</Text>
+          <Text style={styles.sectionTitle}>常用入口</Text>
         </View>
         <View style={styles.shortcutGrid}>
           {quickEntries.map(item => (
@@ -567,6 +508,73 @@ export default function ProfileScreen({navigation}: any) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* 账号与安全 - 简化 */}
+        <ObjectCard style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>账号与安全</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
+              <Text style={styles.sectionLink}>编辑资料</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.roleBadgeWrap}>
+            {roleBadges.map(item => (
+              <StatusBadge key={item.label} label={item.label} tone={item.tone} />
+            ))}
+          </View>
+        </ObjectCard>
+
+        {/* 身份与能力 - 可折叠 */}
+        <TouchableOpacity
+          style={styles.foldToggle}
+          onPress={() => setShowAdvanced(!showAdvanced)}
+          activeOpacity={0.7}>
+          <Text style={styles.foldToggleText}>身份与能力详情</Text>
+          <Text style={styles.foldToggleArrow}>{showAdvanced ? '收起 ▲' : '展开 ▼'}</Text>
+        </TouchableOpacity>
+
+        {showAdvanced && (
+          <>
+            {identityCards.map(card => (
+              <ObjectCard key={card.key} style={styles.identityCard}>
+                <View style={styles.identityHeader}>
+                  <View>
+                    <Text style={styles.identityTitle}>{card.label}</Text>
+                  </View>
+                  <StatusBadge label={card.statusLabel} tone={card.statusTone} />
+                </View>
+                <View style={styles.identityMetrics}>
+                  {card.lines.map(line => (
+                    <Text key={line} style={styles.identityMetricText}>{line}</Text>
+                  ))}
+                </View>
+                <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate(card.screen)}>
+                  <Text style={styles.secondaryActionText}>{card.actionLabel}</Text>
+                </TouchableOpacity>
+              </ObjectCard>
+            ))}
+
+            <ObjectCard style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>能力状态</Text>
+              {capabilityItems.map(item => (
+                <View key={item.key} style={styles.capabilityRow}>
+                  <View style={styles.capabilityCopy}>
+                    <Text style={styles.capabilityLabel}>{item.label}</Text>
+                    <Text style={styles.capabilityDesc}>{item.desc}</Text>
+                  </View>
+                  <StatusBadge label={item.enabled ? '可用' : '未就绪'} tone={item.enabled ? 'green' : 'gray'} />
+                </View>
+              ))}
+              <View style={styles.capabilityNotice}>
+                <Text style={styles.capabilityNoticeText}>
+                  {canApplySelfExecute
+                    ? '当前账号已经具备机主与飞手双能力，后续订单可走自执行链路。'
+                    : '要实现机主自执行，需要同时具备发布供给和接正式派单两种能力。'}
+                </Text>
+              </View>
+            </ObjectCard>
+          </>
+        )}
 
         <TouchableOpacity
           style={styles.logoutBtn}
@@ -831,6 +839,29 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: theme.textSub,
+  },
+  foldToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+  },
+  foldToggleText: {
+    fontSize: 14,
+    color: theme.text,
+    fontWeight: '700',
+  },
+  foldToggleArrow: {
+    fontSize: 12,
+    color: theme.textSub,
+    fontWeight: '600',
   },
   logoutBtn: {
     marginTop: 4,

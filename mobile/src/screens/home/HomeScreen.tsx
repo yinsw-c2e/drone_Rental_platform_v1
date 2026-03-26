@@ -8,7 +8,6 @@ import React, {
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   ActivityIndicator,
-  type DimensionValue,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -24,7 +23,6 @@ import { useSelector } from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
-import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {
   getObjectStatusMeta,
@@ -33,7 +31,7 @@ import {
 } from '../../components/business/visuals';
 import { homeService } from '../../services/home';
 import { RootState } from '../../store/store';
-import { HomeDashboard, HomeFeedItem } from '../../types';
+import { HomeDashboard } from '../../types';
 import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -124,32 +122,6 @@ const emptyDashboard: HomeDashboard = {
   in_progress_orders: [],
   market_feed: [],
 };
-
-function MetricTile({
-  metric,
-  theme,
-  width,
-}: {
-  metric: MetricCard;
-  theme: HeroTheme;
-  width?: DimensionValue;
-}) {
-  const {theme: appTheme} = useTheme();
-  const styles = getStyles(appTheme);
-  return (
-    <View
-      style={[
-        styles.metricTile,
-        width ? { width } : styles.metricTileFull,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}
-    >
-      <Text style={styles.metricValue}>{metric.value}</Text>
-      <Text style={styles.metricLabel}>{metric.label}</Text>
-      <Text style={styles.metricHint}>{metric.hint}</Text>
-    </View>
-  );
-}
 
 function ActionPill({
   title,
@@ -244,7 +216,7 @@ function getHeroTheme(role: RoleView): HeroTheme {
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
         softText: 'rgba(239,255,247,0.88)',
-        eyebrow: '客户驾驶舱',
+        eyebrow: '客户概览',
       };
     case 'owner':
       return {
@@ -253,7 +225,7 @@ function getHeroTheme(role: RoleView): HeroTheme {
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
         softText: 'rgba(230,244,255,0.88)',
-        eyebrow: '机主驾驶舱',
+        eyebrow: '机主概览',
       };
     case 'pilot':
       return {
@@ -262,7 +234,7 @@ function getHeroTheme(role: RoleView): HeroTheme {
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
         softText: 'rgba(255,247,237,0.9)',
-        eyebrow: '飞手驾驶舱',
+        eyebrow: '飞手概览',
       };
     default:
       return {
@@ -271,7 +243,7 @@ function getHeroTheme(role: RoleView): HeroTheme {
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
         softText: 'rgba(236,253,245,0.9)',
-        eyebrow: '综合驾驶舱',
+        eyebrow: '今日概览',
       };
   }
 }
@@ -370,7 +342,7 @@ export default function HomeScreen({ navigation }: any) {
       }
     } catch (error) {
       if (authStateRef.current) {
-        console.warn('加载首页驾驶舱失败:', error);
+        console.warn('加载首页数据失败:', error);
       }
     } finally {
       if (authStateRef.current) {
@@ -396,16 +368,6 @@ export default function HomeScreen({ navigation }: any) {
   }, [fetchDashboard]);
 
   const heroTheme = useMemo(() => getHeroTheme(activeRole), [activeRole]);
-  const metricColumns = viewportWidth >= 440 ? 3 : 2;
-  const contentRailWidth = Math.max(viewportWidth - CONTENT_SIDE_MARGIN * 2, 0);
-  const heroInnerWidth = Math.max(contentRailWidth - HERO_SIDE_PADDING * 2, 0);
-  const metricTileWidth = useMemo(() => {
-    if (metricColumns === 3) {
-      return Math.floor((heroInnerWidth - METRIC_GAP * 2) / 3);
-    }
-    return Math.floor((heroInnerWidth - METRIC_GAP) / 2);
-  }, [heroInnerWidth, metricColumns]);
-  const metricFullWidth = heroInnerWidth;
   const quickActionLayout = useMemo(
     () =>
       getResponsiveTwoColumnLayout({
@@ -464,7 +426,7 @@ export default function HomeScreen({ navigation }: any) {
               key: 'client-progress',
               label: '进行中服务',
               value: currentDashboard.role_views.client.in_progress_order_count,
-              hint: '已进入履约阶段',
+              hint: '已进入执行阶段',
             },
           ] as MetricCard[],
         };
@@ -479,7 +441,7 @@ export default function HomeScreen({ navigation }: any) {
           },
           secondaryActions: [
             {
-              title: '发布供给',
+              title: '上架服务',
               onPress: () => navigation.navigate('PublishOffer'),
             },
             {
@@ -676,7 +638,7 @@ export default function HomeScreen({ navigation }: any) {
           {
             key: 'client-orders',
             title: '我的订单',
-            desc: '查看付款、履约与完成状态',
+            desc: '查看付款、执行与完成状态',
             icon: '📋',
             tone: 'green',
             onPress: () => navigation.navigate('MyOrders'),
@@ -687,7 +649,7 @@ export default function HomeScreen({ navigation }: any) {
           {
             key: 'owner-demand',
             title: '查看新需求',
-            desc: '进入需求市场寻找可承接任务',
+            desc: '进入市场寻找可承接任务',
             icon: '📈',
             tone: 'blue',
             onPress: () => navigation.navigate('DemandList'),
@@ -695,7 +657,7 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'owner-offer',
-            title: '发布供给',
+            title: '上架服务',
             desc: '上架机型、能力与服务区域',
             icon: '🚁',
             tone: 'teal',
@@ -790,7 +752,7 @@ export default function HomeScreen({ navigation }: any) {
         actions.push({
           key: 'all-orders',
           title: '我的订单',
-          desc: '统一查看成交后的履约状态',
+          desc: '统一查看成交后的订单进度',
           icon: '📦',
           tone: 'teal',
           onPress: () => navigation.navigate('MyOrders'),
@@ -960,7 +922,7 @@ export default function HomeScreen({ navigation }: any) {
                 ? currentDashboard.role_views.pilot
                     .pending_response_dispatch_count
                 : 0) + currentDashboard.summary.in_progress_order_count,
-            actionText: '查看履约',
+            actionText: '查看进度',
             onPress: () => navigation.navigate('MyOrders', {statusFilter: 'in_progress'}),
             tone: 'orange',
           });
@@ -977,68 +939,6 @@ export default function HomeScreen({ navigation }: any) {
         return items.slice(0, 3);
     }
   }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
-
-  const feedConfig = useMemo(() => {
-    const allItems = currentDashboard.market_feed;
-    if (activeRole === 'client') {
-      const items = allItems.filter(item => item.object_type === 'supply');
-      return {
-        title: '推荐供给',
-        hint: `供给 ${currentDashboard.market_totals.supply_count}`,
-        items,
-        emptyTitle: '还没有推荐供给',
-        emptyDesc:
-          '先发布需求或进入供给市场，平台会逐步按重载场景推荐可用供给。',
-        emptyAction: '浏览供给',
-        onEmptyAction: () => navigation.navigate('OfferList'),
-      };
-    }
-    if (activeRole === 'owner') {
-      const items = allItems.filter(item => item.object_type === 'demand');
-      return {
-        title: '平台推荐需求',
-        hint: `需求 ${currentDashboard.market_totals.demand_count}`,
-        items,
-        emptyTitle: '当前暂无推荐需求',
-        emptyDesc: '先完善供给和机队能力，平台才能更准确地把需求推给你。',
-        emptyAction: '查看供给',
-        onEmptyAction: () => navigation.navigate('MyOffers'),
-      };
-    }
-    if (activeRole === 'pilot') {
-      const items = allItems.filter(item => item.object_type === 'demand');
-      return {
-        title: '可报名公开需求',
-        hint: `候选 ${currentDashboard.role_views.pilot.candidate_demand_count}`,
-        items,
-        emptyTitle: '当前暂无可报名需求',
-        emptyDesc:
-          '先保持在线并完善飞手资料，平台筛选到合适任务后会出现在这里。',
-        emptyAction: '查看任务',
-        onEmptyAction: () => navigation.navigate('PilotTaskList'),
-      };
-    }
-    return {
-      title: '市场脉搏',
-      hint: `供给 ${currentDashboard.market_totals.supply_count} · 需求 ${currentDashboard.market_totals.demand_count}`,
-      items: allItems,
-      emptyTitle: '当前暂无市场更新',
-      emptyDesc: '可以先去市场页浏览供给和需求，后面这里会聚合推荐内容。',
-      emptyAction: '去市场',
-      onEmptyAction: () => navigation.navigate('DemandList'),
-    };
-  }, [activeRole, currentDashboard, navigation]);
-
-  const navigateFeedItem = useCallback(
-    (item: HomeFeedItem) => {
-      if (item.object_type === 'supply') {
-        navigation.navigate('OfferDetail', { id: item.object_id });
-        return;
-      }
-      navigation.navigate('DemandDetail', { id: item.object_id });
-    },
-    [navigation],
-  );
 
   return (
     <View style={styles.rootWrap}>
@@ -1105,11 +1005,6 @@ export default function HomeScreen({ navigation }: any) {
                   {heroTheme.eyebrow}
                 </Text>
                 <Text style={styles.heroTitle}>{heroConfig.title}</Text>
-                <Text
-                  style={[styles.heroSubtitle, { color: heroTheme.softText }]}
-                >
-                  {heroConfig.subtitle}
-                </Text>
               </View>
 
               {currentDashboard.summary.alert_count > 0 ? (
@@ -1129,7 +1024,7 @@ export default function HomeScreen({ navigation }: any) {
                 primary
                 theme={heroTheme}
               />
-              {heroConfig.secondaryActions.map(action => (
+              {heroConfig.secondaryActions.slice(0, 1).map(action => (
                 <ActionPill
                   key={action.title}
                   title={action.title}
@@ -1138,32 +1033,14 @@ export default function HomeScreen({ navigation }: any) {
                 />
               ))}
             </View>
-
-            <View style={styles.metricGrid}>
-              {heroConfig.metrics.map((metric, index) => {
-                const shouldSpanFull =
-                  metricColumns === 2 &&
-                  heroConfig.metrics.length % 2 === 1 &&
-                  index === heroConfig.metrics.length - 1;
-
-                return (
-                  <MetricTile
-                    key={metric.key}
-                    metric={metric}
-                    theme={heroTheme}
-                    width={shouldSpanFull ? metricFullWidth : metricTileWidth}
-                  />
-                );
-              })}
-            </View>
           </LinearGradient>
         </View>
 
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.text}]}>紧急待办</Text>
-              <Text style={[styles.sectionHint, {color: theme.textHint}]}>先做现在最重要的事</Text>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>今天优先处理</Text>
+              <Text style={[styles.sectionHint, {color: theme.textHint}]}>先处理这些再看其他</Text>
             </View>
             {todoItems.map(item => {
               const palette = getTonePalette(item.tone || 'blue', theme.isDark);
@@ -1215,8 +1092,8 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.text}]}>快捷入口</Text>
-              <Text style={[styles.sectionHint, {color: theme.textHint}]}>按当前视图展示优先动作</Text>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>常用动作</Text>
+              <Text style={[styles.sectionHint, {color: theme.textHint}]}>快速进入常用功能</Text>
             </View>
             <View style={styles.quickGrid}>
               {quickActions.map(action => (
@@ -1276,7 +1153,7 @@ export default function HomeScreen({ navigation }: any) {
                       ? '当前没有执行中的订单'
                       : '当前没有进行中的任务'
                   }
-                  description="这里会汇总已进入履约阶段的订单，避免你在首页和列表页之间来回跳。"
+                  description="这里会汇总正在执行中的订单，避免你在首页和列表页之间来回跳。"
                   actionText="查看订单"
                   onAction={() => navigation.navigate('MyOrders')}
                 />
@@ -1285,53 +1162,6 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.contentRail}>
-          <View style={styles.sectionWrap}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.text}]}>{feedConfig.title}</Text>
-              <Text style={[styles.sectionHint, {color: theme.textHint}]}>{feedConfig.hint}</Text>
-            </View>
-
-            {feedConfig.items.length > 0 ? (
-              feedConfig.items.map(item => (
-                <ObjectCard
-                  key={`${item.object_type}-${item.object_id}`}
-                  onPress={() => navigateFeedItem(item)}
-                >
-                  <View style={styles.feedHeader}>
-                    <SourceTag
-                      source={
-                        item.object_type === 'supply' ? 'supply' : 'demand'
-                      }
-                    />
-                  </View>
-                  <Text style={[styles.feedTitle, {color: theme.text}]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.feedSubtitle, {color: theme.textSub}]} numberOfLines={2}>
-                    {item.subtitle}
-                  </Text>
-                </ObjectCard>
-              ))
-            ) : (
-              <ObjectCard>
-                <EmptyState
-                  icon={
-                    activeRole === 'pilot'
-                      ? '🛰️'
-                      : activeRole === 'owner'
-                      ? '📈'
-                      : '📦'
-                  }
-                  title={feedConfig.emptyTitle}
-                  description={feedConfig.emptyDesc}
-                  actionText={feedConfig.emptyAction}
-                  onAction={feedConfig.onEmptyAction}
-                />
-              </ObjectCard>
-            )}
-          </View>
-        </View>
       </ScrollView>
       </SafeAreaView>
     </View>
@@ -1419,11 +1249,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     textShadowOffset: {width: 0, height: 1},
     textShadowRadius: 4,
   },
-  heroSubtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 20,
-  },
   alertPill: {
     minWidth: 74,
     borderRadius: 18,
@@ -1467,45 +1292,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   heroActionTextGhost: {
     color: '#FFFFFF',
-  },
-  metricGrid: {
-    marginTop: 18,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: HERO_SIDE_PADDING,
-    marginBottom: 18,
-  },
-  metricTile: {
-    marginBottom: METRIC_GAP,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 16,
-    minHeight: 126,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  metricTileFull: {
-    width: '100%',
-  },
-  metricValue: {
-    fontSize: 26,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  metricLabel: {
-    marginTop: 6,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.95)',
-    fontWeight: '700',
-  },
-  metricHint: {
-    marginTop: 4,
-    fontSize: 11,
-    lineHeight: 16,
-    color: 'rgba(255,255,255,0.65)',
   },
   sectionWrap: {
     marginTop: 14,
@@ -1668,22 +1454,5 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.danger,
     fontWeight: '800',
     letterSpacing: 0.3,
-  },
-  feedHeader: {
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  feedTitle: {
-    fontSize: 15,
-    color: theme.text,
-    fontWeight: '800',
-  },
-  feedSubtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
   },
 });

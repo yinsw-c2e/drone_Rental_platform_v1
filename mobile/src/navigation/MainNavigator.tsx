@@ -121,7 +121,7 @@ function MainTabs() {
       })}>
       <Tab.Screen name="Home" component={HomeScreen} options={{tabBarLabel: '首页'}} />
       <Tab.Screen name="Market" component={MarketHubScreen} options={{tabBarLabel: '市场'}} />
-      <Tab.Screen name="Orders" component={FulfillmentHubScreen} options={{tabBarLabel: '履约'}} />
+      <Tab.Screen name="Orders" component={OrderListScreen} options={{tabBarLabel: '进度'}} />
       <Tab.Screen name="Messages" component={MessageStackScreen} options={{tabBarLabel: '消息'}} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{tabBarLabel: '我的'}} />
     </Tab.Navigator>

@@ -274,7 +274,7 @@ function TabBar({ activeTab, onTabPress }: { activeTab: string; onTabPress: (tab
   const tabs = [
     { key: 'Home', label: '首页', icon: '🏠' },
     { key: 'Market', label: '市场', icon: '🧭' },
-    { key: 'Orders', label: '履约', icon: '🛫' },
+    { key: 'Orders', label: '进度', icon: '🛫' },
     { key: 'Messages', label: '消息', icon: '💬' },
     { key: 'Profile', label: '我的', icon: '👤' },
   ];
@@ -538,7 +538,7 @@ function MainView({ onLogout }: { onLogout: () => void }) {
       case 'Market':
         return <MarketHubScreen navigation={nav} />;
       case 'Orders':
-        return <FulfillmentHubScreen navigation={nav} />;
+        return <OrderListScreen navigation={nav} route={{params: {}}} />;
       case 'Messages':
         return <ConversationListScreen navigation={nav} />;
       case 'Profile':

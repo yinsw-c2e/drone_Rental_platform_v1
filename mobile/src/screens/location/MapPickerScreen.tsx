@@ -33,6 +33,8 @@ export default function MapPickerScreen({navigation, route}: any) {
   const myLocationRef = useRef<{latitude: number; longitude: number} | null>(null);
   // 用于强制 MapView 重新挂载，从而移动到新位置
   const [mapKey, setMapKey] = useState(0);
+  // 控制 MapView 的显示/隐藏，用于安全卸载原生组件
+  const [mapVisible, setMapVisible] = useState(true);
 
   useEffect(() => {
     initLocation();
@@ -46,6 +48,27 @@ export default function MapPickerScreen({navigation, route}: any) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 拦截回退操作，先隐藏地图再执行回退，避免原生层崩溃 (react-native-amap3d#821)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      // 如果地图已隐藏，允许正常回退
+      if (!mapVisible) return;
+
+      // 阻止默认回退行为
+      e.preventDefault();
+
+      // 先隐藏地图（卸载原生 MapView）
+      setMapVisible(false);
+
+      // 延迟执行回退，给原生层时间清理资源
+      setTimeout(() => {
+        navigation.dispatch(e.data.action);
+      }, 100);
+    });
+
+    return unsubscribe;
+  }, [navigation, mapVisible]);
 
   const initLocation = async () => {
     setLoading(true);
@@ -167,7 +190,11 @@ export default function MapPickerScreen({navigation, route}: any) {
     if (onSelect) {
       onSelect(addr);
     }
-    navigation.goBack();
+    // 先隐藏地图，再延迟回退，避免原生层崩溃
+    setMapVisible(false);
+    setTimeout(() => {
+      navigation.goBack();
+    }, 100);
   };
 
   const handleSelectPOI = (poi: POIItem, index: number) => {
@@ -184,7 +211,11 @@ export default function MapPickerScreen({navigation, route}: any) {
     if (onSelect) {
       onSelect(addr);
     }
-    navigation.goBack();
+    // 先隐藏地图，再延迟回退，避免原生层崩溃
+    setMapVisible(false);
+    setTimeout(() => {
+      navigation.goBack();
+    }, 100);
   };
 
   const renderPOI = ({item, index}: {item: POIItem; index: number}) => (
@@ -219,20 +250,24 @@ export default function MapPickerScreen({navigation, route}: any) {
           </View>
         ) : (
           <>
-            <MapView
-              key={mapKey}
-              ref={mapRef}
-              style={styles.map}
-              initialCameraPosition={{
-                target: {latitude, longitude},
-                zoom: 16,
-              }}
-              myLocationEnabled
-              zoomControlsEnabled={false}
-              onCameraIdle={handleCameraIdle}
-              // @ts-ignore: onLocation 在原生层支持但 TS 类型未声明
-              onLocation={handleLocationUpdate}
-            />
+            {mapVisible ? (
+              <MapView
+                key={mapKey}
+                ref={mapRef}
+                style={styles.map}
+                initialCameraPosition={{
+                  target: {latitude, longitude},
+                  zoom: 16,
+                }}
+                myLocationEnabled
+                zoomControlsEnabled={false}
+                onCameraIdle={handleCameraIdle}
+                // @ts-ignore: onLocation 在原生层支持但 TS 类型未声明
+                onLocation={handleLocationUpdate}
+              />
+            ) : (
+              <View style={styles.map} />
+            )}
 
             {/* 中心点指示器 */}
             <View style={styles.centerPin} pointerEvents="none">

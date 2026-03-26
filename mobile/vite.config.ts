@@ -10,8 +10,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: {
       alias: {
-        'react-native': 'react-native-web',
-        'react-native$': 'react-native-web',
+        'react-native': path.resolve(__dirname, 'src/utils/react-native.web.ts'),
+        'react-native$': path.resolve(__dirname, 'src/utils/react-native.web.ts'),
         'react-native-config': path.resolve(__dirname, 'src/utils/config.web.ts'),
         'react-native-linear-gradient': path.resolve(__dirname, 'src/components/LinearGradient.web.tsx'),
         '@react-navigation/native': path.resolve(__dirname, 'src/utils/navigation.web.ts'),

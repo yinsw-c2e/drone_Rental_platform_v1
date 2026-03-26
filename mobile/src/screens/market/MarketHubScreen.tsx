@@ -160,7 +160,7 @@ export default function MarketHubScreen({navigation}: any) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>核心市场动作</Text>
           <Text style={styles.sectionDesc}>
-            先在市场里完成撮合与下单，成交后的执行统一去「履约」处理。
+            先在市场里完成撮合与下单，成交后的执行统一去「进度」查看。
           </Text>
           <View style={styles.grid}>
             {marketActions.map(action => (

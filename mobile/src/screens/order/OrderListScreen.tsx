@@ -310,12 +310,40 @@ export default function OrderListScreen({navigation, route}: any) {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>我的订单</Text>
-              <Text style={styles.heroTitle}>这里只看订单对象</Text>
+              <Text style={styles.heroTitle}>订单进度</Text>
               <Text style={styles.heroDesc}>
-                订单列表已经和派单任务、飞手候选彻底拆开。来源、承接方、执行方和当前状态都在同一张卡里表达。
+                成交后的订单都在这里，按身份视角和状态分组筛选。
               </Text>
             </View>
+
+            {(effectiveRoleSummary.has_owner_role || effectiveRoleSummary.has_pilot_role) && (
+              <View style={styles.toolEntryRow}>
+                {effectiveRoleSummary.has_owner_role && (
+                  <TouchableOpacity
+                    style={[styles.toolEntryChip, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
+                    onPress={() => navigation.navigate('DispatchTaskList')}>
+                    <Text style={styles.toolEntryIcon}>📡</Text>
+                    <Text style={[styles.toolEntryText, {color: theme.text}]}>派给飞手</Text>
+                  </TouchableOpacity>
+                )}
+                {effectiveRoleSummary.has_pilot_role && (
+                  <TouchableOpacity
+                    style={[styles.toolEntryChip, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
+                    onPress={() => navigation.navigate('PilotTaskList')}>
+                    <Text style={styles.toolEntryIcon}>🧭</Text>
+                    <Text style={[styles.toolEntryText, {color: theme.text}]}>飞手任务</Text>
+                  </TouchableOpacity>
+                )}
+                {effectiveRoleSummary.has_pilot_role && (
+                  <TouchableOpacity
+                    style={[styles.toolEntryChip, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
+                    onPress={() => navigation.navigate('FlightLog')}>
+                    <Text style={styles.toolEntryIcon}>🛫</Text>
+                    <Text style={[styles.toolEntryText, {color: theme.text}]}>飞行记录</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             <ObjectCard style={styles.filterCard}>
               <Text style={[styles.filterTitle, {color: theme.text}]}>身份视角</Text>
@@ -393,23 +421,39 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderWidth: theme.isDark ? 1 : 0,
     borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
   },
-  heroEyebrow: {
-    fontSize: 12,
-    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
-    fontWeight: '700',
-  },
   heroTitle: {
-    marginTop: 8,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 30,
     color: theme.isDark ? theme.text : '#FFFFFF',
     fontWeight: '800',
   },
   heroDesc: {
-    marginTop: 10,
+    marginTop: 8,
     fontSize: 13,
     lineHeight: 20,
     color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
+  },
+  toolEntryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  toolEntryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  toolEntryIcon: {
+    fontSize: 16,
+  },
+  toolEntryText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   filterCard: {
     marginBottom: 12,

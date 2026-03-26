@@ -121,7 +121,7 @@ export default function FulfillmentHubScreen({navigation}: any) {
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.heroEyebrow}>履约</Text>
+          <Text style={styles.heroEyebrow}>进度</Text>
           <Text style={styles.heroTitle}>成交后的执行中心</Text>
           <Text style={styles.heroDesc}>
             这里专门处理订单、正式派单、飞行监控和飞行记录，不再混市场撮合信息。

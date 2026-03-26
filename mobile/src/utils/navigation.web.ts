@@ -156,9 +156,60 @@ export function NavigationContainer({children}: {children: React.ReactNode}) {
   return React.createElement(React.Fragment, null, children);
 }
 
+// --- React Navigation web shims ---
+// These no-op exports satisfy @react-navigation/elements and @react-navigation/bottom-tabs
+// imports when aliased via vite to this file.
+
+const defaultNavTheme = {
+  dark: true,
+  colors: {
+    primary: '#6C63FF',
+    background: '#0A0A1A',
+    card: '#16162A',
+    text: '#FFFFFF',
+    border: '#2A2A4A',
+    notification: '#FF6B6B',
+  },
+};
+
+export function useTheme() {
+  return defaultNavTheme;
+}
+
+export const NavigationContext = React.createContext<any>(undefined);
+export const NavigationRouteContext = React.createContext<any>(undefined);
+export const NavigationMetaContext = React.createContext<any>(undefined);
+export const usePreventRemoveContext = React.createContext<any>(undefined);
+
+export function useLocale() {
+  return {direction: 'ltr' as const};
+}
+
+export function useLinkProps(_: any) {
+  return {onPress: () => {}, href: undefined};
+}
+
+export function useLinkBuilder() {
+  return {buildHref: () => '', buildAction: () => ({})};
+}
+
+export function useNavigationBuilder(_: any, config: any) {
+  return {state: {routes: [], index: 0}, navigation: {}, descriptors: {}, NavigationContent: ({children}: any) => children, ...config};
+}
+
+export function createNavigatorFactory(_: any) {
+  return () => ({Navigator: (_: any) => null, Screen: (_: any) => null, Group: (_: any) => null});
+}
+
+export const CommonActions = {navigate: () => ({}), reset: () => ({}), goBack: () => ({})};
+export const StackActions = {push: () => ({}), pop: () => ({}), replace: () => ({})};
+export const TabRouter = {};
+export const StackRouter = {};
+
 // 为了保持 API 兼容性，也导出一个默认对象
 export default {
   useFocusEffect,
   useNavigation,
+  useTheme,
   NavigationContainer,
 };
