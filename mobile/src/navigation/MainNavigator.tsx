@@ -152,7 +152,16 @@ export default function MainNavigator() {
       <RootStack.Screen name="DemandQuoteCompose" component={DemandQuoteComposeScreen} options={{title: '提交报价'}} />
       <RootStack.Screen name="AddressPicker" component={AddressPickerScreen} options={{title: '选择地址'}} />
       <RootStack.Screen name="AddressSearch" component={AddressSearchScreen} options={{headerShown: false}} />
-      <RootStack.Screen name="MapPicker" component={MapPickerScreen} options={{title: '地图选点'}} />
+      <RootStack.Screen
+        name="MapPicker"
+        component={MapPickerScreen}
+        options={{
+          headerShown: false,
+          animation: 'none',
+          freezeOnBlur: false,
+          presentation: 'card',
+        }}
+      />
       <RootStack.Screen name="FlightMonitoring" component={FlightMonitoringScreen} options={{title: '飞行监控'}} />
       <RootStack.Screen name="TrajectoryRecord" component={TrajectoryScreen} options={{title: '轨迹记录'}} />
       <RootStack.Screen name="MultiPointTask" component={MultiPointTaskScreen} options={{title: '多点任务'}} />

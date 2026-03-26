@@ -251,6 +251,12 @@ export default function MapPickerScreen({navigation, route}: any) {
     });
   };
 
+  const handleHeaderBack = () => {
+    beginSafeExit(() => {
+      navigation.goBack();
+    });
+  };
+
   const renderPOI = ({item, index}: {item: POIItem; index: number}) => (
     <TouchableOpacity
       style={[styles.poiItem, selectedIndex === index && styles.poiItemActive]}
@@ -275,6 +281,19 @@ export default function MapPickerScreen({navigation, route}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerBack}
+          onPress={handleHeaderBack}
+          disabled={isClosing}
+          activeOpacity={0.7}>
+          <Text style={styles.headerBackIcon}>&#8249;</Text>
+          <Text style={styles.headerBackText}>返回</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>地图选点</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       {/* 高德地图区域 */}
       <View style={styles.mapContainer}>
         {loading ? (
@@ -362,6 +381,39 @@ export default function MapPickerScreen({navigation, route}: any) {
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {flex: 1, backgroundColor: theme.card},
+  header: {
+    height: 52,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.divider,
+    backgroundColor: theme.card,
+  },
+  headerBack: {
+    minWidth: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  headerBackIcon: {
+    fontSize: 28,
+    lineHeight: 28,
+    color: theme.primaryText,
+    marginRight: 2,
+  },
+  headerBackText: {
+    fontSize: 15,
+    color: theme.primaryText,
+    fontWeight: '500',
+  },
+  headerTitle: {
+    fontSize: 17,
+    color: theme.text,
+    fontWeight: '600',
+  },
+  headerSpacer: {minWidth: 72},
   mapContainer: {height: 280, position: 'relative'},
   mapLoading: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
