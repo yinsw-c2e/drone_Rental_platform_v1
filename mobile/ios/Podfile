@@ -1,5 +1,5 @@
 # Resolve react_native_pods.rb with node to allow for hoisting
-require '/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/node_modules/react-native/scripts/react_native_pods.rb'
+require_relative '../node_modules/react-native/scripts/react_native_pods.rb'
 
 platform :ios, '15.1'
 

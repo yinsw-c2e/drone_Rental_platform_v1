@@ -279,7 +279,7 @@
 					"-Xlinker",
 					"-no_fixup_chains",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.yinswc2e.wurenji";
 				PRODUCT_NAME = WurenjiMobile;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -313,7 +313,7 @@
 					"-Xlinker",
 					"-no_fixup_chains",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.yinswc2e.wurenji";
 				PRODUCT_NAME = WurenjiMobile;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;

@@ -55,8 +55,10 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    // 开发模式：连接 Metro bundler
-    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    // 真机调试：必须通过 RCTBundleURLProvider 设置 IP，这样 bundle 和 CDP 调试连接都走同一地址
+    let provider = RCTBundleURLProvider.sharedSettings()
+    provider.jsLocation = "192.168.3.182"
+    return provider.jsBundleURL(forBundleRoot: "index")
 #else
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
