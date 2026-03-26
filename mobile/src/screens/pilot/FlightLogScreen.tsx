@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -26,12 +27,14 @@ import {
   formatHoursFromSeconds,
   sortFlightRecords,
 } from '../../utils/flightRecords';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
 export default function FlightLogScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const [records, setRecords] = useState<V2FlightRecordSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,25 +58,34 @@ export default function FlightLogScreen({navigation}: any) {
   );
 
   const stats = useMemo(() => aggregateFlightRecords(records), [records]);
+  const statsLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 64,
+        minItemWidth: 108,
+      }),
+    [viewportWidth],
+  );
 
   const renderHeader = () => (
     <View>
       <ObjectCard style={styles.statsCard}>
         <Text style={styles.statsTitle}>飞行统计</Text>
         <View style={styles.statsGrid}>
-          <View style={styles.statsItem}>
+          <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
             <Text style={styles.statsValue}>{stats.totalFlights}</Text>
             <Text style={styles.statsLabel}>总飞行次数</Text>
           </View>
-          <View style={styles.statsItem}>
+          <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
             <Text style={styles.statsValue}>{formatHoursFromSeconds(stats.totalDurationSeconds)}</Text>
             <Text style={styles.statsLabel}>总飞行时长</Text>
           </View>
-          <View style={styles.statsItem}>
+          <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
             <Text style={styles.statsValue}>{formatDistanceKilometersShort(stats.totalDistanceM)}</Text>
             <Text style={styles.statsLabel}>总飞行距离</Text>
           </View>
-          <View style={styles.statsItem}>
+          <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
             <Text style={styles.statsValue}>{Math.round(stats.maxAltitudeM)}m</Text>
             <Text style={styles.statsLabel}>最高飞行高度</Text>
           </View>
@@ -212,7 +224,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexWrap: 'wrap',
   },
   statsItem: {
-    width: '50%',
     paddingVertical: 12,
   },
   statsValue: {

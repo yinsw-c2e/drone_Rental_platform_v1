@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -24,6 +25,7 @@ import {
   V2OrderMonitor,
   V2OrderTimelineItem,
 } from '../../types';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -154,7 +156,13 @@ function AlertSection({alerts}: {alerts?: V2FlightAlertSummary[]}) {
   );
 }
 
-function PositionSection({position}: {position?: V2FlightPositionSummary | null}) {
+function PositionSection({
+  position,
+  metricItemWidth,
+}: {
+  position?: V2FlightPositionSummary | null;
+  metricItemWidth: number;
+}) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   if (!position) {
@@ -179,19 +187,19 @@ function PositionSection({position}: {position?: V2FlightPositionSummary | null}
       </View>
 
       <View style={styles.metricGrid}>
-        <View style={styles.metricItem}>
+        <View style={[styles.metricItem, {width: metricItemWidth}]}>
           <Text style={styles.metricLabel}>速度</Text>
           <Text style={styles.metricValue}>{formatSpeed(position.speed)}</Text>
         </View>
-        <View style={styles.metricItem}>
+        <View style={[styles.metricItem, {width: metricItemWidth}]}>
           <Text style={styles.metricLabel}>航向</Text>
           <Text style={styles.metricValue}>{position.heading != null ? `${Number(position.heading).toFixed(0)}°` : '-'}</Text>
         </View>
-        <View style={styles.metricItem}>
+        <View style={[styles.metricItem, {width: metricItemWidth}]}>
           <Text style={styles.metricLabel}>电池</Text>
           <Text style={styles.metricValue}>{position.battery_level != null ? `${position.battery_level}%` : '-'}</Text>
         </View>
-        <View style={styles.metricItem}>
+        <View style={[styles.metricItem, {width: metricItemWidth}]}>
           <Text style={styles.metricLabel}>信号</Text>
           <Text style={styles.metricValue}>{position.signal_strength != null ? `${position.signal_strength}%` : '-'}</Text>
         </View>
@@ -236,6 +244,7 @@ function TimelineSection({items}: {items?: V2OrderTimelineItem[]}) {
 export default function FlightMonitoringScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const initialOrderId = Number(route?.params?.orderId || 0);
   const dispatchId = Number(route?.params?.dispatchId || 0);
   const [resolvedOrderId, setResolvedOrderId] = useState<number>(initialOrderId);
@@ -315,6 +324,16 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
 
   const recentPositionCount = useMemo(() => monitor?.recent_positions?.length || 0, [monitor?.recent_positions]);
   const recentFlightCount = useMemo(() => monitor?.flight_records?.length || 0, [monitor?.flight_records]);
+  const metricLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 60,
+        gap: 10,
+        minItemWidth: 118,
+      }),
+    [viewportWidth],
+  );
 
   if (loading) {
     return (
@@ -398,7 +417,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>最新位置</Text>
-          <PositionSection position={latestPosition} />
+          <PositionSection position={latestPosition} metricItemWidth={metricLayout.itemWidth} />
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
@@ -604,7 +623,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 10,
   },
   metricItem: {
-    width: '48%',
     borderRadius: 16,
     backgroundColor: theme.bgSecondary,
     padding: 12,

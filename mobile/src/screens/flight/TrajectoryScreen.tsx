@@ -12,6 +12,7 @@ import {
   TextInput,
   FlatList,
   Switch,
+  useWindowDimensions,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -26,6 +27,7 @@ import {
   FlightWaypoint,
   SavedRoute,
 } from '../../services/flight';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -37,10 +39,16 @@ const TRAJECTORY_STATUS_MAP: Record<string, {label: string; colorKey: 'success' 
   cancelled: {label: '已取消', colorKey: 'textHint'},
 };
 
-export default function TrajectoryScreen({route, navigation}: any) {
+export default function TrajectoryScreen({route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const orderId = route?.params?.orderId;
+  const statsLayout = getResponsiveTwoColumnLayout({
+    viewportWidth,
+    totalHorizontalPadding: 64,
+    minItemWidth: 108,
+  });
 
   const [activeTab, setActiveTab] = useState<TabKey>('recording');
   const [trajectory, setTrajectory] = useState<FlightTrajectory | null>(null);
@@ -125,20 +133,6 @@ export default function TrajectoryScreen({route, navigation}: any) {
     ]);
   };
 
-  const handleViewTrajectory = async (trajectoryId: number) => {
-    try {
-      setLoading(true);
-      const detail = await getTrajectory(trajectoryId);
-      setTrajectory(detail.trajectory);
-      setWaypoints(detail.waypoints || []);
-      setActiveTab('recording');
-    } catch (e: any) {
-      Alert.alert('错误', e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSaveRoute = async () => {
     if (!trajectory) return;
     if (!saveRouteName.trim()) {
@@ -219,25 +213,25 @@ export default function TrajectoryScreen({route, navigation}: any) {
                 </View>
               </View>
               <View style={styles.statsGrid}>
-                <View style={styles.statsItem}>
+                <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
                   <Text style={styles.statsValue}>
                     {formatDistance(trajectory.total_distance)}
                   </Text>
                   <Text style={styles.statsLabel}>总距离</Text>
                 </View>
-                <View style={styles.statsItem}>
+                <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
                   <Text style={styles.statsValue}>
                     {formatDuration(trajectory.total_duration)}
                   </Text>
                   <Text style={styles.statsLabel}>总时长</Text>
                 </View>
-                <View style={styles.statsItem}>
+                <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
                   <Text style={styles.statsValue}>
                     {trajectory.max_altitude?.toFixed(0) || '-'}m
                   </Text>
                   <Text style={styles.statsLabel}>最大高度</Text>
                 </View>
-                <View style={styles.statsItem}>
+                <View style={[styles.statsItem, {width: statsLayout.itemWidth}]}>
                   <Text style={styles.statsValue}>
                     {trajectory.max_speed?.toFixed(1) || '-'}m/s
                   </Text>
@@ -520,7 +514,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   statusBadge: {paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12},
   statusBadgeText: {fontSize: 13, fontWeight: '500'},
   statsGrid: {flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12},
-  statsItem: {width: '50%', alignItems: 'center', paddingVertical: 10},
+  statsItem: {alignItems: 'center', paddingVertical: 10},
   statsValue: {fontSize: 20, fontWeight: 'bold', color: theme.primaryText},
   statsLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
   extraStats: {

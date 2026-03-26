@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -19,12 +20,14 @@ import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {RootState} from '../../store/store';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
 export default function OwnerProfileScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
@@ -32,7 +35,7 @@ export default function OwnerProfileScreen({navigation}: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
+  const [_profile, setProfile] = useState<any>(null);
   const [draft, setDraft] = useState({service_city: '', contact_phone: '', intro: ''});
   const [stats, setStats] = useState({drones: 0, activeSupplies: 0, quotes: 0, bindings: 0});
 
@@ -110,6 +113,26 @@ export default function OwnerProfileScreen({navigation}: any) {
     ],
     [effectiveRoleSummary.can_publish_supply, effectiveRoleSummary.can_self_execute],
   );
+  const summaryLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 64,
+        gap: 10,
+        minItemWidth: 118,
+      }),
+    [viewportWidth],
+  );
+  const quickCardLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 64,
+        gap: 12,
+        minItemWidth: 118,
+      }),
+    [viewportWidth],
+  );
 
   if (loading) {
     return (
@@ -139,19 +162,19 @@ export default function OwnerProfileScreen({navigation}: any) {
           </View>
 
           <View style={styles.summaryRow}>
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
               <Text style={styles.summaryValue}>{stats.drones}</Text>
               <Text style={styles.summaryLabel}>无人机</Text>
             </View>
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
               <Text style={styles.summaryValue}>{stats.activeSupplies}</Text>
               <Text style={styles.summaryLabel}>生效供给</Text>
             </View>
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
               <Text style={styles.summaryValue}>{stats.quotes}</Text>
               <Text style={styles.summaryLabel}>我的报价</Text>
             </View>
-            <View style={styles.summaryItem}>
+            <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
               <Text style={styles.summaryValue}>{stats.bindings}</Text>
               <Text style={styles.summaryLabel}>绑定飞手</Text>
             </View>
@@ -204,27 +227,27 @@ export default function OwnerProfileScreen({navigation}: any) {
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>机主快捷入口</Text>
           <View style={styles.quickGrid}>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('MyDrones')}>
+            <TouchableOpacity style={[styles.quickCard, {width: quickCardLayout.itemWidth}]} onPress={() => navigation.navigate('MyDrones')}>
               <Text style={styles.quickIcon}>🛩️</Text>
               <Text style={styles.quickTitle}>我的无人机</Text>
               <Text style={styles.quickDesc}>管理设备、状态和资质</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('MyOffers')}>
+            <TouchableOpacity style={[styles.quickCard, {width: quickCardLayout.itemWidth}]} onPress={() => navigation.navigate('MyOffers')}>
               <Text style={styles.quickIcon}>📦</Text>
               <Text style={styles.quickTitle}>我的供给</Text>
               <Text style={styles.quickDesc}>查看草稿、上架与暂停中的供给</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('PublishOffer')}>
+            <TouchableOpacity style={[styles.quickCard, {width: quickCardLayout.itemWidth}]} onPress={() => navigation.navigate('PublishOffer')}>
               <Text style={styles.quickIcon}>🧾</Text>
               <Text style={styles.quickTitle}>发布供给</Text>
               <Text style={styles.quickDesc}>创建新的重载吊运供给方案</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('MyQuotes')}>
+            <TouchableOpacity style={[styles.quickCard, {width: quickCardLayout.itemWidth}]} onPress={() => navigation.navigate('MyQuotes')}>
               <Text style={styles.quickIcon}>💬</Text>
               <Text style={styles.quickTitle}>我的报价</Text>
               <Text style={styles.quickDesc}>跟进需求报价与承接节奏</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('OwnerPilotBindings')}>
+            <TouchableOpacity style={[styles.quickCard, {width: quickCardLayout.itemWidth}]} onPress={() => navigation.navigate('OwnerPilotBindings')}>
               <Text style={styles.quickIcon}>🤝</Text>
               <Text style={styles.quickTitle}>绑定飞手</Text>
               <Text style={styles.quickDesc}>邀请、确认和管理长期合作飞手</Text>
@@ -252,7 +275,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   heroMetaRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
-    flex: 1,
     backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.12)',
     borderRadius: 14,
     paddingVertical: 12,
@@ -281,7 +303,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   capabilityDesc: {marginTop: 4, fontSize: 13, lineHeight: 19, color: theme.textSub},
   quickGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   quickCard: {
-    width: '47%',
     borderRadius: 18,
     padding: 16,
     backgroundColor: theme.bgSecondary,

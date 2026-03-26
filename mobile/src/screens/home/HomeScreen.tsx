@@ -34,6 +34,7 @@ import {
 import { homeService } from '../../services/home';
 import { RootState } from '../../store/store';
 import { HomeDashboard, HomeFeedItem } from '../../types';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -189,13 +190,27 @@ function ActionPill({
   );
 }
 
-function QuickActionCard({ action }: { action: DashboardAction }) {
+function QuickActionCard({
+  action,
+  width,
+}: {
+  action: DashboardAction;
+  width: number;
+}) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const palette = getTonePalette(action.tone, theme.isDark);
   return (
     <TouchableOpacity
-      style={[styles.quickActionCard, {backgroundColor: theme.card, borderWidth: 1, borderColor: theme.cardBorder}]}
+      style={[
+        styles.quickActionCard,
+        {
+          width,
+          backgroundColor: theme.card,
+          borderWidth: 1,
+          borderColor: theme.cardBorder,
+        },
+      ]}
       onPress={action.onPress}
       activeOpacity={0.88}
     >
@@ -391,6 +406,16 @@ export default function HomeScreen({ navigation }: any) {
     return Math.floor((heroInnerWidth - METRIC_GAP) / 2);
   }, [heroInnerWidth, metricColumns]);
   const metricFullWidth = heroInnerWidth;
+  const quickActionLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: CONTENT_SIDE_MARGIN * 2,
+        gap: 10,
+        minItemWidth: 132,
+      }),
+    [viewportWidth],
+  );
 
   const heroConfig = useMemo(() => {
     switch (activeRole) {
@@ -772,7 +797,7 @@ export default function HomeScreen({ navigation }: any) {
         });
         return actions.slice(0, 4);
     }
-  }, [activeRole, currentDashboard, navigation]);
+  }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
 
   const todoItems = useMemo<TodoItem[]>(() => {
     switch (activeRole) {
@@ -1195,7 +1220,7 @@ export default function HomeScreen({ navigation }: any) {
             </View>
             <View style={styles.quickGrid}>
               {quickActions.map(action => (
-                <QuickActionCard key={action.key} action={action} />
+                <QuickActionCard key={action.key} action={action} width={quickActionLayout.itemWidth} />
               ))}
             </View>
           </View>
@@ -1559,11 +1584,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 10,
   },
   quickActionCard: {
-    width: '48%',
-    marginBottom: 10,
     borderRadius: 20,
     padding: 14,
     shadowColor: theme.isDark ? 'rgba(0,212,255,0.15)' : '#000',

@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -30,6 +31,7 @@ import {orderV2Service} from '../../services/orderV2';
 import {ownerService} from '../../services/owner';
 import {pilotV2Service} from '../../services/pilotV2';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -136,6 +138,7 @@ const capabilityCatalog = [
 export default function ProfileScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const dispatch = useDispatch();
@@ -433,6 +436,16 @@ export default function ProfileScreen({navigation}: any) {
   }, [effectiveRoleSummary]);
 
   const canApplySelfExecute = effectiveRoleSummary.can_publish_supply && effectiveRoleSummary.can_accept_dispatch;
+  const shortcutCardLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 32,
+        gap: 12,
+        minItemWidth: 136,
+      }),
+    [viewportWidth],
+  );
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -545,7 +558,7 @@ export default function ProfileScreen({navigation}: any) {
           {quickEntries.map(item => (
             <TouchableOpacity
               key={item.key}
-              style={styles.shortcutCard}
+              style={[styles.shortcutCard, {width: shortcutCardLayout.itemWidth}]}
               activeOpacity={0.88}
               onPress={() => navigation.navigate(item.screen)}>
               <Text style={styles.shortcutIcon}>{item.icon}</Text>
@@ -792,14 +805,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   shortcutGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 12,
   },
   shortcutCard: {
-    width: '48.3%',
     borderRadius: 20,
     backgroundColor: theme.card,
     padding: 16,
-    marginBottom: 12,
     shadowColor: '#102a43',
     shadowOpacity: 0.05,
     shadowRadius: 10,

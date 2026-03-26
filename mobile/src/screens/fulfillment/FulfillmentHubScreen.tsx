@@ -6,11 +6,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 import {getEffectiveRoleSummary, getRoleDisplayText} from '../../utils/roleSummary';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -23,12 +25,12 @@ type FulfillmentAction = {
   onPress: () => void;
 };
 
-function ActionCard({action}: {action: FulfillmentAction}) {
+function ActionCard({action, width}: {action: FulfillmentAction; width: number}) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   return (
     <TouchableOpacity
-      style={[styles.actionCard, {borderColor: action.accent}]}
+      style={[styles.actionCard, {width, borderColor: action.accent}]}
       onPress={action.onPress}
       activeOpacity={0.88}>
       <View style={[styles.actionIconWrap, {backgroundColor: `${action.accent}18`}]}>
@@ -43,9 +45,20 @@ function ActionCard({action}: {action: FulfillmentAction}) {
 export default function FulfillmentHubScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
+  const actionCardLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 64,
+        gap: 12,
+        minItemWidth: 120,
+      }),
+    [viewportWidth],
+  );
 
   const fulfillmentActions = useMemo<FulfillmentAction[]>(() => {
     const actions: FulfillmentAction[] = [
@@ -125,7 +138,7 @@ export default function FulfillmentHubScreen({navigation}: any) {
           </Text>
           <View style={styles.grid}>
             {fulfillmentActions.map(action => (
-              <ActionCard key={action.key} action={action} />
+              <ActionCard key={action.key} action={action} width={actionCardLayout.itemWidth} />
             ))}
           </View>
         </View>
@@ -204,7 +217,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 12,
   },
   actionCard: {
-    width: '48%',
     minHeight: 148,
     borderRadius: 18,
     backgroundColor: theme.card,

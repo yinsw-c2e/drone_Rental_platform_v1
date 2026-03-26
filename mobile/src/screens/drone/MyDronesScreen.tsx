@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -16,6 +17,7 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {droneService} from '../../services/drone';
 import {orderV2Service} from '../../services/orderV2';
 import {Drone, V2OrderSummary} from '../../types';
+import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -25,6 +27,12 @@ const STATUS_GROUPS = [
   {key: 'rented', label: '忙碌'},
   {key: 'maintenance', label: '维护中'},
   {key: 'offline', label: '不可用'},
+] as const;
+
+const CHANGEABLE_STATUSES = [
+  {key: 'available', label: '可用（可接单）'},
+  {key: 'maintenance', label: '维护中'},
+  {key: 'offline', label: '不可用（下线）'},
 ] as const;
 
 type StatusKey = (typeof STATUS_GROUPS)[number]['key'];
@@ -78,19 +86,23 @@ const isDroneStillOccupiedByOrder = (order: V2OrderSummary) =>
 export default function MyDronesScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const {width: viewportWidth} = useWindowDimensions();
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeGroup, setActiveGroup] = useState<StatusKey>('all');
-
-  const CHANGEABLE_STATUSES = [
-    {key: 'available', label: '可用（可接单）'},
-    {key: 'maintenance', label: '维护中'},
-    {key: 'offline', label: '不可用（下线）'},
-  ];
+  const summaryLayout = useMemo(
+    () =>
+      getResponsiveTwoColumnLayout({
+        viewportWidth,
+        totalHorizontalPadding: 68,
+        gap: 10,
+        minItemWidth: 118,
+      }),
+    [viewportWidth],
+  );
 
   const handleChangeStatus = useCallback((drone: Drone) => {
-    const options = CHANGEABLE_STATUSES.filter(s => s.key !== drone.availability_status).map(s => s.label);
     Alert.alert('更改状态', `当前：${statusMap[drone.availability_status || 'offline']?.label || drone.availability_status}`, [
       ...CHANGEABLE_STATUSES.filter(s => s.key !== drone.availability_status).map(s => ({
         text: s.label,
@@ -137,7 +149,7 @@ export default function MyDronesScreen({navigation}: any) {
         </TouchableOpacity>
       ),
     });
-  }, [navigation]);
+  }, [navigation, theme.primaryText]);
 
   const fetchDrones = useCallback(async () => {
     try {
@@ -245,19 +257,19 @@ export default function MyDronesScreen({navigation}: any) {
               <Text style={styles.heroDesc}>机主链路里，无人机不是静态资产，而是后续供给、报价、履约和派单的基础能力。</Text>
 
               <View style={styles.summaryRow}>
-                <View style={styles.summaryItem}>
+                <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
                   <Text style={styles.summaryValue}>{drones.length}</Text>
                   <Text style={styles.summaryLabel}>总设备</Text>
                 </View>
-                <View style={styles.summaryItem}>
+                <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
                   <Text style={styles.summaryValue}>{summary.available}</Text>
                   <Text style={styles.summaryLabel}>可用</Text>
                 </View>
-                <View style={styles.summaryItem}>
+                <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
                   <Text style={styles.summaryValue}>{summary.active}</Text>
                   <Text style={styles.summaryLabel}>基础资质通过</Text>
                 </View>
-                <View style={styles.summaryItem}>
+                <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
                   <Text style={styles.summaryValue}>{summary.suppliesReady}</Text>
                   <Text style={styles.summaryLabel}>可上架准备</Text>
                 </View>
@@ -308,7 +320,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
-    width: '48%',
     minWidth: 68,
     backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.12)',
     borderRadius: 14,
