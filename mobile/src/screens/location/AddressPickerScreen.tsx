@@ -49,12 +49,16 @@ export default function AddressPickerScreen({navigation, route}: any) {
     }
   };
 
-  const handleSelectAddress = useCallback((addr: AddressData) => {
+  const notifyAddressSelected = useCallback((addr: AddressData) => {
     if (onSelect) {
       onSelect(addr);
     }
+  }, [onSelect]);
+
+  const handleSelectAddress = useCallback((addr: AddressData) => {
+    notifyAddressSelected(addr);
     navigation.goBack();
-  }, [onSelect, navigation]);
+  }, [navigation, notifyAddressSelected]);
 
   const handleCurrentLocation = async () => {
     setLocating(true);
@@ -81,13 +85,13 @@ export default function AddressPickerScreen({navigation, route}: any) {
 
   const handleMapPicker = () => {
     navigation.navigate('MapPicker', {
-      onSelect: handleSelectAddress,
+      onSelect: notifyAddressSelected,
     });
   };
 
   const handleSearch = () => {
     navigation.navigate('AddressSearch', {
-      onSelect: handleSelectAddress,
+      onSelect: notifyAddressSelected,
       city: currentCity,
     });
   };

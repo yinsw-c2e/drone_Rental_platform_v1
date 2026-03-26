@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, FlatList, ActivityIndicator, Alert,
+  SafeAreaView, FlatList, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import {MapView} from 'react-native-amap3d';
 import type {CameraEvent} from 'react-native-amap3d';
@@ -11,6 +11,8 @@ import {POIItem, AddressData} from '../../types';
 import {getCurrentPosition} from '../../utils/LocationService';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+
+const MAP_EXIT_DELAY_MS = Platform.OS === 'android' ? 220 : 0;
 
 export default function MapPickerScreen({navigation, route}: any) {
   const {theme} = useTheme();
@@ -29,12 +31,16 @@ export default function MapPickerScreen({navigation, route}: any) {
   const isMountedRef = useRef(true);
   const mapRef = useRef<any>(null);
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 保存地图 SDK 上报的用户实时位置（GCJ-02 坐标，比 GPS 更准更快）
   const myLocationRef = useRef<{latitude: number; longitude: number} | null>(null);
   // 用于强制 MapView 重新挂载，从而移动到新位置
   const [mapKey, setMapKey] = useState(0);
   // 控制 MapView 的显示/隐藏，用于安全卸载原生组件
   const [mapVisible, setMapVisible] = useState(true);
+  const [isClosing, setIsClosing] = useState(false);
+  const isClosingRef = useRef(false);
+  const allowRemoveRef = useRef(false);
 
   useEffect(() => {
     initLocation();
@@ -45,30 +51,59 @@ export default function MapPickerScreen({navigation, route}: any) {
         clearTimeout(fetchTimerRef.current);
         fetchTimerRef.current = null;
       }
+      if (exitTimerRef.current) {
+        clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const beginSafeExit = useCallback((leave: () => void) => {
+    if (allowRemoveRef.current) {
+      leave();
+      return;
+    }
+
+    if (isClosingRef.current) {
+      return;
+    }
+
+    isClosingRef.current = true;
+    setIsClosing(true);
+    setMapVisible(false);
+
+    if (fetchTimerRef.current) {
+      clearTimeout(fetchTimerRef.current);
+      fetchTimerRef.current = null;
+    }
+    if (exitTimerRef.current) {
+      clearTimeout(exitTimerRef.current);
+    }
+
+    exitTimerRef.current = setTimeout(() => {
+      exitTimerRef.current = null;
+      allowRemoveRef.current = true;
+      leave();
+    }, MAP_EXIT_DELAY_MS);
   }, []);
 
   // 拦截回退操作，先隐藏地图再执行回退，避免原生层崩溃 (react-native-amap3d#821)
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
-      // 如果地图已隐藏，允许正常回退
-      if (!mapVisible) return;
+      if (allowRemoveRef.current) { return; }
 
-      // 阻止默认回退行为
       e.preventDefault();
 
-      // 先隐藏地图（卸载原生 MapView）
-      setMapVisible(false);
+      if (isClosingRef.current) { return; }
 
-      // 延迟执行回退，给原生层时间清理资源
-      setTimeout(() => {
+      beginSafeExit(() => {
         navigation.dispatch(e.data.action);
-      }, 100);
+      });
     });
 
     return unsubscribe;
-  }, [navigation, mapVisible]);
+  }, [beginSafeExit, navigation]);
 
   const initLocation = async () => {
     setLoading(true);
@@ -190,11 +225,10 @@ export default function MapPickerScreen({navigation, route}: any) {
     if (onSelect) {
       onSelect(addr);
     }
-    // 先隐藏地图，再延迟回退，避免原生层崩溃
-    setMapVisible(false);
-    setTimeout(() => {
+
+    beginSafeExit(() => {
       navigation.goBack();
-    }, 100);
+    });
   };
 
   const handleSelectPOI = (poi: POIItem, index: number) => {
@@ -211,17 +245,17 @@ export default function MapPickerScreen({navigation, route}: any) {
     if (onSelect) {
       onSelect(addr);
     }
-    // 先隐藏地图，再延迟回退，避免原生层崩溃
-    setMapVisible(false);
-    setTimeout(() => {
+
+    beginSafeExit(() => {
       navigation.goBack();
-    }, 100);
+    });
   };
 
   const renderPOI = ({item, index}: {item: POIItem; index: number}) => (
     <TouchableOpacity
       style={[styles.poiItem, selectedIndex === index && styles.poiItemActive]}
       onPress={() => handleSelectPOI(item, index)}
+      disabled={isClosing}
       activeOpacity={0.6}>
       <View style={styles.poiInfo}>
         <Text style={styles.poiName} numberOfLines={1}>{item.name}</Text>
@@ -266,7 +300,9 @@ export default function MapPickerScreen({navigation, route}: any) {
                 onLocation={handleLocationUpdate}
               />
             ) : (
-              <View style={styles.map} />
+              <View style={styles.mapPlaceholder}>
+                {isClosing ? <ActivityIndicator size="small" color={theme.primary} /> : null}
+              </View>
             )}
 
             {/* 中心点指示器 */}
@@ -275,7 +311,11 @@ export default function MapPickerScreen({navigation, route}: any) {
             </View>
 
             {/* 回到当前位置按钮 */}
-            <TouchableOpacity style={styles.relocateBtn} onPress={handleRelocate} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.relocateBtn}
+              onPress={handleRelocate}
+              disabled={isClosing}
+              activeOpacity={0.7}>
               <Text style={styles.relocateIcon}>&#9678;</Text>
             </TouchableOpacity>
           </>
@@ -283,7 +323,11 @@ export default function MapPickerScreen({navigation, route}: any) {
       </View>
 
       {/* 当前定位地址 */}
-      <TouchableOpacity style={styles.currentBar} onPress={handleSelectCurrent} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.currentBar}
+        onPress={handleSelectCurrent}
+        disabled={isClosing}
+        activeOpacity={0.7}>
         <View style={styles.locIcon}>
           <Text style={styles.locIconText}>&#9678;</Text>
         </View>
@@ -302,6 +346,7 @@ export default function MapPickerScreen({navigation, route}: any) {
         data={nearbyPOIs}
         keyExtractor={(_, i) => String(i)}
         renderItem={renderPOI}
+        scrollEnabled={!isClosing}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           !loading ? (
@@ -324,6 +369,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   mapLoadingText: {fontSize: 13, color: theme.textSub, marginTop: 8},
   map: {flex: 1},
+  mapPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.primaryBg,
+  },
   centerPin: {
     position: 'absolute', top: '50%', left: '50%',
     marginLeft: -15, marginTop: -30,
