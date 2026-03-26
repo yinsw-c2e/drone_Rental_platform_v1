@@ -33,8 +33,8 @@ jobs:
       working-directory: mobile
       run: |
         cat > .env << EOF
-        API_BASE_URL=https://77e3f1d8.r3.cpolar.cn/api/v1
-        WS_BASE_URL=wss://68aa0ac9.r3.cpolar.cn/ws
+        API_BASE_URL=https://dronerentalplat.cpolar.top/api/v2
+        WS_BASE_URL=wss://dronerentalplat.cpolar.top/ws
         API_TIMEOUT=15000
         APP_ENV=production
         DEBUG_MODE=false
@@ -55,8 +55,8 @@ jobs:
     - name: Build Android APK with bundled JS
       working-directory: mobile
       env:
-        API_BASE_URL: https://77e3f1d8.r3.cpolar.cn/api/v1
-        WS_BASE_URL: wss://68aa0ac9.r3.cpolar.cn/ws
+        API_BASE_URL: https://dronerentalplat.cpolar.top/api/v2
+        WS_BASE_URL: wss://dronerentalplat.cpolar.top/ws
         API_TIMEOUT: 15000
         APP_ENV: production
         DEBUG_MODE: false
