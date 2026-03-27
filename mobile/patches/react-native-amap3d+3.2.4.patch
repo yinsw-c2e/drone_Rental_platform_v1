@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
-index cc717fd..36410c0 100644
+index cc717fd..a1b2c3d 100644
 --- a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
 +++ b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
 @@ -30,6 +30,7 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
@@ -10,21 +10,35 @@ index cc717fd..36410c0 100644
  
      locationStyle = MyLocationStyle()
      locationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
+@@ -95,6 +96,13 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
+     }
+   }
+ 
++  override fun onDetachedFromWindow() {
++    // Ensure GL thread is paused before the TextureView surface is destroyed.
++    // Without this, the GL thread may still be rendering when the surface goes away.
++    try { onPause() } catch (_: Throwable) {}
++    super.onDetachedFromWindow()
++  }
++
+   fun emit(id: Int?, event: String, data: WritableMap = Arguments.createMap()) {
+     @Suppress("Deprecation")
+     id?.let { eventEmitter.receiveEvent(it, event, data) }
 diff --git a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
-index 3e8ce69..8e753ac 100644
+index 3e8ce69..f4c9a12 100644
 --- a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
 +++ b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
-@@ -27,7 +27,12 @@ internal class MapViewManager : ViewGroupManager<MapView>() {
+@@ -27,7 +27,13 @@ internal class MapViewManager : ViewGroupManager<MapView>() {
  
    override fun onDropViewInstance(view: MapView) {
      super.onDropViewInstance(view)
 -    view.onDestroy()
 +    try {
 +      view.onPause()
-+      view.onDestroy()
-+    } catch (e: Exception) {
-+      // Avoid crashing the app if AMap is already tearing down internally.
-+    }
++    } catch (_: Throwable) {}
++    // Do NOT call view.onDestroy() — it triggers nativeDestroy on the GL thread
++    // which causes SIGABRT (signal 6) in libAMapSDK_MAP_v9_8_3.so.
++    // onPause() stops GL rendering; resources are GC'd when the view is collected.
    }
  
    override fun getCommandsMap(): Map<String, Int> {

@@ -12,7 +12,7 @@ import {getCurrentPosition} from '../../utils/LocationService';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
-const MAP_EXIT_DELAY_MS = Platform.OS === 'android' ? 220 : 0;
+const MAP_EXIT_DELAY_MS = Platform.OS === 'android' ? 400 : 0;
 
 export default function MapPickerScreen({navigation, route}: any) {
   const {theme} = useTheme();
@@ -36,8 +36,6 @@ export default function MapPickerScreen({navigation, route}: any) {
   const myLocationRef = useRef<{latitude: number; longitude: number} | null>(null);
   // 用于强制 MapView 重新挂载，从而移动到新位置
   const [mapKey, setMapKey] = useState(0);
-  // 控制 MapView 的显示/隐藏，用于安全卸载原生组件
-  const [mapVisible, setMapVisible] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
   const isClosingRef = useRef(false);
   const allowRemoveRef = useRef(false);
@@ -71,7 +69,8 @@ export default function MapPickerScreen({navigation, route}: any) {
 
     isClosingRef.current = true;
     setIsClosing(true);
-    setMapVisible(false);
+    // 不再卸载 MapView —— 保持挂载，退出时随屏幕一起自然销毁
+    // 避免提前 unmount 原生地图组件导致 AMap SDK 崩溃
 
     if (fetchTimerRef.current) {
       clearTimeout(fetchTimerRef.current);
@@ -164,6 +163,7 @@ export default function MapPickerScreen({navigation, route}: any) {
 
   // 地图拖拽结束后，防抖获取新地址
   const handleCameraIdle = useCallback((event: NativeSyntheticEvent<CameraEvent>) => {
+    if (isClosingRef.current) { return; }
     const {cameraPosition} = event.nativeEvent;
     if (!cameraPosition?.target) {return;}
 
@@ -182,6 +182,7 @@ export default function MapPickerScreen({navigation, route}: any) {
 
   // 地图 SDK 实时上报用户位置
   const handleLocationUpdate = useCallback((event: any) => {
+    if (isClosingRef.current) { return; }
     const coords = event.nativeEvent?.coords;
     if (coords?.latitude && coords?.longitude) {
       myLocationRef.current = {latitude: coords.latitude, longitude: coords.longitude};
@@ -295,7 +296,7 @@ export default function MapPickerScreen({navigation, route}: any) {
       </View>
 
       {/* 高德地图区域 */}
-      <View style={styles.mapContainer}>
+      <View style={styles.mapContainer} pointerEvents={isClosing ? 'none' : 'auto'}>
         {loading ? (
           <View style={styles.mapLoading}>
             <ActivityIndicator size="large" color={theme.primary} />
@@ -303,24 +304,23 @@ export default function MapPickerScreen({navigation, route}: any) {
           </View>
         ) : (
           <>
-            {mapVisible ? (
-              <MapView
-                key={mapKey}
-                ref={mapRef}
-                style={styles.map}
-                initialCameraPosition={{
-                  target: {latitude, longitude},
-                  zoom: 16,
-                }}
-                myLocationEnabled
-                zoomControlsEnabled={false}
-                onCameraIdle={handleCameraIdle}
-                // @ts-ignore: onLocation 在原生层支持但 TS 类型未声明
-                onLocation={handleLocationUpdate}
-              />
-            ) : (
-              <View style={styles.mapPlaceholder}>
-                {isClosing ? <ActivityIndicator size="small" color={theme.primary} /> : null}
+            <MapView
+              key={mapKey}
+              ref={mapRef}
+              style={styles.map}
+              initialCameraPosition={{
+                target: {latitude, longitude},
+                zoom: 16,
+              }}
+              myLocationEnabled
+              zoomControlsEnabled={false}
+              onCameraIdle={handleCameraIdle}
+              // @ts-ignore: onLocation 在原生层支持但 TS 类型未声明
+              onLocation={handleLocationUpdate}
+            />
+            {isClosing && (
+              <View style={[StyleSheet.absoluteFill, styles.mapPlaceholder]}>
+                <ActivityIndicator size="small" color={theme.primary} />
               </View>
             )}
 
