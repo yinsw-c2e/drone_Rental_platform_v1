@@ -996,7 +996,13 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.contentRail}>
-          <LinearGradient colors={heroTheme.gradient} style={styles.hero}>
+          <View style={styles.hero}>
+            <LinearGradient
+              colors={heroTheme.gradient}
+              style={StyleSheet.absoluteFill}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+            />
             <View style={styles.heroTopRow}>
               <View style={styles.heroCopyWrap}>
                 <Text
@@ -1033,7 +1039,7 @@ export default function HomeScreen({ navigation }: any) {
                 />
               ))}
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         <View style={styles.contentRail}>
@@ -1216,9 +1222,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   hero: {
     marginTop: 12,
     borderRadius: 26,
-    paddingTop: 18,
-    paddingBottom: 20,
     overflow: 'hidden',
+    paddingTop: 18,
+    paddingBottom: 22,
     shadowColor: theme.isDark ? 'rgba(0,212,255,0.3)' : '#000',
     shadowOffset: {width: 0, height: theme.isDark ? 0 : 4},
     shadowOpacity: theme.isDark ? 0.5 : 0.08,

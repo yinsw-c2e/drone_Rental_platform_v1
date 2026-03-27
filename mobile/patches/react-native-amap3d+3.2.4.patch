@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
-index cc717fd..a1b2c3d 100644
+index cc717fd..3cbaa4c 100644
 --- a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
 +++ b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapView.kt
 @@ -30,6 +30,7 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
@@ -10,7 +10,7 @@ index cc717fd..a1b2c3d 100644
  
      locationStyle = MyLocationStyle()
      locationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER)
-@@ -95,6 +96,13 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
+@@ -94,6 +95,13 @@ class MapView(context: ThemedReactContext) : TextureMapView(context) {
      }
    }
  
@@ -25,10 +25,10 @@ index cc717fd..a1b2c3d 100644
      @Suppress("Deprecation")
      id?.let { eventEmitter.receiveEvent(it, event, data) }
 diff --git a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
-index 3e8ce69..f4c9a12 100644
+index 3e8ce69..c552c8e 100644
 --- a/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
 +++ b/node_modules/react-native-amap3d/lib/android/src/main/java/qiuxiang/amap3d/map_view/MapViewManager.kt
-@@ -27,7 +27,13 @@ internal class MapViewManager : ViewGroupManager<MapView>() {
+@@ -27,7 +27,12 @@ internal class MapViewManager : ViewGroupManager<MapView>() {
  
    override fun onDropViewInstance(view: MapView) {
      super.onDropViewInstance(view)

@@ -814,6 +814,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    marginBottom: 14,
   },
   shortcutCard: {
     borderRadius: 20,
