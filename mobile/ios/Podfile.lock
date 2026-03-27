@@ -1,7 +1,7 @@
 PODS:
   - AMap3DMap (9.6.2):
     - AMapFoundation (>= 1.8.0)
-  - AMapFoundation (1.8.2)
+  - AMapFoundation (1.8.6)
   - BVLinearGradient (2.8.3):
     - React-Core
   - FBLazyVector (0.84.0)
@@ -17,6 +17,8 @@ PODS:
     - FBLazyVector (= 0.84.0)
     - RCTRequired (= 0.84.0)
     - React-Core (= 0.84.0)
+  - RCTWeChat (1.1.27):
+    - React-Core
   - React (0.84.0):
     - React-Core (= 0.84.0)
     - React-Core/DevSupport (= 0.84.0)
@@ -1545,6 +1547,55 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-update (10.38.4):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - react-native-update/RCTPushy (= 10.38.4)
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - SSZipArchive
+    - Yoga
+  - react-native-update/RCTPushy (10.38.4):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - SSZipArchive
+    - Yoga
   - React-NativeModulesApple (0.84.0):
     - hermes-engine
     - React-callinvoker
@@ -1999,6 +2050,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - SSZipArchive (2.4.3)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2012,6 +2064,7 @@ DEPENDENCIES:
   - RCTSwiftUI (from `../node_modules/react-native/ReactApple/RCTSwiftUI`)
   - RCTSwiftUIWrapper (from `../node_modules/react-native/ReactApple/RCTSwiftUIWrapper`)
   - RCTTypeSafety (from `../node_modules/react-native/Libraries/TypeSafety`)
+  - RCTWeChat (from `../node_modules/react-native-wechat-lib`)
   - React (from `../node_modules/react-native/`)
   - React-callinvoker (from `../node_modules/react-native/ReactCommon/callinvoker`)
   - React-Core (from `../node_modules/react-native/`)
@@ -2049,6 +2102,7 @@ DEPENDENCIES:
   - "react-native-geolocation (from `../node_modules/@react-native-community/geolocation`)"
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
+  - react-native-update (from `../node_modules/react-native-update`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../node_modules/react-native/ReactCommon/react/networking`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
@@ -2091,6 +2145,7 @@ SPEC REPOS:
   trunk:
     - AMap3DMap
     - AMapFoundation
+    - SSZipArchive
 
 EXTERNAL SOURCES:
   BVLinearGradient:
@@ -2110,6 +2165,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactApple/RCTSwiftUIWrapper"
   RCTTypeSafety:
     :path: "../node_modules/react-native/Libraries/TypeSafety"
+  RCTWeChat:
+    :path: "../node_modules/react-native-wechat-lib"
   React:
     :path: "../node_modules/react-native/"
   React-callinvoker:
@@ -2182,6 +2239,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-image-picker"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
+  react-native-update:
+    :path: "../node_modules/react-native-update"
   React-NativeModulesApple:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-networking:
@@ -2259,7 +2318,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   AMap3DMap: 1d24615b754c2ac5a92258b59729e60a6d478205
-  AMapFoundation: 9885c48fc3a78fdfb84a0299a2293e56ea3c9fec
+  AMapFoundation: d539ff40e882c872bef6c6682bf1e3a2d4a03026
   BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
   FBLazyVector: c12d2108050e27952983d565a232f6f7b1ad5e69
   hermes-engine: 55d80b28f08ae24dcb175102b965c63390f7130d
@@ -2268,6 +2327,7 @@ SPEC CHECKSUMS:
   RCTSwiftUI: 96986e49a4fdc2c2103929dee2641e1b57edf33d
   RCTSwiftUIWrapper: 55e482219b78c2c652123fea845a6b1716fa97e7
   RCTTypeSafety: e9ba155357c236764934054ee2d393fd76e7b36b
+  RCTWeChat: 30f7ffea04116d2bf662599fb06f6d6c8b9c2578
   React: 7ef36630d07638043a134a7dd2ec17e0be10fc3c
   React-callinvoker: af4e8fe1d60ab63dd8d74c2a68988064c2848954
   React-Core: c609976c034ba9556bef9850a571a71bd458d73f
@@ -2304,6 +2364,7 @@ SPEC CHECKSUMS:
   react-native-geolocation: cfc39041210bd9f591ec2beb7d417291251da8e5
   react-native-image-picker: 48d850454b4a389753053e1d7378b624d3b47d77
   react-native-safe-area-context: acabbcf2d4ab4360952522ca445f29afbd140e71
+  react-native-update: c0e4dc882501c689acd8b728140b9453dc02b714
   React-NativeModulesApple: 44a9474594566cd03659f92e38f42599c6b9dee4
   React-networking: db73d91466cb134fcbdaaa579fb2de14e2c2ea01
   React-oscompat: b924b8609d06899f00ab1aa813b0cde9c5e12771
@@ -2340,6 +2401,7 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: cb0966f5892e3535ba7c3a20da28409b97756329
   RNDateTimePicker: 9c0a849bbe1c256f0854fea255734b715f5ea876
   RNScreens: 14243fa0d9842ffa7f8bb2d00b6c3cfd3ca817e8
+  SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   Yoga: 772166513f9cd2d61a6251d0dacbbfaa5b537479
 
 PODFILE CHECKSUM: 0f0da7d08e7565c0cecd6e004108c8c03d264524

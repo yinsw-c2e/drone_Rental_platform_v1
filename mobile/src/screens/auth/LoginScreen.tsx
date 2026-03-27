@@ -14,10 +14,12 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import * as WeChat from 'react-native-wechat-lib';
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
 import {API_BASE_URL} from '../../constants';
+import {THIRD_PARTY_LOGIN} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -64,6 +66,18 @@ export default function LoginScreen({navigation}: any) {
     return () => { mountedRef.current = false; };
   }, []);
 
+  // 初始化微信 SDK
+  useEffect(() => {
+    const appId = THIRD_PARTY_LOGIN.wechatAppId;
+    if (appId && WeChat && WeChat.registerApp) {
+      WeChat.registerApp(appId, 'https://dronerentalplat.cpolar.top/app/')
+        .then(() => console.log('[WeChat] SDK registered'))
+        .catch((e: any) => console.warn('[WeChat] register failed:', e));
+    } else {
+      console.warn('[WeChat] SDK not available or appId empty, appId=', appId, 'WeChat=', WeChat);
+    }
+  }, []);
+
   const beginSubmit = () => {
     if (submittingRef.current) return null;
     submittingRef.current = true;
@@ -80,8 +94,51 @@ export default function LoginScreen({navigation}: any) {
     if (isLatestRequest(requestId)) setSubmitting(false);
   };
 
-  const handleWeChatLogin = () => {
-    Alert.alert('微信登录', '微信登录需要在微信开放平台注册应用并集成SDK。\n\n当前开发模式，请使用手机号登录。', [{text: '确定'}]);
+  const handleWeChatLogin = async () => {
+    console.log('[WeChat] handleWeChatLogin called');
+    const appId = THIRD_PARTY_LOGIN.wechatAppId;
+    console.log('[WeChat] appId =', JSON.stringify(appId));
+    console.log('[WeChat] WeChat module keys:', Object.keys(WeChat));
+    if (!appId) {
+      Alert.alert('提示', '微信登录未配置 AppID');
+      return;
+    }
+    try {
+      console.log('[WeChat] Checking isWXAppInstalled...');
+      const isInstalled = await WeChat.isWXAppInstalled();
+      console.log('[WeChat] isInstalled =', isInstalled);
+      if (!isInstalled) {
+        Alert.alert('提示', '请先安装微信 App');
+        return;
+      }
+      console.log('[WeChat] Sending auth request...');
+      const result = await WeChat.sendAuthRequest('snsapi_userinfo');
+      console.log('[WeChat] Auth result:', JSON.stringify(result));
+      if (result.errCode === 0 && result.code) {
+        const requestId = beginSubmit();
+        if (!requestId) return;
+        try {
+          const res = await authService.wechatLogin(result.code);
+          if (!isLatestRequest(requestId)) return;
+          dispatch(setCredentials({
+            user: res.data.user,
+            token: res.data.token,
+            roleSummary: (res.data as any).role_summary || null,
+          }));
+        } catch (e: any) {
+          if (isLatestRequest(requestId)) Alert.alert('微信登录失败', e.message);
+        } finally {
+          finishSubmit(requestId);
+        }
+      } else if (result.errCode === -2) {
+        // 用户取消
+      } else {
+        Alert.alert('微信授权失败', `错误码: ${result.errCode}`);
+      }
+    } catch (e: any) {
+      console.log('[WeChat] Error:', e);
+      Alert.alert('微信登录失败', e.message || '无法拉起微信');
+    }
   };
 
   const handleQQLogin = () => {

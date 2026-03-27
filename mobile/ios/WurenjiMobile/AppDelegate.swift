@@ -4,6 +4,7 @@ import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import AMapFoundationKit
 import MAMapKit
+import react_native_update
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -46,6 +47,38 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     return true
   }
+
+  // 处理 URL Scheme 回调（微信登录等第三方 SDK 需要）
+  func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    // 发送 RCTOpenURLNotification，RCTWeChat 等原生模块监听此通知
+    NotificationCenter.default.post(
+      name: NSNotification.Name("RCTOpenURLNotification"),
+      object: nil,
+      userInfo: ["url": url.absoluteString]
+    )
+    return true
+  }
+
+  // 处理 Universal Link 回调
+  func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+       let url = userActivity.webpageURL {
+      NotificationCenter.default.post(
+        name: NSNotification.Name("RCTOpenURLNotification"),
+        object: nil,
+        userInfo: ["url": url.absoluteString]
+      )
+    }
+    return true
+  }
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
@@ -60,7 +93,7 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
     provider.jsLocation = "192.168.3.182"
     return provider.jsBundleURL(forBundleRoot: "index")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    return RCTPushy.bundleURL()
 #endif
   }
 }

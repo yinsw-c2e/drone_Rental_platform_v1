@@ -117,7 +117,7 @@ export default function OwnerProfileScreen({navigation}: any) {
     () =>
       getResponsiveTwoColumnLayout({
         viewportWidth,
-        totalHorizontalPadding: 64,
+        totalHorizontalPadding: 68,
         gap: 10,
         minItemWidth: 118,
       }),
@@ -127,7 +127,7 @@ export default function OwnerProfileScreen({navigation}: any) {
     () =>
       getResponsiveTwoColumnLayout({
         viewportWidth,
-        totalHorizontalPadding: 64,
+        totalHorizontalPadding: 68,
         gap: 12,
         minItemWidth: 118,
       }),

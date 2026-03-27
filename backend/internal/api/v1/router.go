@@ -59,6 +59,26 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 	// Static files
 	r.Static("/uploads", "./uploads")
 
+	// Apple App Site Association（Universal Link 必须）
+	r.GET("/.well-known/apple-app-site-association", func(c *gin.Context) {
+		c.Header("Content-Type", "application/json")
+		c.JSON(200, gin.H{
+			"applinks": gin.H{
+				"apps": []string{},
+				"details": []gin.H{
+					{
+						"appIDs": []string{"Y63CMZRDV9.com.yinswc2e.wurenji"},
+						"paths":  []string{"/app/*"},
+					},
+				},
+			},
+		})
+	})
+	// Universal Link 落地路径（微信回调会打开此 URL）
+	r.GET("/app/*path", func(c *gin.Context) {
+		c.String(200, "ok")
+	})
+
 	// WebSocket
 	r.GET("/ws", ws.HandleWebSocket(hub, cfg, logger))
 
