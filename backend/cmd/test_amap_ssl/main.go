@@ -5,13 +5,23 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"time"
 )
 
 func main() {
+	apiKey, ok := os.LookupEnv("AMAP_API_KEY")
+	if !ok || apiKey == "" {
+		fmt.Println("missing AMAP_API_KEY environment variable")
+		os.Exit(1)
+	}
+
+	targetURL := buildTestURL(apiKey)
+
 	// 测试1: 默认HTTP客户端
 	fmt.Println("=== 测试1: 默认HTTP客户端 ===")
-	testWithClient(&http.Client{Timeout: 10 * time.Second})
+	testWithClient(&http.Client{Timeout: 10 * time.Second}, targetURL)
 
 	// 测试2: 配置TLS的HTTP客户端
 	fmt.Println("\n=== 测试2: 配置TLS MinVersion的HTTP客户端 ===")
@@ -23,7 +33,7 @@ func main() {
 	testWithClient(&http.Client{
 		Timeout:   10 * time.Second,
 		Transport: transport,
-	})
+	}, targetURL)
 
 	// 测试3: 跳过证书验证(仅用于诊断)
 	fmt.Println("\n=== 测试3: 跳过证书验证的HTTP客户端 ===")
@@ -35,13 +45,20 @@ func main() {
 	testWithClient(&http.Client{
 		Timeout:   10 * time.Second,
 		Transport: insecureTransport,
-	})
+	}, targetURL)
 }
 
-func testWithClient(client *http.Client) {
-	url := "https://restapi.amap.com/v3/geocode/regeo?key=dd09b07875e237f695aa6b3cf4c70510&location=113.264435,23.129163&output=JSON"
-	
-	resp, err := client.Get(url)
+func buildTestURL(apiKey string) string {
+	params := url.Values{}
+	params.Set("key", apiKey)
+	params.Set("location", "113.264435,23.129163")
+	params.Set("output", "JSON")
+
+	return "https://restapi.amap.com/v3/geocode/regeo?" + params.Encode()
+}
+
+func testWithClient(client *http.Client, targetURL string) {
+	resp, err := client.Get(targetURL)
 	if err != nil {
 		fmt.Printf("❌ 请求失败: %v\n", err)
 		return
