@@ -179,6 +179,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.POST("/:order_id/disputes", h.Order.CreateDispute)
 			orderGroup.POST("/:order_id/reviews", h.Review.CreateOrderReview)
 			orderGroup.GET("/:order_id/reviews", h.Review.ListOrderReviews)
+			orderGroup.GET("/:order_id/contract", h.Order.GetContract)
+			orderGroup.POST("/:order_id/contract/sign", h.Order.SignContract)
 		}
 
 		dispatchGroup := authenticated.Group("/dispatch-tasks")

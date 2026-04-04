@@ -434,6 +434,13 @@ export default function OrderDetailScreen({route, navigation}: any) {
       });
     }
 
+    // 合同入口（所有状态可查看）
+    buttons.push({
+      label: '查看合同',
+      tone: 'ghost',
+      onPress: () => navigation.navigate('Contract', {orderId: detail.id}),
+    });
+
     return buttons;
   }, [actionLoading, canOpenAfterSale, canOpenFlightMonitor, canOpenReview, detail, fetchDetail, isClient, isProvider, navigation]);
 

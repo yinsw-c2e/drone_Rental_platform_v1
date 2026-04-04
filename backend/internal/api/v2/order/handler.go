@@ -19,6 +19,7 @@ type Handler struct {
 	orderService    *service.OrderService
 	dispatchService *service.DispatchService
 	flightService   *service.FlightService
+	contractService *service.ContractService
 }
 
 func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService) *Handler {
@@ -27,6 +28,10 @@ func NewHandler(orderService *service.OrderService, dispatchService *service.Dis
 		dispatchService: dispatchService,
 		flightService:   flightService,
 	}
+}
+
+func (h *Handler) SetContractService(cs *service.ContractService) {
+	h.contractService = cs
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -759,4 +764,95 @@ func (h *Handler) ConfirmReceipt(c *gin.Context) {
 	}
 
 	response.V2Success(c, gin.H{"message": "已确认签收"})
+}
+
+// ─── 合同 API ─────────────────────────────────────────
+
+// GetContract 获取订单关联合同
+func (h *Handler) GetContract(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	// 权限检查
+	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, ""); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	if h.contractService == nil {
+		response.V2Error(c, 500, "INTERNAL_ERROR", "合同服务未初始化")
+		return
+	}
+
+	contract, err := h.contractService.GetContractByOrder(orderID)
+	if err != nil {
+		response.V2Error(c, 404, "NOT_FOUND", "该订单暂无合同")
+		return
+	}
+
+	response.V2Success(c, buildContractResponse(contract))
+}
+
+// SignContract 签署订单合同
+func (h *Handler) SignContract(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, ""); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	if h.contractService == nil {
+		response.V2Error(c, 500, "INTERNAL_ERROR", "合同服务未初始化")
+		return
+	}
+
+	contract, err := h.contractService.SignContractByOrder(orderID, userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, buildContractResponse(contract))
+}
+
+func buildContractResponse(c *model.OrderContract) gin.H {
+	if c == nil {
+		return nil
+	}
+	return gin.H{
+		"id":                  c.ID,
+		"contract_no":         c.ContractNo,
+		"order_id":            c.OrderID,
+		"order_no":            c.OrderNo,
+		"title":               c.Title,
+		"status":              c.Status,
+		"client_user_id":      c.ClientUserID,
+		"provider_user_id":    c.ProviderUserID,
+		"contract_amount":     c.ContractAmount,
+		"platform_commission": c.PlatformCommission,
+		"provider_amount":     c.ProviderAmount,
+		"client_signed_at":    c.ClientSignedAt,
+		"provider_signed_at":  c.ProviderSignedAt,
+		"contract_html":       c.ContractHTML,
+		"created_at":          c.CreatedAt,
+		"updated_at":          c.UpdatedAt,
+	}
 }

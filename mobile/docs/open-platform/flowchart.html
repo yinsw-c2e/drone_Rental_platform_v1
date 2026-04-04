@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无人机服务 - 移动端应用运行流程图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; padding: 40px; }
+  .container { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 40px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+
+  /* 标题区 */
+  .header { background: linear-gradient(135deg, #e8f4fd 0%, #f0f8ff 100%); border-radius: 12px; padding: 28px 36px; margin-bottom: 32px; }
+  .header h1 { font-size: 32px; color: #1a73e8; font-weight: 700; margin-bottom: 10px; }
+  .header p { font-size: 15px; color: #5f6368; line-height: 1.6; }
+
+  /* 导航栏 */
+  .nav-bar { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  .nav-item { padding: 8px 20px; border: 1.5px solid #d0d5dd; border-radius: 20px; font-size: 14px; color: #344054; background: #fff; }
+
+  /* 流程步骤 */
+  .flow-row { display: flex; align-items: stretch; gap: 16px; margin-bottom: 20px; flex-wrap: nowrap; }
+  .flow-row.reverse { flex-direction: row-reverse; }
+  .step { flex: 1; min-width: 0; border: 2px solid #e0e5ec; border-radius: 12px; padding: 20px 18px; position: relative; display: flex; flex-direction: column; }
+  .step.highlight { border-color: #ed8936; }
+  .step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .step-num { width: 30px; height: 30px; border-radius: 50%; background: #1a73e8; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .step-title { font-size: 17px; font-weight: 700; color: #1d2939; }
+  .step-desc { font-size: 13px; color: #667085; line-height: 1.65; }
+
+  /* 箭头 */
+  .arrow { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; }
+  .arrow-right::after { content: '→'; font-size: 28px; color: #98a2b3; font-weight: 700; }
+  .arrow-left::after { content: '←'; font-size: 28px; color: #98a2b3; font-weight: 700; }
+  .arrow-down { width: 100%; display: flex; justify-content: flex-end; padding-right: 80px; margin: 4px 0; }
+  .arrow-down::after { content: '↓'; font-size: 32px; color: #ed8936; font-weight: 700; }
+
+  /* 角色区 */
+  .roles { display: flex; gap: 20px; margin-top: 32px; padding-top: 28px; border-top: 2px dashed #e0e5ec; }
+  .role { flex: 1; border: 1.5px solid #e0e5ec; border-radius: 10px; padding: 20px; }
+  .role-title { font-size: 15px; font-weight: 700; color: #1a73e8; margin-bottom: 10px; border-bottom: 1px solid #e8f0fe; padding-bottom: 8px; }
+  .role-desc { font-size: 13px; color: #667085; line-height: 1.7; }
+
+  /* 底部说明 */
+  .footer { margin-top: 28px; padding: 16px 20px; background: #f8fafc; border-radius: 8px; }
+  .footer p { font-size: 13px; color: #98a2b3; line-height: 1.7; }
+
+  /* 微信登录标注 */
+  .wechat-badge { display: inline-block; background: #07c160; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- 标题 -->
+  <div class="header">
+    <h1>无人机服务 移动端应用运行流程图</h1>
+    <p>适用于开放平台审核说明：展示「无人机服务」App 中客户、机主、飞手三类角色在无人机租赁/作业/货运场景中的完整业务闭环，包含微信登录授权接入流程。</p>
+  </div>
+
+  <!-- 导航 -->
+  <div class="nav-bar">
+    <div class="nav-item">核心入口：首页</div>
+    <div class="nav-item">市场：供给/需求</div>
+    <div class="nav-item">履约：订单/派单</div>
+    <div class="nav-item">消息：聊天通知</div>
+    <div class="nav-item">我的：认证/钱包</div>
+  </div>
+
+  <!-- 第一行：步骤 1-4 -->
+  <div class="flow-row">
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">登录与身份认证 <span class="wechat-badge">微信登录</span></div>
+      </div>
+      <div class="step-desc">支持手机号登录与<b>微信授权快捷登录</b>，完成实名认证后按客户/机主/飞手角色进入移动端。微信登录通过 OAuth2.0 获取用户基本信息。</div>
+    </div>
+    <div class="arrow arrow-right"></div>
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">市场浏览与发布</div>
+      </div>
+      <div class="step-desc">浏览附近无人机供给与需求列表，可发布租机、作业或货运需求。</div>
+    </div>
+    <div class="arrow arrow-right"></div>
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">在线沟通与报价</div>
+      </div>
+      <div class="step-desc">通过消息聊天确认时间、地点、服务内容，完成报价撮合。</div>
+    </div>
+    <div class="arrow arrow-right"></div>
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div class="step-title">订单创建与支付</div>
+      </div>
+      <div class="step-desc">确认下单后生成订单，选择支付方式并同步订单状态。</div>
+    </div>
+  </div>
+
+  <div class="arrow-down"></div>
+
+  <!-- 第二行：步骤 5-8（反向） -->
+  <div class="flow-row reverse">
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">5</div>
+        <div class="step-title">派单与资源匹配</div>
+      </div>
+      <div class="step-desc">平台向机主/飞手发起正式派单，完成任务承接与无人机绑定。</div>
+    </div>
+    <div class="arrow arrow-left"></div>
+    <div class="step highlight">
+      <div class="step-header">
+        <div class="step-num">6</div>
+        <div class="step-title">飞前合规检查</div>
+      </div>
+      <div class="step-desc">执行空域申请、禁飞区校验、证照与无人机合规检查。</div>
+    </div>
+    <div class="arrow arrow-left"></div>
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num">7</div>
+        <div class="step-title">飞行执行与监控</div>
+      </div>
+      <div class="step-desc">飞手执行任务，平台记录轨迹、监控飞行状态并推送通知。</div>
+    </div>
+    <div class="arrow arrow-left"></div>
+    <div class="step highlight">
+      <div class="step-header">
+        <div class="step-num">8</div>
+        <div class="step-title">完成验收与结算</div>
+      </div>
+      <div class="step-desc">客户确认完成后评价/售后，平台分账结算，钱包入账并支持提现。</div>
+    </div>
+  </div>
+
+  <!-- 角色区 -->
+  <div class="roles">
+    <div class="role">
+      <div class="role-title">客户 / 企业客户端</div>
+      <div class="role-desc">浏览市场、发布租机/作业/货运需求；在线支付；查看执行进度；完成验收、评价与售后。</div>
+    </div>
+    <div class="role">
+      <div class="role-title">平台业务系统</div>
+      <div class="role-desc">承担报价撮合、订单创建、正式派单、消息通知、合规校验、飞行监控、轨迹记录、分账结算等核心能力。</div>
+    </div>
+    <div class="role">
+      <div class="role-title">机主 / 飞手端</div>
+      <div class="role-desc">发布供给、维护无人机档案、接收派单、执行飞行任务、查看账单与钱包提现。</div>
+    </div>
+  </div>
+
+  <!-- 微信登录说明 -->
+  <div style="margin-top: 28px; padding: 18px 22px; background: #f0faf4; border-radius: 10px; border-left: 4px solid #07c160;">
+    <p style="font-size: 14px; color: #1d2939; font-weight: 600; margin-bottom: 6px;">📱 微信登录使用说明</p>
+    <p style="font-size: 13px; color: #667085; line-height: 1.7;">「无人机服务」App 接入微信登录 SDK，用户点击"微信登录"按钮后，通过 OAuth2.0 授权获取 openid 与用户基本信息（昵称、头像），实现快速登录注册。全流程无需用户手动输入账号密码，提升登录体验。微信登录仅在用户主动点击时触发，不会自动获取任何用户信息。</p>
+  </div>
+
+  <!-- 底部说明 -->
+  <div class="footer">
+    <p>说明：「无人机服务」移动端应用围绕 "需求发布/供给上架→订单支付→派单执行→飞行监管→完成结算" 形成完整业务闭环，可用于无人机租赁、作业服务与货运履约场景。微信登录作为用户认证入口之一，贯穿整个业务流程的起点。</p>
+  </div>
+</div>
+</body>
+</html>

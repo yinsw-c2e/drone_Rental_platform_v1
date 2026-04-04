@@ -131,6 +131,8 @@ func main() {
 	insuranceRepo := repository.NewInsuranceRepository(db)
 	analyticsRepo := repository.NewAnalyticsRepository(db)
 
+	contractRepo := repository.NewContractRepo(db)
+
 	// Init pkg services
 	smsService := sms.NewSMSService(cfg.SMS.Provider, zapLogger)
 	// 配置阿里云短信参数
@@ -202,6 +204,7 @@ func main() {
 	creditService := service.NewCreditService(creditRepo)
 	insuranceService := service.NewInsuranceService(insuranceRepo, zapLogger)
 	analyticsService := service.NewAnalyticsService(analyticsRepo)
+	contractService := service.NewContractService(contractRepo, orderRepo, userRepo, cfg)
 
 	ownerService.SetMatchingService(matchingService)
 	ownerService.SetEventService(eventService)
@@ -245,6 +248,9 @@ func main() {
 		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
 	v2Handlers := v2.NewHandlers(authService, userService, homeService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, handlers.Admin, handlers.Analytics, handlers.Client)
+	v2Handlers.Order.SetContractService(contractService)
+	clientService.SetContractService(contractService)
+	orderService.SetContractService(contractService)
 
 	// Setup Gin
 	gin.SetMode(cfg.Server.Mode)

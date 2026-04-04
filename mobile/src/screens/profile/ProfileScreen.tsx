@@ -308,9 +308,9 @@ export default function ProfileScreen({navigation}: any) {
 
   const accountHighlights = useMemo(
     () => [
-      {label: '订单', value: stats.orders},
-      {label: '需求', value: stats.demands},
-      {label: '供给', value: stats.supplies},
+      {label: '订单', value: stats.orders, screen: 'MyOrders'},
+      {label: '需求', value: stats.demands, screen: 'MyDemands'},
+      {label: '供给', value: stats.supplies, screen: 'MyOffers'},
     ],
     [stats.demands, stats.orders, stats.supplies],
   );
@@ -483,10 +483,10 @@ export default function ProfileScreen({navigation}: any) {
 
           <View style={styles.heroStatsRow}>
             {accountHighlights.map(item => (
-              <View key={item.label} style={styles.heroStatItem}>
+              <TouchableOpacity key={item.label} style={styles.heroStatItem} activeOpacity={0.6} onPress={() => navigation.navigate(item.screen)}>
                 <Text style={styles.heroStatValue}>{item.value}</Text>
                 <Text style={styles.heroStatLabel}>{item.label}</Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>

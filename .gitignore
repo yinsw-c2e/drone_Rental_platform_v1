@@ -58,3 +58,7 @@ prn
 PRN
 aux
 AUX
+
+# react-native-update
+.update
+.pushy

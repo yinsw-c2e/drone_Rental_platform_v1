@@ -2698,3 +2698,35 @@ type RealtimeDashboard struct {
 func (RealtimeDashboard) TableName() string {
 	return "realtime_dashboard"
 }
+
+// ─── 合同签约 ────────────────────────────────────────────
+
+type OrderContract struct {
+	ID                 int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	ContractNo         string     `gorm:"type:varchar(50);uniqueIndex" json:"contract_no"`
+	OrderID            int64      `gorm:"index;not null" json:"order_id"`
+	OrderNo            string     `gorm:"type:varchar(30)" json:"order_no"`
+	TemplateKey        string     `gorm:"type:varchar(50);default:heavy_cargo_standard" json:"template_key"`
+	ClientUserID       int64      `gorm:"not null" json:"client_user_id"`
+	ProviderUserID     int64      `gorm:"not null" json:"provider_user_id"`
+	Title              string     `gorm:"type:varchar(200)" json:"title"`
+	ServiceDescription string     `gorm:"type:text" json:"service_description"`
+	ServiceAddress     string     `gorm:"type:text" json:"service_address"`
+	ScheduledStartAt   *time.Time `json:"scheduled_start_at"`
+	ScheduledEndAt     *time.Time `json:"scheduled_end_at"`
+	CargoWeightKG      float64    `gorm:"type:decimal(10,2)" json:"cargo_weight_kg"`
+	EstimatedTripCount int        `gorm:"default:1" json:"estimated_trip_count"`
+	ContractAmount     int64      `json:"contract_amount"`
+	PlatformCommission int64      `json:"platform_commission"`
+	ProviderAmount     int64      `json:"provider_amount"`
+	Status             string     `gorm:"type:varchar(20);default:pending" json:"status"`
+	ClientSignedAt     *time.Time `json:"client_signed_at"`
+	ProviderSignedAt   *time.Time `json:"provider_signed_at"`
+	ContractHTML       string     `gorm:"type:mediumtext" json:"contract_html"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+func (OrderContract) TableName() string {
+	return "order_contracts"
+}

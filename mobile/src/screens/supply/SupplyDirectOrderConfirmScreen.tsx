@@ -203,11 +203,16 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
           <ObjectCard>
             <Text style={styles.sectionTitle}>下一步</Text>
             <Text style={styles.bodyText}>
-              你可以先返回订单页查看状态，等机主确认后再继续支付和履约。
+              订单已创建并自动生成合同，你可以查看并签署合同，等机主确认后再继续支付。
             </Text>
             <View style={styles.actionStack}>
               <TouchableOpacity
                 style={[styles.primaryBtn, styles.fullWidthBtn]}
+                onPress={() => navigation.navigate('Contract', {orderId: createdOrder.order_id})}>
+                <Text style={styles.primaryBtnText}>查看并签署合同</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, styles.fullWidthBtn]}
                 onPress={() =>
                   navigation.navigate('MyOrders', {
                     roleFilter: 'client',
@@ -215,7 +220,7 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
                     serverStatus: 'pending_provider_confirmation',
                   })
                 }>
-                <Text style={styles.primaryBtnText}>查看我的订单</Text>
+                <Text style={styles.secondaryBtnText}>查看我的订单</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.secondaryBtn, styles.fullWidthBtn]}

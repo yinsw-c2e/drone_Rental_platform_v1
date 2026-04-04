@@ -439,6 +439,12 @@ func (s *ClientService) SelectProvider(userID, demandID, quoteID int64) (*Select
 	if s.matchingService != nil {
 		_ = s.matchingService.SyncDemandQuoteRanking(demandID, "client", userID)
 	}
+
+	// 自动生成合同
+	if s.contractService != nil && result != nil {
+		_, _ = s.contractService.GenerateContractForOrder(result.OrderID)
+	}
+
 	if s.eventService != nil && result != nil {
 		demand, err := s.demandDomainRepo.GetDemandByID(demandID)
 		if err == nil {
@@ -466,6 +472,12 @@ func (s *ClientService) CreateDirectSupplyOrder(userID, supplyID int64, input *D
 	if err != nil {
 		return nil, err
 	}
+
+	// 直达订单也自动生成合同
+	if s.contractService != nil {
+		_, _ = s.contractService.GenerateContractForOrder(order.ID)
+	}
+
 	if s.eventService != nil {
 		s.eventService.NotifyDirectOrderCreated(order)
 	}

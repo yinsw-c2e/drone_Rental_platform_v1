@@ -26,6 +26,7 @@ type OrderService struct {
 	ownerDomainRepo   *repository.OwnerDomainRepo
 	orderArtifactRepo *repository.OrderArtifactRepo
 	eventService      *EventService
+	contractService   *ContractService
 	cfg               *config.Config
 	logger            *zap.Logger
 }
@@ -60,6 +61,10 @@ func NewOrderService(
 
 func (s *OrderService) SetEventService(eventService *EventService) {
 	s.eventService = eventService
+}
+
+func (s *OrderService) SetContractService(contractService *ContractService) {
+	s.contractService = contractService
 }
 
 func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error) {
@@ -554,7 +559,7 @@ func (s *OrderService) ProviderConfirmOrder(orderID, ownerID int64) error {
 	}
 
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		return s.providerConfirmOrderWithRepos(
+		if txErr := s.providerConfirmOrderWithRepos(
 			orderID,
 			ownerID,
 			repository.NewOrderRepo(tx),
@@ -562,7 +567,14 @@ func (s *OrderService) ProviderConfirmOrder(orderID, ownerID int64) error {
 			repository.NewOrderArtifactRepo(tx),
 			repository.NewDemandDomainRepo(tx),
 			repository.NewOwnerDomainRepo(tx),
-		)
+		); txErr != nil {
+			return txErr
+		}
+		// 机主确认订单时自动签署合同
+		if s.contractService != nil {
+			_ = s.contractService.ProviderAutoSign(tx, orderID, ownerID)
+		}
+		return nil
 	}); err != nil {
 		return err
 	}

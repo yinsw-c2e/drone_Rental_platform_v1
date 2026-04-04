@@ -47,6 +47,7 @@ import MapPickerScreen from '../screens/location/MapPickerScreen';
 import PaymentScreen from '../screens/order/PaymentScreen';
 import ReviewScreen from '../screens/order/ReviewScreen';
 import OrderAfterSaleScreen from '../screens/order/OrderAfterSaleScreen';
+import ContractScreen from '../screens/order/ContractScreen';
 
 import PilotRegisterScreen from '../screens/pilot/PilotRegisterScreen';
 import PilotProfileScreen from '../screens/pilot/PilotProfileScreen';
@@ -144,6 +145,7 @@ export default function MainNavigator() {
       <RootStack.Screen name="Payment" component={PaymentScreen} options={{title: '订单支付'}} />
       <RootStack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <RootStack.Screen name="OrderAfterSale" component={OrderAfterSaleScreen} options={{title: '售后处理'}} />
+      <RootStack.Screen name="Contract" component={ContractScreen} options={{title: '合同签约'}} />
       <RootStack.Screen name="OfferList" component={OfferListScreen} options={{title: '供给列表'}} />
       <RootStack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
       <RootStack.Screen name="SupplyDirectOrderConfirm" component={SupplyDirectOrderConfirmScreen} options={{title: '确认直达下单'}} />

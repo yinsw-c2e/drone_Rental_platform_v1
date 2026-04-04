@@ -125,7 +125,8 @@ export default function DemandDetailScreen({route, navigation}: any) {
     setSelectingQuoteId(quote.id);
     try {
       const res = await demandV2Service.selectProvider(demand.id, quote.id);
-      Alert.alert('已生成订单', '需求已转为待支付订单，后续履约请到订单页处理。', [
+      Alert.alert('已生成订单', '需求已转为订单，请查看并签署合同。', [
+        {text: '签署合同', onPress: () => navigation.navigate('Contract', {orderId: res.data.order_id})},
         {text: '查看订单', onPress: () => navigation.navigate('OrderDetail', {id: res.data.order_id})},
       ]);
     } catch (error: any) {
