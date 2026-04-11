@@ -60,7 +60,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
       const res = await supplyService.getById(id);
       setSupply(res.data);
     } catch (error: any) {
-      Alert.alert('获取失败', error.message || '获取供给详情失败');
+      Alert.alert('获取失败', error.message || '获取服务详情失败');
       setSupply(null);
     } finally {
       setLoading(false);
@@ -81,11 +81,11 @@ export default function OfferDetailScreen({route, navigation}: any) {
     }
     const actionTextMap: Record<string, string> = {
       active: '恢复上架',
-      paused: '暂停供给',
-      closed: '关闭供给',
+      paused: '暂停服务',
+      closed: '关闭服务',
     };
 
-    Alert.alert('确认操作', `确认${actionTextMap[status] || '更新供给状态'}？`, [
+    Alert.alert('确认操作', `确认${actionTextMap[status] || '更新服务状态'}？`, [
       {text: '取消', style: 'cancel'},
       {
         text: '确认',
@@ -119,8 +119,8 @@ export default function OfferDetailScreen({route, navigation}: any) {
           <ObjectCard>
             <EmptyState
               icon="🛩️"
-              title="供给信息不存在"
-              description="这条供给可能已下架，或当前账号无权查看。"
+              title="服务信息不存在"
+              description="这条服务可能已下架，或当前账号无权查看。"
               actionText="返回市场"
               onAction={() => navigation.goBack()}
             />
@@ -149,7 +149,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
           </View>
           <Text style={styles.title}>{supply.title}</Text>
           <Text style={styles.price}>{formatSupplyPricing(supply.base_price_amount, supply.pricing_unit)}</Text>
-          <Text style={styles.heroDesc}>这是一条新版供给对象。客户在这里确认能力和范围后，再发起直达下单。</Text>
+          <Text style={styles.heroDesc}>这是一条新版服务对象。客户在这里确认能力和范围后，再发起直达下单。</Text>
         </ObjectCard>
 
         <ObjectCard>
@@ -227,7 +227,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
             <Text style={styles.infoLabel}>发布时间</Text>
             <Text style={styles.infoValue}>{supply.created_at?.slice(0, 10) || '-'}</Text>
           </View>
-          <Text style={styles.description}>{supply.description || '当前供给暂未补充更详细的说明。'}</Text>
+          <Text style={styles.description}>{supply.description || '当前服务暂未补充更详细的说明。'}</Text>
         </ObjectCard>
 
         {!supply.accepts_direct_order ? (
@@ -242,14 +242,14 @@ export default function OfferDetailScreen({route, navigation}: any) {
         {isMySupply ? (
           <>
             <TouchableOpacity style={[styles.secondaryBtn, styles.footerBtn]} onPress={() => navigation.navigate('MyOffers')}>
-              <Text style={styles.secondaryBtnText}>我的供给</Text>
+              <Text style={styles.secondaryBtnText}>我的服务</Text>
             </TouchableOpacity>
             {supply.status === 'active' ? (
               <TouchableOpacity
                 style={[styles.primaryBtn, styles.footerBtn, updatingStatus && styles.disabledBtn]}
                 onPress={() => handleUpdateStatus('paused')}
                 disabled={updatingStatus}>
-                <Text style={styles.primaryBtnText}>{updatingStatus ? '处理中...' : '暂停供给'}</Text>
+                <Text style={styles.primaryBtnText}>{updatingStatus ? '处理中...' : '暂停服务'}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity

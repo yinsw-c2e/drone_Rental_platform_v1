@@ -100,7 +100,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={styles.loadingText}>加载订单信息...</Text>
+          <Text style={styles.loadingText}>加载任务信息...</Text>
         </View>
       </SafeAreaView>
     );
@@ -110,7 +110,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.center}>
-          <Text style={styles.emptyText}>暂无执行订单</Text>
+          <Text style={styles.emptyText}>暂无执行任务</Text>
           <Text style={styles.emptySubText}>接受任务后将在此查看执行流程</Text>
         </View>
       </SafeAreaView>
@@ -126,10 +126,10 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 订单头部信息 */}
+        {/* 任务详情 */}
         <View style={styles.orderCard}>
           <View style={styles.orderHeader}>
-            <Text style={styles.orderNo}>{order.order_no || '-'}</Text>
+            <Text style={styles.orderNo}>任务号：{order.order_no || '-'}</Text>
             <View style={[styles.statusBadge, {backgroundColor: isCompleted ? theme.success + '20' : theme.primary + '20'}]}>
               <Text style={[styles.statusText, {color: isCompleted ? theme.success : theme.primary}]}>
                 {currentStep?.label || order.status}

@@ -133,8 +133,8 @@ export default function PublishDemandScreen({navigation}: any) {
         expires_at: expiresAt,
       });
       await demandV2Service.publish(created.data.id);
-      Alert.alert('发布成功', '需求已进入公开需求市场。', [
-        {text: '查看需求', onPress: () => navigation.replace('DemandDetail', {id: created.data.id})},
+      Alert.alert('发布成功', '任务已进入公开任务列表。', [
+        {text: '查看任务', onPress: () => navigation.replace('DemandDetail', {id: created.data.id})},
       ]);
     } catch (error: any) {
       Alert.alert('发布失败', error.message || '请稍后重试');
@@ -147,7 +147,7 @@ export default function PublishDemandScreen({navigation}: any) {
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>发布重载吊运需求</Text>
-        <Text style={styles.subtitle}>创建的是 v2 需求对象，发布后会进入公开需求市场，供机主报价、飞手候选。</Text>
+        <Text style={styles.subtitle}>创建的是 v2 任务对象，发布后会进入公开任务列表，供机主报价、飞手候选。</Text>
 
         <Text style={styles.label}>需求标题 *</Text>
         <TextInput style={styles.input} placeholder="例如：山区电网建设塔材吊运" value={title} onChangeText={setTitle} />

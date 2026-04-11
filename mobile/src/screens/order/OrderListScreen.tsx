@@ -294,10 +294,10 @@ export default function OrderListScreen({navigation, route}: any) {
   };
 
   const emptyAction = activeRole === 'owner'
-    ? {text: '去需求市场', onPress: () => navigation.navigate('DemandList', {mode: 'owner'})}
+    ? {text: '去任务列表', onPress: () => navigation.navigate('DemandList', {mode: 'owner'})}
     : activeRole === 'pilot'
       ? {text: '看派单任务', onPress: () => navigation.navigate('PilotTaskList')}
-      : {text: '去供给市场', onPress: () => navigation.navigate('OfferList')};
+      : {text: '去服务列表', onPress: () => navigation.navigate('OfferList')};
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -392,7 +392,7 @@ export default function OrderListScreen({navigation, route}: any) {
               <EmptyState
                 icon="📦"
                 title="当前没有匹配订单"
-                description="订单页已经只保留成交后的订单对象。需求、供给、派单任务请去对应页面查看。"
+                description="订单页已经只保留成交后的订单对象。任务、服务、派单任务请去对应页面查看。"
                 actionText={emptyAction.text}
                 onAction={emptyAction.onPress}
               />

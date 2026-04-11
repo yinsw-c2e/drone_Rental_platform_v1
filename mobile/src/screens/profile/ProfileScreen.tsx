@@ -309,8 +309,8 @@ export default function ProfileScreen({navigation}: any) {
   const accountHighlights = useMemo(
     () => [
       {label: '订单', value: stats.orders, screen: 'MyOrders'},
-      {label: '需求', value: stats.demands, screen: 'MyDemands'},
-      {label: '供给', value: stats.supplies, screen: 'MyOffers'},
+      {label: '任务', value: stats.demands, screen: 'MyDemands'},
+      {label: '服务', value: stats.supplies, screen: 'MyOffers'},
     ],
     [stats.demands, stats.orders, stats.supplies],
   );
@@ -331,14 +331,14 @@ export default function ProfileScreen({navigation}: any) {
       let lines: string[] = [];
       if (item.key === 'client') {
         lines = [
-          `我的需求 ${stats.demands}`,
+          `我的任务 ${stats.demands}`,
           `我的订单 ${stats.orders}`,
           hasRole ? '默认个人客户档案可直接使用。' : '默认客户档案异常，后续需要排查。',
         ];
       } else if (item.key === 'owner') {
         lines = [
           `可用无人机 ${stats.drones}`,
-          `生效中供给 ${stats.supplies}`,
+          `生效中服务 ${stats.supplies}`,
           `绑定飞手 ${stats.bindings}`,
         ];
       } else {
@@ -381,7 +381,7 @@ export default function ProfileScreen({navigation}: any) {
 
   const quickEntries = useMemo<ShortcutItem[]>(() => {
     const items: ShortcutItem[] = [
-      {key: 'client-profile', title: '客户档案', desc: '联系人、地址、需求统计', icon: '👔', screen: 'ClientProfile'},
+      {key: 'client-profile', title: '客户档案', desc: '联系人、地址、项目统计', icon: '👔', screen: 'ClientProfile'},
       {key: 'orders', title: '我的订单', desc: '统一查看订单进度与财务', icon: '📋', screen: 'MyOrders'},
       {key: 'verify', title: '实名认证', desc: '完善账号实名与资料校验', icon: '🔒', screen: 'Verification'},
       {key: 'settings', title: '设置', desc: '账号与通知偏好设置', icon: '⚙️', screen: 'Settings'},
@@ -390,7 +390,7 @@ export default function ProfileScreen({navigation}: any) {
     if (effectiveRoleSummary.has_client_role) {
       items.splice(1, 0, {
         key: 'demands',
-        title: '我的需求',
+        title: '我的任务',
         desc: '继续跟进报价和转单',
         icon: '📝',
         screen: 'MyDemands',
@@ -399,10 +399,10 @@ export default function ProfileScreen({navigation}: any) {
 
     if (effectiveRoleSummary.has_owner_role) {
       items.push(
-      {key: 'owner-profile', title: '机主档案', desc: '查看资产、供给与能力就绪情况', icon: '🧭', screen: 'OwnerProfile'},
+      {key: 'owner-profile', title: '机主档案', desc: '查看资产、服务与能力就绪情况', icon: '🧭', screen: 'OwnerProfile'},
       {key: 'drones', title: '我的无人机', desc: '管理设备、资质和状态', icon: '🛩️', screen: 'MyDrones'},
-        {key: 'offers', title: '我的供给', desc: '查看上架、暂停和关闭中的供给', icon: '📦', screen: 'MyOffers'},
-        {key: 'quotes', title: '我的报价', desc: '继续跟进需求报价结果', icon: '💬', screen: 'MyQuotes'},
+        {key: 'offers', title: '我的服务', desc: '查看上架、暂停和关闭中的服务', icon: '📦', screen: 'MyOffers'},
+        {key: 'quotes', title: '我的报价', desc: '继续跟进任务报价结果', icon: '💬', screen: 'MyQuotes'},
       );
     }
 

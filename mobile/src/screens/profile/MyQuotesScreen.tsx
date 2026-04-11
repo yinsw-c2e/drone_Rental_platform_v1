@@ -163,8 +163,8 @@ export default function MyQuotesScreen({navigation}: any) {
               <EmptyState
                 icon="💬"
                 title={activeGroup === 'all' ? '还没有报价记录' : '这个分组下暂无报价'}
-                description="进入需求市场后，选择合适需求提交报价，这里会统一追踪所有报价状态。"
-                actionText="去需求市场"
+                description="进入任务列表后，选择合适任务提交报价，这里会统一追踪所有报价状态。"
+                actionText="去任务列表"
                 onAction={() => navigation.navigate('DemandList', {mode: 'owner'})}
               />
             </ObjectCard>

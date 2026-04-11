@@ -114,9 +114,9 @@ export default function OfferListScreen({navigation}: any) {
 
   const heroTitle = useMemo(() => {
     if (region.trim()) {
-      return `${region.trim()} 供给市场`;
+      return `${region.trim()} 服务市场`;
     }
-    return '重载吊运供给市场';
+    return '重载吊运服务市场';
   }, [region]);
 
   const renderItem = ({item}: {item: SupplySummary}) => {
@@ -180,10 +180,10 @@ export default function OfferListScreen({navigation}: any) {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>供给市场</Text>
+              <Text style={styles.heroEyebrow}>服务市场</Text>
               <Text style={styles.heroTitle}>{heroTitle}</Text>
               <Text style={styles.heroDesc}>
-                这里只展示满足平台重载门槛、并支持客户直达下单的供给，不再混需求卡片和订单卡片。
+                这里只展示满足平台重载门槛、并支持客户直达下单的服务，不再混任务卡片和订单卡片。
               </Text>
             </View>
 
@@ -230,9 +230,9 @@ export default function OfferListScreen({navigation}: any) {
             <ObjectCard>
               <EmptyState
                 icon="🛩️"
-                title="当前没有匹配的供给"
-                description="可以调整场景或区域筛选，或者先发布需求，让平台反向撮合合适机主。"
-                actionText="发布需求"
+                title="当前没有匹配的服务"
+                description="可以调整场景或区域筛选，或者先发布任务，让平台反向撮合合适机主。"
+                actionText="发布任务"
                 onAction={() => navigation.navigate('PublishCargo')}
               />
             </ObjectCard>

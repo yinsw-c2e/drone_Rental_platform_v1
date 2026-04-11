@@ -214,7 +214,7 @@ function TimelineSection({items}: {items?: V2OrderTimelineItem[]}) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   if (!items || items.length === 0) {
-    return <Text style={styles.emptyHint}>当前还没有可展示的履约时间线。</Text>;
+    return <Text style={styles.emptyHint}>当前还没有可展示的进度时间线。</Text>;
   }
 
   return (
@@ -382,7 +382,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
               style={[styles.liveChip, autoRefresh && styles.liveChipActive]}
               onPress={() => setAutoRefresh(value => !value)}>
               <Text style={[styles.liveChipText, autoRefresh && styles.liveChipTextActive]}>
-                {autoRefresh ? '实时监控中' : '已暂停自动刷新'}
+                {autoRefresh ? '数据同步中' : '已暂停自动同步'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('OrderDetail', {id: order.id, orderId: order.id})}>
@@ -399,7 +399,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
         </View>
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>监控摘要</Text>
+          <Text style={styles.sectionTitle}>飞行概览</Text>
           <DetailRow label="订单状态" value={orderStatusLabel} />
           <DetailRow label="执行状态" value={isActiveExecution ? '处于履约监控窗口' : '当前不在活跃履约窗口'} />
           <DetailRow label="飞行开始" value={formatDateTime(stats?.flight_start_time)} />
@@ -440,7 +440,7 @@ export default function FlightMonitoringScreen({route, navigation}: any) {
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>履约时间线</Text>
+          <Text style={styles.sectionTitle}>执行时间线</Text>
           <TimelineSection items={monitor?.timeline} />
         </ObjectCard>
       </ScrollView>

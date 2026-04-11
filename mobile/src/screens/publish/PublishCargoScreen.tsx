@@ -99,8 +99,8 @@ export default function PublishCargoScreen({navigation}: any) {
         expires_at: defaults.expires,
       });
       await demandV2Service.publish(created.data.id);
-      Alert.alert('发布成功', '运输需求已进入公开需求市场。', [
-        {text: '查看需求', onPress: () => navigation.replace('DemandDetail', {id: created.data.id})},
+      Alert.alert('发布成功', '运输任务已进入公开任务列表。', [
+        {text: '查看任务', onPress: () => navigation.replace('DemandDetail', {id: created.data.id})},
       ]);
     } catch (error: any) {
       Alert.alert('发布失败', error.message || '请稍后重试');

@@ -165,15 +165,15 @@ export default function MyOffersScreen({navigation}: any) {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>我的供给</Text>
-              <Text style={styles.heroTitle}>供给和市场入口已经拆开</Text>
+              <Text style={styles.heroEyebrow}>我的服务</Text>
+              <Text style={styles.heroTitle}>服务与市场入口已经拆开</Text>
               <Text style={styles.heroDesc}>
-                这里只展示自己发布的供给对象。草稿、上架中、暂停、关闭各看各的，不再和需求或订单混成一页。
+                这里只展示自己发布的服务方案。草稿、上架中、暂停、关闭各看各的，不再和任务或订单混成一页。
               </Text>
             </View>
 
             <ObjectCard style={styles.filterCard}>
-              <Text style={styles.filterTitle}>供给分组</Text>
+              <Text style={styles.filterTitle}>服务分组</Text>
               <View style={styles.filterRow}>
                 {STATUS_GROUPS.map(group => (
                   <TouchableOpacity

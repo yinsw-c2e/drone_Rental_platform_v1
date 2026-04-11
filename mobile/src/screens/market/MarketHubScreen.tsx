@@ -1,293 +1,336 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {useSelector} from 'react-redux';
+
+import EmptyState from '../../components/business/EmptyState';
+import ObjectCard from '../../components/business/ObjectCard';
+import SourceTag from '../../components/business/SourceTag';
+import StatusBadge from '../../components/business/StatusBadge';
+import {getObjectStatusMeta} from '../../components/business/visuals';
+import {demandV2Service} from '../../services/demandV2';
+import {supplyService} from '../../services/supply';
+import {homeService} from '../../services/home';
 import {RootState} from '../../store/store';
-import {getEffectiveRoleSummary, getRoleDisplayText} from '../../utils/roleSummary';
-import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
+import {DemandSummary, SupplySummary} from '../../types';
+import {
+  formatDemandBudget,
+  formatDemandSchedule,
+  getDemandSceneLabel,
+  resolveDemandPrimaryAddress,
+} from '../../utils/demandMeta';
+import {formatSupplyPricing, getSupplySceneLabel} from '../../utils/supplyMeta';
+import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
-type MarketAction = {
-  key: string;
-  title: string;
-  desc: string;
-  icon: string;
-  accent: string;
-  onPress: () => void;
-};
-
-function ActionCard({action, width}: {action: MarketAction; width: number}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  return (
-    <TouchableOpacity
-      style={[styles.actionCard, {width, borderColor: action.accent}]}
-      onPress={action.onPress}
-      activeOpacity={0.88}>
-      <View style={[styles.actionIconWrap, {backgroundColor: `${action.accent}18`}]}>
-        <Text style={styles.actionIcon}>{action.icon}</Text>
-      </View>
-      <Text style={styles.actionTitle}>{action.title}</Text>
-      <Text style={styles.actionDesc}>{action.desc}</Text>
-    </TouchableOpacity>
-  );
-}
+type MarketTab = 'demand' | 'supply';
 
 export default function MarketHubScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {width: viewportWidth} = useWindowDimensions();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
-  const actionCardLayout = useMemo(
-    () =>
-      getResponsiveTwoColumnLayout({
-        viewportWidth,
-        totalHorizontalPadding: 64,
-        gap: 12,
-        minItemWidth: 120,
-      }),
-    [viewportWidth],
+
+  const [activeTab, setActiveTab] = useState<MarketTab>(
+    effectiveRoleSummary.has_client_role && !effectiveRoleSummary.has_owner_role && !effectiveRoleSummary.has_pilot_role
+      ? 'supply'
+      : 'demand',
+  );
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [demands, setDemands] = useState<DemandSummary[]>([]);
+  const [supplies, setSupplies] = useState<SupplySummary[]>([]);
+
+  const fetchDemands = useCallback(async () => {
+    try {
+      // 优先展示市场推荐需求
+      const res = await demandV2Service.listMarketplaceDemands({page: 1, page_size: 10});
+      setDemands(res.data?.items || []);
+    } catch (error) {
+      console.warn('获取需求流失败:', error);
+    }
+  }, []);
+
+  const fetchSupplies = useCallback(async () => {
+    try {
+      // 展示支持直达下单的重载供给
+      const res = await supplyService.list({
+        page: 1,
+        page_size: 10,
+        accepts_direct_order: true,
+        service_type: 'heavy_cargo_lift_transport',
+      });
+      setSupplies(res.data?.items || []);
+    } catch (error) {
+      console.warn('获取服务流失败:', error);
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    if (activeTab === 'demand') {
+      await fetchDemands();
+    } else {
+      await fetchSupplies();
+    }
+    setLoading(false);
+    setRefreshing(false);
+  }, [activeTab, fetchDemands, fetchSupplies]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
+
+  const renderDemandItem = ({item}: {item: DemandSummary}) => (
+    <ObjectCard
+      style={styles.card}
+      onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderLeft}>
+          <SourceTag source="demand" />
+          <StatusBadge meta={getObjectStatusMeta('demand', item.status)} label="" />
+        </View>
+        <Text style={styles.budget}>{formatDemandBudget(item.budget_min, item.budget_max)}</Text>
+      </View>
+      <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+      <View style={styles.metaBlock}>
+        <Text style={styles.metaText}>场景：{getDemandSceneLabel(item.cargo_scene)}</Text>
+        <Text style={styles.metaText}>区域：{resolveDemandPrimaryAddress(item)}</Text>
+        <Text style={styles.metaText}>时间：{formatDemandSchedule(item.scheduled_start_at, item.scheduled_end_at)}</Text>
+      </View>
+    </ObjectCard>
   );
 
-  const marketActions = useMemo<MarketAction[]>(() => {
-    const actions: MarketAction[] = [
-      {
-        key: 'demand-market',
-        title: '需求市场',
-        desc: '查看公开需求，按区域和能力筛选',
-        icon: '📋',
-        accent: '#1677ff',
-        onPress: () => navigation.navigate('DemandList', {mode: 'public'}),
-      },
-      {
-        key: 'supply-market',
-        title: '供给市场',
-        desc: '浏览可直接下单的重载吊运供给',
-        icon: '🛩️',
-        accent: '#13c2c2',
-        onPress: () => navigation.navigate('OfferList'),
-      },
-    ];
+  const renderSupplyItem = ({item}: {item: SupplySummary}) => (
+    <ObjectCard
+      style={styles.card}
+      onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderLeft}>
+          <SourceTag source="supply" />
+          <StatusBadge meta={getObjectStatusMeta('supply', item.status)} label="" />
+        </View>
+        <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
+      </View>
+      <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+      <View style={styles.metaBlock}>
+        <Text style={styles.metaText}>吊重：{item.max_payload_kg || 0}kg</Text>
+        <Text style={styles.metaText}>场景：{(item.cargo_scenes || []).map(s => getSupplySceneLabel(s)).join('、')}</Text>
+      </View>
+    </ObjectCard>
+  );
 
-    if (effectiveRoleSummary.has_client_role) {
-      actions.push(
-        {
-          key: 'publish-demand',
-          title: '发布需求',
-          desc: '发布重载末端吊运需求',
-          icon: '📝',
-          accent: '#2f54eb',
-          onPress: () => navigation.navigate('PublishDemand'),
-        },
-        {
-          key: 'my-demands',
-          title: '我的需求',
-          desc: '查看已发布需求与报价进展',
-          icon: '🗂️',
-          accent: '#1d39c4',
-          onPress: () => navigation.navigate('MyDemands'),
-        },
-      );
+  const mainAction = useMemo(() => {
+    if (activeTab === 'demand') {
+      return {
+        label: effectiveRoleSummary.has_client_role ? '发布任务' : '查看全部任务',
+        onPress: () => navigation.navigate(effectiveRoleSummary.has_client_role ? 'PublishDemand' : 'DemandList'),
+      };
     }
-
-    if (effectiveRoleSummary.has_owner_role) {
-      actions.push(
-        {
-          key: 'publish-offer',
-          title: '发布供给',
-          desc: '上架机型、能力与服务区域',
-          icon: '📦',
-          accent: '#52c41a',
-          onPress: () => navigation.navigate('PublishOffer'),
-        },
-        {
-          key: 'my-offers',
-          title: '我的供给',
-          desc: '管理上架状态、查看曝光与接单',
-          icon: '🧾',
-          accent: '#389e0d',
-          onPress: () => navigation.navigate('MyOffers'),
-        },
-        {
-          key: 'my-drones',
-          title: '我的无人机',
-          desc: '维护设备、资质与可用状态',
-          icon: '🚁',
-          accent: '#36cfc9',
-          onPress: () => navigation.navigate('MyDrones'),
-        },
-      );
-    }
-
-    if (effectiveRoleSummary.has_pilot_role) {
-      actions.push({
-        key: 'candidate-market',
-        title: '候选需求',
-        desc: '查看可报名的公开需求，提前进入候选池',
-        icon: '📍',
-        accent: '#fa8c16',
-        onPress: () => navigation.navigate('DemandList', {mode: 'pilot'}),
-      });
-    }
-
-    return actions;
-  }, [effectiveRoleSummary, navigation]);
+    return {
+      label: effectiveRoleSummary.has_owner_role ? '上架服务' : '查看全部服务',
+      onPress: () => navigation.navigate(effectiveRoleSummary.has_owner_role ? 'PublishOffer' : 'OfferList'),
+    };
+  }, [activeTab, effectiveRoleSummary, navigation]);
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <Text style={styles.heroEyebrow}>市场</Text>
-          <Text style={styles.heroTitle}>重载吊运撮合入口</Text>
-          <Text style={styles.heroDesc}>
-            这里专门处理需求、供给、报价和候选，不再混订单与派单任务。
-          </Text>
-          <View style={styles.rolePill}>
-            <Text style={styles.rolePillText}>{getRoleDisplayText(roleSummary, user)}</Text>
-          </View>
+      <View style={styles.header}>
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'demand' && styles.tabActive]}
+            onPress={() => setActiveTab('demand')}>
+            <Text style={[styles.tabText, activeTab === 'demand' && styles.tabTextActive]}>看需求</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'supply' && styles.tabActive]}
+            onPress={() => setActiveTab('supply')}>
+            <Text style={[styles.tabText, activeTab === 'supply' && styles.tabTextActive]}>看服务</Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>核心市场动作</Text>
-          <Text style={styles.sectionDesc}>
-            先在市场里完成撮合与下单，成交后的执行统一去「进度」查看。
-          </Text>
-          <View style={styles.grid}>
-            {marketActions.map(action => (
-              <ActionCard key={action.key} action={action} width={actionCardLayout.itemWidth} />
-            ))}
+      <FlatList
+        data={activeTab === 'demand' ? demands : supplies}
+        keyExtractor={item => String(item.id)}
+        renderItem={activeTab === 'demand' ? renderDemandItem : renderSupplyItem}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <View style={styles.hero}>
+              <Text style={styles.heroTitle}>{activeTab === 'demand' ? '发现新需求' : '挑选重载服务'}</Text>
+              <Text style={styles.heroDesc}>
+                {activeTab === 'demand' 
+                  ? '机主和飞手可在此寻找作业机会，公开需求报价不等于成交。' 
+                  : '客户可在此挑选合规供给，支持从详情页发起直达下单。'}
+              </Text>
+            </View>
           </View>
-        </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.loading} color={theme.primary} />
+          ) : (
+            <EmptyState
+              icon={activeTab === 'demand' ? '📋' : '🛩️'}
+              title={`暂无公开${activeTab === 'demand' ? '需求' : '服务'}`}
+              description="市场内容正在更新中，请稍后再试。"
+            />
+          )
+        }
+      />
 
-        <View style={styles.tipCard}>
-          <Text style={styles.tipTitle}>边界提醒</Text>
-          <Text style={styles.tipText}>
-            需求、供给、订单、派单任务是四类不同对象。市场页只展示需求与供给，不再直接堆订单卡片。
-          </Text>
-        </View>
-      </ScrollView>
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.mainBtn} onPress={mainAction.onPress}>
+          <Text style={styles.mainBtnText}>{mainAction.label}</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bg},
-  content: {padding: 16, paddingBottom: 28},
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  header: {
+    backgroundColor: theme.bg,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.divider,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: theme.bgSecondary,
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  tabActive: {
+    backgroundColor: theme.card,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    color: theme.textSub,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: theme.primary,
+    fontWeight: '700',
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  listHeader: {
+    marginBottom: 16,
+  },
   hero: {
     backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: theme.isDark ? 1 : 0,
-    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
-  },
-  heroEyebrow: {
-    fontSize: 13,
-    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
-    marginBottom: 8,
-    fontWeight: '600',
+    borderRadius: 20,
+    padding: 18,
   },
   heroTitle: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 20,
     color: theme.isDark ? theme.text : '#FFFFFF',
-    fontWeight: '700',
-    marginBottom: 8,
+    fontWeight: '800',
+    marginBottom: 6,
   },
   heroDesc: {
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 18,
     color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
-  rolePill: {
-    alignSelf: 'flex-start',
-    marginTop: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.14)',
-  },
-  rolePillText: {
-    fontSize: 13,
-    color: theme.isDark ? theme.primaryText : '#FFFFFF',
-    fontWeight: '600',
-  },
-  section: {
-    backgroundColor: theme.card,
-    borderRadius: 20,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    color: theme.text,
-    fontWeight: '700',
-  },
-  sectionDesc: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionCard: {
-    minHeight: 148,
-    borderRadius: 18,
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    padding: 14,
-  },
-  actionIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  card: {
     marginBottom: 12,
   },
-  actionIcon: {fontSize: 20},
-  actionTitle: {
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  budget: {
     fontSize: 16,
+    color: theme.danger,
+    fontWeight: '700',
+  },
+  price: {
+    fontSize: 16,
+    color: theme.danger,
+    fontWeight: '700',
+  },
+  title: {
+    fontSize: 16,
+    lineHeight: 22,
     color: theme.text,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 10,
   },
-  actionDesc: {
+  metaBlock: {
+    gap: 4,
+  },
+  metaText: {
     fontSize: 12,
-    lineHeight: 18,
     color: theme.textSub,
   },
-  tipCard: {
-    marginTop: 16,
-    borderRadius: 18,
-    backgroundColor: theme.warning + '22',
-    borderWidth: 1,
-    borderColor: theme.warning + '55',
+  loading: {
+    paddingVertical: 40,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderTopWidth: 1,
+    borderTopColor: theme.divider,
   },
-  tipTitle: {
+  mainBtn: {
+    backgroundColor: theme.primary,
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: theme.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mainBtnText: {
     fontSize: 15,
-    color: theme.warning,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  tipText: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.warning,
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 });

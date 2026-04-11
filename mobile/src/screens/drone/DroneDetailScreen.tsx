@@ -76,9 +76,9 @@ export default function DroneDetailScreen({route, navigation}: any) {
       Alert.alert('提示', '该无人机当前不可接入市场链路');
       return;
     }
-    Alert.alert('入口已切换', '新版下单链路统一从供给市场发起。', [
+    Alert.alert('入口已切换', '新版下单链路统一从服务列表发起。', [
       {text: '取消', style: 'cancel'},
-      {text: '去供给市场', onPress: () => navigation.navigate('OfferList')},
+      {text: '去服务列表', onPress: () => navigation.navigate('OfferList')},
     ]);
   };
 
@@ -321,7 +321,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
             ]}
             onPress={handleRent}>
             <Text style={styles.bottomRentText}>
-              {drone.availability_status === 'available' ? '去供给市场' : availability.label}
+              {drone.availability_status === 'available' ? '去服务列表' : availability.label}
             </Text>
           </TouchableOpacity>
         </View>

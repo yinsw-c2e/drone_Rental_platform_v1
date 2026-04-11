@@ -64,7 +64,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
       const res = await demandV2Service.getById(demandId);
       setDemand(res.data);
     } catch (error: any) {
-      Alert.alert('错误', error.message || '获取需求详情失败');
+      Alert.alert('错误', error.message || '获取任务详情失败');
       setDemand(null);
     } finally {
       setLoading(false);
@@ -125,7 +125,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
     setSelectingQuoteId(quote.id);
     try {
       const res = await demandV2Service.selectProvider(demand.id, quote.id);
-      Alert.alert('已生成订单', '需求已转为订单，请查看并签署合同。', [
+      Alert.alert('已生成订单', '任务已转为订单，请查看并签署合同。', [
         {text: '签署合同', onPress: () => navigation.navigate('Contract', {orderId: res.data.order_id})},
         {text: '查看订单', onPress: () => navigation.navigate('OrderDetail', {id: res.data.order_id})},
       ]);
@@ -169,8 +169,8 @@ export default function DemandDetailScreen({route, navigation}: any) {
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.emptyBox}>
           <Text style={styles.emptyIcon}>📋</Text>
-          <Text style={styles.emptyTitle}>需求不存在</Text>
-          <Text style={styles.emptyDesc}>这条需求可能已关闭，或者当前账号无权查看。</Text>
+          <Text style={styles.emptyTitle}>任务不存在</Text>
+          <Text style={styles.emptyDesc}>这条任务可能已关闭，或者当前账号无权查看。</Text>
         </View>
       </SafeAreaView>
     );
@@ -203,13 +203,13 @@ export default function DemandDetailScreen({route, navigation}: any) {
             <TouchableOpacity
               style={styles.editBtn}
               onPress={() => navigation.navigate('EditDemand', {demandId: demand.id})}>
-              <Text style={styles.editBtnText}>修改需求</Text>
+              <Text style={styles.editBtnText}>修改任务</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelBtn}
               onPress={handleCancel}
               disabled={cancelling}>
-              <Text style={styles.cancelBtnText}>{cancelling ? '撤销中...' : '撤销需求'}</Text>
+              <Text style={styles.cancelBtnText}>{cancelling ? '撤销中...' : '撤销任务'}</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -242,12 +242,12 @@ export default function DemandDetailScreen({route, navigation}: any) {
                 </Text>
               </TouchableOpacity>
             ) : null}
-            <Text style={styles.helperText}>机主报价和飞手候选现在都只围绕新版需求对象运转，不再混入旧订单入口。</Text>
+            <Text style={styles.helperText}>机主报价和飞手候选现在都只围绕新版任务对象运转，不再混入旧订单入口。</Text>
           </View>
         ) : null}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>需求详情</Text>
+          <Text style={styles.sectionTitle}>任务详情</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>服务类型</Text>
             <Text style={styles.infoValue}>重载吊运</Text>
@@ -323,7 +323,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
 
         {isConvertedToOrder ? (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>该需求已转为订单</Text>
+            <Text style={styles.sectionTitle}>该任务已转为订单</Text>
           </View>
         ) : null}
 

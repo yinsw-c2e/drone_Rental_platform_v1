@@ -383,16 +383,16 @@ export default function HomeScreen({ navigation }: any) {
     switch (activeRole) {
       case 'client':
         return {
-          title: '先发需求，再选方案',
+          title: '先发任务，再选方案',
           subtitle:
-            '你最需要的是尽快发起需求、浏览供给、跟进报价与待支付订单。',
+            '你最需要的是尽快发起任务、浏览服务、跟进报价与待支付订单。',
           primaryAction: {
-            title: '立即发布需求',
+            title: '立即发布任务',
             onPress: () => navigation.navigate('PublishCargo'),
           },
           secondaryActions: [
             {
-              title: '浏览供给',
+              title: '浏览服务',
               onPress: () => navigation.navigate('OfferList'),
             },
             {
@@ -424,7 +424,7 @@ export default function HomeScreen({ navigation }: any) {
             },
             {
               key: 'client-progress',
-              label: '进行中服务',
+              label: '进行中任务',
               value: currentDashboard.role_views.client.in_progress_order_count,
               hint: '已进入执行阶段',
             },
@@ -434,7 +434,7 @@ export default function HomeScreen({ navigation }: any) {
         return {
           title: '先看新需求，再做承接',
           subtitle:
-            '机主首页只聚焦获客、报价和履约准备，不再把客户信息和飞手信息混在一起。',
+            '机主首页只聚焦获客、报价和进度管理，不再把客户信息和飞手信息混在一起。',
           primaryAction: {
             title: '查看新需求',
             onPress: () => navigation.navigate('DemandList'),
@@ -483,7 +483,7 @@ export default function HomeScreen({ navigation }: any) {
         return {
           title: '先接派单，再看执行',
           subtitle:
-            '飞手视图只保留执行相关信息，避免把需求、供给和订单列表堆在一起。',
+            '飞手视图只保留执行相关信息，避免把任务、服务和订单列表堆在一起。',
           primaryAction: {
             title: '待接派单',
             onPress: () =>
@@ -539,7 +539,7 @@ export default function HomeScreen({ navigation }: any) {
         }
         if (hasClient && !hasOwner && !hasPilot) {
           allSecondaryActions.push({
-            title: '浏览供给',
+            title: '浏览服务',
             onPress: () => navigation.navigate('OfferList'),
           });
         }
@@ -586,10 +586,10 @@ export default function HomeScreen({ navigation }: any) {
         return {
           title: '先处理优先动作，再看全局',
           subtitle:
-            '综合视图只保留今天最重要的三件事：发需求、看新需求、接派单。',
+            '综合视图只保留今天最重要的三件事：发布任务、看新需求、接派单。',
           primaryAction: {
             title: hasClient
-              ? '发布需求'
+              ? '发布任务'
               : hasOwner
               ? '查看新需求'
               : '待接派单',
@@ -611,16 +611,16 @@ export default function HomeScreen({ navigation }: any) {
         return [
           {
             key: 'client-publish',
-            title: '发布需求',
-            desc: '发起重载末端吊运需求',
+            title: '发布任务',
+            desc: '发起重载末端吊运任务',
             icon: '📝',
             tone: 'green',
             onPress: () => navigation.navigate('PublishCargo'),
           },
           {
             key: 'client-supply',
-            title: '浏览供给',
-            desc: '查看可直达下单的合规供给',
+            title: '浏览服务',
+            desc: '查看可直达下单的合规服务',
             icon: '📦',
             tone: 'blue',
             onPress: () => navigation.navigate('OfferList'),
@@ -628,8 +628,8 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'client-demands',
-            title: '我的需求',
-            desc: '跟进报价与撮合进度',
+            title: '我的任务',
+            desc: '跟进报价与项目进度',
             icon: '🗂️',
             tone: 'teal',
             onPress: () => navigation.navigate('MyDemands'),
@@ -665,8 +665,8 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'owner-supplies',
-            title: '我的供给',
-            desc: '查看供给状态与曝光结果',
+            title: '我的服务',
+            desc: '查看服务状态与曝光结果',
             icon: '📦',
             tone: 'green',
             onPress: () => navigation.navigate('MyOffers'),
@@ -696,8 +696,8 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'pilot-nearby',
-            title: '可报名需求',
-            desc: '查看系统筛选后的公开需求',
+            title: '可报名任务',
+            desc: '查看系统筛选后的公开任务',
             icon: '🛰️',
             tone: 'blue',
             onPress: () => navigation.navigate('DemandList'),
@@ -706,7 +706,7 @@ export default function HomeScreen({ navigation }: any) {
           {
             key: 'pilot-records',
             title: '飞行记录',
-            desc: '查看真实履约飞行数据',
+            desc: '查看真实执行飞行数据',
             icon: '🛫',
             tone: 'purple',
             onPress: () => navigation.navigate('FlightLog'),
@@ -718,7 +718,7 @@ export default function HomeScreen({ navigation }: any) {
         if (hasClient) {
           actions.push({
             key: 'all-publish',
-            title: '发布需求',
+            title: '发布任务',
             desc: '快速发起新的重载吊运任务',
             icon: '📝',
             tone: 'green',
@@ -768,9 +768,9 @@ export default function HomeScreen({ navigation }: any) {
           {
             key: 'client-quote',
             title: '待确认报价与方案',
-            desc: '先看哪些需求已经进入报价阶段，再决定是否继续推进。',
+            desc: '先看哪些任务已经进入报价阶段，再决定是否继续推进。',
             badge: currentDashboard.role_views.client.quoted_demand_count,
-            actionText: '查看需求',
+            actionText: '查看任务',
             onPress: () => navigation.navigate('MyDemands', {statusFilter: 'quoting'}),
             tone: 'green',
           },
@@ -807,8 +807,8 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'client-progress',
-            title: '进行中服务',
-            desc: '履约中的订单会持续出现在首页，避免你再去翻列表。',
+            title: '进行中任务',
+            desc: '执行中的订单会持续出现在首页，避免你再去翻列表。',
             badge: currentDashboard.role_views.client.in_progress_order_count,
             actionText: '查看订单',
             onPress: () => navigation.navigate('MyOrders', {roleFilter: 'client', statusFilter: 'in_progress'}),
@@ -819,7 +819,7 @@ export default function HomeScreen({ navigation }: any) {
         return [
           {
             key: 'owner-recommend',
-            title: '待报价需求',
+            title: '待报价新需求',
             desc: '优先处理当前机队可承接的新需求，缩短获客反应时间。',
             badge: currentDashboard.role_views.owner.recommended_demand_count,
             actionText: '去报价',
@@ -859,8 +859,8 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'owner-asset',
-            title: '供给与机队状态',
-            desc: '如果供给不上架或设备不合规，会直接影响后续承接和派单。',
+            title: '服务与机队状态',
+            desc: '如果服务不上架或设备不合规，会直接影响后续承接和派单。',
             badge: currentDashboard.role_views.owner.active_supply_count,
             actionText: '查看机队',
             onPress: () => navigation.navigate('MyDrones'),
@@ -872,7 +872,7 @@ export default function HomeScreen({ navigation }: any) {
           {
             key: 'pilot-pending',
             title: '待响应派单',
-            desc: '系统正式派单优先于候选报名，超时会自动回退。',
+            desc: '系统正式派单优先于报名任务，超时会自动回退。',
             badge:
               currentDashboard.role_views.pilot.pending_response_dispatch_count,
             actionText: '去接单',
@@ -891,8 +891,8 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'pilot-candidate',
-            title: '可报名需求',
-            desc: '公开需求报名不等于抢单成功，但能提前进入后续候选池。',
+            title: '可报名任务',
+            desc: '公开任务报名不等于抢单成功，但能提前进入后续候选池。',
             badge: currentDashboard.role_views.pilot.candidate_demand_count,
             actionText: '去查看',
             onPress: () => navigation.navigate('DemandList', {mode: 'pilot'}),
@@ -916,7 +916,7 @@ export default function HomeScreen({ navigation }: any) {
           items.push({
             key: 'all-exec',
             title: '执行优先',
-            desc: '待接派单和进行中订单是今天最应该先处理的执行项。',
+            desc: '待接派单和进行中任务是今天最应该先处理的执行项。',
             badge:
               (hasPilot
                 ? currentDashboard.role_views.pilot
@@ -936,7 +936,7 @@ export default function HomeScreen({ navigation }: any) {
           onPress: () => navigation.navigate('MyOrders'),
           tone: 'red',
         });
-        return items.slice(0, 3);
+        return items;
     }
   }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
 

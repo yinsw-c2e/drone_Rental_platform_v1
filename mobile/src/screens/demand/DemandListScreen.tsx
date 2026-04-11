@@ -29,20 +29,20 @@ const PAGE_SIZE = 20;
 
 const MODE_META: Record<MarketDemandMode, {label: string; desc: string; tone: ReturnType<typeof getTonePalette>; actionLabel: string}> = {
   public: {
-    label: '公开需求',
-    desc: '查看当前公开的重载吊运需求，市场页只展示需求对象。',
+    label: '公开任务',
+    desc: '查看当前公开的重载吊运任务，市场页只展示任务对象。',
     tone: getTonePalette('blue'),
     actionLabel: '查看详情',
   },
   owner: {
     label: '机主视角',
-    desc: '这里展示可报价需求，报价后仍停留在撮合阶段，不会直接生成订单。',
+    desc: '这里展示可报价任务，报价后仍停留在撮合阶段，不会直接生成订单。',
     tone: getTonePalette('green'),
     actionLabel: '去报价',
   },
   pilot: {
     label: '飞手视角',
-    desc: '这里只展示可报名候选的公开需求，报名后进入候选池，不等于直接接单。',
+    desc: '这里只展示可报名候选的公开任务，报名后进入候选池，不等于直接接单。',
     tone: getTonePalette('orange'),
     actionLabel: '去候选',
   },
@@ -260,10 +260,10 @@ export default function DemandListScreen({navigation, route}: any) {
         ListEmptyComponent={
           <EmptyState
             icon="📋"
-            title={loading ? '需求加载中…' : '当前没有可展示的需求'}
+            title={loading ? '任务加载中…' : '当前没有可展示的任务'}
             description={
               !loading && mode === 'owner' && availableModes.includes('public')
-                ? '当前没有匹配到你的机主推荐需求，可以切换到“公开需求”继续浏览市场全量入口。'
+                ? '当前没有匹配到你的机主推荐任务，可以切换到“公开任务”继续浏览市场全量入口。'
                 : modeMeta.desc
             }
           />

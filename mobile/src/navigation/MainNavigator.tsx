@@ -133,10 +133,10 @@ export default function MainNavigator() {
   return (
     <RootStack.Navigator>
       <RootStack.Screen name="MainTabs" component={MainTabs} options={{headerShown: false}} />
-      <RootStack.Screen name="PublishOffer" component={PublishOfferScreen} options={{title: '发布供给'}} />
-      <RootStack.Screen name="PublishDemand" component={PublishDemandScreen} options={{title: '发布需求'}} />
-      <RootStack.Screen name="EditDemand" component={EditDemandScreen} options={{title: '修改需求'}} />
-      <RootStack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '货运需求'}} />
+      <RootStack.Screen name="PublishOffer" component={PublishOfferScreen} options={{title: '上架服务'}} />
+      <RootStack.Screen name="PublishDemand" component={PublishDemandScreen} options={{title: '发布任务'}} />
+      <RootStack.Screen name="EditDemand" component={EditDemandScreen} options={{title: '修改任务'}} />
+      <RootStack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '货运任务'}} />
       <RootStack.Screen name="AddDrone" component={AddDroneScreen} options={{title: '添加无人机'}} />
       <RootStack.Screen name="EditDrone" component={EditDroneScreen} options={{title: '编辑无人机'}} />
       <RootStack.Screen name="NearbyDrones" component={NearbyDronesScreen} options={{title: '附近无人机'}} />
@@ -146,11 +146,11 @@ export default function MainNavigator() {
       <RootStack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <RootStack.Screen name="OrderAfterSale" component={OrderAfterSaleScreen} options={{title: '售后处理'}} />
       <RootStack.Screen name="Contract" component={ContractScreen} options={{title: '合同签约'}} />
-      <RootStack.Screen name="OfferList" component={OfferListScreen} options={{title: '供给列表'}} />
-      <RootStack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '供给详情'}} />
+      <RootStack.Screen name="OfferList" component={OfferListScreen} options={{title: '服务列表'}} />
+      <RootStack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '服务详情'}} />
       <RootStack.Screen name="SupplyDirectOrderConfirm" component={SupplyDirectOrderConfirmScreen} options={{title: '确认直达下单'}} />
-      <RootStack.Screen name="DemandList" component={DemandListScreen} options={{title: '需求列表'}} />
-      <RootStack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '需求详情'}} />
+      <RootStack.Screen name="DemandList" component={DemandListScreen} options={{title: '任务列表'}} />
+      <RootStack.Screen name="DemandDetail" component={DemandDetailScreen} options={{title: '任务详情'}} />
       <RootStack.Screen name="DemandQuoteCompose" component={DemandQuoteComposeScreen} options={{title: '提交报价'}} />
       <RootStack.Screen name="AddressPicker" component={AddressPickerScreen} options={{title: '选择地址'}} />
       <RootStack.Screen name="AddressSearch" component={AddressSearchScreen} options={{headerShown: false}} />
@@ -175,13 +175,13 @@ export default function MainNavigator() {
       <RootStack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '正式派单'}} />
       <RootStack.Screen name="DispatchTaskDetail" component={DispatchTaskDetailScreen} options={{title: '正式派单详情'}} />
       <RootStack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '接单派单'}} />
-      <RootStack.Screen name="PilotOrderExecution" component={PilotOrderExecutionScreen} options={{title: '订单执行'}} />
+      <RootStack.Screen name="PilotOrderExecution" component={PilotOrderExecutionScreen} options={{title: '任务执行'}} />
       <RootStack.Screen name="EditProfile" component={EditProfileScreen} options={{title: '编辑资料'}} />
       <RootStack.Screen name="MyDrones" component={MyDronesScreen} options={{title: '我的无人机'}} />
       <RootStack.Screen name="MyOrders" component={OrderListScreen} options={{title: '我的订单'}} />
-      <RootStack.Screen name="MyOffers" component={MyOffersScreen} options={{title: '我的供给'}} />
+      <RootStack.Screen name="MyOffers" component={MyOffersScreen} options={{title: '我的服务'}} />
       <RootStack.Screen name="MyQuotes" component={MyQuotesScreen} options={{title: '我的报价'}} />
-      <RootStack.Screen name="MyDemands" component={MyDemandsScreen} options={{title: '我的需求'}} />
+      <RootStack.Screen name="MyDemands" component={MyDemandsScreen} options={{title: '我的任务'}} />
       <RootStack.Screen name="OwnerProfile" component={OwnerProfileScreen} options={{title: '机主档案'}} />
       <RootStack.Screen name="OwnerPilotBindings" component={OwnerPilotBindingsScreen} options={{title: '绑定飞手'}} />
       <RootStack.Screen name="Verification" component={VerificationScreen} options={{title: '实名认证'}} />
