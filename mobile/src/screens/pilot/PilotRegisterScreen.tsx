@@ -139,7 +139,7 @@ export default function PilotRegisterScreen({navigation}: any) {
   };
 
   const ImageUploadBlock = ({label, value, onPick, required}: {label: string; value: string; onPick: () => void; required?: boolean}) => (
-    <View>
+    <View style={styles.fieldGroup}>
       <Text style={styles.label}>{label}{required ? ' *' : ''}</Text>
       <TouchableOpacity style={styles.imageUpload} onPress={onPick} disabled={uploading}>
         {value ? (
@@ -157,69 +157,93 @@ export default function PilotRegisterScreen({navigation}: any) {
   );
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ObjectCard style={styles.heroCard}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bgSecondary}]}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ObjectCard style={[styles.heroCard, {marginBottom: 0}]}>
           <View style={styles.heroHeader}>
-            <View>
+            <View style={styles.heroContent}>
               <Text style={styles.heroTitle}>飞手认证与能力设置</Text>
               <Text style={styles.heroSubtitle}>这里负责建立飞手档案。后续在线状态、服务城市和技能标签都围绕这份档案展开。</Text>
             </View>
-            <StatusBadge label={`进度 ${progress}/4`} tone="blue" />
+            <View style={styles.heroBadge}>
+              <StatusBadge label={`进度 ${progress}/4`} tone="blue" />
+            </View>
           </View>
         </ObjectCard>
 
-        <ObjectCard style={styles.sectionCard}>
+        <ObjectCard style={[styles.sectionCard, {marginBottom: 0}]}>
           <Text style={styles.sectionTitle}>执照信息</Text>
-          <Text style={styles.label}>CAAC 执照类型 *</Text>
-          <View style={styles.typeContainer}>
-            {CAAC_TYPES.map(type => {
-              const active = licenseType === type.value;
-              return (
-                <TouchableOpacity key={type.value} style={[styles.typeOption, active && styles.typeOptionActive]} onPress={() => setLicenseType(type.value)}>
-                  <Text style={[styles.typeOptionText, active && styles.typeOptionTextActive]}>{type.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.sectionBody}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>CAAC 执照类型 *</Text>
+              <View style={styles.typeContainer}>
+                {CAAC_TYPES.map(type => {
+                  const active = licenseType === type.value;
+                  return (
+                    <TouchableOpacity key={type.value} style={[styles.typeOption, active && styles.typeOptionActive]} onPress={() => setLicenseType(type.value)}>
+                      <Text style={[styles.typeOptionText, active && styles.typeOptionTextActive]}>{type.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>CAAC 执照编号 *</Text>
+              <TextInput style={styles.input} placeholder="请输入 CAAC 执照编号" value={licenseNo} onChangeText={setLicenseNo} autoCapitalize="none" />
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>执照有效期 *</Text>
+              <TextInput style={styles.input} placeholder="YYYY-MM-DD" value={licenseExpireDate} onChangeText={setLicenseExpireDate} />
+            </View>
+
+            <ImageUploadBlock label="CAAC 执照照片" value={licenseImage} onPick={() => uploadImage(setLicenseImage, 'CAAC 执照照片')} required />
           </View>
-
-          <Text style={styles.label}>CAAC 执照编号 *</Text>
-          <TextInput style={styles.input} placeholder="请输入 CAAC 执照编号" value={licenseNo} onChangeText={setLicenseNo} autoCapitalize="none" />
-
-          <Text style={styles.label}>执照有效期 *</Text>
-          <TextInput style={styles.input} placeholder="YYYY-MM-DD" value={licenseExpireDate} onChangeText={setLicenseExpireDate} />
-
-          <ImageUploadBlock label="CAAC 执照照片" value={licenseImage} onPick={() => uploadImage(setLicenseImage, 'CAAC 执照照片')} required />
         </ObjectCard>
 
-        <ObjectCard style={styles.sectionCard}>
+        <ObjectCard style={[styles.sectionCard, {marginBottom: 0}]}>
           <Text style={styles.sectionTitle}>接单能力设置</Text>
-          <Text style={styles.label}>当前服务城市 *</Text>
-          <TextInput style={styles.input} placeholder="例如：佛山" value={currentCity} onChangeText={setCurrentCity} />
+          <View style={styles.sectionBody}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>当前服务城市 *</Text>
+              <TextInput style={styles.input} placeholder="例如：佛山" value={currentCity} onChangeText={setCurrentCity} />
+            </View>
 
-          <Text style={styles.label}>服务半径（公里）</Text>
-          <TextInput style={styles.input} placeholder="默认 50" value={serviceRadius} onChangeText={setServiceRadius} keyboardType="number-pad" />
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>服务半径（公里）</Text>
+              <TextInput style={styles.input} placeholder="默认 50" value={serviceRadius} onChangeText={setServiceRadius} keyboardType="number-pad" />
+            </View>
 
-          <Text style={styles.label}>技能标签</Text>
-          <View style={styles.skillRow}>
-            {skillOptions.map(skill => {
-              const active = specialSkills.includes(skill);
-              return (
-                <TouchableOpacity key={skill} style={[styles.skillChip, active && styles.skillChipActive]} onPress={() => toggleSkill(skill)}>
-                  <Text style={[styles.skillChipText, active && styles.skillChipTextActive]}>{skill}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>技能标签</Text>
+              <View style={styles.skillRow}>
+                {skillOptions.map(skill => {
+                  const active = specialSkills.includes(skill);
+                  return (
+                    <TouchableOpacity key={skill} style={[styles.skillChip, active && styles.skillChipActive]} onPress={() => toggleSkill(skill)}>
+                      <Text style={[styles.skillChipText, active && styles.skillChipTextActive]}>{skill}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
         </ObjectCard>
 
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>补充材料</Text>
-          <Text style={styles.sectionDesc}>这些材料当前仍走补充提交流程，用来提高审核通过率，不影响飞手主档案的 v2 建立。</Text>
-          <ImageUploadBlock label="无犯罪记录证明" value={criminalDoc} onPick={() => uploadImage(setCriminalDoc, '无犯罪记录证明')} />
-          <ImageUploadBlock label="健康证明" value={healthDoc} onPick={() => uploadImage(setHealthDoc, '健康证明')} />
-          <Text style={styles.label}>健康证明有效期</Text>
-          <TextInput style={styles.input} placeholder="YYYY-MM-DD" value={healthExpireDate} onChangeText={setHealthExpireDate} />
+        <ObjectCard style={[styles.sectionCard, {marginBottom: 0}]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>补充材料</Text>
+            <Text style={styles.sectionDesc}>这些材料用来提高审核通过率，不影响飞手主档案的 v2 建立。</Text>
+          </View>
+          <View style={styles.sectionBody}>
+            <ImageUploadBlock label="无犯罪记录证明" value={criminalDoc} onPick={() => uploadImage(setCriminalDoc, '无犯罪记录证明')} />
+            <ImageUploadBlock label="健康证明" value={healthDoc} onPick={() => uploadImage(setHealthDoc, '健康证明')} />
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>健康证明有效期</Text>
+              <TextInput style={styles.input} placeholder="YYYY-MM-DD" value={healthExpireDate} onChangeText={setHealthExpireDate} />
+            </View>
+          </View>
         </ObjectCard>
 
         <TouchableOpacity style={[styles.submitButton, (loading || uploading) && styles.buttonDisabled]} onPress={handleSubmit} disabled={loading || uploading}>
@@ -232,32 +256,37 @@ export default function PilotRegisterScreen({navigation}: any) {
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {flex: 1, backgroundColor: theme.bgSecondary},
-  content: {padding: 16, paddingBottom: 32, gap: 14},
-  heroCard: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
-  heroHeader: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
-  heroTitle: {fontSize: 24, fontWeight: '800', color: theme.isDark ? theme.text : '#FFFFFF'},
-  heroSubtitle: {marginTop: 6, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
-  sectionCard: {gap: 12},
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
-  sectionDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub},
-  label: {fontSize: 13, fontWeight: '700', color: theme.text},
-  input: {borderWidth: 1, borderColor: theme.cardBorder, borderRadius: 12, backgroundColor: theme.bgSecondary, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text},
-  typeContainer: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  typeOption: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: theme.primaryBg},
-  typeOptionActive: {backgroundColor: theme.primaryBg},
-  typeOptionText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
-  typeOptionTextActive: {color: theme.primaryText},
-  skillRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: theme.primaryBg},
-  skillChipActive: {backgroundColor: theme.success + '22'},
-  skillChipText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
+  content: {paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40, gap: 24},
+  heroCard: {padding: 24, backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
+  heroHeader: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12},
+  heroContent: {flex: 1, minWidth: 0, gap: 12},
+  heroBadge: {flexShrink: 0, alignSelf: 'flex-start', marginTop: 4},
+  heroTitle: {fontSize: 26, fontWeight: '900', color: theme.isDark ? theme.text : '#FFFFFF', letterSpacing: -0.5},
+  heroSubtitle: {fontSize: 14, lineHeight: 22, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.9)'},
+  sectionCard: {padding: 24, gap: 24},
+  sectionHeader: {gap: 12},
+  sectionBody: {gap: 24},
+  sectionTitle: {fontSize: 22, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  sectionDesc: {fontSize: 14, lineHeight: 20, color: theme.textSub},
+  fieldGroup: {gap: 12},
+  label: {fontSize: 14, fontWeight: '800', color: theme.text, opacity: 0.9},
+  input: {borderWidth: 1.5, borderColor: theme.cardBorder, borderRadius: 16, backgroundColor: theme.bgSecondary, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: theme.text},
+  typeContainer: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
+  typeOption: {paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.bgSecondary, borderWidth: 1.5, borderColor: theme.cardBorder},
+  typeOptionActive: {backgroundColor: theme.primary + '15', borderColor: theme.primary},
+  typeOptionText: {fontSize: 14, fontWeight: '700', color: theme.textSub},
+  typeOptionTextActive: {color: theme.primary},
+  skillRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
+  skillChip: {paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.bgSecondary, borderWidth: 1.5, borderColor: theme.cardBorder},
+  skillChipActive: {backgroundColor: theme.success + '15', borderColor: theme.success},
+  skillChipText: {fontSize: 14, fontWeight: '700', color: theme.textSub},
   skillChipTextActive: {color: theme.success},
-  imageUpload: {minHeight: 180, borderRadius: 14, borderWidth: 1, borderColor: theme.cardBorder, overflow: 'hidden', backgroundColor: theme.bgSecondary},
-  uploadPlaceholder: {minHeight: 180, alignItems: 'center', justifyContent: 'center'},
-  uploadIcon: {fontSize: 36, color: theme.textHint},
-  uploadText: {marginTop: 8, fontSize: 14, color: theme.textSub},
-  uploadedImage: {width: '100%', height: 220, resizeMode: 'cover'},
-  submitButton: {borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
-  submitButtonText: {fontSize: 15, fontWeight: '800', color: theme.btnPrimaryText},
-  buttonDisabled: {opacity: 0.6},
+  imageUpload: {minHeight: 200, borderRadius: 18, borderWidth: 2, borderColor: theme.cardBorder, borderStyle: 'dashed', overflow: 'hidden', backgroundColor: theme.bgSecondary},
+  uploadPlaceholder: {minHeight: 200, alignItems: 'center', justifyContent: 'center', gap: 12},
+  uploadIcon: {fontSize: 40, color: theme.textHint, fontWeight: '300'},
+  uploadText: {fontSize: 15, color: theme.textSub, fontWeight: '600'},
+  uploadedImage: {width: '100%', height: 240, resizeMode: 'cover'},
+  submitButton: {borderRadius: 18, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 18, shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6},
+  submitButtonText: {fontSize: 17, fontWeight: '900', color: theme.btnPrimaryText},
+  buttonDisabled: {opacity: 0.6, shadowOpacity: 0},
 });

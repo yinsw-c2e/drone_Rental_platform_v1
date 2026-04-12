@@ -271,10 +271,12 @@ export default function DroneCertificationScreen({route, navigation}: any) {
   const overallStatus = getVerifyStatus(drone.certification_status);
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bgSecondary}]}>
       <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }>
         {/* 无人机基本信息 */}
         <View style={styles.droneHeader}>
@@ -287,7 +289,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
             <Text style={styles.droneName}>{drone.brand} {drone.model}</Text>
             <Text style={styles.droneSerial}>SN: {drone.serial_number || '-'}</Text>
           </View>
-          <View style={[styles.overallBadge, {backgroundColor: overallStatus.color + '20'}]}>
+          <View style={[styles.overallBadge, {backgroundColor: overallStatus.color + '15'}]}>
             <Text style={[styles.overallText, {color: overallStatus.color}]}>
               {overallStatus.label}
             </Text>
@@ -298,7 +300,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
         <View style={styles.certCard}>
           <View style={styles.certHeader}>
             <Text style={styles.certTitle}>UOM 平台登记</Text>
-            <View style={[styles.statusBadge, {backgroundColor: uomStatus.color + '20'}]}>
+            <View style={[styles.statusBadge, {backgroundColor: uomStatus.color + '15'}]}>
               <Text style={[styles.statusText, {color: uomStatus.color}]}>
                 {uomStatus.label}
               </Text>
@@ -312,11 +314,13 @@ export default function DroneCertificationScreen({route, navigation}: any) {
               </View>
             </View>
           ) : (
-            <Text style={styles.emptyHint}>尚未提交UOM平台登记信息</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyHint}>尚未提交UOM平台登记信息</Text>
+            </View>
           )}
-          <TouchableOpacity style={styles.certAction} onPress={() => openForm('uom')}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.certAction} onPress={() => openForm('uom')}>
             <Text style={styles.certActionText}>
-              {drone.uom_registration_no ? '更新登记' : '提交登记'}
+              {drone.uom_registration_no ? '更新登记信息' : '提交 UOM 登记'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -325,7 +329,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
         <View style={styles.certCard}>
           <View style={styles.certHeader}>
             <Text style={styles.certTitle}>无人机保险</Text>
-            <View style={[styles.statusBadge, {backgroundColor: insuranceStatus.color + '20'}]}>
+            <View style={[styles.statusBadge, {backgroundColor: insuranceStatus.color + '15'}]}>
               <Text style={[styles.statusText, {color: insuranceStatus.color}]}>
                 {insuranceStatus.label}
               </Text>
@@ -355,11 +359,13 @@ export default function DroneCertificationScreen({route, navigation}: any) {
               </View>
             </View>
           ) : (
-            <Text style={styles.emptyHint}>尚未提交保险信息</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyHint}>尚未提交保险单信息</Text>
+            </View>
           )}
-          <TouchableOpacity style={styles.certAction} onPress={() => openForm('insurance')}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.certAction} onPress={() => openForm('insurance')}>
             <Text style={styles.certActionText}>
-              {drone.insurance_policy_no ? '更新保险' : '提交保险'}
+              {drone.insurance_policy_no ? '更新保险资料' : '提交保险资料'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -368,7 +374,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
         <View style={styles.certCard}>
           <View style={styles.certHeader}>
             <Text style={styles.certTitle}>适航证书</Text>
-            <View style={[styles.statusBadge, {backgroundColor: airworthinessStatus.color + '20'}]}>
+            <View style={[styles.statusBadge, {backgroundColor: airworthinessStatus.color + '15'}]}>
               <Text style={[styles.statusText, {color: airworthinessStatus.color}]}>
                 {airworthinessStatus.label}
               </Text>
@@ -388,17 +394,20 @@ export default function DroneCertificationScreen({route, navigation}: any) {
               </View>
             </View>
           ) : (
-            <Text style={styles.emptyHint}>尚未提交适航证书</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyHint}>尚未提交适航证书资料</Text>
+            </View>
           )}
-          <TouchableOpacity style={styles.certAction} onPress={() => openForm('airworthiness')}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.certAction} onPress={() => openForm('airworthiness')}>
             <Text style={styles.certActionText}>
-              {drone.airworthiness_cert_no ? '更新证书' : '提交证书'}
+              {drone.airworthiness_cert_no ? '更新证书资料' : '提交适航证书'}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* 维护记录入口 */}
         <TouchableOpacity
+          activeOpacity={0.7}
           style={styles.maintenanceEntry}
           onPress={() => navigation.navigate('DroneMaintenanceLog', {id: droneId})}>
           <View style={styles.maintenanceLeft}>
@@ -411,8 +420,6 @@ export default function DroneCertificationScreen({route, navigation}: any) {
           </View>
           <Text style={styles.maintenanceArrow}>›</Text>
         </TouchableOpacity>
-
-        <View style={{height: 24}} />
       </ScrollView>
 
       {/* 提交表单弹窗 */}
@@ -428,116 +435,146 @@ export default function DroneCertificationScreen({route, navigation}: any) {
                 {activeType === 'uom'
                   ? 'UOM平台登记'
                   : activeType === 'insurance'
-                  ? '保险信息'
+                  ? '保险资料'
                   : '适航证书'}
               </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Text style={styles.modalClose}>×</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                <Text style={styles.modalClose}>\u2715</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               {activeType === 'uom' && (
-                <View>
-                  <Text style={styles.label}>UOM登记号 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="请输入UOM平台登记号"
-                    value={uomRegNo}
-                    onChangeText={setUomRegNo}
-                  />
-                  <Text style={styles.label}>登记证明文件 *</Text>
-                  <TouchableOpacity
-                    style={styles.imageUpload}
-                    onPress={() => pickImage(setUomDoc)}>
-                    {uomDoc ? (
-                      <Image source={{uri: uomDoc}} style={styles.uploadedImage} />
-                    ) : (
-                      <View style={styles.uploadPlaceholder}>
-                        <Text style={styles.uploadIcon}>+</Text>
-                        <Text style={styles.uploadText}>上传UOM登记证明</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                <View style={styles.formGroupContainer}>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>UOM登记号 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="请输入UOM平台登记号"
+                      placeholderTextColor={theme.textHint}
+                      value={uomRegNo}
+                      onChangeText={setUomRegNo}
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>登记证明文件 *</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={styles.imageUpload}
+                      onPress={() => pickImage(setUomDoc)}>
+                      {uomDoc ? (
+                        <Image source={{uri: uomDoc}} style={styles.uploadedImage} />
+                      ) : (
+                        <View style={styles.uploadPlaceholder}>
+                          <Text style={styles.uploadIcon}>+</Text>
+                          <Text style={styles.uploadText}>上传 UOM 登记证明</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
               {activeType === 'insurance' && (
-                <View>
-                  <Text style={styles.label}>保险单号 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="请输入保险单号"
-                    value={insurancePolicyNo}
-                    onChangeText={setInsurancePolicyNo}
-                  />
-                  <Text style={styles.label}>保险公司 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="如: 中国人保"
-                    value={insuranceCompany}
-                    onChangeText={setInsuranceCompany}
-                  />
-                  <Text style={styles.label}>保额 (万元) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="如: 500"
-                    value={insuranceCoverage}
-                    onChangeText={setInsuranceCoverage}
-                    keyboardType="numeric"
-                  />
-                  <Text style={styles.label}>到期日期 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    value={insuranceExpireDate}
-                    onChangeText={setInsuranceExpireDate}
-                  />
-                  <Text style={styles.label}>保险单文件 *</Text>
-                  <TouchableOpacity
-                    style={styles.imageUpload}
-                    onPress={() => pickImage(setInsuranceDoc)}>
-                    {insuranceDoc ? (
-                      <Image source={{uri: insuranceDoc}} style={styles.uploadedImage} />
-                    ) : (
-                      <View style={styles.uploadPlaceholder}>
-                        <Text style={styles.uploadIcon}>+</Text>
-                        <Text style={styles.uploadText}>上传保险单</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                <View style={styles.formGroupContainer}>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>保险单号 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="请输入保单号"
+                      placeholderTextColor={theme.textHint}
+                      value={insurancePolicyNo}
+                      onChangeText={setInsurancePolicyNo}
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>保险公司 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="如: 中国人保"
+                      placeholderTextColor={theme.textHint}
+                      value={insuranceCompany}
+                      onChangeText={setInsuranceCompany}
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>保额 (万元) *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="如: 500"
+                      placeholderTextColor={theme.textHint}
+                      value={insuranceCoverage}
+                      onChangeText={setInsuranceCoverage}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>到期日期 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={theme.textHint}
+                      value={insuranceExpireDate}
+                      onChangeText={setInsuranceExpireDate}
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>保险单文件 *</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={styles.imageUpload}
+                      onPress={() => pickImage(setInsuranceDoc)}>
+                      {insuranceDoc ? (
+                        <Image source={{uri: insuranceDoc}} style={styles.uploadedImage} />
+                      ) : (
+                        <View style={styles.uploadPlaceholder}>
+                          <Text style={styles.uploadIcon}>+</Text>
+                          <Text style={styles.uploadText}>上传保险单扫描件</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
               {activeType === 'airworthiness' && (
-                <View>
-                  <Text style={styles.label}>证书编号 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="请输入适航证书编号"
-                    value={airworthinessCertNo}
-                    onChangeText={setAirworthinessCertNo}
-                  />
-                  <Text style={styles.label}>有效期至 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    value={airworthinessExpire}
-                    onChangeText={setAirworthinessExpire}
-                  />
-                  <Text style={styles.label}>适航证书文件 *</Text>
-                  <TouchableOpacity
-                    style={styles.imageUpload}
-                    onPress={() => pickImage(setAirworthinessDoc)}>
-                    {airworthinessDoc ? (
-                      <Image source={{uri: airworthinessDoc}} style={styles.uploadedImage} />
-                    ) : (
-                      <View style={styles.uploadPlaceholder}>
-                        <Text style={styles.uploadIcon}>+</Text>
-                        <Text style={styles.uploadText}>上传适航证书</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                <View style={styles.formGroupContainer}>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>证书编号 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="请输入适航证书编号"
+                      placeholderTextColor={theme.textHint}
+                      value={airworthinessCertNo}
+                      onChangeText={setAirworthinessCertNo}
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>有效期至 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={theme.textHint}
+                      value={airworthinessExpire}
+                      onChangeText={setAirworthinessExpire}
+                    />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>适航证书文件 *</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={styles.imageUpload}
+                      onPress={() => pickImage(setAirworthinessDoc)}>
+                      {airworthinessDoc ? (
+                        <Image source={{uri: airworthinessDoc}} style={styles.uploadedImage} />
+                      ) : (
+                        <View style={styles.uploadPlaceholder}>
+                          <Text style={styles.uploadIcon}>+</Text>
+                          <Text style={styles.uploadText}>上传适航证书照片</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -546,7 +583,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
                 onPress={handleSubmit}
                 disabled={submitting}>
                 <Text style={styles.submitBtnText}>
-                  {submitting ? '提交中...' : '提交'}
+                  {submitting ? '提交中...' : '确认提交资料'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -558,243 +595,53 @@ export default function DroneCertificationScreen({route, navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.bgSecondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: theme.textSub,
-  },
-  droneHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.card,
-    padding: 16,
-    marginBottom: 12,
-  },
-  droneIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.primaryBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  droneIconText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: theme.primaryText,
-  },
-  droneInfo: {
-    flex: 1,
-  },
-  droneName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  droneSerial: {
-    fontSize: 13,
-    color: theme.textSub,
-    marginTop: 2,
-  },
-  overallBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  overallText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  certCard: {
-    backgroundColor: theme.card,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
-  },
-  certHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  certTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  certBody: {
-    borderTopWidth: 1,
-    borderTopColor: theme.divider,
-    paddingTop: 12,
-  },
-  certRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  certLabel: {
-    fontSize: 14,
-    color: theme.textSub,
-  },
-  certValue: {
-    fontSize: 14,
-    color: theme.text,
-    fontWeight: '500',
-  },
-  emptyHint: {
-    fontSize: 14,
-    color: theme.textSub,
-    paddingVertical: 8,
-  },
-  certAction: {
-    marginTop: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: theme.divider,
-    alignItems: 'center',
-  },
-  certActionText: {
-    fontSize: 14,
-    color: theme.primaryText,
-    fontWeight: '500',
-  },
-  maintenanceEntry: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.card,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
-  },
-  maintenanceLeft: {
-    flex: 1,
-  },
-  maintenanceTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  maintenanceSub: {
-    fontSize: 13,
-    color: theme.textSub,
-    marginTop: 4,
-  },
-  maintenanceArrow: {
-    fontSize: 24,
-    color: theme.textHint,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: theme.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.divider,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  modalClose: {
-    fontSize: 28,
-    color: theme.textSub,
-  },
-  modalBody: {
-    padding: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.text,
-    marginBottom: 8,
-    marginTop: 14,
-  },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: theme.divider,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: theme.bgSecondary,
-  },
-  imageUpload: {
-    height: 150,
-    borderWidth: 2,
-    borderColor: theme.divider,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  uploadPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.bgSecondary,
-  },
-  uploadIcon: {
-    fontSize: 36,
-    color: theme.textHint,
-    marginBottom: 8,
-  },
-  uploadText: {
-    fontSize: 14,
-    color: theme.textSub,
-  },
-  uploadedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-  },
-  submitBtn: {
-    height: 50,
-    backgroundColor: theme.primary,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
-  },
-  submitBtnDisabled: {
-    backgroundColor: theme.cardBorder,
-  },
-  submitBtnText: {
-    color: theme.btnPrimaryText,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  scrollContent: {padding: 20, paddingBottom: 40, gap: 20},
+  loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  loadingText: {fontSize: 16, color: theme.textSub},
+  droneHeader: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.card, padding: 24, borderRadius: 20, borderWidth: 1, borderColor: theme.cardBorder, gap: 16},
+  droneIcon: {width: 60, height: 60, borderRadius: 30, backgroundColor: theme.primary + '15', justifyContent: 'center', alignItems: 'center'},
+  droneIconText: {fontSize: 24, fontWeight: '900', color: theme.primary},
+  droneInfo: {flex: 1, gap: 4},
+  droneName: {fontSize: 20, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  droneSerial: {fontSize: 14, color: theme.textSub, fontWeight: '600'},
+  overallBadge: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10},
+  overallText: {fontSize: 13, fontWeight: '700'},
+  certCard: {backgroundColor: theme.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: theme.cardBorder, gap: 16},
+  certHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  certTitle: {fontSize: 18, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  statusBadge: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10},
+  statusText: {fontSize: 13, fontWeight: '700'},
+  certBody: {borderTopWidth: 1, borderTopColor: theme.divider, paddingTop: 16, gap: 10},
+  certRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  certLabel: {fontSize: 14, color: theme.textSub, fontWeight: '600'},
+  certValue: {fontSize: 14, color: theme.text, fontWeight: '700'},
+  emptyCard: {paddingVertical: 12},
+  emptyHint: {fontSize: 14, color: theme.textHint, fontWeight: '500', fontStyle: 'italic'},
+  certAction: {marginTop: 8, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.cardBorder, alignItems: 'center'},
+  certActionText: {fontSize: 14, color: theme.primary, fontWeight: '800'},
+  maintenanceEntry: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, padding: 20, borderRadius: 20, borderWidth: 1, borderColor: theme.cardBorder},
+  maintenanceLeft: {flex: 1, gap: 4},
+  maintenanceTitle: {fontSize: 17, fontWeight: '900', color: theme.text},
+  maintenanceSub: {fontSize: 14, color: theme.textSub, fontWeight: '500'},
+  maintenanceArrow: {fontSize: 24, color: theme.textHint, fontWeight: '300'},
+  modalOverlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end'},
+  modalContent: {backgroundColor: theme.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '90%'},
+  modalHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: theme.divider},
+  modalTitle: {fontSize: 20, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  modalClose: {fontSize: 24, color: theme.textSub, fontWeight: '300'},
+  modalBody: {paddingHorizontal: 24},
+  modalScrollContent: {paddingBottom: 40},
+  formGroupContainer: {gap: 20, marginTop: 24},
+  formGroup: {gap: 10},
+  label: {fontSize: 14, fontWeight: '800', color: theme.text, opacity: 0.9},
+  input: {borderWidth: 1.5, borderColor: theme.cardBorder, borderRadius: 16, backgroundColor: theme.bgSecondary, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: theme.text},
+  imageUpload: {minHeight: 180, borderWidth: 2, borderColor: theme.cardBorder, borderStyle: 'dashed', borderRadius: 18, overflow: 'hidden', backgroundColor: theme.bgSecondary},
+  uploadPlaceholder: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 8},
+  uploadIcon: {fontSize: 40, color: theme.textHint, fontWeight: '300'},
+  uploadText: {fontSize: 14, color: theme.textSub, fontWeight: '600', textAlign: 'center'},
+  uploadedImage: {width: '100%', height: '100%', resizeMode: 'cover'},
+  submitBtn: {height: 56, backgroundColor: theme.primary, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginTop: 32, shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6},
+  submitBtnDisabled: {opacity: 0.6},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: '900'},
 });

@@ -221,25 +221,31 @@ export default function CertificationUploadScreen({navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bgSecondary}]}>
       <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }>
         {/* 添加证书按钮 */}
         <TouchableOpacity
+          activeOpacity={0.8}
           style={styles.addBtn}
           onPress={() => {
             resetForm();
             setShowModal(true);
           }}>
-          <Text style={styles.addBtnIcon}>+</Text>
+          <View style={styles.addBtnIconBox}>
+            <Text style={styles.addBtnIcon}>+</Text>
+          </View>
           <Text style={styles.addBtnText}>添加新证书</Text>
         </TouchableOpacity>
 
         {/* 证书列表 */}
         {certifications.length === 0 ? (
           <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>{'\ud83d\udcc4'}</Text>
             <Text style={styles.emptyText}>暂无证书记录</Text>
             <Text style={styles.emptySubText}>点击上方按钮添加您的资质证书</Text>
           </View>
@@ -251,7 +257,7 @@ export default function CertificationUploadScreen({navigation}: any) {
               <View key={cert.id} style={styles.certCard}>
                 <View style={styles.certHeader}>
                   <Text style={styles.certType}>{getCertTypeLabel(cert.cert_type)}</Text>
-                  <View style={[styles.statusBadge, {backgroundColor: statusColor + '20'}]}>
+                  <View style={[styles.statusBadge, {backgroundColor: statusColor + '15'}]}>
                     <Text style={[styles.statusText, {color: statusColor}]}>
                       {status.label}
                     </Text>
@@ -265,10 +271,6 @@ export default function CertificationUploadScreen({navigation}: any) {
                   <View style={styles.certRow}>
                     <Text style={styles.certLabel}>证书编号</Text>
                     <Text style={styles.certValue}>{cert.cert_no || '-'}</Text>
-                  </View>
-                  <View style={styles.certRow}>
-                    <Text style={styles.certLabel}>发证机关</Text>
-                    <Text style={styles.certValue}>{cert.issuer || '-'}</Text>
                   </View>
                   <View style={styles.certRow}>
                     <Text style={styles.certLabel}>有效期至</Text>
@@ -300,109 +302,134 @@ export default function CertificationUploadScreen({navigation}: any) {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>添加证书</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Text style={styles.modalClose}>×</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                <Text style={styles.modalClose}>\u2715</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               {/* 证书类型 */}
-              <Text style={styles.label}>证书类型</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.typeContainer}>
-                  {CERT_TYPES.map(type => (
-                    <TouchableOpacity
-                      key={type.value}
-                      style={[
-                        styles.typeOption,
-                        certType === type.value && styles.typeOptionActive,
-                      ]}
-                      onPress={() => setCertType(type.value)}>
-                      <Text
+              <View style={styles.formSection}>
+                <Text style={styles.label}>证书类型</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeScrollContent}>
+                  <View style={styles.typeContainer}>
+                    {CERT_TYPES.map(type => (
+                      <TouchableOpacity
+                        key={type.value}
                         style={[
-                          styles.typeOptionText,
-                          certType === type.value && styles.typeOptionTextActive,
-                        ]}>
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
+                          styles.typeOption,
+                          certType === type.value && styles.typeOptionActive,
+                        ]}
+                        onPress={() => setCertType(type.value)}>
+                        <Text
+                          style={[
+                            styles.typeOptionText,
+                            certType === type.value && styles.typeOptionTextActive,
+                          ]}>
+                          {type.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
 
               {/* 根据类型显示不同表单 */}
-              {certType === 'criminal_check' ? (
-                <View>
-                  <Text style={styles.tipText}>
-                    请上传有效的无犯罪记录证明文件
-                  </Text>
-                </View>
-              ) : certType === 'health_check' ? (
-                <View>
-                  <Text style={styles.label}>有效期至 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    value={healthExpireDate}
-                    onChangeText={setHealthExpireDate}
-                  />
-                </View>
-              ) : (
-                <View>
-                  <Text style={styles.label}>证书名称 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="请输入证书名称"
-                    value={certName}
-                    onChangeText={setCertName}
-                  />
-
-                  <Text style={styles.label}>证书编号 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="请输入证书编号"
-                    value={certNo}
-                    onChangeText={setCertNo}
-                  />
-
-                  <Text style={styles.label}>发证机关 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="请输入发证机关"
-                    value={issuer}
-                    onChangeText={setIssuer}
-                  />
-
-                  <Text style={styles.label}>发证日期 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    value={issueDate}
-                    onChangeText={setIssueDate}
-                  />
-
-                  <Text style={styles.label}>有效期至 *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="YYYY-MM-DD"
-                    value={expireDate}
-                    onChangeText={setExpireDate}
-                  />
-                </View>
-              )}
-
-              {/* 证书照片 */}
-              <Text style={styles.label}>证书照片 *</Text>
-              <TouchableOpacity style={styles.imageUpload} onPress={pickImage}>
-                {certImage ? (
-                  <Image source={{uri: certImage}} style={styles.uploadedImage} />
-                ) : (
-                  <View style={styles.uploadPlaceholder}>
-                    <Text style={styles.uploadIcon}>+</Text>
-                    <Text style={styles.uploadText}>点击上传证书照片</Text>
+              <View style={styles.formGroupContainer}>
+                {certType === 'criminal_check' ? (
+                  <View style={styles.tipCard}>
+                    <Text style={styles.tipText}>
+                      请上传有效的无犯罪记录证明文件，用于增强您的信用背书。
+                    </Text>
                   </View>
+                ) : certType === 'health_check' ? (
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>有效期至 *</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={theme.textHint}
+                      value={healthExpireDate}
+                      onChangeText={setHealthExpireDate}
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.label}>证书名称 *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="请输入证书全称"
+                        placeholderTextColor={theme.textHint}
+                        value={certName}
+                        onChangeText={setCertName}
+                      />
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <Text style={styles.label}>证书编号 *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="如：C12345678"
+                        placeholderTextColor={theme.textHint}
+                        value={certNo}
+                        onChangeText={setCertNo}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <Text style={styles.label}>发证机关 *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="请输入签发机构"
+                        placeholderTextColor={theme.textHint}
+                        value={issuer}
+                        onChangeText={setIssuer}
+                      />
+                    </View>
+
+                    <View style={styles.row}>
+                      <View style={[styles.formGroup, {flex: 1}]}>
+                        <Text style={styles.label}>发证日期 *</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={theme.textHint}
+                          value={issueDate}
+                          onChangeText={setIssueDate}
+                        />
+                      </View>
+                      <View style={{width: 12}} />
+                      <View style={[styles.formGroup, {flex: 1}]}>
+                        <Text style={styles.label}>有效期至 *</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={theme.textHint}
+                          value={expireDate}
+                          onChangeText={setExpireDate}
+                        />
+                      </View>
+                    </View>
+                  </>
                 )}
-              </TouchableOpacity>
+
+                {/* 证书照片 */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>证书照片 *</Text>
+                  <TouchableOpacity activeOpacity={0.7} style={styles.imageUpload} onPress={pickImage}>
+                    {certImage ? (
+                      <Image source={{uri: certImage}} style={styles.uploadedImage} />
+                    ) : (
+                      <View style={styles.uploadPlaceholder}>
+                        <Text style={styles.uploadIcon}>+</Text>
+                        <Text style={styles.uploadText}>点击上传清晰的证书原件照片</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* 提交按钮 */}
               <TouchableOpacity
@@ -410,7 +437,7 @@ export default function CertificationUploadScreen({navigation}: any) {
                 onPress={handleSubmit}
                 disabled={submitting}>
                 <Text style={styles.submitBtnText}>
-                  {submitting ? '提交中...' : '提交'}
+                  {submitting ? '提交中...' : '提交证书资料'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -422,225 +449,56 @@ export default function CertificationUploadScreen({navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.bgSecondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: theme.textSub,
-  },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.primary,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: 8,
-  },
-  addBtnIcon: {
-    fontSize: 20,
-    color: theme.btnPrimaryText,
-    marginRight: 8,
-  },
-  addBtnText: {
-    fontSize: 16,
-    color: theme.btnPrimaryText,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: theme.textSub,
-    marginBottom: 8,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: theme.textSub,
-  },
-  certCard: {
-    backgroundColor: theme.card,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-    overflow: 'hidden',
-  },
-  certHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  certType: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  certBody: {
-    borderTopWidth: 1,
-    borderTopColor: theme.divider,
-    paddingTop: 12,
-  },
-  certRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  certLabel: {
-    fontSize: 14,
-    color: theme.textSub,
-  },
-  certValue: {
-    fontSize: 14,
-    color: theme.text,
-    fontWeight: '500',
-  },
-  certImage: {
-    width: '100%',
-    height: 150,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: theme.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.divider,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  modalClose: {
-    fontSize: 28,
-    color: theme.textSub,
-  },
-  modalBody: {
-    padding: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.text,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: theme.divider,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: theme.bgSecondary,
-  },
-  typeContainer: {
-    flexDirection: 'row',
-    paddingVertical: 4,
-  },
-  typeOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: theme.divider,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  typeOptionActive: {
-    backgroundColor: theme.primary,
-    borderColor: theme.primary,
-  },
-  typeOptionText: {
-    fontSize: 13,
-    color: theme.textSub,
-  },
-  typeOptionTextActive: {
-    color: theme.btnPrimaryText,
-  },
-  tipText: {
-    fontSize: 14,
-    color: theme.textSub,
-    marginTop: 16,
-    lineHeight: 22,
-  },
-  imageUpload: {
-    height: 150,
-    borderWidth: 2,
-    borderColor: theme.divider,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  uploadPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.bgSecondary,
-  },
-  uploadIcon: {
-    fontSize: 36,
-    color: theme.textHint,
-    marginBottom: 8,
-  },
-  uploadText: {
-    fontSize: 14,
-    color: theme.textSub,
-  },
-  uploadedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-  },
-  submitBtn: {
-    height: 50,
-    backgroundColor: theme.primary,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
-  },
-  submitBtnDisabled: {
-    backgroundColor: theme.cardBorder,
-  },
-  submitBtnText: {
-    color: theme.btnPrimaryText,
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  scrollContent: {padding: 20, paddingBottom: 40, gap: 20},
+  loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  loadingText: {fontSize: 16, color: theme.textSub},
+  addBtn: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary, paddingVertical: 18, paddingHorizontal: 24, borderRadius: 18, shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6},
+  addBtnIconBox: {width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 12},
+  addBtnIcon: {fontSize: 20, color: theme.btnPrimaryText, fontWeight: 'bold'},
+  addBtnText: {fontSize: 18, color: theme.btnPrimaryText, fontWeight: '900'},
+  emptyContainer: {paddingTop: 80, alignItems: 'center', gap: 12},
+  emptyIcon: {fontSize: 64, marginBottom: 8, opacity: 0.5},
+  emptyText: {fontSize: 18, fontWeight: '800', color: theme.textSub},
+  emptySubText: {fontSize: 14, color: theme.textHint},
+  certCard: {backgroundColor: theme.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: theme.cardBorder, gap: 16},
+  certHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  certType: {fontSize: 18, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  statusBadge: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10},
+  statusText: {fontSize: 13, fontWeight: '700'},
+  certBody: {borderTopWidth: 1, borderTopColor: theme.divider, paddingTop: 16, gap: 8},
+  certRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  certLabel: {fontSize: 14, color: theme.textSub, fontWeight: '600'},
+  certValue: {fontSize: 14, color: theme.text, fontWeight: '700'},
+  certImage: {width: '100%', height: 180, borderRadius: 14, marginTop: 8},
+  modalOverlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end'},
+  modalContent: {backgroundColor: theme.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%'},
+  modalHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: theme.divider},
+  modalTitle: {fontSize: 20, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  modalClose: {fontSize: 24, color: theme.textSub, fontWeight: '300'},
+  modalBody: {paddingHorizontal: 24},
+  modalScrollContent: {paddingBottom: 40},
+  modalScrollContentInner: {gap: 24},
+  formSection: {marginTop: 20, gap: 12},
+  formGroupContainer: {gap: 20, marginTop: 20},
+  formGroup: {gap: 10},
+  row: {flexDirection: 'row'},
+  label: {fontSize: 14, fontWeight: '800', color: theme.text, opacity: 0.9},
+  input: {borderWidth: 1.5, borderColor: theme.cardBorder, borderRadius: 16, backgroundColor: theme.bgSecondary, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: theme.text},
+  typeScrollContent: {paddingBottom: 4},
+  typeContainer: {flexDirection: 'row', gap: 10},
+  typeOption: {paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.bgSecondary, borderWidth: 1.5, borderColor: theme.cardBorder},
+  typeOptionActive: {backgroundColor: theme.primary + '15', borderColor: theme.primary},
+  typeOptionText: {fontSize: 14, fontWeight: '700', color: theme.textSub},
+  typeOptionTextActive: {color: theme.primary},
+  tipCard: {backgroundColor: theme.primary + '10', padding: 16, borderRadius: 14, borderLeftWidth: 4, borderLeftColor: theme.primary},
+  tipText: {fontSize: 14, color: theme.textSub, lineHeight: 22, fontWeight: '500'},
+  imageUpload: {minHeight: 180, borderWidth: 2, borderColor: theme.cardBorder, borderStyle: 'dashed', borderRadius: 18, overflow: 'hidden', backgroundColor: theme.bgSecondary},
+  uploadPlaceholder: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 8},
+  uploadIcon: {fontSize: 40, color: theme.textHint, fontWeight: '300'},
+  uploadText: {fontSize: 14, color: theme.textSub, fontWeight: '600', textAlign: 'center'},
+  uploadedImage: {width: '100%', height: '100%', resizeMode: 'cover'},
+  submitBtn: {height: 56, backgroundColor: theme.primary, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginTop: 32, shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6},
+  submitBtnDisabled: {opacity: 0.6},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: '900'},
 });
