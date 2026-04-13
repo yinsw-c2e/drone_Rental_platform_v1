@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文件是 [BUSINESS_ROLE_REDESIGN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_ROLE_REDESIGN.md) 的配套字段字典。
+本文件是 [BUSINESS_ROLE_REDESIGN.md](./BUSINESS_ROLE_REDESIGN.md) 的配套字段字典。
 
 它的作用不是定义数据库语法细节，而是统一后续重构时的：
 
@@ -819,7 +819,7 @@
 
 本字段字典与主文档的对应关系如下：
 
-- 业务逻辑：看 [BUSINESS_ROLE_REDESIGN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_ROLE_REDESIGN.md)
+- 业务逻辑：看 [BUSINESS_ROLE_REDESIGN.md](./BUSINESS_ROLE_REDESIGN.md)
 - 字段定义：看本文件
 - 后续页面重构：建议补 `页面信息架构`
 - 后续接口重构：建议补 `接口契约`

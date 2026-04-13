@@ -4,9 +4,9 @@
 
 本文件用于把以下三份业务文档落到接口层：
 
-- [BUSINESS_ROLE_REDESIGN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_ROLE_REDESIGN.md)
-- [BUSINESS_FIELD_DICTIONARY.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_FIELD_DICTIONARY.md)
-- [BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md)
+- [BUSINESS_ROLE_REDESIGN.md](./BUSINESS_ROLE_REDESIGN.md)
+- [BUSINESS_FIELD_DICTIONARY.md](./BUSINESS_FIELD_DICTIONARY.md)
+- [BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md](./BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md)
 
 这份文档的目标不是覆盖所有实现细节，而是先定清：
 

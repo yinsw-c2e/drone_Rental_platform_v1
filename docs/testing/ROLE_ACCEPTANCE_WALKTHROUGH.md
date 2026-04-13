@@ -111,7 +111,7 @@
 
 脚本位置：
 
-- [phase10_role_acceptance.sh](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/backend/scripts/phase10_role_acceptance.sh)
+- [phase10_role_acceptance.sh](/Users/yinswc2e/Code/drone_Rental_platform_v1/backend/scripts/phase10_role_acceptance.sh)
 
 推荐运行方式：
 

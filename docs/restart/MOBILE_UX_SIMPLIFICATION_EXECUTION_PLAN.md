@@ -18,7 +18,7 @@
 
 仓库状态：
 
-- 仓库路径：`/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1`
+- 仓库路径：`/Users/yinswc2e/Code/drone_Rental_platform_v1`
 - 当前分支：`main`
 - 当前提交：`d5f6dffb0289dafa122c908895b0cc207a40224e`
 - 当前工作区：`clean`
@@ -26,12 +26,12 @@
 当前版本关键事实：
 
 - 底部导航当前为 `首页 / 市场 / 履约 / 消息 / 我的`
-- Native 入口在 [MainNavigator.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx#L122)
-- Web 预览手工维护了一套等价 Tab 逻辑，在 [index.web.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/index.web.tsx#L275) 与 [index.web.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/index.web.tsx#L534)
-- 首页主文件为 [HomeScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx)
-- 市场落地页当前为 [MarketHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx)
-- 履约落地页当前为 [FulfillmentHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx)
-- “我的”主文件为 [ProfileScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx)
+- Native 入口在 [MainNavigator.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx#L122)
+- Web 预览手工维护了一套等价 Tab 逻辑，在 [index.web.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/index.web.tsx#L275) 与 [index.web.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/index.web.tsx#L534)
+- 首页主文件为 [HomeScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx)
+- 市场落地页当前为 [MarketHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx)
+- 履约落地页当前为 [FulfillmentHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx)
+- “我的”主文件为 [ProfileScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx)
 
 ## 3. 本轮改版目标
 
@@ -100,8 +100,8 @@
 
 任何涉及底部导航、Tab 标签、Tab 落地组件的改动，必须同时更新：
 
-- [MainNavigator.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx)
-- [index.web.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/index.web.tsx)
+- [MainNavigator.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx)
+- [index.web.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/index.web.tsx)
 
 只改其中一端视为未完成。
 
@@ -109,7 +109,7 @@
 
 ### 5.1 首页当前是“角色驱动”，不是“任务驱动”
 
-[HomeScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx#L324) 先要求用户切角色，再用不同角色拼接 Hero、指标、待办、快捷入口、进行中任务、市场 Feed。
+[HomeScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx#L324) 先要求用户切角色，再用不同角色拼接 Hero、指标、待办、快捷入口、进行中任务、市场 Feed。
 
 实际问题：
 
@@ -119,9 +119,9 @@
 
 ### 5.2 市场和履约当前是“目录页”
 
-[MarketHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx#L62) 本质是在列动作卡。
+[MarketHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx#L62) 本质是在列动作卡。
 
-[FulfillmentHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx#L63) 也是在列动作卡。
+[FulfillmentHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx#L63) 也是在列动作卡。
 
 实际问题：
 
@@ -131,7 +131,7 @@
 
 ### 5.3 “我的”页暴露了太多系统概念
 
-[ProfileScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx#L493) 现在顺序是：
+[ProfileScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx#L493) 现在顺序是：
 
 - Hero 资料卡
 - 账号卡
@@ -321,7 +321,7 @@
 建议命令：
 
 ```bash
-cd /Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1
+cd /Users/yinswc2e/Code/drone_Rental_platform_v1
 git tag -a ui-before-ux-simplification-20260326 -m "Before mobile UX simplification round"
 git push origin ui-before-ux-simplification-20260326
 ```
@@ -329,7 +329,7 @@ git push origin ui-before-ux-simplification-20260326
 回退方式：
 
 ```bash
-cd /Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1
+cd /Users/yinswc2e/Code/drone_Rental_platform_v1
 git checkout -b restore/ui-before-ux-simplification ui-before-ux-simplification-20260326
 ```
 
@@ -349,13 +349,13 @@ git checkout -b restore/ui-before-ux-simplification ui-before-ux-simplification-
 
 主要文件：
 
-- [MainNavigator.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx)
-- [index.web.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/index.web.tsx)
-- [OrderListScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/order/OrderListScreen.tsx)
+- [MainNavigator.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx)
+- [index.web.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/index.web.tsx)
+- [OrderListScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/order/OrderListScreen.tsx)
 
 可选读取文件：
 
-- [FulfillmentHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx)
+- [FulfillmentHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx)
 
 具体要求：
 
@@ -382,7 +382,7 @@ git checkout -b restore/ui-before-ux-simplification ui-before-ux-simplification-
 建议验证：
 
 ```bash
-cd /Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile
+cd /Users/yinswc2e/Code/drone_Rental_platform_v1/mobile
 npx tsc --noEmit
 npm run web:build
 ```
@@ -398,7 +398,7 @@ npm run web:build
 
 主要文件：
 
-- [HomeScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx)
+- [HomeScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx)
 
 设计冻结点：
 
@@ -446,7 +446,7 @@ npm run web:build
 
 主要文件：
 
-- [ProfileScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx)
+- [ProfileScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx)
 
 设计冻结点：
 
@@ -501,8 +501,8 @@ npm run web:build
 
 推荐文件所有权：
 
-- [MarketHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx)
-- 如必须扩展，可只读 [DemandListScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/demand/DemandListScreen.tsx)
+- [MarketHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx)
+- 如必须扩展，可只读 [DemandListScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/demand/DemandListScreen.tsx)
 
 设计冻结点：
 
@@ -544,12 +544,12 @@ npm run web:build
 
 主要文件：
 
-- [HomeScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx)
-- [MarketHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx)
-- [FulfillmentHubScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx)
-- [ProfileScreen.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx)
-- [MainNavigator.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx)
-- [index.web.tsx](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile/src/index.web.tsx)
+- [HomeScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/home/HomeScreen.tsx)
+- [MarketHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/market/MarketHubScreen.tsx)
+- [FulfillmentHubScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/fulfillment/FulfillmentHubScreen.tsx)
+- [ProfileScreen.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/screens/profile/ProfileScreen.tsx)
+- [MainNavigator.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/navigation/MainNavigator.tsx)
+- [index.web.tsx](/Users/yinswc2e/Code/drone_Rental_platform_v1/mobile/src/index.web.tsx)
 
 执行规则：
 
@@ -584,7 +584,7 @@ npm run web:build
 
 主要文件：
 
-- [MOBILE_REGRESSION_ACCEPTANCE.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/MOBILE_REGRESSION_ACCEPTANCE.md)
+- [MOBILE_REGRESSION_ACCEPTANCE.md](../testing/MOBILE_REGRESSION_ACCEPTANCE.md)
 - 如有必要，可回写本文件的“阶段结论”
 
 必补内容：
@@ -685,7 +685,7 @@ npm run web:build
 6. 提交前至少运行：
 
 ```bash
-cd /Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/mobile
+cd /Users/yinswc2e/Code/drone_Rental_platform_v1/mobile
 npx tsc --noEmit
 npm run web:build
 ```

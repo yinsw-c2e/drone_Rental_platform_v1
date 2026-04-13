@@ -1395,8 +1395,8 @@ mindmap
 1. 先定稿本文档
 2. 画出目标数据库关系图
 3. 定义状态枚举与字段字典
-已补充字段字典：[BUSINESS_FIELD_DICTIONARY.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_FIELD_DICTIONARY.md)
-已补充数据库关系与迁移方案：[BUSINESS_DATABASE_MIGRATION_PLAN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_DATABASE_MIGRATION_PLAN.md)
+已补充字段字典：[BUSINESS_FIELD_DICTIONARY.md](./BUSINESS_FIELD_DICTIONARY.md)
+已补充数据库关系与迁移方案：[BUSINESS_DATABASE_MIGRATION_PLAN.md](./BUSINESS_DATABASE_MIGRATION_PLAN.md)
 4. 重写后端领域模型与迁移脚本
 5. 重写核心接口：需求、报价、订单、派单
 6. 重写首页、订单页、派单页
@@ -1410,23 +1410,23 @@ mindmap
 
 1. `字段字典`
 明确每个核心表、每个状态枚举、每个字段含义。
-已补充：[BUSINESS_FIELD_DICTIONARY.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_FIELD_DICTIONARY.md)
+已补充：[BUSINESS_FIELD_DICTIONARY.md](./BUSINESS_FIELD_DICTIONARY.md)
 
 2. `页面信息架构`
 明确首页、订单页、派单页、我的页分别展示什么卡片、按钮、状态。
-已补充：[BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md)
+已补充：[BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md](./BUSINESS_PAGE_INFORMATION_ARCHITECTURE.md)
 
 3. `接口契约`
 明确关键接口的 request / response 结构，避免前后端重构时反复对齐。
-已补充：[BUSINESS_API_CONTRACT.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_API_CONTRACT.md)
+已补充：[BUSINESS_API_CONTRACT.md](./BUSINESS_API_CONTRACT.md)
 
 4. `数据库关系与迁移方案`
 明确目标表关系、旧表到新表的映射规则，以及实际切换顺序。
-已补充：[BUSINESS_DATABASE_MIGRATION_PLAN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_DATABASE_MIGRATION_PLAN.md)
+已补充：[BUSINESS_DATABASE_MIGRATION_PLAN.md](./BUSINESS_DATABASE_MIGRATION_PLAN.md)
 
 5. `重构任务总表`
 把业务文档、字段、页面、接口、迁移拆成可执行任务，并在后续重构过程中持续勾选更新。
-已补充：[REFACTOR_MASTER_TASKLIST.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/REFACTOR_MASTER_TASKLIST.md)
+已补充：[REFACTOR_MASTER_TASKLIST.md](../planning/REFACTOR_MASTER_TASKLIST.md)
 
 ## 13. 最终结论
 

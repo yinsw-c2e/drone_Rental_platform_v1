@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文件用于把 [BUSINESS_ROLE_REDESIGN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_ROLE_REDESIGN.md) 中的业务逻辑，落到移动端页面结构上。
+本文件用于把 [BUSINESS_ROLE_REDESIGN.md](./BUSINESS_ROLE_REDESIGN.md) 中的业务逻辑，落到移动端页面结构上。
 
 它要解决的不是视觉样式问题，而是：
 

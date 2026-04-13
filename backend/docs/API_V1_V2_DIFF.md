@@ -2,7 +2,7 @@
 
 最后更新：2026-03-15
 
-本文档用于说明当前项目中 `v1` 与 `v2` 的边界、映射关系与切换建议。它是联调说明，不替代详细业务规则；业务口径以 [BUSINESS_ROLE_REDESIGN.md](../BUSINESS_ROLE_REDESIGN.md) 和 [BUSINESS_API_CONTRACT.md](../BUSINESS_API_CONTRACT.md) 为准。
+本文档用于说明当前项目中 `v1` 与 `v2` 的边界、映射关系与切换建议。它是联调说明，不替代详细业务规则；业务口径以 [BUSINESS_ROLE_REDESIGN.md](../../docs/business/BUSINESS_ROLE_REDESIGN.md) 和 [BUSINESS_API_CONTRACT.md](../../docs/business/BUSINESS_API_CONTRACT.md) 为准。
 
 ## 1. 总体变化
 
@@ -215,7 +215,7 @@
 ## 7. 参考文件
 
 - [当前已实现的 OpenAPI v2](./openapi-v2.yaml)
-- [业务角色重构文档](../BUSINESS_ROLE_REDESIGN.md)
-- [字段字典](../BUSINESS_FIELD_DICTIONARY.md)
-- [API 契约](../BUSINESS_API_CONTRACT.md)
-- [数据库迁移方案](../BUSINESS_DATABASE_MIGRATION_PLAN.md)
+- [业务角色重构文档](../../docs/business/BUSINESS_ROLE_REDESIGN.md)
+- [字段字典](../../docs/business/BUSINESS_FIELD_DICTIONARY.md)
+- [API 契约](../../docs/business/BUSINESS_API_CONTRACT.md)
+- [数据库迁移方案](../../docs/business/BUSINESS_DATABASE_MIGRATION_PLAN.md)

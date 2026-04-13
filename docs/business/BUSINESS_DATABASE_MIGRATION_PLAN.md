@@ -4,9 +4,9 @@
 
 本文件用于承接以下业务设计文档，并把它们进一步落到数据库重构与历史数据迁移层：
 
-- [BUSINESS_ROLE_REDESIGN.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_ROLE_REDESIGN.md)
-- [BUSINESS_FIELD_DICTIONARY.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_FIELD_DICTIONARY.md)
-- [BUSINESS_API_CONTRACT.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/BUSINESS_API_CONTRACT.md)
+- [BUSINESS_ROLE_REDESIGN.md](./BUSINESS_ROLE_REDESIGN.md)
+- [BUSINESS_FIELD_DICTIONARY.md](./BUSINESS_FIELD_DICTIONARY.md)
+- [BUSINESS_API_CONTRACT.md](./BUSINESS_API_CONTRACT.md)
 
 它要解决的核心问题是：
 
@@ -494,7 +494,7 @@ erDiagram
 
 配套执行说明：
 
-- [PHASE9_MIGRATION_RUNBOOK.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/backend/docs/PHASE9_MIGRATION_RUNBOOK.md)
+- [PHASE9_MIGRATION_RUNBOOK.md](/Users/yinswc2e/Code/drone_Rental_platform_v1/backend/docs/PHASE9_MIGRATION_RUNBOOK.md)
 
 原则：
 

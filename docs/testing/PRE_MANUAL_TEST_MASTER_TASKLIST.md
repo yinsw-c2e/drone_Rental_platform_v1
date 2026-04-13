@@ -28,12 +28,12 @@
 
 基于以下文档整理：
 
-- [REFACTOR_MASTER_TASKLIST.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/REFACTOR_MASTER_TASKLIST.md)
-- [REFACTOR_TASK_TRACKER.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/REFACTOR_TASK_TRACKER.md)
-- [ROLE_ACCEPTANCE_WALKTHROUGH.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/ROLE_ACCEPTANCE_WALKTHROUGH.md)
-- [MOBILE_REGRESSION_ACCEPTANCE.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/MOBILE_REGRESSION_ACCEPTANCE.md)
-- [DEMO_ACCOUNTS.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/DEMO_ACCOUNTS.md)
-- [PHASE9_MIGRATION_RUNBOOK.md](/Users/yinsw1994/myproject/drone_rental_platform/drone_Rental_platform_v1/backend/docs/PHASE9_MIGRATION_RUNBOOK.md)
+- [REFACTOR_MASTER_TASKLIST.md](../planning/REFACTOR_MASTER_TASKLIST.md)
+- [REFACTOR_TASK_TRACKER.md](../planning/REFACTOR_TASK_TRACKER.md)
+- [ROLE_ACCEPTANCE_WALKTHROUGH.md](./ROLE_ACCEPTANCE_WALKTHROUGH.md)
+- [MOBILE_REGRESSION_ACCEPTANCE.md](./MOBILE_REGRESSION_ACCEPTANCE.md)
+- [DEMO_ACCOUNTS.md](./DEMO_ACCOUNTS.md)
+- [PHASE9_MIGRATION_RUNBOOK.md](/Users/yinswc2e/Code/drone_Rental_platform_v1/backend/docs/PHASE9_MIGRATION_RUNBOOK.md)
 
 当前共识：
 
