@@ -21,6 +21,16 @@ build/
 *.swo
 *~
 
+# Local AI / agent tooling
+AGENTS.md
+GEMINI.md
+.agents/skills/uiux-delegate/SKILL.md
+
+.claude/
+examples/
+prompts/
+scripts/
+
 # OS
 .DS_Store
 Thumbs.db
