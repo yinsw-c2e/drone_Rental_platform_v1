@@ -75,8 +75,8 @@ export default function FulfillmentHubScreen({navigation}: any) {
     if (effectiveRoleSummary.has_owner_role) {
       actions.push({
         key: 'dispatch',
-        title: '派单任务',
-        desc: '给绑定飞手或候选飞手发起正式派单',
+        title: '执行安排',
+        desc: '集中安排飞手、处理重派和执行响应',
         icon: '📡',
         accent: '#13c2c2',
         onPress: () => navigation.navigate('DispatchTaskList'),
@@ -107,11 +107,11 @@ export default function FulfillmentHubScreen({navigation}: any) {
     actions.push({
       key: 'monitor-tip',
       title: '飞行监控',
-      desc: '从订单详情或任务详情进入，避免脱离上下文',
+      desc: '从订单详情或执行安排详情进入，避免脱离上下文',
       icon: '📍',
       accent: '#eb2f96',
       onPress: () =>
-        Alert.alert('飞行监控入口', '请从订单详情或派单任务详情进入飞行监控。'),
+        Alert.alert('飞行监控入口', '请从订单详情或执行安排详情进入飞行监控。'),
     });
 
     return actions;
@@ -122,9 +122,9 @@ export default function FulfillmentHubScreen({navigation}: any) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.heroEyebrow}>进度</Text>
-          <Text style={styles.heroTitle}>成交后的执行中心</Text>
+          <Text style={styles.heroTitle}>成交后的履约工作台</Text>
           <Text style={styles.heroDesc}>
-            这里专门处理订单、正式派单、飞行监控和飞行记录，不再混市场撮合信息。
+            这里专门处理订单、执行安排、飞行监控和飞行记录，不再混市场撮合信息。
           </Text>
           <View style={styles.rolePill}>
             <Text style={styles.rolePillText}>{getRoleDisplayText(roleSummary, user)}</Text>
@@ -134,7 +134,7 @@ export default function FulfillmentHubScreen({navigation}: any) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>核心履约动作</Text>
           <Text style={styles.sectionDesc}>
-            订单是成交结果，派单任务是执行指令，飞行记录是执行留痕。
+            对客户来说主要看订单进度；对机主和飞手来说，再在这里处理执行安排和飞行留痕。
           </Text>
           <View style={styles.grid}>
             {fulfillmentActions.map(action => (
@@ -146,7 +146,7 @@ export default function FulfillmentHubScreen({navigation}: any) {
         <View style={styles.tipCard}>
           <Text style={styles.tipTitle}>履约规则提醒</Text>
           <Text style={styles.tipText}>
-            订单页只看订单，派单页只看派单，飞行记录只看真实执行结果。这样后面再做监控和售后时，状态口径才不会再打架。
+            订单页负责对外说明进度，执行安排页负责机主和飞手的内部协作，飞行记录只保留真实执行留痕。这样客户不会被内部对象打断，运营和执行也能保持清晰分工。
           </Text>
         </View>
       </ScrollView>

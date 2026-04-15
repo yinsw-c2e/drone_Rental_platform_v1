@@ -67,6 +67,10 @@ func (s *ClientService) CreateDemand(userID int64, input *ClientDemandInput) (*m
 		return nil, errors.New("需求域仓储未初始化")
 	}
 
+	if _, err := s.requireCurrentEligibility(userID, clientEligibilityActionPublishDemand); err != nil {
+		return nil, err
+	}
+
 	if _, err := s.ensureDefaultClient(userID); err != nil {
 		return nil, err
 	}
@@ -109,6 +113,10 @@ func (s *ClientService) UpdateDemand(userID, demandID int64, input *ClientDemand
 func (s *ClientService) PublishDemand(userID, demandID int64) (*model.Demand, error) {
 	if s.demandDomainRepo == nil {
 		return nil, errors.New("需求域仓储未初始化")
+	}
+
+	if _, err := s.requireCurrentEligibility(userID, clientEligibilityActionPublishDemand); err != nil {
+		return nil, err
 	}
 
 	demand, err := s.getOwnedDemand(userID, demandID)
@@ -328,6 +336,10 @@ func (s *ClientService) SelectProvider(userID, demandID, quoteID int64) (*Select
 		return nil, errors.New("需求转单依赖未初始化")
 	}
 
+	if _, err := s.requireCurrentEligibility(userID, clientEligibilityActionSelectProvider); err != nil {
+		return nil, err
+	}
+
 	client, err := s.ensureDefaultClient(userID)
 	if err != nil {
 		return nil, err
@@ -463,6 +475,10 @@ func (s *ClientService) CreateDirectSupplyOrder(userID, supplyID int64, input *D
 		return nil, errors.New("直达下单服务未初始化")
 	}
 
+	if _, err := s.requireCurrentEligibility(userID, clientEligibilityActionCreateDirectOrder); err != nil {
+		return nil, err
+	}
+
 	client, err := s.ensureDefaultClient(userID)
 	if err != nil {
 		return nil, err
@@ -483,10 +499,13 @@ func (s *ClientService) CreateDirectSupplyOrder(userID, supplyID int64, input *D
 	}
 
 	return &DirectOrderResult{
-		OrderID:     order.ID,
-		OrderNo:     order.OrderNo,
-		OrderSource: order.OrderSource,
-		Status:      order.Status,
+		OrderID:            order.ID,
+		OrderNo:            order.OrderNo,
+		OrderSource:        order.OrderSource,
+		Status:             order.Status,
+		TotalAmount:        order.TotalAmount,
+		PlatformCommission: order.PlatformCommission,
+		OwnerAmount:        order.OwnerAmount,
 	}, nil
 }
 

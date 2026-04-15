@@ -365,10 +365,13 @@ type DirectOrderInput struct {
 }
 
 type DirectOrderResult struct {
-	OrderID     int64  `json:"order_id"`
-	OrderNo     string `json:"order_no"`
-	OrderSource string `json:"order_source"`
-	Status      string `json:"status"`
+	OrderID             int64  `json:"order_id"`
+	OrderNo             string `json:"order_no"`
+	OrderSource         string `json:"order_source"`
+	Status              string `json:"status"`
+	TotalAmount         int64  `json:"total_amount"`
+	PlatformCommission  int64  `json:"platform_commission"`
+	OwnerAmount         int64  `json:"owner_amount"`
 }
 
 func (s *OrderService) CreateDirectSupplyOrder(renterUserID int64, client *model.Client, supplyID int64, input *DirectOrderInput) (*model.Order, error) {
@@ -1457,7 +1460,7 @@ func (s *OrderService) restoreDroneStatusIfNoActiveOrders(droneID, excludeOrderI
 
 func (s *OrderService) restoreDroneStatusIfNoActiveOrdersWithRepos(droneID, excludeOrderID int64, orderRepo *repository.OrderRepo, droneRepo *repository.DroneRepo) {
 	// 查询是否还有其他进行中的订单
-	activeStatuses := []string{"accepted", "confirmed", "paid", "pending_dispatch", "assigned", "preparing", "in_progress", "delivered"}
+	activeStatuses := []string{"accepted", "confirmed", "paid", "pending_dispatch", "assigned", "loading", "preparing", "in_progress", "in_transit", "delivered"}
 	hasOtherOrders := false
 
 	for _, status := range activeStatuses {
@@ -1675,57 +1678,228 @@ func derefFloat64(value *float64) float64 {
 	return *value
 }
 
-func (s *OrderService) UpdateExecutionStatus(userID int64, orderID int64, status string) error {
-	pilot, err := s.pilotRepo.GetByUserID(userID)
-	if err != nil {
-		return errors.New("请先注册成为飞手")
+func normalizeExecutionStatus(status string) string {
+	switch status {
+	case "loading":
+		return "preparing"
+	default:
+		return status
+	}
+}
+
+func executionStatusTransitions() map[string]map[string]bool {
+	return map[string]map[string]bool{
+		"assigned": {
+			"confirmed": true,
+			"preparing": true,
+		},
+		"confirmed": {
+			"airspace_applying": true,
+			"preparing":         true,
+		},
+		"airspace_applying": {
+			"airspace_approved": true,
+			"preparing":         true,
+		},
+		"airspace_approved": {
+			"preparing": true,
+		},
+		"preparing": {
+			"in_transit": true,
+		},
+		"in_transit": {
+			"delivered": true,
+		},
+	}
+}
+
+func executionStatusLabels() map[string]string {
+	return map[string]string{
+		"confirmed":         "飞手已确认接单",
+		"airspace_applying": "正在申请空域许可",
+		"airspace_approved": "空域许可已获批",
+		"preparing":         "执行人已开始准备",
+		"in_transit":        "无人机已起飞，订单执行中",
+		"delivered":         "已到达目的地，完成投送",
+	}
+}
+
+func executionStatusNotification(status string) (string, string, string, bool) {
+	switch status {
+	case "preparing":
+		return "order_preparing", "订单准备中", "订单“%s”已进入准备阶段。", true
+	case "in_transit":
+		return "order_in_transit", "订单执行中", "订单“%s”已开始飞行，请留意执行进度。", true
+	case "delivered":
+		return "order_delivered", "订单已投送", "订单“%s”已完成投送，请尽快确认签收。", true
+	default:
+		return "", "", "", false
+	}
+}
+
+func validateExecutionStatusTransition(currentStatus, targetStatus string) error {
+	if targetStatus == "" {
+		return errors.New("无效的状态值")
+	}
+	if currentStatus == targetStatus {
+		return errors.New("订单已处于该状态")
+	}
+	next, exists := executionStatusTransitions()[currentStatus]
+	if !exists || !next[targetStatus] {
+		return fmt.Errorf("订单当前状态为 %s，不允许变更为 %s", currentStatus, targetStatus)
+	}
+	return nil
+}
+
+func buildExecutionStatusUpdates(order *model.Order, operatorUserID int64, targetStatus, persistedStatus string, now time.Time) map[string]interface{} {
+	updates := map[string]interface{}{
+		"status":     persistedStatus,
+		"updated_at": now,
 	}
 
+	switch targetStatus {
+	case "preparing":
+		if order != nil && order.AirspaceStatus == "" {
+			updates["airspace_status"] = "approved"
+		}
+	case "in_transit":
+		updates["loading_confirmed_at"] = now
+		updates["loading_confirmed_by"] = operatorUserID
+		updates["flight_start_time"] = now
+	case "delivered":
+		updates["unloading_confirmed_at"] = now
+		updates["unloading_confirmed_by"] = operatorUserID
+		updates["flight_end_time"] = now
+	}
+
+	return updates
+}
+
+func executionStatusOptionalColumns() map[string]struct{} {
+	return map[string]struct{}{
+		"loading_confirmed_at":   {},
+		"loading_confirmed_by":   {},
+		"unloading_confirmed_at": {},
+		"unloading_confirmed_by": {},
+		"flight_start_time":      {},
+		"flight_end_time":        {},
+	}
+}
+
+func filterExecutionStatusUpdates(updates map[string]interface{}, hasColumn func(string) bool) map[string]interface{} {
+	if len(updates) == 0 || hasColumn == nil {
+		return updates
+	}
+
+	optionalColumns := executionStatusOptionalColumns()
+	filtered := make(map[string]interface{}, len(updates))
+	for column, value := range updates {
+		if _, optional := optionalColumns[column]; optional && !hasColumn(column) {
+			continue
+		}
+		filtered[column] = value
+	}
+	return filtered
+}
+
+func (s *OrderService) updateExecutionStatusWithRepos(userID int64, orderID int64, rawStatus string, orderRepo *repository.OrderRepo) (string, error) {
+	order, err := orderRepo.GetByID(orderID)
+	if err != nil {
+		return "", errors.New("订单不存在")
+	}
+	if !s.CanAccessOrder(order, userID, "pilot") {
+		return "", errors.New("无权操作此订单")
+	}
+
+	targetStatus := normalizeExecutionStatus(rawStatus)
 	allowedStatuses := map[string]bool{
 		"confirmed":         true,
 		"airspace_applying": true,
 		"airspace_approved": true,
-		"loading":           true,
+		"preparing":         true,
 		"in_transit":        true,
 		"delivered":         true,
 	}
-	if !allowedStatuses[status] {
-		return errors.New("无效的状态值")
+	if !allowedStatuses[targetStatus] {
+		return "", errors.New("无效的状态值")
 	}
 
-	extra := map[string]interface{}{}
+	currentStatus := normalizeExecutionStatus(order.Status)
+	if err := validateExecutionStatusTransition(currentStatus, targetStatus); err != nil {
+		return "", err
+	}
+
 	now := time.Now()
-	switch status {
-	case "loading":
-		extra["airspace_status"] = "approved"
-	case "in_transit":
-		extra["loading_confirmed_at"] = now
-		extra["flight_start_time"] = now
-	case "delivered":
-		extra["unloading_confirmed_at"] = now
-		extra["flight_end_time"] = now
+	updates := buildExecutionStatusUpdates(order, userID, targetStatus, rawStatus, now)
+	if db := orderRepo.DB(); db != nil {
+		updates = filterExecutionStatusUpdates(updates, func(column string) bool {
+			return db.Migrator().HasColumn(&model.Order{}, column)
+		})
+	}
+	if err := orderRepo.UpdateFields(orderID, updates); err != nil {
+		return "", err
 	}
 
-	if err := s.orderRepo.UpdateStatusWithFields(orderID, pilot.ID, status, extra); err != nil {
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       rawStatus,
+		Note:         executionStatusLabels()[targetStatus],
+		OperatorID:   userID,
+		OperatorType: "pilot",
+	}); err != nil {
+		return "", err
+	}
+
+	return targetStatus, nil
+}
+
+func (s *OrderService) UpdateExecutionStatus(userID int64, orderID int64, status string) error {
+	db := s.orderRepo.DB()
+	if db == nil {
+		targetStatus, err := s.updateExecutionStatusWithRepos(userID, orderID, status, s.orderRepo)
+		if err != nil {
+			return err
+		}
+		if eventType, title, template, ok := executionStatusNotification(targetStatus); ok && s.eventService != nil {
+			if order, orderErr := s.orderRepo.GetByID(orderID); orderErr == nil && order != nil {
+				order.Status = status
+				s.eventService.NotifyOrderStatusChanged(order, eventType, title, fmt.Sprintf(template, firstNonEmpty(order.Title, order.OrderNo, "订单")))
+			}
+		}
+		return nil
+	}
+
+	targetStatus := ""
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		nextStatus, txErr := s.updateExecutionStatusWithRepos(userID, orderID, status, repository.NewOrderRepo(tx))
+		if txErr != nil {
+			return txErr
+		}
+		targetStatus = nextStatus
+		return nil
+	}); err != nil {
 		return err
 	}
 
-	statusLabels := map[string]string{
-		"confirmed":         "飞手已确认接单",
-		"airspace_applying": "正在申请空域许可",
-		"airspace_approved": "空域许可已获批",
-		"loading":           "装货确认",
-		"in_transit":        "无人机已起飞",
-		"delivered":         "已到达目的地，完成卸货",
+	if eventType, title, template, ok := executionStatusNotification(targetStatus); ok && s.eventService != nil {
+		if order, err := s.orderRepo.GetByID(orderID); err == nil && order != nil {
+			order.Status = status
+			s.eventService.NotifyOrderStatusChanged(order, eventType, title, fmt.Sprintf(template, firstNonEmpty(order.Title, order.OrderNo, "订单")))
+		}
 	}
-	s.orderRepo.AddTimeline(&model.OrderTimeline{
-		OrderID:      orderID,
-		Status:       status,
-		Note:         statusLabels[status],
-		OperatorID:   pilot.ID,
-		OperatorType: "pilot",
-	})
 	return nil
+}
+
+func (s *OrderService) StartPreparing(userID int64, orderID int64) error {
+	return s.UpdateExecutionStatus(userID, orderID, "preparing")
+}
+
+func (s *OrderService) StartFlight(userID int64, orderID int64) error {
+	return s.UpdateExecutionStatus(userID, orderID, "in_transit")
+}
+
+func (s *OrderService) ConfirmDelivery(userID int64, orderID int64) error {
+	return s.UpdateExecutionStatus(userID, orderID, "delivered")
 }
 
 func (s *OrderService) ConfirmReceipt(userID int64, orderID int64) error {

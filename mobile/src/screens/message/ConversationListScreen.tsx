@@ -150,7 +150,7 @@ export default function ConversationListScreen({navigation}: any) {
       ]);
 
       const nextNotifications = notificationRes.data?.items || [];
-      const nextConversations = (conversationRes.data || []).filter(
+      const nextConversations = (conversationRes.data?.items || []).filter(
         item => item.peer_id > 0 && !String(item.conversation_id || '').startsWith('system-'),
       );
 
@@ -220,6 +220,13 @@ export default function ConversationListScreen({navigation}: any) {
       }
 
       const extra = notification.extra_data || {};
+      if (extra.order_id) {
+        const preferOrderView = !roleSummary?.has_owner_role && !roleSummary?.has_pilot_role;
+        if (preferOrderView || !extra.dispatch_task_id) {
+          navigation.navigate('OrderDetail', {orderId: Number(extra.order_id)});
+          return;
+        }
+      }
       if (extra.dispatch_task_id) {
         navigation.navigate('DispatchTaskDetail', {dispatchId: Number(extra.dispatch_task_id)});
         return;

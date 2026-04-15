@@ -1,4 +1,4 @@
-import api from './api';
+import api, {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -30,10 +30,31 @@ export interface Client {
   total_spending: number;
   average_rating: number;
   verification_status: string;
+  client_verification_status?: string;
+  identity_verification_status?: string;
   verification_note: string;
   status: string;
+  eligibility?: ClientEligibility;
   created_at: string;
   updated_at: string;
+}
+
+export interface ClientEligibilityBlocker {
+  code: string;
+  message: string;
+  suggested_action?: 'verify_identity' | 'repair_credit' | 'contact_support' | string;
+}
+
+export interface ClientEligibility {
+  eligible: boolean;
+  can_publish_demand: boolean;
+  can_create_direct_order: boolean;
+  account_active: boolean;
+  identity_verified: boolean;
+  credit_qualified: boolean;
+  enterprise_upgrade_optional: boolean;
+  summary: string;
+  blockers?: ClientEligibilityBlocker[];
 }
 
 export interface CargoDeclaration {
@@ -133,13 +154,19 @@ export const registerEnterprise = async (data: RegisterEnterpriseRequest): Promi
 
 // 获取客户档案
 export const getClientProfile = async (): Promise<Client> => {
-  const res: any = await api.get('/client/profile');
+  const res: any = await apiV2.get('/client/profile');
   return res.data;
 };
 
 // 更新客户档案
 export const updateClientProfile = async (data: UpdateProfileRequest): Promise<Client> => {
-  const res: any = await api.put('/client/profile', data);
+  const res: any = await apiV2.patch('/client/profile', data);
+  return res.data;
+};
+
+// 获取当前客户资格
+export const getClientEligibility = async (): Promise<ClientEligibility> => {
+  const res: any = await apiV2.get('/client/eligibility');
   return res.data;
 };
 
@@ -192,6 +219,7 @@ export default {
   registerEnterprise,
   getClientProfile,
   updateClientProfile,
+  getClientEligibility,
   requestCreditCheck,
   getCreditHistory,
   checkOrderEligibility,

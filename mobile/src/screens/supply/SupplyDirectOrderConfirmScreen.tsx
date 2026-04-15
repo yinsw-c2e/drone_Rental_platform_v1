@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
   Platform,
@@ -18,9 +18,10 @@ import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
+import {ClientEligibility, getClientEligibility} from '../../services/client';
 import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
-import {AddressData, DirectOrderResult, SupplyDetail} from '../../types';
+import {AddressData, DirectOrderResult, QuickOrderDraft, SupplyDetail} from '../../types';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 import {
   formatAmountYuan,
@@ -52,6 +53,24 @@ function buildDefaultEndDate(startDate: Date): Date {
   return date;
 }
 
+function parseDraftDate(value: string | undefined, fallback: Date): Date {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function summarizeDraftAddress(address?: QuickOrderDraft['departure_address']): string {
+  if (!address) {
+    return '待补充';
+  }
+  return address.name || address.address || '待补充';
+}
+
 function toAddressSnapshot(address: AddressData) {
   return {
     text: address.address,
@@ -66,7 +85,11 @@ function toAddressSnapshot(address: AddressData) {
 export default function SupplyDirectOrderConfirmScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {supply} = route.params as {supply: SupplyDetail};
+  const {supply, quickOrderDraft, quickOrder} = route.params as {
+    supply: SupplyDetail;
+    quickOrderDraft?: QuickOrderDraft;
+    quickOrder?: any;
+  };
   const {user, roleSummary} = useSelector((state: RootState) => state.auth);
 
   const effectiveRoleSummary = useMemo(
@@ -79,28 +102,115 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
     () => (supply.cargo_scenes?.length ? supply.cargo_scenes : ['emergency']),
     [supply.cargo_scenes],
   );
+  const normalizedQuickOrderDraft = useMemo(
+    () =>
+      (quickOrderDraft ||
+        (quickOrder
+          ? {
+              cargo_scene: quickOrder.cargoScene,
+              cargo_weight_kg: Number(quickOrder.cargoWeight) || undefined,
+              departure_address: quickOrder.pickupAddress,
+              destination_address: quickOrder.deliveryAddress,
+            }
+          : undefined)) as QuickOrderDraft | undefined,
+    [quickOrder, quickOrderDraft],
+  );
+  const initialStartDate = useMemo(
+    () => parseDraftDate(normalizedQuickOrderDraft?.scheduled_start_at, buildDefaultStartDate()),
+    [normalizedQuickOrderDraft?.scheduled_start_at],
+  );
+  const initialEndDate = useMemo(
+    () => parseDraftDate(normalizedQuickOrderDraft?.scheduled_end_at, buildDefaultEndDate(initialStartDate)),
+    [initialStartDate, normalizedQuickOrderDraft?.scheduled_end_at],
+  );
 
-  const [cargoScene, setCargoScene] = useState(sceneOptions[0]);
-  const [departureAddress, setDepartureAddress] = useState<AddressData | null>(null);
-  const [destinationAddress, setDestinationAddress] = useState<AddressData | null>(null);
-  const [startDate, setStartDate] = useState<Date>(buildDefaultStartDate());
-  const [endDate, setEndDate] = useState<Date>(buildDefaultEndDate(buildDefaultStartDate()));
+  const [cargoScene, setCargoScene] = useState(() => {
+    const preferredScene = normalizedQuickOrderDraft?.cargo_scene;
+    return preferredScene && sceneOptions.includes(preferredScene) ? preferredScene : sceneOptions[0];
+  });
+  const [departureAddress, setDepartureAddress] = useState<AddressData | null>(
+    normalizedQuickOrderDraft?.departure_address || null,
+  );
+  const [destinationAddress, setDestinationAddress] = useState<AddressData | null>(
+    normalizedQuickOrderDraft?.destination_address || null,
+  );
+  const [startDate, setStartDate] = useState<Date>(initialStartDate);
+  const [endDate, setEndDate] = useState<Date>(initialEndDate);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [cargoWeight, setCargoWeight] = useState('');
+  const [cargoWeight, setCargoWeight] = useState(
+    normalizedQuickOrderDraft?.cargo_weight_kg ? String(normalizedQuickOrderDraft.cargo_weight_kg) : '',
+  );
   const [cargoVolume, setCargoVolume] = useState('');
-  const [cargoType, setCargoType] = useState('');
-  const [specialRequirements, setSpecialRequirements] = useState('');
-  const [description, setDescription] = useState('');
+  const [cargoType, setCargoType] = useState(normalizedQuickOrderDraft?.cargo_type || '');
+  const [specialRequirements, setSpecialRequirements] = useState(
+    normalizedQuickOrderDraft?.special_requirements || '',
+  );
+  const [description, setDescription] = useState(normalizedQuickOrderDraft?.description || '');
   const [submitting, setSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<DirectOrderResult | null>(null);
+  const [eligibility, setEligibility] = useState<ClientEligibility | null>(null);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
 
   const estimatedAmount = supply.base_price_amount || 0;
   const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
+  const primaryBlocker = eligibility?.blockers?.[0];
+  const orderReady = canCreateOrder && (eligibility?.can_create_direct_order ?? true);
+
+  useEffect(() => {
+    let active = true;
+    if (!canCreateOrder) {
+      setEligibility(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    setEligibilityLoading(true);
+    getClientEligibility()
+      .then(nextEligibility => {
+        if (active) {
+          setEligibility(nextEligibility);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setEligibility(null);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setEligibilityLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [canCreateOrder]);
 
   const handleSubmit = async () => {
     if (!canCreateOrder) {
       Alert.alert('当前不可下单', '当前账号没有客户能力，无法从供给发起直达下单。');
+      return;
+    }
+    try {
+      const currentEligibility = await getClientEligibility();
+      setEligibility(currentEligibility);
+      if (!currentEligibility.can_create_direct_order) {
+        const blocker = currentEligibility.blockers?.[0];
+        if (blocker?.suggested_action === 'verify_identity') {
+          Alert.alert('请先完成实名认证', blocker.message, [
+            {text: '稍后再说', style: 'cancel'},
+            {text: '去认证', onPress: () => navigation.navigate('Verification')},
+          ]);
+        } else {
+          Alert.alert('当前暂不可下单', blocker?.message || '当前客户资格未就绪，请稍后重试。');
+        }
+        return;
+      }
+    } catch (error: any) {
+      Alert.alert('资格检查失败', error?.message || '请稍后重试');
       return;
     }
     if (!departureAddress || !destinationAddress) {
@@ -180,11 +290,11 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
             </View>
           </ObjectCard>
 
-          <ObjectCard>
-            <Text style={styles.sectionTitle}>订单摘要</Text>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>订单编号</Text>
-              <Text style={styles.infoValue}>{createdOrder.order_no}</Text>
+        <ObjectCard>
+          <Text style={styles.sectionTitle}>订单摘要</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>订单编号</Text>
+            <Text style={styles.infoValue}>{createdOrder.order_no}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>订单来源</Text>
@@ -198,6 +308,23 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
               <Text style={styles.infoLabel}>基础价格</Text>
               <Text style={styles.infoValue}>{formatSupplyPricing(supply.base_price_amount, supply.pricing_unit)}</Text>
             </View>
+          </ObjectCard>
+
+          <ObjectCard>
+            <Text style={styles.sectionTitle}>费用明细</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>订单总额</Text>
+              <Text style={styles.infoValue}>{formatAmountYuan(createdOrder.total_amount || estimatedAmount)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>平台服务费</Text>
+              <Text style={styles.infoValue}>{formatAmountYuan(createdOrder.platform_commission || 0)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>承接方预计到账</Text>
+              <Text style={styles.infoValue}>{formatAmountYuan(createdOrder.owner_amount || 0)}</Text>
+            </View>
+            <Text style={styles.tipText}>订单生成后，费用拆分已经固定；后续在合同和订单详情里都可以继续查看。</Text>
           </ObjectCard>
 
           <ObjectCard>
@@ -237,6 +364,36 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
+        {normalizedQuickOrderDraft ? (
+          <ObjectCard highlightColor={theme.primaryBorder}>
+            <Text style={styles.sectionTitle}>快速下单已带入</Text>
+            <Text style={styles.tipText}>
+              起终点、货物和时间已经自动带过来了。你现在只需要确认方案，必要时再补充体积、特殊要求等细节。
+            </Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>运输路线</Text>
+              <Text style={styles.infoValue}>
+                {summarizeDraftAddress(normalizedQuickOrderDraft.departure_address)}
+                {' -> '}
+                {summarizeDraftAddress(normalizedQuickOrderDraft.destination_address)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>货物摘要</Text>
+              <Text style={styles.infoValue}>
+                {getSupplySceneLabel(normalizedQuickOrderDraft.cargo_scene)} /{' '}
+                {normalizedQuickOrderDraft.cargo_weight_kg || '--'}kg /{' '}
+                {normalizedQuickOrderDraft.cargo_type || '重载物资'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.prefillSecondaryBtn}
+              onPress={() => navigation.navigate('PublishCargo', {quickOrderDraft: normalizedQuickOrderDraft})}>
+              <Text style={styles.prefillSecondaryBtnText}>这条服务不合适，改为发布任务</Text>
+            </TouchableOpacity>
+          </ObjectCard>
+        ) : null}
+
         {!canCreateOrder ? (
           <ObjectCard>
             <EmptyState
@@ -245,6 +402,22 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
               description="直达下单属于客户动作。先补齐客户能力后，再从供给详情发起下单。"
               actionText="返回供给详情"
               onAction={() => navigation.goBack()}
+            />
+          </ObjectCard>
+        ) : null}
+
+        {canCreateOrder && eligibility && !eligibility.can_create_direct_order ? (
+          <ObjectCard>
+            <EmptyState
+              icon="🪪"
+              title="当前还差一步才能直达下单"
+              description={primaryBlocker?.message || eligibility.summary}
+              actionText={primaryBlocker?.suggested_action === 'verify_identity' ? '去做实名认证' : '返回供给详情'}
+              onAction={() =>
+                primaryBlocker?.suggested_action === 'verify_identity'
+                  ? navigation.navigate('Verification')
+                  : navigation.goBack()
+              }
             />
           </ObjectCard>
         ) : null}
@@ -391,25 +564,32 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
             <Text style={styles.infoLabel}>预估费用</Text>
             <Text style={styles.infoValue}>{formatAmountYuan(estimatedAmount)}</Text>
           </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>费用拆分</Text>
+            <Text style={styles.infoValue}>创建订单后锁定，并同步写入合同</Text>
+          </View>
           <Text style={styles.tipText}>
-            当前仅展示供给基础价格。最终订单金额以后续机主确认和订单信息为准。
+            当前先展示基础价格和预估总额。平台服务费、承接方到账金额会在订单生成后立即可见，并在订单详情和合同里持续保留。
           </Text>
         </ObjectCard>
 
         <ObjectCard highlightColor="#ffd591">
           <Text style={styles.sectionTitle}>提交提醒</Text>
           <Text style={styles.tipText}>
-            提交后会直接创建订单，但订单状态先进入“待机主确认”。机主确认后，你才能继续支付。
+            提交后会直接创建订单，但订单状态先进入“待机主确认”。机主确认后，你才能继续支付。个人实名认证通过后即可直达下单，企业升级不是当前前置条件。
           </Text>
+          {eligibilityLoading ? <Text style={styles.tipText}>正在检查当前客户资格...</Text> : null}
         </ObjectCard>
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.primaryBtn, (!canCreateOrder || submitting) && styles.disabledBtn]}
+          style={[styles.primaryBtn, (!orderReady || submitting || eligibilityLoading) && styles.disabledBtn]}
           onPress={handleSubmit}
-          disabled={!canCreateOrder || submitting}>
-          <Text style={styles.primaryBtnText}>{submitting ? '提交中...' : '提交直达下单'}</Text>
+          disabled={!orderReady || submitting || eligibilityLoading}>
+          <Text style={styles.primaryBtnText}>
+            {eligibilityLoading ? '检查资格中...' : submitting ? '提交中...' : '提交直达下单'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -589,6 +769,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   secondaryBtnText: {
     fontSize: 15,
     color: theme.text,
+    fontWeight: '700',
+  },
+  prefillSecondaryBtn: {
+    marginTop: 12,
+    backgroundColor: theme.primaryBg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  prefillSecondaryBtnText: {
+    fontSize: 14,
+    color: theme.primaryText,
     fontWeight: '700',
   },
   fullWidthBtn: {

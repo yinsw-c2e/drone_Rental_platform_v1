@@ -163,9 +163,24 @@ export default function PilotProfileScreen({navigation}: any) {
 
   const verificationStatus = STATUS_MAP[pilot?.verification_status || 'unverified'] || STATUS_MAP.unverified;
   const availabilityStatus = availabilityMap[pilot?.availability_status || 'offline'] || availabilityMap.offline;
+  const eligibility = pilot?.eligibility;
   const hoursText = formatHoursFromSeconds(flightStats.totalDurationSeconds);
   const serviceRadiusText = Number(draft.service_radius || 0) > 0 ? `${Number(draft.service_radius)}km` : '未设置';
   const isOnline = ['online', 'available'].includes(pilot?.availability_status || 'offline');
+  const canUpdateAvailability = eligibility?.can_update_availability ?? ['verified', 'approved'].includes(pilot?.verification_status || '');
+  const readinessTone: 'green' | 'orange' | 'red' | 'gray' =
+    eligibility?.tier === 'dispatch_ready'
+      ? 'green'
+      : eligibility?.tier === 'candidate_ready' || eligibility?.tier === 'verified_offline'
+      ? 'orange'
+      : eligibility?.tier === 'needs_resubmission'
+      ? 'red'
+      : 'gray';
+  const readinessActions = [
+    eligibility?.can_apply_candidate ? '可报名候选需求' : null,
+    eligibility?.can_accept_dispatch ? '可承接正式派单' : null,
+    eligibility?.can_start_execution ? '可进入执行流程' : null,
+  ].filter(Boolean) as string[];
 
   const summaryItems = useMemo(
     () => [
@@ -218,6 +233,9 @@ export default function PilotProfileScreen({navigation}: any) {
             <Text style={styles.heroMetaLine}>执照类型：{pilot.caac_license_type || '-'}</Text>
             <Text style={styles.heroMetaLine}>执照编号：{pilot.caac_license_no || '-'}</Text>
             <Text style={styles.heroMetaLine}>服务城市：{draft.current_city || '未设置'} · 服务半径：{serviceRadiusText}</Text>
+            <Text style={[styles.heroMetaLine, {marginTop: 4}]}>
+              当前阶段：{eligibility?.label || verificationStatus.label}
+            </Text>
           </View>
 
           <View style={styles.summaryRow}>
@@ -231,12 +249,65 @@ export default function PilotProfileScreen({navigation}: any) {
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>当前阶段与下一步</Text>
+          <View style={styles.readinessRow}>
+            <StatusBadge label={eligibility?.label || verificationStatus.label} tone={readinessTone} />
+            {eligibility?.can_accept_dispatch ? (
+              <StatusBadge label="正式派单已开放" tone="green" />
+            ) : eligibility?.can_apply_candidate ? (
+              <StatusBadge label="先参与候选需求" tone="orange" />
+            ) : (
+              <StatusBadge label="需补资料" tone="gray" />
+            )}
+          </View>
+          <Text style={styles.readinessDesc}>
+            {eligibility?.recommended_next_step || '先补齐飞手资料，后续可以逐步开放候选需求、正式派单和执行能力。'}
+          </Text>
+          {readinessActions.length > 0 ? (
+            <View style={styles.readinessTagRow}>
+              {readinessActions.map(item => (
+                <View key={item} style={styles.readinessTag}>
+                  <Text style={styles.readinessTagText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {eligibility?.blockers?.length ? (
+            <View style={styles.blockerList}>
+              {eligibility.blockers.map((blocker: any) => (
+                <Text key={blocker.code || blocker.message} style={styles.blockerText}>
+                  {`\u2022 ${blocker.message}`}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          <View style={styles.readinessActionRow}>
+            <TouchableOpacity style={styles.secondaryMiniButton} onPress={() => navigation.navigate('DemandList')}>
+              <Text style={styles.secondaryMiniButtonText}>查看可报名任务</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryMiniButton} onPress={() => navigation.navigate('PilotRegister')}>
+              <Text style={styles.secondaryMiniButtonText}>补充认证资料</Text>
+            </TouchableOpacity>
+          </View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
               <Text style={styles.sectionTitle}>接单状态</Text>
-              <Text style={styles.sectionDesc}>通过认证后，可随时切换是否接受新的正式派单。</Text>
+              <Text style={styles.sectionDesc}>
+                {canUpdateAvailability
+                  ? '当前已具备正式派单准入，可随时切换是否接受新的正式派单。'
+                  : '正式派单开关会在认证通过后解锁。当前仍可先浏览并报名候选需求。'}
+              </Text>
             </View>
-            <Switch value={isOnline} onValueChange={toggleAvailability} trackColor={{false: '#d8e1eb', true: '#22c55e'}} thumbColor="#fff" />
+            <Switch
+              value={isOnline}
+              onValueChange={toggleAvailability}
+              disabled={!canUpdateAvailability}
+              trackColor={{false: '#d8e1eb', true: '#22c55e'}}
+              thumbColor="#fff"
+            />
           </View>
         </ObjectCard>
 
@@ -324,6 +395,28 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   summaryValue: {fontSize: 18, fontWeight: '800', color: theme.isDark ? theme.primary : '#FFFFFF'},
   summaryLabel: {marginTop: 4, fontSize: 12, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)', textAlign: 'center'},
   sectionCard: {gap: 12},
+  readinessRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  readinessDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub},
+  readinessTagRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  readinessTag: {
+    borderRadius: 999,
+    backgroundColor: theme.primaryBg,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  readinessTagText: {fontSize: 12, color: theme.primaryText, fontWeight: '700'},
+  blockerList: {gap: 6},
+  blockerText: {fontSize: 13, lineHeight: 19, color: theme.warning},
+  readinessActionRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
+  secondaryMiniButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.bgSecondary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  secondaryMiniButtonText: {fontSize: 13, fontWeight: '700', color: theme.primaryText},
   sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
   sectionDesc: {marginTop: 6, fontSize: 13, lineHeight: 19, color: theme.textSub},
   switchRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'center'},

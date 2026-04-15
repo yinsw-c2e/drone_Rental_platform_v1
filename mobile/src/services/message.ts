@@ -1,12 +1,20 @@
-import api from './api';
-import {ApiResponse, Message, ConversationSummary, PageData} from '../types';
+import api, {apiV2} from './api';
+import {
+  ApiResponse,
+  Message,
+  ConversationSummary,
+  PageData,
+  V2ApiResponse,
+  V2ListData,
+  V2PageMeta,
+} from '../types';
 
 export const messageService = {
   getConversations: () =>
-    api.get<any, ApiResponse<ConversationSummary[]>>('/message/conversations'),
+    apiV2.get<any, V2ApiResponse<V2ListData<ConversationSummary>, V2PageMeta>>('/conversations'),
 
   getMessages: (conversationId: string, page?: number, pageSize?: number) =>
-    api.get<any, ApiResponse<PageData<Message>>>(`/message/${conversationId}`, {
+    apiV2.get<any, V2ApiResponse<V2ListData<Message>, V2PageMeta>>(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
       params: {page, page_size: pageSize},
     }),
 

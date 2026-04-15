@@ -92,21 +92,22 @@ func (s *FlightService) AdminListFlightRecords(page, pageSize int, filters map[s
 
 // ReportPositionRequest 位置上报请求
 type ReportPositionRequest struct {
-	OrderID        int64   `json:"order_id"`
-	DroneID        int64   `json:"drone_id"`
-	PilotID        int64   `json:"pilot_id"`
-	Latitude       float64 `json:"latitude"`
-	Longitude      float64 `json:"longitude"`
-	Altitude       int     `json:"altitude"`
-	Speed          int     `json:"speed"`          // 米/秒x100
-	Heading        int     `json:"heading"`        // 度
-	VerticalSpeed  int     `json:"vertical_speed"` // 米/秒x100
-	BatteryLevel   int     `json:"battery_level"`
-	SignalStrength int     `json:"signal_strength"`
-	GPSSatellites  int     `json:"gps_satellites"`
-	Temperature    *int    `json:"temperature"`
-	WindSpeed      *int    `json:"wind_speed"`
-	WindDirection  *int    `json:"wind_direction"`
+	OrderID        int64      `json:"order_id"`
+	DroneID        int64      `json:"drone_id"`
+	PilotID        int64      `json:"pilot_id"`
+	Latitude       float64    `json:"latitude"`
+	Longitude      float64    `json:"longitude"`
+	Altitude       int        `json:"altitude"`
+	Speed          int        `json:"speed"`          // 米/秒x100
+	Heading        int        `json:"heading"`        // 度
+	VerticalSpeed  int        `json:"vertical_speed"` // 米/秒x100
+	BatteryLevel   int        `json:"battery_level"`
+	SignalStrength int        `json:"signal_strength"`
+	GPSSatellites  int        `json:"gps_satellites"`
+	Temperature    *int       `json:"temperature"`
+	WindSpeed      *int       `json:"wind_speed"`
+	WindDirection  *int       `json:"wind_direction"`
+	RecordedAt     *time.Time `json:"recorded_at"`
 }
 
 // ReportPosition 上报飞行位置
@@ -128,6 +129,9 @@ func (s *FlightService) ReportPosition(req *ReportPositionRequest) (*model.Fligh
 		WindSpeed:      req.WindSpeed,
 		WindDirection:  req.WindDirection,
 		RecordedAt:     time.Now(),
+	}
+	if req.RecordedAt != nil {
+		pos.RecordedAt = *req.RecordedAt
 	}
 
 	return s.persistPosition(pos, req.PilotID)
@@ -638,6 +642,10 @@ func (s *FlightService) isInsideGeofence(lat, lng float64, alt int, fence *model
 // GetAlertsByOrder 获取订单告警列表
 func (s *FlightService) GetAlertsByOrder(orderID int64) ([]model.FlightAlert, error) {
 	return s.flightRepo.GetAlertsByOrder(orderID)
+}
+
+func (s *FlightService) GetAlertsByFlightRecord(flightRecordID int64) ([]model.FlightAlert, error) {
+	return s.flightRepo.GetAlertsByFlightRecord(flightRecordID)
 }
 
 // GetActiveAlerts 获取活跃告警
@@ -1196,6 +1204,18 @@ func (s *FlightService) GetFlightStats(orderID int64) (map[string]interface{}, e
 	return s.flightRepo.GetFlightStats(orderID)
 }
 
+func (s *FlightService) GetFlightRecordByID(flightID int64) (*model.FlightRecord, error) {
+	record, err := s.flightRepo.GetFlightRecordByID(flightID)
+	if err != nil {
+		return nil, err
+	}
+	order, err := s.orderRepo.GetByID(record.OrderID)
+	if err != nil {
+		return record, nil
+	}
+	return s.refreshFlightRecordMetrics(record, order)
+}
+
 func (s *FlightService) GetLatestFlightRecordByOrder(orderID int64) (*model.FlightRecord, error) {
 	if err := s.SyncOrderFlightRecord(orderID); err != nil {
 		return nil, err
@@ -1215,6 +1235,90 @@ func (s *FlightService) ListFlightRecordsByOrder(orderID int64) ([]model.FlightR
 		return nil, err
 	}
 	return s.flightRepo.ListFlightRecordsByOrder(orderID)
+}
+
+func (s *FlightService) GetPositionsByFlightRecord(flightID int64) ([]model.FlightPosition, error) {
+	return s.flightRepo.GetPositionsByFlightRecord(flightID)
+}
+
+type CreateFlightAlertInput struct {
+	FlightRecordID int64
+	OrderID        int64
+	DroneID        int64
+	PilotID        int64
+	AlertType      string
+	AlertLevel     string
+	AlertCode      string
+	Title          string
+	Description    string
+	Latitude       *float64
+	Longitude      *float64
+	Altitude       *int
+	ThresholdValue string
+	ActualValue    string
+	TriggeredAt    *time.Time
+}
+
+func (s *FlightService) CreateManualAlert(input *CreateFlightAlertInput) (*model.FlightAlert, error) {
+	if input == nil {
+		return nil, errors.New("告警参数不能为空")
+	}
+	triggeredAt := time.Now()
+	if input.TriggeredAt != nil {
+		triggeredAt = *input.TriggeredAt
+	}
+	alert := &model.FlightAlert{
+		FlightRecordID: &input.FlightRecordID,
+		OrderID:        input.OrderID,
+		DroneID:        input.DroneID,
+		PilotID:        input.PilotID,
+		AlertType:      input.AlertType,
+		AlertLevel:     input.AlertLevel,
+		AlertCode:      input.AlertCode,
+		Title:          input.Title,
+		Description:    input.Description,
+		Latitude:       input.Latitude,
+		Longitude:      input.Longitude,
+		Altitude:       input.Altitude,
+		ThresholdValue: input.ThresholdValue,
+		ActualValue:    input.ActualValue,
+		Status:         "active",
+		TriggeredAt:    triggeredAt,
+	}
+	if err := s.flightRepo.CreateAlert(alert); err != nil {
+		return nil, err
+	}
+	return alert, nil
+}
+
+func (s *FlightService) CompleteFlightRecord(flightID int64, landedAt *time.Time) (*model.FlightRecord, error) {
+	record, err := s.flightRepo.GetFlightRecordByID(flightID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	if landedAt != nil {
+		now = *landedAt
+	}
+
+	if record.LandingAt == nil {
+		record.LandingAt = &now
+	}
+	record.Status = "completed"
+	if record.TakeoffAt != nil && record.TotalDurationSeconds == 0 {
+		record.TotalDurationSeconds = int(record.LandingAt.Sub(*record.TakeoffAt).Seconds())
+	}
+
+	if err := s.flightRepo.UpdateFlightRecord(record); err != nil {
+		return nil, err
+	}
+
+	order, err := s.orderRepo.GetByID(record.OrderID)
+	if err != nil {
+		return record, nil
+	}
+	return s.refreshFlightRecordMetrics(record, order)
 }
 
 // GetLatestPosition 获取最新位置

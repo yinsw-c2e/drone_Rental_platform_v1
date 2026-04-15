@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"wurenji-backend/internal/model"
 )
@@ -36,16 +37,21 @@ func (r *FlightRepo) GetDispatchTask(taskID int64) (*model.DispatchTask, error) 
 // ==================== 飞行位置相关 ====================
 
 func (r *FlightRepo) CreateFlightRecord(record *model.FlightRecord) error {
-	return r.db.Create(record).Error
+	return r.db.Omit(clause.Associations).Create(record).Error
 }
 
 func (r *FlightRepo) UpdateFlightRecord(record *model.FlightRecord) error {
-	return r.db.Save(record).Error
+	return r.db.Omit(clause.Associations).Save(record).Error
 }
 
 func (r *FlightRepo) GetFlightRecordByID(id int64) (*model.FlightRecord, error) {
 	var record model.FlightRecord
-	if err := r.db.Where("id = ?", id).First(&record).Error; err != nil {
+	if err := r.db.Where("id = ? AND deleted_at IS NULL", id).
+		Preload("Order").
+		Preload("DispatchTask").
+		Preload("Pilot").
+		Preload("Drone").
+		First(&record).Error; err != nil {
 		return nil, err
 	}
 	return &record, nil
@@ -177,6 +183,12 @@ func (r *FlightRepo) UpdateAlert(alert *model.FlightAlert) error {
 func (r *FlightRepo) GetAlertsByOrder(orderID int64) ([]model.FlightAlert, error) {
 	var alerts []model.FlightAlert
 	err := r.db.Where("order_id = ?", orderID).Order("triggered_at DESC").Find(&alerts).Error
+	return alerts, err
+}
+
+func (r *FlightRepo) GetAlertsByFlightRecord(flightRecordID int64) ([]model.FlightAlert, error) {
+	var alerts []model.FlightAlert
+	err := r.db.Where("flight_record_id = ?", flightRecordID).Order("triggered_at DESC").Find(&alerts).Error
 	return alerts, err
 }
 

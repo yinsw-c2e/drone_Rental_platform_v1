@@ -111,18 +111,18 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 - 至少 1 条与订单关联的正式派单
 - 至少 1 次飞手接受正式派单
 
-### 5.5 后续待补样本
+### 5.5 已纳入的扩展样本
 
-以下样本需要在对应任务完成后补齐：
+以下样本已随着阶段 1、4、5 的任务完成并纳入回归口径：
 
-- 飞行记录详情样本
-- 位置上报样本
-- 告警上报样本
+- 飞行记录详情、位置上报、告警上报、完成飞行样本
 - 会话列表与消息列表样本
 - 订单取消与退款边界样本
 - 订单事件时间线聚合样本（对应 N1.06）
+- 合同自动生成、可见性与签署样本（对应 N4.12）
 - 快速下单无匹配时降级为发布任务样本（对应 N2.03）
 - 机主待处理线索聚合视图样本（对应 N4.07）
+- 飞手分级准入与任务视角首页样本（对应 N4.01、N4.05）
 
 ## 6. 固定验收顺序
 
@@ -147,15 +147,19 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 15. 客户对直达订单执行 `mock` 支付
 16. 飞手查看并接受派单
 
-后续任务补齐后，再扩展：
+扩展回归顺序：
 
-17. 订单取消
+17. 创建取消样本并验证取消/退款
 18. 开始准备
 19. 开始飞行
-20. 写入飞行位置和告警
-21. 完成飞行
+20. 写入飞行位置
+21. 写入飞行告警
 22. 确认交付
-23. 验证会话和消息
+23. 完成飞行记录
+24. 验证订单统一时间线
+25. 验证合同读取与签署
+26. 验证会话和消息
+27. 验证机主待处理工作台与飞手分级准入提示
 
 ## 7. 主链路样本清单
 
@@ -269,19 +273,24 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 
 当前状态：
 
-- 未完成
+- 已完成
 
-目标步骤：
+固定步骤：
 
-1. 取消订单
+1. 机主或飞手在已分配订单上调用 `start-preparing`
 2. 开始准备
 3. 开始飞行
 4. 确认交付
 
-未来验收断言：
+当前验收断言：
 
-- 四个端点不再 `NotImplemented`
-- 订单时间线与状态正确推进
+- `start-preparing / start-flight / confirm-delivery` 均不再返回 `NotImplemented`
+- 订单状态按 `assigned -> preparing -> in_transit -> delivered` 正确推进
+- 订单详情与统一时间线可看到对应阶段留痕
+
+当前样本字段：
+
+- `demand_order_id`
 
 ## 7.5 样本 E：飞行记录闭环链路
 
@@ -295,14 +304,18 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 
 当前状态：
 
-- 未完成
+- 已完成
 
-未来验收断言：
+当前验收断言：
 
 - 至少 1 条飞行记录详情可读
 - 至少 1 条位置记录可写
 - 至少 1 条告警记录可写
 - 至少 1 次飞行完成动作可回写订单进度
+
+当前样本字段：
+
+- `demand_flight_id`
 
 ## 7.6 样本 F：会话与消息链路
 
@@ -316,13 +329,18 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 
 当前状态：
 
-- 未完成
+- 已完成
 
-未来验收断言：
+当前验收断言：
 
 - `GET /conversations` 可读
 - `GET /conversations/:id/messages` 可读
 - 会话数量、未读数、消息时间顺序正确
+- 订单确认、支付成功、派单分配、执行推进等系统消息会写入关联双人会话
+
+当前样本字段：
+
+- `conversation_id`
 
 ## 7.7 样本 G：取消与退款边界链路
 
@@ -337,19 +355,61 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 
 当前状态：
 
-- 待补
+- 已纳入回归
 
-未来验收断言：
+说明：
 
-- 取消动作可触发
-- 支付后取消与退款记录口径一致
+- 当前 smoke 会优先尝试基于样本供给新建一个临时直达单再执行取消
+- 如果当前供给关联无人机不满足直达准入条件，该步骤允许记为 `skipped`，不阻塞整套主链路回归
+
+当前验收断言：
+
+- `POST /orders/{id}/cancel` 可调用且返回一致状态
+- 可创建取消样本时，支付后取消与退款记录口径一致
 - 订单详情、支付记录、退款记录之间不打架
+
+当前样本字段：
+
+- `cancel_order_id`
+
+## 7.8 样本 H：合同自动生成与签约链路
+
+目标：
+
+- 验证需求转单和直达下单两条成交链路都能自动生成合同，并完成双方签署
+
+关联任务：
+
+- `N4.10`
+- `N4.12`
+
+当前状态：
+
+- 已完成
+
+固定步骤：
+
+1. 复用样本 A 的 `demand_order_id` 和样本 B 的 `direct_order_id`
+2. 客户与机主分别读取两条订单的合同详情
+3. 验证合同编号、金额、平台佣金、机主实收与订单一致
+4. 验证合同正文中包含设备操作责任条款
+5. 客户签署合同
+6. 机主签署合同
+
+当前验收断言：
+
+- 两条成单链路成交后均已自动生成合同
+- 客户和机主看到的合同编号一致，且可正常读取正文
+- 合同金额、平台佣金、机主实收口径正确
+- 合同中包含“设备操作责任条款”
+- 双方签署完成后合同状态为 `fully_signed`
 
 ## 8. 当前样本的产物记录方式
 
 当前统一以脚本产物文件为准：
 
 - [backend/docs/phase10_role_acceptance_last_run.json](/Users/yinswc2e/Code/drone_Rental_platform_v1/backend/docs/phase10_role_acceptance_last_run.json)
+- [backend/docs/v2_core_regression_last_run.json](/Users/yinswc2e/Code/drone_Rental_platform_v1/backend/docs/v2_core_regression_last_run.json)
 
 应记录的核心字段：
 
@@ -360,25 +420,34 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 - `artifacts.demand_order_id`
 - `artifacts.direct_order_id`
 - `artifacts.supply_id`
+- `artifacts.cancel_order_id`
+- `artifacts.demand_dispatch_id`
+- `artifacts.direct_dispatch_id`
+- `artifacts.demand_flight_id`
+- `artifacts.conversation_id`
+- `timeline_event_count`
+- `results[].phase=HEALTH`
+- `results[].phase=CONTRACT`
 
-扩展建议：
+说明：
 
-- 后续补上 `dispatch_id`（样本 A 步骤 8 产出后可直接记录）
-- 后续补上 `flight_record_id`
-- 后续补上 `conversation_id`
-- 后续补上 `timeline_event_count`（时间线聚合接口上线后）
+- `phase10_role_acceptance_last_run.json` 继续承担“样本重建”产物
+- `v2_core_regression_last_run.json` 承担“v2 主链路断点 smoke 回归”产物，当前同时覆盖健康检查、统一时间线、合同签约与消息链路
+- `timeline_event_count` 用于记录统一时间线接口当前可返回的聚合事件数
+- 合同相关断言以 `results` 中 `CONTRACT` 阶段的多条步骤结果为准
 
 ## 9. 失败时的优先排查顺序
 
 如果主链路样本跑不通，优先按下面顺序排查：
 
 1. 基础服务没启动
-2. Redis 验证码读不到
-3. 样本无人机不满足重载门槛
-4. 服务未处于 `active + accepts_direct_order=true`
-5. v2 接口存在 `NotImplemented`
-6. v2 接口权限校验不通过（角色/身份不匹配）
-7. 历史脏数据未被脚本清理
+2. `/healthz` 或 `/readyz` 未通过
+3. Redis 验证码读不到
+4. 样本无人机不满足重载门槛
+5. 服务未处于 `active + accepts_direct_order=true`
+6. v2 接口存在 `NotImplemented`
+7. v2 接口权限校验不通过（角色/身份不匹配）
+8. 历史脏数据未被脚本清理
 
 ## 10. 执行结论
 
@@ -387,11 +456,10 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
 1. 先复用固定账号
 2. 先跑固定重建脚本
 3. 先验证样本 A、B、C
-4. 再随着 `N1.01 / N1.02 / N1.03` 的完成扩展到样本 D、E、F、G
+4. 再按样本 D、E、F、G、H 复验执行推进、飞行记录、消息、取消退款和合同签约
 
 这样后续每做一步，都能清楚回答：
 
 - 影响了哪条样本链路
 - 该用哪个账号复验
 - 需要看哪个产物编号
-

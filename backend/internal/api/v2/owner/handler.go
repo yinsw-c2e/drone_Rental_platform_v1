@@ -62,6 +62,21 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	response.V2Success(c, profile)
 }
 
+func (h *Handler) GetWorkbench(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	workbench, err := h.ownerService.GetWorkbench(userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, workbench)
+}
+
 func (h *Handler) ListDrones(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

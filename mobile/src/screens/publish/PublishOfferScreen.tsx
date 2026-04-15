@@ -36,6 +36,8 @@ const PRICING_OPTIONS = [
   {key: 'per_kg', label: '按公斤'},
 ];
 
+const isApprovedStatus = (value?: string) => value === 'approved' || value === 'verified';
+
 const buildAddressSnapshot = (address?: AddressData | null) => {
   if (!address) {
     return null;
@@ -96,6 +98,17 @@ export default function PublishOfferScreen({route, navigation}: any) {
   const selectedDrone = useMemo(
     () => drones.find(item => item.id === selectedDroneId) || null,
     [drones, selectedDroneId],
+  );
+  const isDroneMarketReady = useMemo(
+    () =>
+      Boolean(
+        selectedDrone &&
+          isApprovedStatus(selectedDrone.certification_status) &&
+          isApprovedStatus(selectedDrone.uom_verified) &&
+          isApprovedStatus(selectedDrone.insurance_verified) &&
+          isApprovedStatus(selectedDrone.airworthiness_verified),
+      ),
+    [selectedDrone],
   );
 
   useEffect(() => {
@@ -189,6 +202,15 @@ export default function PublishOfferScreen({route, navigation}: any) {
       Alert.alert('提示', '请输入有效基础价格');
       return;
     }
+    if (status === 'active' && !isDroneMarketReady) {
+      Alert.alert('暂时不能上架', '当前设备资质还没有全部通过，建议先保存服务草稿，等基础资质、UOM、保险和适航状态都达标后再正式上架。', [
+        {text: '知道了', style: 'cancel'},
+        selectedDroneId
+          ? {text: '去管理资质', onPress: () => navigation.navigate('DroneCertification', {id: selectedDroneId})}
+          : {text: '好的'},
+      ]);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -221,7 +243,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyIcon}>🛩️</Text>
           <Text style={styles.emptyTitle}>还没有可用无人机</Text>
-          <Text style={styles.emptyDesc}>先补齐无人机和资质，再回来创建供给。</Text>
+          <Text style={styles.emptyDesc}>请先添加无人机基础信息（无需立即完成所有资质），再来建立服务草稿。</Text>
           <TouchableOpacity style={styles.primaryAction} onPress={() => navigation.navigate('AddDrone')}>
             <Text style={styles.primaryActionText}>去添加无人机</Text>
           </TouchableOpacity>
@@ -237,9 +259,21 @@ export default function PublishOfferScreen({route, navigation}: any) {
           <Text style={styles.heroEyebrow}>机主供给</Text>
           <Text style={styles.heroTitle}>{isEditing ? '编辑你的供给方案' : '创建新的供给方案'}</Text>
           <Text style={styles.heroDesc}>
-            供给对象现在会直接绑定无人机能力、价格规则、可服务时间和是否接受直达下单。保存为草稿后，也可以再回来修改。
+            先把无人机、服务能力和价格规则整理成草稿，再逐步补齐资质。只有资质达标后的服务，才会正式进入公开市场。
           </Text>
         </View>
+
+        <ObjectCard>
+          <Text style={styles.sectionTitle}>草稿优先，不用一次到位</Text>
+          <Text style={styles.tipText}>
+            这一步的目标不是一次把所有资质都补完，而是先形成一份可经营的服务草稿。设备资料、服务场景、价格和时间准备好后，随时都可以回来继续完善。
+          </Text>
+          {!isDroneMarketReady && selectedDrone ? (
+            <TouchableOpacity style={styles.tipAction} onPress={() => navigation.navigate('DroneCertification', {id: selectedDrone.id})}>
+              <Text style={styles.tipActionText}>当前设备资质未齐，去查看并行审核进度</Text>
+            </TouchableOpacity>
+          ) : null}
+        </ObjectCard>
 
         <ObjectCard>
           <Text style={styles.sectionTitle}>1. 选择执行设备</Text>
@@ -368,6 +402,8 @@ export default function PublishOfferScreen({route, navigation}: any) {
           <Text style={styles.summaryLine}>场景：{selectedScenes.map(scene => SCENE_OPTIONS.find(item => item.key === scene)?.label || scene).join(' / ')}</Text>
           <Text style={styles.summaryLine}>价格：¥{Number(pricingText || 0).toFixed(0)} / {PRICING_OPTIONS.find(item => item.key === pricingUnit)?.label || pricingUnit}</Text>
           <Text style={styles.summaryLine}>直达下单：{acceptsDirectOrder ? '开启' : '关闭'}</Text>
+          <Text style={styles.summaryLine}>市场状态：{isDroneMarketReady ? '资质已满足，可正式上架' : '建议先保存草稿，补齐资质后再上架'}</Text>
+          {!isDroneMarketReady ? <Text style={styles.summaryHint}>基础资质、UOM、保险、适航四项可并行提交，无需串行等待。</Text> : null}
         </ObjectCard>
 
         <View style={styles.footerActions}>
@@ -378,10 +414,18 @@ export default function PublishOfferScreen({route, navigation}: any) {
             <Text style={styles.secondaryActionText}>{submitting ? '保存中...' : '保存草稿'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.primaryAction, submitting && styles.actionDisabled]}
-            disabled={submitting}
+            style={[styles.primaryAction, (!isDroneMarketReady || submitting) && styles.actionDisabled]}
+            disabled={!isDroneMarketReady || submitting}
             onPress={() => handleSubmit('active')}>
-            <Text style={styles.primaryActionText}>{submitting ? '提交中...' : isEditing ? '保存并上架' : '创建并上架'}</Text>
+            <Text style={styles.primaryActionText}>
+              {!isDroneMarketReady
+                ? '资质未齐，暂不能上架'
+                : submitting
+                ? '提交中...'
+                : isEditing
+                ? '保存并上架'
+                : '创建并上架'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -426,6 +470,26 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
+  },
+  tipText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.textSub,
+  },
+  tipAction: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.bgSecondary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  tipActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.primaryText,
   },
   sectionTitle: {
     fontSize: 16,
@@ -530,6 +594,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 13,
     color: theme.textSub,
     lineHeight: 22,
+  },
+  summaryHint: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.textSub,
   },
   footerActions: {
     flexDirection: 'row',

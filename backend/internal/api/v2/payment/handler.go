@@ -1,13 +1,16 @@
 package payment
 
 import (
+	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"wurenji-backend/internal/api/middleware"
 	v2common "wurenji-backend/internal/api/v2/common"
 	"wurenji-backend/internal/model"
+	paymentpkg "wurenji-backend/internal/pkg/payment"
 	"wurenji-backend/internal/pkg/response"
 	"wurenji-backend/internal/service"
 )
@@ -55,16 +58,18 @@ func (h *Handler) CreateOrderPayment(c *gin.Context) {
 	}
 
 	data := gin.H{
-		"payment":    buildPaymentSummary(paymentRecord),
-		"pay_params": payParams,
+		"payment":      buildPaymentSummary(paymentRecord),
+		"pay_params":   parsePaymentParams(payParams),
+		"payment_flow": buildPaymentFlow(req.Method, paymentRecord),
 	}
-	if req.Method == "mock" {
+	if strings.EqualFold(req.Method, "mock") {
 		if err := h.paymentService.MockPaymentComplete(paymentRecord.PaymentNo); err != nil {
 			v2common.HandleServiceError(c, err)
 			return
 		}
 		if latestPayment, err := h.paymentService.GetPaymentStatus(paymentRecord.PaymentNo); err == nil && latestPayment != nil {
 			data["payment"] = buildPaymentSummary(latestPayment)
+			data["payment_flow"] = buildPaymentFlow(req.Method, latestPayment)
 		}
 		if order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "client"); err == nil && order != nil {
 			data["order"] = gin.H{
@@ -197,6 +202,56 @@ func buildPaymentSummary(payment *model.Payment) gin.H {
 		"paid_at":        payment.PaidAt,
 		"created_at":     payment.CreatedAt,
 		"updated_at":     payment.UpdatedAt,
+	}
+}
+
+func parsePaymentParams(result *paymentpkg.PaymentResult) interface{} {
+	if result == nil || result.PayParams == "" {
+		return nil
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal([]byte(result.PayParams), &payload); err == nil {
+		return payload
+	}
+	return gin.H{"raw": result.PayParams}
+}
+
+func buildPaymentFlow(method string, paymentRecord *model.Payment) gin.H {
+	normalizedMethod := strings.ToLower(strings.TrimSpace(method))
+	status := "pending"
+	autoCompleted := false
+	capability := "deferred"
+	notice := "当前渠道暂未接入真实商户联调，本阶段只保留待回调支付单作为占位，请改用模拟支付完成联调。"
+
+	if paymentRecord != nil && strings.EqualFold(paymentRecord.Status, "paid") {
+		status = "completed"
+	}
+
+	switch normalizedMethod {
+	case "mock":
+		capability = "active"
+		if paymentRecord != nil && strings.EqualFold(paymentRecord.Status, "paid") {
+			autoCompleted = true
+		}
+		notice = "当前开发/测试环境正式联调路径为模拟支付，提交后会自动回写支付成功并继续推进订单状态。"
+	case "wechat":
+		status = "pending_callback"
+		notice = "微信支付正式商户联调暂缓，当前只创建待回调支付单，不会发起真实扣款。"
+	case "alipay":
+		status = "pending_callback"
+		notice = "支付宝正式商户联调暂缓，当前只创建待回调支付单，不会发起真实扣款。"
+	default:
+		status = "pending_callback"
+	}
+
+	return gin.H{
+		"method":             normalizedMethod,
+		"capability":         capability,
+		"status":             status,
+		"auto_completed":     autoCompleted,
+		"recommended_method": "mock",
+		"notice":             notice,
 	}
 }
 

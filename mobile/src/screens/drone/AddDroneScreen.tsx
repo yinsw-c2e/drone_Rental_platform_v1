@@ -6,12 +6,11 @@ import {
 import {launchImageLibrary} from 'react-native-image-picker';
 import {droneService} from '../../services/drone';
 import api from '../../services/api';
-import {API_BASE_URL} from '../../constants';
+import {API_ROOT_URL} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
-// 图片访问基础地址（去掉 /api/v1 后缀）
-const IMAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
+const IMAGE_BASE_URL = API_ROOT_URL;
 
 export default function AddDroneScreen({navigation}: any) {
   const {theme} = useTheme();

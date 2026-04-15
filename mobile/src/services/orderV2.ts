@@ -2,12 +2,12 @@ import {apiV2} from './api';
 import {
   V2ApiResponse,
   V2DispatchActionResult,
-  V2DispatchTaskSummary,
   V2OrderMonitor,
   V2OrderDetail,
   V2ListData,
   V2OrderSummary,
   V2PageMeta,
+  V2OrderTimelineResponse,
 } from '../types';
 
 export type OrderV2ListParams = {
@@ -24,6 +24,9 @@ export const orderV2Service = {
   get: (orderId: number) =>
     apiV2.get<any, V2ApiResponse<V2OrderDetail>>(`/orders/${orderId}`),
 
+  getTimeline: (orderId: number) =>
+    apiV2.get<any, V2ApiResponse<V2OrderTimelineResponse>>(`/orders/${orderId}/timeline`),
+
   getMonitor: (orderId: number) =>
     apiV2.get<any, V2ApiResponse<V2OrderMonitor>>(`/orders/${orderId}/monitor`),
 
@@ -32,6 +35,9 @@ export const orderV2Service = {
 
   providerReject: (orderId: number, reason?: string) =>
     apiV2.post<any, V2ApiResponse<V2OrderSummary>>(`/orders/${orderId}/provider-reject`, {reason}),
+
+  cancel: (orderId: number, reason?: string) =>
+    apiV2.post<any, V2ApiResponse<V2OrderSummary>>(`/orders/${orderId}/cancel`, {reason}),
 
   dispatch: (
     orderId: number,

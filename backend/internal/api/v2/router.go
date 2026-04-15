@@ -12,8 +12,10 @@ import (
 	v2client "wurenji-backend/internal/api/v2/client"
 	v2demand "wurenji-backend/internal/api/v2/demand"
 	v2dispatch "wurenji-backend/internal/api/v2/dispatch"
+	v2flight "wurenji-backend/internal/api/v2/flight"
 	v2home "wurenji-backend/internal/api/v2/home"
 	v2me "wurenji-backend/internal/api/v2/me"
+	v2message "wurenji-backend/internal/api/v2/message"
 	v2notification "wurenji-backend/internal/api/v2/notification"
 	v2order "wurenji-backend/internal/api/v2/order"
 	v2owner "wurenji-backend/internal/api/v2/owner"
@@ -37,6 +39,8 @@ type Handlers struct {
 	Pilot        *v2pilot.Handler
 	Order        *v2order.Handler
 	Dispatch     *v2dispatch.Handler
+	Flight       *v2flight.Handler
+	Message      *v2message.Handler
 	Payment      *v2payment.Handler
 	Settlement   *v2settlement.Handler
 	Notification *v2notification.Handler
@@ -59,6 +63,8 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Pilot:        v2pilot.NewHandler(pilotService),
 		Order:        v2order.NewHandler(orderService, dispatchService, flightService),
 		Dispatch:     v2dispatch.NewHandler(dispatchService, orderService),
+		Flight:       v2flight.NewHandler(flightService, orderService),
+		Message:      v2message.NewHandler(messageService),
 		Payment:      v2payment.NewHandler(orderService, paymentService),
 		Settlement:   v2settlement.NewHandler(orderService, settlementService),
 		Notification: v2notification.NewHandler(messageService),
@@ -94,6 +100,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		clientGroup := authenticated.Group("/client")
 		{
 			clientGroup.GET("/profile", h.Client.GetProfile)
+			clientGroup.GET("/eligibility", h.Client.GetEligibility)
 			clientGroup.PATCH("/profile", h.Client.UpdateProfile)
 		}
 
@@ -123,6 +130,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		{
 			ownerGroup.GET("/profile", h.Owner.GetProfile)
 			ownerGroup.PUT("/profile", h.Owner.UpdateProfile)
+			ownerGroup.GET("/workbench", h.Owner.GetWorkbench)
 			ownerGroup.GET("/drones", h.Owner.ListDrones)
 			ownerGroup.POST("/drones", h.Owner.CreateDrone)
 			ownerGroup.GET("/drones/:drone_id", h.Owner.GetDrone)
@@ -163,13 +171,14 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.POST("/:order_id/provider-confirm", h.Order.ProviderConfirm)
 			orderGroup.POST("/:order_id/provider-reject", h.Order.ProviderReject)
 			orderGroup.POST("/:order_id/pay", h.Payment.CreateOrderPayment)
-			orderGroup.POST("/:order_id/cancel", h.Base.NotImplemented)
-			orderGroup.POST("/:order_id/start-preparing", h.Base.NotImplemented)
-			orderGroup.POST("/:order_id/start-flight", h.Base.NotImplemented)
-			orderGroup.POST("/:order_id/confirm-delivery", h.Base.NotImplemented)
+			orderGroup.POST("/:order_id/cancel", h.Order.Cancel)
+			orderGroup.POST("/:order_id/start-preparing", h.Order.StartPreparing)
+			orderGroup.POST("/:order_id/start-flight", h.Order.StartFlight)
+			orderGroup.POST("/:order_id/confirm-delivery", h.Order.ConfirmDelivery)
 			orderGroup.POST("/:order_id/confirm-receipt", h.Order.ConfirmReceipt)
 			orderGroup.POST("/:order_id/execution-status", h.Order.UpdateExecutionStatus)
 			orderGroup.GET("/:order_id/monitor", h.Order.Monitor)
+			orderGroup.GET("/:order_id/timeline", h.Order.Timeline)
 			orderGroup.POST("/:order_id/dispatch", h.Order.Dispatch)
 			orderGroup.GET("/:order_id/payments", h.Payment.ListOrderPayments)
 			orderGroup.GET("/:order_id/refunds", h.Payment.ListOrderRefunds)
@@ -194,10 +203,10 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 
 		flightGroup := authenticated.Group("/flight-records")
 		{
-			flightGroup.GET("/:flight_id", h.Base.NotImplemented)
-			flightGroup.POST("/:flight_id/positions", h.Base.NotImplemented)
-			flightGroup.POST("/:flight_id/alerts", h.Base.NotImplemented)
-			flightGroup.POST("/:flight_id/complete", h.Base.NotImplemented)
+			flightGroup.GET("/:flight_id", h.Flight.Get)
+			flightGroup.POST("/:flight_id/positions", h.Flight.ReportPosition)
+			flightGroup.POST("/:flight_id/alerts", h.Flight.ReportAlert)
+			flightGroup.POST("/:flight_id/complete", h.Flight.Complete)
 		}
 
 		notificationGroup := authenticated.Group("/notifications")
@@ -208,8 +217,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 
 		conversationGroup := authenticated.Group("/conversations")
 		{
-			conversationGroup.GET("", h.Base.NotImplemented)
-			conversationGroup.GET("/:conversation_id/messages", h.Base.NotImplemented)
+			conversationGroup.GET("", h.Message.ListConversations)
+			conversationGroup.GET("/:conversation_id/messages", h.Message.ListMessages)
 		}
 
 		if h.ClientLegacy != nil {

@@ -104,6 +104,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
       : '不开放飞手候选';
 
     const canEdit = ['draft', 'published', 'quoting'].includes(item.status);
+    const editLabel = item.status === 'draft' ? '继续完善' : '修改';
     const canShowQuoteButton = ['published', 'quoting', 'selected'].includes(item.status) && item.quote_count > 0;
 
     const handleCancel = () => {
@@ -159,7 +160,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
               <TouchableOpacity
                 style={styles.secondaryBtn}
                 onPress={() => navigation.navigate('EditDemand', {demandId: item.id})}>
-                <Text style={styles.secondaryBtnText}>修改</Text>
+                <Text style={styles.secondaryBtnText}>{editLabel}</Text>
               </TouchableOpacity>
             </>
           ) : null}
@@ -226,8 +227,8 @@ export default function MyDemandsScreen({navigation, route}: any) {
                 icon="📝"
                 title={activeGroup === 'all' ? '还没有发布需求' : '这个分组下暂无需求'}
                 description="发布后，机主会围绕需求报价，飞手也可以对开放候选的需求报名。"
-                actionText="发布需求"
-                onAction={() => navigation.navigate('PublishDemand')}
+                actionText="发布任务"
+                onAction={() => navigation.navigate('PublishCargo')}
               />
             </ObjectCard>
           )

@@ -19,6 +19,7 @@ MYSQL_PASS="${MYSQL_PASS:-root}"
 MYSQL_DB="${MYSQL_DB:-wurenji}"
 
 PREPARE_DEMO_DATA="${PREPARE_DEMO_DATA:-0}"
+DEVTOKEN_CONFIG_PATH="${DEVTOKEN_CONFIG_PATH:-config.yaml}"
 
 CUSTOMER_PHONE="${CUSTOMER_PHONE:-13800000004}"
 OWNER_PHONE="${OWNER_PHONE:-13800000007}"
@@ -36,8 +37,8 @@ require_bin() {
 
 require_bin curl
 require_bin jq
-require_bin redis-cli
 require_bin python3
+require_bin go
 
 append_result() {
   local phase="$1"
@@ -129,21 +130,50 @@ read_code() {
   redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" GET "sms:code:$phone" | tr -d '\r'
 }
 
+mint_dev_token() {
+  local phone="$1"
+  (
+    cd "$BACKEND_DIR"
+    go run ./cmd/devtoken -phone "$phone" -config "$DEVTOKEN_CONFIG_PATH"
+  )
+}
+
 login_token() {
   local phone="$1"
-  send_code "$phone"
-  local code
-  code="$(read_code "$phone")"
-  if [[ -z "$code" || "$code" == "(nil)" ]]; then
-    echo "failed to read sms code for $phone" >&2
-    exit 1
+  local response code access_token
+
+  if command -v redis-cli >/dev/null 2>&1; then
+    send_code "$phone"
+    code="$(read_code "$phone")"
+    if [[ -n "$code" && "$code" != "(nil)" ]]; then
+      response="$(curl -sS --max-time 15 -X POST "$API_V2/auth/login" \
+        -H "Content-Type: application/json" \
+        -d "{\"phone\":\"$phone\",\"code\":\"$code\"}")"
+      if [[ "$(jq -r '.code // empty' <<<"$response")" == "OK" ]]; then
+        jq -r '.data.token.access_token' <<<"$response"
+        return
+      fi
+    fi
   fi
-  local response
-  response="$(curl -sS --max-time 15 -X POST "$API_V2/auth/login" \
-    -H "Content-Type: application/json" \
-    -d "{\"phone\":\"$phone\",\"code\":\"$code\"}")"
-  assert_ok "$response" "login:$phone"
-  jq -r '.data.token.access_token' <<<"$response"
+
+  if [[ -n "${LOGIN_PASSWORD:-}" ]]; then
+    response="$(curl -sS --max-time 15 -X POST "$API_V2/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"phone\":\"$phone\",\"password\":\"$LOGIN_PASSWORD\"}")"
+    if [[ "$(jq -r '.code // empty' <<<"$response")" == "OK" ]]; then
+      jq -r '.data.token.access_token' <<<"$response"
+      return
+    fi
+  fi
+
+  access_token="$(mint_dev_token "$phone")"
+  if [[ -n "$access_token" ]]; then
+    echo "$access_token"
+    return
+  fi
+
+  echo "failed to login for $phone via sms/password/devtoken" >&2
+  exit 1
 }
 
 prepare_demo_data() {
@@ -214,6 +244,10 @@ SQL
 force_drone_available() {
   local drone_id="$1"
   if [[ -z "$drone_id" || "$drone_id" == "0" ]]; then
+    return
+  fi
+  if ! command -v mysql >/dev/null 2>&1; then
+    append_result "PREPARE" "force_drone_available" "skipped" "mysql not found, skipped drone availability patch for drone_id=$drone_id"
     return
   fi
   mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" \

@@ -254,7 +254,7 @@ export default function MyDronesScreen({navigation}: any) {
             <View style={styles.hero}>
               <Text style={styles.heroEyebrow}>我的无人机</Text>
               <Text style={styles.heroTitle}>设备、状态、资质在一页看清</Text>
-              <Text style={styles.heroDesc}>机主链路里，无人机不是静态资产，而是后续供给、报价、履约和派单的基础能力。</Text>
+              <Text style={styles.heroDesc}>机主链路里，无人机不是静态资产，而是后续供给、报价、履约和派单的基础能力。基础资质、UOM、保险、适航现在也按并行总览展示，不用再按串行心智理解。</Text>
 
               <View style={styles.summaryRow}>
                 <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
@@ -299,7 +299,7 @@ export default function MyDronesScreen({navigation}: any) {
               <EmptyState
                 icon="🛩️"
                 title={activeGroup === 'all' ? '还没有添加无人机' : '这个分组下暂无无人机'}
-                description="先补齐设备与资质，后面发布供给、报价和履约都从这里起步。"
+                description="先添加设备基础信息，即可开始建立服务草稿。合规资质可后续再补充。"
                 actionText="添加无人机"
                 onAction={() => navigation.navigate('AddDrone')}
               />

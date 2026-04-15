@@ -136,14 +136,14 @@ const FLIGHT_RECORD_STATUS: Record<string, BadgeMeta> = {
 };
 
 const SOURCE_META: Record<BusinessSourceKind, BadgeMeta> = {
-  demand: {label: '需求', tone: 'blue'},
+  demand: {label: '任务', tone: 'blue'},
   quote: {label: '报价', tone: 'purple'},
-  supply: {label: '供给', tone: 'teal'},
+  supply: {label: '服务', tone: 'teal'},
   order: {label: '订单', tone: 'blue'},
-  dispatch_task: {label: '派单任务', tone: 'green'},
+  dispatch_task: {label: '执行安排', tone: 'green'},
   flight_record: {label: '飞行记录', tone: 'purple'},
   pilot_task: {label: '飞手任务', tone: 'orange'},
-  client_task: {label: '派单任务', tone: 'green'},
+  client_task: {label: '执行任务', tone: 'green'},
 };
 
 export const getObjectStatusMeta = (

@@ -27,9 +27,9 @@ import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
 const METHODS = [
-  {key: 'wechat', label: '微信支付', icon: '📱', desc: '生成支付单后等待外部支付完成'},
-  {key: 'alipay', label: '支付宝', icon: '💳', desc: '生成支付单后等待外部支付完成'},
-  {key: 'mock', label: '模拟支付', icon: '🧪', desc: '开发测试环境建议使用，立即回写支付成功'},
+  {key: 'mock', label: '模拟支付', icon: '🧪', desc: '当前正式联调路径，提交后立即回写支付成功'},
+  {key: 'wechat', label: '微信支付', icon: '📱', desc: '预留真实通道，当前只创建待回调支付单'},
+  {key: 'alipay', label: '支付宝', icon: '💳', desc: '预留真实通道，当前只创建待回调支付单'},
 ] as const;
 
 type PaymentMethod = (typeof METHODS)[number]['key'];
@@ -138,6 +138,10 @@ export default function PaymentScreen({route, navigation}: any) {
   }, [detail]);
 
   const canPay = !!detail && (detail.status === 'pending_payment' || detail.status === 'accepted') && !detail.paid_at;
+  const selectedMethod = METHODS.find(method => method.key === selected) || METHODS[0];
+  const primaryActionLabel = selected === 'mock'
+    ? `确认模拟支付 ${formatMoney(totalPay)}`
+    : `创建待回调支付单 ${formatMoney(totalPay)}`;
 
   const handlePay = async () => {
     if (!detail) {
@@ -147,18 +151,20 @@ export default function PaymentScreen({route, navigation}: any) {
     try {
       const res = await orderFinanceV2Service.createPayment(detail.id, selected);
       const latestPayment = res.data?.payment;
+      const paymentFlow = res.data?.payment_flow;
+      const flowNotice = paymentFlow?.notice || '当前开发环境未接真实支付 SDK，请继续使用模拟支付联调。';
 
-      if (selected === 'mock' && String(latestPayment?.status || '').toLowerCase() === 'paid') {
+      if ((paymentFlow?.auto_completed || selected === 'mock') && String(latestPayment?.status || '').toLowerCase() === 'paid') {
         setResult({
           mode: 'success',
           title: '支付成功',
-          desc: `订单 ${detail.order_no} 已完成支付，后续履约会按订单状态继续推进。`,
+          desc: `${flowNotice} 订单 ${detail.order_no} 已完成支付，后续履约会按订单状态继续推进。`,
         });
       } else {
         setResult({
           mode: 'pending',
           title: '支付单已创建',
-          desc: `支付单号 ${latestPayment?.payment_no || '-'} 已生成。当前开发环境未接真实支付 SDK，请继续使用模拟支付联调。`,
+          desc: `支付单号 ${latestPayment?.payment_no || '-'} 已生成。${flowNotice}`,
         });
       }
       await loadData();
@@ -223,7 +229,7 @@ export default function PaymentScreen({route, navigation}: any) {
                 <Text style={styles.secondaryBtnText}>关闭结果</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.primaryBtn, {flex: 1, marginTop: 0}]}
+                style={styles.resultPrimaryBtn}
                 onPress={() => navigation.navigate('OrderDetail', {id: detail.id, orderId: detail.id})}>
                 <Text style={styles.primaryBtnText}>返回订单</Text>
               </TouchableOpacity>
@@ -243,7 +249,7 @@ export default function PaymentScreen({route, navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>支付方式</Text>
-          <Text style={styles.sectionHint}>开发测试阶段建议使用模拟支付，真实渠道目前只创建支付单，不会自动完成回调。</Text>
+          <Text style={styles.sectionHint}>当前正式联调路径只有模拟支付。微信/支付宝在本阶段只保留占位支付单与接口字段，不会发起真实扣款。</Text>
           {METHODS.map(method => (
             <TouchableOpacity
               key={method.key}
@@ -259,11 +265,14 @@ export default function PaymentScreen({route, navigation}: any) {
               </View>
             </TouchableOpacity>
           ))}
+          {selected !== 'mock' ? (
+            <Text style={styles.sectionHint}>当前选择的是 {selectedMethod.label}，点击主按钮后只会生成待回调支付单；如需继续推进订单，请改用模拟支付。</Text>
+          ) : null}
           <TouchableOpacity
             style={[styles.primaryBtn, (!canPay || paying) && styles.primaryBtnDisabled]}
             disabled={!canPay || paying}
             onPress={handlePay}>
-            {paying ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>确认支付 {formatMoney(totalPay)}</Text>}
+            {paying ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>{primaryActionLabel}</Text>}
           </TouchableOpacity>
           {!canPay ? (
             <Text style={styles.sectionHint}>当前订单状态不是待支付，不能重复发起支付。</Text>
@@ -462,6 +471,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   primaryBtn: {
     alignSelf: 'stretch',
     marginTop: 14,
+    borderRadius: 999,
+    backgroundColor: theme.primary,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  resultPrimaryBtn: {
+    flex: 1,
+    marginTop: 0,
     borderRadius: 999,
     backgroundColor: theme.primary,
     paddingVertical: 13,

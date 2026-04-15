@@ -76,7 +76,6 @@ type TodoItem = {
 
 const CONTENT_SIDE_MARGIN = 16;
 const HERO_SIDE_PADDING = 18;
-const METRIC_GAP = 12;
 
 const emptyDashboard: HomeDashboard = {
   role_summary: {
@@ -383,21 +382,17 @@ export default function HomeScreen({ navigation }: any) {
     switch (activeRole) {
       case 'client':
         return {
-          title: '先发任务，再选方案',
+          title: '这次要快速下单，还是发布任务？',
           subtitle:
-            '你最需要的是尽快发起任务、浏览服务、跟进报价与待支付订单。',
+            '标准化场景先走快速下单，直接看可下单服务；复杂、非标或需要比价的场景再发布任务。',
           primaryAction: {
-            title: '立即发布任务',
-            onPress: () => navigation.navigate('PublishCargo'),
+            title: '快速下单',
+            onPress: () => navigation.navigate('QuickOrderEntry'),
           },
           secondaryActions: [
             {
-              title: '浏览服务',
-              onPress: () => navigation.navigate('OfferList'),
-            },
-            {
-              title: '我的订单',
-              onPress: () => navigation.navigate('MyOrders'),
+              title: '发布任务',
+              onPress: () => navigation.navigate('PublishCargo'),
             },
           ],
           metrics: [
@@ -540,7 +535,7 @@ export default function HomeScreen({ navigation }: any) {
         if (hasClient && !hasOwner && !hasPilot) {
           allSecondaryActions.push({
             title: '浏览服务',
-            onPress: () => navigation.navigate('OfferList'),
+            onPress: () => navigation.navigate('QuickOrderEntry'),
           });
         }
 
@@ -610,21 +605,21 @@ export default function HomeScreen({ navigation }: any) {
       case 'client':
         return [
           {
+            key: 'client-quick-order',
+            title: '快速下单',
+            desc: '先看支持直达下单的服务，标准场景更省步骤',
+            icon: '📦',
+            tone: 'blue',
+            onPress: () => navigation.navigate('QuickOrderEntry'),
+            badge: currentDashboard.market_totals.supply_count,
+          },
+          {
             key: 'client-publish',
             title: '发布任务',
-            desc: '发起重载末端吊运任务',
+            desc: '复杂需求先发起任务，后续再比价和补资料',
             icon: '📝',
             tone: 'green',
             onPress: () => navigation.navigate('PublishCargo'),
-          },
-          {
-            key: 'client-supply',
-            title: '浏览服务',
-            desc: '查看可直达下单的合规服务',
-            icon: '📦',
-            tone: 'blue',
-            onPress: () => navigation.navigate('OfferList'),
-            badge: currentDashboard.market_totals.supply_count,
           },
           {
             key: 'client-demands',
@@ -717,9 +712,18 @@ export default function HomeScreen({ navigation }: any) {
         const actions: DashboardAction[] = [];
         if (hasClient) {
           actions.push({
+            key: 'all-quick-order',
+            title: '快速下单',
+            desc: '标准场景先看可下单服务，直接进入最短路径',
+            icon: '📦',
+            tone: 'blue',
+            onPress: () => navigation.navigate('QuickOrderEntry'),
+            badge: currentDashboard.market_totals.supply_count,
+          });
+          actions.push({
             key: 'all-publish',
             title: '发布任务',
-            desc: '快速发起新的重载吊运任务',
+            desc: '复杂或非标需求先发起任务，再慢慢补细节',
             icon: '📝',
             tone: 'green',
             onPress: () => navigation.navigate('PublishCargo'),
@@ -858,12 +862,12 @@ export default function HomeScreen({ navigation }: any) {
             tone: 'orange',
           },
           {
-            key: 'owner-asset',
-            title: '服务与机队状态',
-            desc: '如果服务不上架或设备不合规，会直接影响后续承接和派单。',
+            key: 'owner-draft',
+            title: '草稿与待上架服务',
+            desc: '补充资质，将草稿服务转为正式上架以获取更多订单。',
             badge: currentDashboard.role_views.owner.active_supply_count,
-            actionText: '查看机队',
-            onPress: () => navigation.navigate('MyDrones'),
+            actionText: '查看服务',
+            onPress: () => navigation.navigate('MyOffers'),
             tone: 'teal',
           },
         ];
@@ -1011,6 +1015,7 @@ export default function HomeScreen({ navigation }: any) {
                   {heroTheme.eyebrow}
                 </Text>
                 <Text style={styles.heroTitle}>{heroConfig.title}</Text>
+                <Text style={styles.heroSubtitle}>{heroConfig.subtitle}</Text>
               </View>
 
               {currentDashboard.summary.alert_count > 0 ? (
@@ -1098,8 +1103,12 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.contentRail}>
           <View style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.text}]}>常用动作</Text>
-              <Text style={[styles.sectionHint, {color: theme.textHint}]}>快速进入常用功能</Text>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>
+                {activeRole === 'client' ? '开始新任务' : '常用动作'}
+              </Text>
+              <Text style={[styles.sectionHint, {color: theme.textHint}]}>
+                {activeRole === 'client' ? '先选快速下单或发布任务' : '快速进入常用功能'}
+              </Text>
             </View>
             <View style={styles.quickGrid}>
               {quickActions.map(action => (
@@ -1254,6 +1263,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.2)',
     textShadowOffset: {width: 0, height: 1},
     textShadowRadius: 4,
+  },
+  heroSubtitle: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.88)',
   },
   alertPill: {
     minWidth: 74,

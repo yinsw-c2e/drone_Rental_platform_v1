@@ -1,12 +1,11 @@
 import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {Text} from 'react-native';
 import {useTheme} from '../theme/ThemeContext';
+import TabGlyph from '../components/navigation/TabGlyph';
 
 import HomeScreen from '../screens/home/HomeScreen';
 import MarketHubScreen from '../screens/market/MarketHubScreen';
-import FulfillmentHubScreen from '../screens/fulfillment/FulfillmentHubScreen';
 import OrderListScreen from '../screens/order/OrderListScreen';
 import OrderDetailScreen from '../screens/order/OrderDetailScreen';
 import ConversationListScreen from '../screens/message/ConversationListScreen';
@@ -35,6 +34,7 @@ import DroneDetailScreen from '../screens/drone/DroneDetailScreen';
 
 import OfferListScreen from '../screens/demand/OfferListScreen';
 import OfferDetailScreen from '../screens/demand/OfferDetailScreen';
+import QuickOrderEntryScreen from '../screens/demand/QuickOrderEntryScreen';
 import DemandListScreen from '../screens/demand/DemandListScreen';
 import DemandDetailScreen from '../screens/demand/DemandDetailScreen';
 import DemandQuoteComposeScreen from '../screens/demand/DemandQuoteComposeScreen';
@@ -93,20 +93,16 @@ function MessageStackScreen() {
   );
 }
 
-const tabIcon = (name: string, focused: boolean) => {
-  const iconMap: Record<string, string> = {
-    Home: '🏠',
-    Market: '🧭',
-    Orders: '🛫',
-    Messages: '💬',
-    Profile: '👤',
+const tabIcon = (name: string, color: string) => {
+  const iconMap: Record<string, 'home' | 'discover' | 'orders' | 'messages' | 'profile'> = {
+    Home: 'home',
+    Market: 'discover',
+    Orders: 'orders',
+    Messages: 'messages',
+    Profile: 'profile',
   };
 
-  return (
-    <Text style={{fontSize: 22, opacity: focused ? 1 : 0.5}}>
-      {iconMap[name] || '•'}
-    </Text>
-  );
+  return <TabGlyph name={iconMap[name] || 'home'} color={color} />;
 };
 
 function MainTabs() {
@@ -115,13 +111,13 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({route}) => ({
         headerShown: false,
-        tabBarIcon: ({focused}) => tabIcon(route.name, focused),
+        tabBarIcon: ({color}) => tabIcon(route.name, color),
         tabBarActiveTintColor: theme.navIconActive,
         tabBarInactiveTintColor: theme.navIconInactive,
         tabBarStyle: {backgroundColor: theme.navBg, borderTopColor: theme.navBorder},
       })}>
       <Tab.Screen name="Home" component={HomeScreen} options={{tabBarLabel: '首页'}} />
-      <Tab.Screen name="Market" component={MarketHubScreen} options={{tabBarLabel: '市场'}} />
+      <Tab.Screen name="Market" component={MarketHubScreen} options={{tabBarLabel: '发现'}} />
       <Tab.Screen name="Orders" component={OrderListScreen} options={{tabBarLabel: '进度'}} />
       <Tab.Screen name="Messages" component={MessageStackScreen} options={{tabBarLabel: '消息'}} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{tabBarLabel: '我的'}} />
@@ -133,10 +129,10 @@ export default function MainNavigator() {
   return (
     <RootStack.Navigator>
       <RootStack.Screen name="MainTabs" component={MainTabs} options={{headerShown: false}} />
-      <RootStack.Screen name="PublishOffer" component={PublishOfferScreen} options={{title: '上架服务'}} />
+      <RootStack.Screen name="PublishOffer" component={PublishOfferScreen} options={{title: '服务草稿与上架'}} />
       <RootStack.Screen name="PublishDemand" component={PublishDemandScreen} options={{title: '发布任务'}} />
       <RootStack.Screen name="EditDemand" component={EditDemandScreen} options={{title: '修改任务'}} />
-      <RootStack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '货运任务'}} />
+      <RootStack.Screen name="PublishCargo" component={PublishCargoScreen} options={{title: '发布任务'}} />
       <RootStack.Screen name="AddDrone" component={AddDroneScreen} options={{title: '添加无人机'}} />
       <RootStack.Screen name="EditDrone" component={EditDroneScreen} options={{title: '编辑无人机'}} />
       <RootStack.Screen name="NearbyDrones" component={NearbyDronesScreen} options={{title: '附近无人机'}} />
@@ -146,6 +142,7 @@ export default function MainNavigator() {
       <RootStack.Screen name="Review" component={ReviewScreen} options={{title: '评价订单'}} />
       <RootStack.Screen name="OrderAfterSale" component={OrderAfterSaleScreen} options={{title: '售后处理'}} />
       <RootStack.Screen name="Contract" component={ContractScreen} options={{title: '合同签约'}} />
+      <RootStack.Screen name="QuickOrderEntry" component={QuickOrderEntryScreen} options={{title: '快速下单'}} />
       <RootStack.Screen name="OfferList" component={OfferListScreen} options={{title: '服务列表'}} />
       <RootStack.Screen name="OfferDetail" component={OfferDetailScreen} options={{title: '服务详情'}} />
       <RootStack.Screen name="SupplyDirectOrderConfirm" component={SupplyDirectOrderConfirmScreen} options={{title: '确认直达下单'}} />
@@ -167,14 +164,14 @@ export default function MainNavigator() {
       <RootStack.Screen name="FlightMonitoring" component={FlightMonitoringScreen} options={{title: '飞行监控'}} />
       <RootStack.Screen name="TrajectoryRecord" component={TrajectoryScreen} options={{title: '轨迹记录'}} />
       <RootStack.Screen name="MultiPointTask" component={MultiPointTaskScreen} options={{title: '多点任务'}} />
-      <RootStack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域申请'}} />
+      <RootStack.Screen name="AirspaceApplication" component={AirspaceApplicationScreen} options={{title: '空域报备'}} />
       <RootStack.Screen name="ComplianceCheck" component={ComplianceCheckScreen} options={{title: '合规检查'}} />
       <RootStack.Screen name="NoFlyZone" component={NoFlyZoneScreen} options={{title: '禁飞区'}} />
       <RootStack.Screen name="CargoDeclaration" component={CargoDeclarationScreen} options={{title: '货物申报'}} />
-      <RootStack.Screen name="CreateDispatchTask" component={CreateDispatchTaskScreen} options={{title: '发起正式派单'}} />
-      <RootStack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '正式派单'}} />
-      <RootStack.Screen name="DispatchTaskDetail" component={DispatchTaskDetailScreen} options={{title: '正式派单详情'}} />
-      <RootStack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '接单派单'}} />
+      <RootStack.Screen name="CreateDispatchTask" component={CreateDispatchTaskScreen} options={{title: '安排执行'}} />
+      <RootStack.Screen name="DispatchTaskList" component={DispatchTaskListScreen} options={{title: '执行安排'}} />
+      <RootStack.Screen name="DispatchTaskDetail" component={DispatchTaskDetailScreen} options={{title: '执行安排详情'}} />
+      <RootStack.Screen name="PilotTaskList" component={PilotTaskListScreen} options={{title: '待接任务'}} />
       <RootStack.Screen name="PilotOrderExecution" component={PilotOrderExecutionScreen} options={{title: '任务执行'}} />
       <RootStack.Screen name="EditProfile" component={EditProfileScreen} options={{title: '编辑资料'}} />
       <RootStack.Screen name="MyDrones" component={MyDronesScreen} options={{title: '我的无人机'}} />

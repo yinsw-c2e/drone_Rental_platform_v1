@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +50,9 @@ func (u *UploadService) SaveFile(file *multipart.FileHeader, subDir string) (str
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer src.Close()
+	if err := u.validateContentType(src, ext); err != nil {
+		return "", err
+	}
 
 	out, err := os.Create(dst)
 	if err != nil {
@@ -71,4 +75,36 @@ func (u *UploadService) isAllowedExt(ext string) bool {
 		}
 	}
 	return false
+}
+
+func (u *UploadService) validateContentType(file multipart.File, ext string) error {
+	buf := make([]byte, 512)
+	n, err := file.Read(buf)
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("failed to inspect file content: %w", err)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to reset file pointer: %w", err)
+	}
+
+	contentType := http.DetectContentType(buf[:n])
+	if !u.isAllowedContentType(ext, contentType) {
+		return fmt.Errorf("file content type %s does not match extension %s", contentType, ext)
+	}
+	return nil
+}
+
+func (u *UploadService) isAllowedContentType(ext, contentType string) bool {
+	switch ext {
+	case ".jpg", ".jpeg":
+		return contentType == "image/jpeg"
+	case ".png":
+		return contentType == "image/png"
+	case ".gif":
+		return contentType == "image/gif"
+	case ".pdf":
+		return contentType == "application/pdf"
+	default:
+		return true
+	}
 }

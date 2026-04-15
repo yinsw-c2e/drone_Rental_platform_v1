@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider, useSelector, useDispatch } from 'react-redux';
-import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { store } from './store/store';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { markMeInitialized, setCredentials, setMeSummary, logout } from './store/slices/authSlice';
-import { API_BASE_URL } from './constants';
+import { API_V2_BASE_URL } from './constants';
 import { sessionService } from './services/session';
 
 // Import screens directly
@@ -42,6 +42,7 @@ import PilotTaskListScreen from './screens/dispatch/PilotTaskListScreen';
 import CreateDispatchTaskScreen from './screens/dispatch/CreateDispatchTaskScreen';
 import FlightMonitoringScreen from './screens/flight/FlightMonitoringScreen';
 import TrajectoryScreen from './screens/flight/TrajectoryScreen';
+import TabGlyph from './components/navigation/TabGlyph';
 
 // Import additional screens for navigation
 import DroneDetailScreen from './screens/drone/DroneDetailScreen';
@@ -244,7 +245,7 @@ function createRouterNavigation(navigate: any) {
     },
     goBack: () => navigate(-1),
     setOptions: () => {},
-    addListener: (event: string, callback: () => void) => {
+    addListener: (_event: string, _callback: () => void) => {
       // Web 版本不需要真正监听 focus 事件
       // 因为组件挂载时已经在 useEffect 中调用了数据加载
       // 返回一个空的取消订阅函数
@@ -272,11 +273,11 @@ const mainStyles = StyleSheet.create({
 });
 function TabBar({ activeTab, onTabPress }: { activeTab: string; onTabPress: (tab: string) => void }) {
   const tabs = [
-    { key: 'Home', label: '首页', icon: '🏠' },
-    { key: 'Market', label: '市场', icon: '🧭' },
-    { key: 'Orders', label: '进度', icon: '🛫' },
-    { key: 'Messages', label: '消息', icon: '💬' },
-    { key: 'Profile', label: '我的', icon: '👤' },
+    { key: 'Home', label: '首页', icon: 'home' as const },
+    { key: 'Market', label: '发现', icon: 'discover' as const },
+    { key: 'Orders', label: '进度', icon: 'orders' as const },
+    { key: 'Messages', label: '消息', icon: 'messages' as const },
+    { key: 'Profile', label: '我的', icon: 'profile' as const },
   ];
 
   return (
@@ -287,9 +288,12 @@ function TabBar({ activeTab, onTabPress }: { activeTab: string; onTabPress: (tab
           style={tabStyles.tab}
           onPress={() => onTabPress(tab.key)}
         >
-          <Text style={[tabStyles.icon, activeTab === tab.key && tabStyles.iconActive]}>
-            {tab.icon}
-          </Text>
+          <View style={[tabStyles.iconWrap, activeTab === tab.key && tabStyles.iconActive]}>
+            <TabGlyph
+              name={tab.icon}
+              color={activeTab === tab.key ? '#1890ff' : '#999'}
+            />
+          </View>
           <Text style={[tabStyles.label, activeTab === tab.key && tabStyles.labelActive]}>
             {tab.label}
           </Text>
@@ -312,9 +316,8 @@ const tabStyles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
-  icon: {
-    fontSize: 22,
-    opacity: 0.5,
+  iconWrap: {
+    opacity: 0.55,
   },
   iconActive: {
     opacity: 1,
@@ -331,7 +334,7 @@ const tabStyles = StyleSheet.create({
 });
 
 // Auth screens wrapper
-function AuthView({ onLogin }: { onLogin: () => void }) {
+function AuthView({ onLogin: _onLogin }: { onLogin: () => void }) {
   return (
     <View style={{ flex: 1 }}>
       <Routes>
@@ -480,7 +483,7 @@ function ScreenWrapper({ Component }: { Component: any }) {
 }
 
 // Main app with tabs and routes
-function MainView({ onLogout }: { onLogout: () => void }) {
+function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('Home');
@@ -668,7 +671,7 @@ function WebAppInner() {
     setIsLoading(true);
     try {
       // 使用测试账号登录（王五-租客，有3条订单）
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_V2_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -681,7 +684,7 @@ function WebAppInner() {
 
       const result = await response.json();
       
-      if (result.code === 0 && result.data) {
+      if (result.code === 'OK' && result.data) {
         // 登录成功，保存用户信息和 token（Redux会自动触发重新渲染）
         store.dispatch(setCredentials({
           user: result.data.user,

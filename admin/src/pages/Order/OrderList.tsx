@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Table, Tag, Select, Card, Row, Col, Input, Button, Space, Modal, Timeline } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Table, Tag, Select, Card, Row, Col, Input, Button, Space, Modal, Timeline, Statistic, Descriptions, Divider, message } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/api';
@@ -76,6 +76,21 @@ const SERVICE_TYPE_MAP: Record<string, string> = {
   agriculture: '农业植保',
 };
 
+const formatMoney = (value?: number) => `¥${((value || 0) / 100).toFixed(2)}`;
+const formatTime = (value?: string) => value?.slice(0, 19).replace('T', ' ') || '-';
+
+const downloadCsv = (filename: string, headers: string[], rows: Array<Array<string | number | undefined>>) => {
+  const escapeCell = (value: string | number | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csvContent = [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\n');
+  const blob = new Blob([`\uFEFF${csvContent}`], {type: 'text/csv;charset=utf-8;'});
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};
+
 const OrderList: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
@@ -134,6 +149,36 @@ const OrderList: React.FC = () => {
     }
     return true;
   });
+  const summary = useMemo(() => filteredOrders.reduce(
+    (acc, item) => {
+      acc.totalAmount += Number(item.total_amount || 0);
+      acc.pendingCount += ['created', 'pending_provider_confirmation', 'pending_payment'].includes(item.status) ? 1 : 0;
+      acc.executingCount += ['paid', 'pending_dispatch', 'assigned', 'preparing', 'accepted', 'in_progress', 'delivered'].includes(item.status) ? 1 : 0;
+      acc.closedCount += ['completed', 'cancelled', 'rejected', 'refunded'].includes(item.status) ? 1 : 0;
+      return acc;
+    },
+    {totalAmount: 0, pendingCount: 0, executingCount: 0, closedCount: 0},
+  ), [filteredOrders]);
+
+  const handleExport = () => {
+    downloadCsv(
+      `orders-export-${Date.now()}.csv`,
+      ['订单号', '标题', '来源', '状态', '执行模式', '客户', '承接方', '总金额', '平台佣金', '创建时间'],
+      filteredOrders.map(item => [
+        item.order_no,
+        item.title,
+        ORDER_SOURCE_MAP[item.order_source || ''] || item.order_source || '-',
+        STATUS_MAP[item.status]?.text || item.status,
+        EXECUTION_MODE_MAP[item.execution_mode || ''] || item.execution_mode || '-',
+        item.renter?.nickname || '-',
+        item.owner?.nickname || '-',
+        formatMoney(item.total_amount),
+        formatMoney(item.platform_commission),
+        formatTime(item.created_at),
+      ]),
+    );
+    message.success(`已导出 ${filteredOrders.length} 条订单记录`);
+  };
 
   const columns: ColumnsType<Order> = [
     { title: '订单号', dataIndex: 'order_no', width: 180 },
@@ -195,6 +240,29 @@ const OrderList: React.FC = () => {
     <div>
       <h2>订单管理</h2>
 
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} md={6}>
+          <Card>
+            <Statistic title="当前列表" value={filteredOrders.length} suffix={`/ ${total || 0}`} />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card>
+            <Statistic title="待推进订单" value={summary.pendingCount} />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card>
+            <Statistic title="执行中/待收口" value={summary.executingCount} />
+          </Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card>
+            <Statistic title="当前列表总额" value={summary.totalAmount / 100} precision={2} prefix="¥" />
+          </Card>
+        </Col>
+      </Row>
+
       {/* 搜索筛选栏 */}
       <Card size="small" style={{ marginBottom: 16 }}>
         <Row gutter={[16, 12]} align="middle">
@@ -237,6 +305,7 @@ const OrderList: React.FC = () => {
             <Space>
               <Button type="primary" onClick={handleSearch}>搜索</Button>
               <Button onClick={handleReset}>重置</Button>
+              <Button onClick={handleExport}>导出当前列表</Button>
             </Space>
           </Col>
         </Row>
@@ -257,83 +326,82 @@ const OrderList: React.FC = () => {
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={null}
-        width={700}>
+        width={860}>
         {detailOrder && (
-          <div>
-            <Row gutter={[0, 8]}>
-              <Col span={24} style={{ marginBottom: 8 }}>
-                <Tag
-                  color={STATUS_MAP[detailOrder.status]?.color || 'default'}
-                  style={{ fontSize: 14, padding: '4px 12px' }}>
-                  {STATUS_MAP[detailOrder.status]?.text || detailOrder.status}
-                </Tag>
-              </Col>
+          <>
+            <Space style={{ marginBottom: 12 }} wrap>
+              <Tag color={STATUS_MAP[detailOrder.status]?.color || 'default'}>
+                {STATUS_MAP[detailOrder.status]?.text || detailOrder.status}
+              </Tag>
+              <Tag color="geekblue">{ORDER_SOURCE_MAP[detailOrder.order_source || ''] || detailOrder.order_source || '-'}</Tag>
+              <Tag>{EXECUTION_MODE_MAP[detailOrder.execution_mode || ''] || detailOrder.execution_mode || '-'}</Tag>
+              {detailOrder.needs_dispatch ? <Tag color="cyan">待安排执行</Tag> : <Tag>无需再派单</Tag>}
+            </Space>
 
-              <Col span={24}><h4 style={{ margin: '8px 0' }}>基本信息</h4></Col>
-              <Col span={8}><strong>订单号:</strong></Col>
-              <Col span={16}>{detailOrder.order_no}</Col>
-              <Col span={8}><strong>订单类型:</strong></Col>
-              <Col span={16}>{TYPE_MAP[detailOrder.order_type] || detailOrder.order_type}</Col>
-              <Col span={8}><strong>订单来源:</strong></Col>
-              <Col span={16}>{ORDER_SOURCE_MAP[detailOrder.order_source || ''] || detailOrder.order_source || '-'}</Col>
-              <Col span={8}><strong>标题:</strong></Col>
-              <Col span={16}>{detailOrder.title}</Col>
-              <Col span={8}><strong>服务类型:</strong></Col>
-              <Col span={16}>{SERVICE_TYPE_MAP[detailOrder.service_type] || detailOrder.service_type || '-'}</Col>
-              <Col span={8}><strong>执行模式:</strong></Col>
-              <Col span={16}>{EXECUTION_MODE_MAP[detailOrder.execution_mode || ''] || detailOrder.execution_mode || '-'}</Col>
-              <Col span={8}><strong>待派单:</strong></Col>
-              <Col span={16}>{detailOrder.needs_dispatch ? '是' : '否'}</Col>
-              <Col span={8}><strong>服务地址:</strong></Col>
-              <Col span={16}>{detailOrder.service_address || '-'}</Col>
-              <Col span={8}><strong>开始时间:</strong></Col>
-              <Col span={16}>{detailOrder.start_time?.slice(0, 19) || '-'}</Col>
-              <Col span={8}><strong>结束时间:</strong></Col>
-              <Col span={16}>{detailOrder.end_time?.slice(0, 19) || '-'}</Col>
-
-              <Col span={24}><h4 style={{ margin: '12px 0 8px' }}>费用信息</h4></Col>
-              <Col span={8}><strong>订单总额:</strong></Col>
-              <Col span={16} style={{ color: '#f5222d', fontWeight: 600 }}>
-                ¥{(detailOrder.total_amount / 100).toFixed(2)}
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={8}>
+                <Card size="small">
+                  <Statistic title="订单总额" value={detailOrder.total_amount / 100} precision={2} prefix="¥" />
+                </Card>
               </Col>
-              <Col span={8}><strong>押金:</strong></Col>
-              <Col span={16}>¥{(detailOrder.deposit_amount / 100).toFixed(2)}</Col>
-              <Col span={8}><strong>平台佣金:</strong></Col>
-              <Col span={16} style={{ color: '#52c41a' }}>
-                ¥{(detailOrder.platform_commission / 100).toFixed(2)}
+              <Col xs={24} md={8}>
+                <Card size="small">
+                  <Statistic title="平台佣金" value={detailOrder.platform_commission / 100} precision={2} prefix="¥" />
+                </Card>
               </Col>
-              <Col span={8}><strong>机主收入:</strong></Col>
-              <Col span={16}>¥{((detailOrder.owner_amount || 0) / 100).toFixed(2)}</Col>
+              <Col xs={24} md={8}>
+                <Card size="small">
+                  <Statistic title="服务方到账" value={(detailOrder.owner_amount || 0) / 100} precision={2} prefix="¥" />
+                </Card>
+              </Col>
+            </Row>
 
-              <Col span={24}><h4 style={{ margin: '12px 0 8px' }}>参与方信息</h4></Col>
-              <Col span={8}><strong>承接方:</strong></Col>
-              <Col span={16}>
+            <Divider>基本信息</Divider>
+            <Descriptions bordered size="small" column={2}>
+              <Descriptions.Item label="订单号">{detailOrder.order_no}</Descriptions.Item>
+              <Descriptions.Item label="标题">{detailOrder.title}</Descriptions.Item>
+              <Descriptions.Item label="订单类型">{TYPE_MAP[detailOrder.order_type] || detailOrder.order_type}</Descriptions.Item>
+              <Descriptions.Item label="服务类型">{SERVICE_TYPE_MAP[detailOrder.service_type] || detailOrder.service_type || '-'}</Descriptions.Item>
+              <Descriptions.Item label="服务地址" span={2}>{detailOrder.service_address || '-'}</Descriptions.Item>
+              <Descriptions.Item label="开始时间">{formatTime(detailOrder.start_time)}</Descriptions.Item>
+              <Descriptions.Item label="结束时间">{formatTime(detailOrder.end_time)}</Descriptions.Item>
+            </Descriptions>
+
+            <Divider>参与方与设备</Divider>
+            <Descriptions bordered size="small" column={2}>
+              <Descriptions.Item label="承接方">
                 {detailOrder.owner?.nickname || '-'}
                 {detailOrder.owner?.phone ? ` (${detailOrder.owner.phone})` : ''}
-              </Col>
-              <Col span={8}><strong>客户:</strong></Col>
-              <Col span={16}>
+              </Descriptions.Item>
+              <Descriptions.Item label="客户">
                 {detailOrder.renter?.nickname || '-'}
                 {detailOrder.renter?.phone ? ` (${detailOrder.renter.phone})` : ''}
-              </Col>
+              </Descriptions.Item>
+              <Descriptions.Item label="设备品牌">
+                {detailOrder.drone ? `${detailOrder.drone.brand} ${detailOrder.drone.model}` : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="设备序列号">{detailOrder.drone?.serial_number || '-'}</Descriptions.Item>
+            </Descriptions>
 
-              {detailOrder.drone && (
-                <>
-                  <Col span={24}><h4 style={{ margin: '12px 0 8px' }}>无人机信息</h4></Col>
-                  <Col span={8}><strong>品牌型号:</strong></Col>
-                  <Col span={16}>{detailOrder.drone.brand} {detailOrder.drone.model}</Col>
-                  <Col span={8}><strong>序列号:</strong></Col>
-                  <Col span={16}>{detailOrder.drone.serial_number || '-'}</Col>
-                </>
-              )}
+            <Divider>费用与排障</Divider>
+            <Descriptions bordered size="small" column={2}>
+              <Descriptions.Item label="押金">{formatMoney(detailOrder.deposit_amount)}</Descriptions.Item>
+              <Descriptions.Item label="待派单">{detailOrder.needs_dispatch ? '是' : '否'}</Descriptions.Item>
+              <Descriptions.Item label="承接方用户ID">{detailOrder.provider_user_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="执行飞手用户ID">{detailOrder.executor_pilot_user_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="需求ID">{detailOrder.demand_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="供给ID">{detailOrder.source_supply_id || '-'}</Descriptions.Item>
+            </Descriptions>
 
-              <Col span={24}><h4 style={{ margin: '12px 0 8px' }}>时间信息</h4></Col>
-              <Col span={8}><strong>创建时间:</strong></Col>
-              <Col span={16}>{detailOrder.created_at?.slice(0, 19)}</Col>
-              <Col span={8}><strong>更新时间:</strong></Col>
-              <Col span={16}>{detailOrder.updated_at?.slice(0, 19)}</Col>
-            </Row>
-          </div>
+            <Divider>关键流转日志</Divider>
+            <Timeline
+              items={[
+                {color: 'blue', children: `订单创建：${formatTime(detailOrder.created_at)}`},
+                {color: detailOrder.provider_confirmed_at ? 'green' : 'gray', children: `承接方确认：${formatTime(detailOrder.provider_confirmed_at)}`},
+                {color: 'orange', children: `最近更新：${formatTime(detailOrder.updated_at)}`},
+              ]}
+            />
+          </>
         )}
       </Modal>
     </div>

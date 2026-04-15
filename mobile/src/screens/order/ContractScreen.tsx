@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,14 @@ import {RootState} from '../../store/store';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
+const formatTime = (value?: string | null) => (value ? new Date(value).toLocaleString('zh-CN') : '待签署');
+const stripHtml = (value?: string | null) =>
+  String(value || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 export default function ContractScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
@@ -27,7 +35,7 @@ export default function ContractScreen({route, navigation}: any) {
   const [contract, setContract] = useState<ContractDetail | null>(null);
   const [signing, setSigning] = useState(false);
 
-  const fetchContract = async () => {
+  const fetchContract = useCallback(async () => {
     try {
       const res = await contractService.getByOrder(orderId);
       setContract(res.data);
@@ -37,11 +45,11 @@ export default function ContractScreen({route, navigation}: any) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigation, orderId]);
 
   useEffect(() => {
     fetchContract();
-  }, [orderId]);
+  }, [fetchContract]);
 
   const handleSign = async () => {
     if (!contract) return;
@@ -78,6 +86,9 @@ export default function ContractScreen({route, navigation}: any) {
 
   const mySignedAt = isClient ? contract.client_signed_at : contract.provider_signed_at;
   const canSign = !mySignedAt && (isClient || isProvider);
+  const plainTextContract = stripHtml(contract.contract_html);
+  const contractPreview = plainTextContract ? `${plainTextContract.slice(0, 220)}${plainTextContract.length > 220 ? '...' : ''}` : '';
+  const hasTrustClause = plainTextContract.includes('设备操作责任') || plainTextContract.includes('执行飞手具备合法资质');
 
   const statusLabel = (() => {
     switch (contract.status) {
@@ -134,6 +145,14 @@ export default function ContractScreen({route, navigation}: any) {
               {contract.provider_signed_at ? '已签署' : '待签署'}
             </Text>
           </View>
+          <View style={styles.signRow}>
+            <Text style={styles.signLabel}>甲方签署时间</Text>
+            <Text style={styles.signValue}>{formatTime(contract.client_signed_at)}</Text>
+          </View>
+          <View style={styles.signRow}>
+            <Text style={styles.signLabel}>乙方签署时间</Text>
+            <Text style={styles.signValue}>{formatTime(contract.provider_signed_at)}</Text>
+          </View>
         </View>
 
         {/* 合同摘要信息（代替 HTML 渲染） */}
@@ -143,6 +162,15 @@ export default function ContractScreen({route, navigation}: any) {
             本合同由平台根据订单信息自动生成，包含服务内容、费用条款、双方权利义务及违约责任等条款。
             点击“确认签署合同”表示您已阅读并同意合同全部内容。
           </Text>
+          {hasTrustClause ? (
+            <View style={styles.trustCard}>
+              <Text style={styles.trustTitle}>设备操作责任条款</Text>
+              <Text style={styles.trustText}>
+                当机主与执行飞手不是同一人时，合同已写入“执行飞手需具备合法资质并确认设备操作责任，服务方对外先承担责任”的保障条款。
+              </Text>
+            </View>
+          ) : null}
+          {contractPreview ? <Text style={styles.contractPreview}>{contractPreview}</Text> : null}
           <Text style={styles.contractDateInfo}>
             合同创建时间：{contract.created_at ? new Date(contract.created_at).toLocaleString('zh-CN') : '-'}
           </Text>
@@ -230,6 +258,18 @@ const getStyles = (theme: AppTheme) =>
     },
     emptyText: {fontSize: 14, color: theme.textHint, textAlign: 'center', marginTop: 40},
     contractBody: {fontSize: 14, color: theme.textSub, lineHeight: 22, marginBottom: 8},
+    trustCard: {
+      marginTop: 6,
+      marginBottom: 10,
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: theme.warning + '15',
+      borderWidth: 1,
+      borderColor: theme.warning + '33',
+    },
+    trustTitle: {fontSize: 13, fontWeight: '700', color: theme.text},
+    trustText: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
+    contractPreview: {fontSize: 13, color: theme.text, lineHeight: 21},
     contractDateInfo: {fontSize: 12, color: theme.textHint, marginTop: 4},
     signBtn: {
       marginTop: 20,

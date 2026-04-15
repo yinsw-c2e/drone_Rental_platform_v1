@@ -7,6 +7,8 @@
 # Go
 /backend/tmp/
 /backend/vendor/
+/.gocache/
+/backend/.gocache/
 
 # Node
 node_modules/
@@ -29,7 +31,7 @@ GEMINI.md
 .claude/
 examples/
 prompts/
-scripts/
+/scripts/
 
 # OS
 .DS_Store
@@ -40,6 +42,9 @@ Thumbs.db
 .env.local
 .env.*.local
 .env.production
+admin/.env
+mobile/.env
+mobile/.env.*
 
 # 后端配置文件（包含敏感信息）
 # 使用 config.example.yaml 作为模板
@@ -54,6 +59,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+/backend/docs/*_last_run.json
 
 # Docker
 mysql_data/

@@ -20,6 +20,7 @@ type OwnerService struct {
 	roleProfileRepo  *repository.RoleProfileRepo
 	ownerDomainRepo  *repository.OwnerDomainRepo
 	demandDomainRepo *repository.DemandDomainRepo
+	orderService     *OrderService
 	matchingService  *MatchingService
 	eventService     *EventService
 }
@@ -30,12 +31,76 @@ type OwnerProfileInput struct {
 	Intro        string `json:"intro"`
 }
 
+type OwnerWorkbenchSummary struct {
+	RecommendedDemandCount                int64 `json:"recommended_demand_count"`
+	PendingQuoteCount                     int64 `json:"pending_quote_count"`
+	PendingProviderConfirmationOrderCount int64 `json:"pending_provider_confirmation_order_count"`
+	PendingDispatchOrderCount             int64 `json:"pending_dispatch_order_count"`
+	DraftSupplyCount                      int64 `json:"draft_supply_count"`
+}
+
+type OwnerWorkbenchDemandItem struct {
+	ID                  int64      `json:"id"`
+	DemandNo            string     `json:"demand_no"`
+	Title               string     `json:"title"`
+	Status              string     `json:"status"`
+	ServiceAddressText  string     `json:"service_address_text"`
+	ScheduledStartAt    *time.Time `json:"scheduled_start_at,omitempty"`
+	ScheduledEndAt      *time.Time `json:"scheduled_end_at,omitempty"`
+	BudgetMin           int64      `json:"budget_min"`
+	BudgetMax           int64      `json:"budget_max"`
+	QuoteCount          int64      `json:"quote_count"`
+	CandidatePilotCount int64      `json:"candidate_pilot_count"`
+}
+
+type OwnerWorkbenchOrderItem struct {
+	ID             int64     `json:"id"`
+	OrderNo        string    `json:"order_no"`
+	Title          string    `json:"title"`
+	Status         string    `json:"status"`
+	OrderSource    string    `json:"order_source"`
+	ServiceAddress string    `json:"service_address"`
+	DestAddress    string    `json:"dest_address"`
+	TotalAmount    int64     `json:"total_amount"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type OwnerWorkbenchSupplyItem struct {
+	ID                    int64     `json:"id"`
+	SupplyNo              string    `json:"supply_no"`
+	Title                 string    `json:"title"`
+	Status                string    `json:"status"`
+	DroneID               int64     `json:"drone_id"`
+	BasePriceAmount       int64     `json:"base_price_amount"`
+	PricingUnit           string    `json:"pricing_unit"`
+	UpdatedAt             time.Time `json:"updated_at"`
+	DroneBrand            string    `json:"drone_brand,omitempty"`
+	DroneModel            string    `json:"drone_model,omitempty"`
+	CertificationStatus   string    `json:"certification_status,omitempty"`
+	UOMVerified           string    `json:"uom_verified,omitempty"`
+	InsuranceVerified     string    `json:"insurance_verified,omitempty"`
+	AirworthinessVerified string    `json:"airworthiness_verified,omitempty"`
+}
+
+type OwnerWorkbenchView struct {
+	Summary                           OwnerWorkbenchSummary      `json:"summary"`
+	RecommendedDemands                []OwnerWorkbenchDemandItem `json:"recommended_demands"`
+	PendingProviderConfirmationOrders []OwnerWorkbenchOrderItem  `json:"pending_provider_confirmation_orders"`
+	PendingDispatchOrders             []OwnerWorkbenchOrderItem  `json:"pending_dispatch_orders"`
+	DraftSupplies                     []OwnerWorkbenchSupplyItem `json:"draft_supplies"`
+}
+
 func (s *OwnerService) SetMatchingService(matchingService *MatchingService) {
 	s.matchingService = matchingService
 }
 
 func (s *OwnerService) SetEventService(eventService *EventService) {
 	s.eventService = eventService
+}
+
+func (s *OwnerService) SetOrderService(orderService *OrderService) {
+	s.orderService = orderService
 }
 
 type OwnerSupplyInput struct {
@@ -276,6 +341,91 @@ func (s *OwnerService) ListRecommendedDemands(ownerUserID int64, page, pageSize 
 		return s.matchingService.RecommendDemandsForOwner(ownerUserID, page, pageSize)
 	}
 	return s.demandDomainRepo.ListRecommendedDemands(page, pageSize)
+}
+
+func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, error) {
+	if _, err := s.ensureOwnerProfile(ownerUserID); err != nil {
+		return nil, err
+	}
+	if s.orderService == nil {
+		return nil, errors.New("订单服务未初始化")
+	}
+
+	recommendedDemands, recommendedTotal, err := s.ListRecommendedDemands(ownerUserID, 1, 5)
+	if err != nil {
+		return nil, err
+	}
+	demandIDs := make([]int64, 0, len(recommendedDemands))
+	for i := range recommendedDemands {
+		demandIDs = append(demandIDs, recommendedDemands[i].ID)
+	}
+	demandStats, err := s.GetDemandStats(demandIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	_, pendingQuoteTotal, err := s.ListMyQuotes(ownerUserID, "submitted", 1, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	pendingProviderOrders, pendingProviderTotal, err := s.orderService.ListOrders(ownerUserID, "owner", "pending_provider_confirmation", 1, 5)
+	if err != nil {
+		return nil, err
+	}
+	pendingDispatchOrders, pendingDispatchTotal, err := s.orderService.ListOrders(ownerUserID, "owner", "pending_dispatch", 1, 5)
+	if err != nil {
+		return nil, err
+	}
+
+	draftSupplies, draftSupplyTotal, err := s.ListMySupplies(ownerUserID, "draft", 1, 5)
+	if err != nil {
+		return nil, err
+	}
+
+	view := &OwnerWorkbenchView{
+		Summary: OwnerWorkbenchSummary{
+			RecommendedDemandCount:                recommendedTotal,
+			PendingQuoteCount:                     pendingQuoteTotal,
+			PendingProviderConfirmationOrderCount: pendingProviderTotal,
+			PendingDispatchOrderCount:             pendingDispatchTotal,
+			DraftSupplyCount:                      draftSupplyTotal,
+		},
+		RecommendedDemands:                make([]OwnerWorkbenchDemandItem, 0, len(recommendedDemands)),
+		PendingProviderConfirmationOrders: make([]OwnerWorkbenchOrderItem, 0, len(pendingProviderOrders)),
+		PendingDispatchOrders:             make([]OwnerWorkbenchOrderItem, 0, len(pendingDispatchOrders)),
+		DraftSupplies:                     make([]OwnerWorkbenchSupplyItem, 0, len(draftSupplies)),
+	}
+
+	for i := range recommendedDemands {
+		item := recommendedDemands[i]
+		stats := demandStats[item.ID]
+		view.RecommendedDemands = append(view.RecommendedDemands, OwnerWorkbenchDemandItem{
+			ID:                  item.ID,
+			DemandNo:            item.DemandNo,
+			Title:               item.Title,
+			Status:              item.Status,
+			ServiceAddressText:  homeDemandAddressText(&item),
+			ScheduledStartAt:    item.ScheduledStartAt,
+			ScheduledEndAt:      item.ScheduledEndAt,
+			BudgetMin:           item.BudgetMin,
+			BudgetMax:           item.BudgetMax,
+			QuoteCount:          stats.QuoteCount,
+			CandidatePilotCount: stats.CandidatePilotCount,
+		})
+	}
+
+	for i := range pendingProviderOrders {
+		view.PendingProviderConfirmationOrders = append(view.PendingProviderConfirmationOrders, buildOwnerWorkbenchOrderItem(&pendingProviderOrders[i]))
+	}
+	for i := range pendingDispatchOrders {
+		view.PendingDispatchOrders = append(view.PendingDispatchOrders, buildOwnerWorkbenchOrderItem(&pendingDispatchOrders[i]))
+	}
+	for i := range draftSupplies {
+		view.DraftSupplies = append(view.DraftSupplies, buildOwnerWorkbenchSupplyItem(&draftSupplies[i]))
+	}
+
+	return view, nil
 }
 
 func (s *OwnerService) GetDemandStats(demandIDs []int64) (map[int64]DemandStats, error) {
@@ -814,4 +964,47 @@ func mustOwnerJSON(v interface{}) model.JSON {
 
 func generateSupplyNo() string {
 	return fmt.Sprintf("SP%s%06d", time.Now().Format("20060102150405"), time.Now().UnixNano()%1000000)
+}
+
+func buildOwnerWorkbenchOrderItem(order *model.Order) OwnerWorkbenchOrderItem {
+	if order == nil {
+		return OwnerWorkbenchOrderItem{}
+	}
+	return OwnerWorkbenchOrderItem{
+		ID:             order.ID,
+		OrderNo:        order.OrderNo,
+		Title:          order.Title,
+		Status:         order.Status,
+		OrderSource:    order.OrderSource,
+		ServiceAddress: order.ServiceAddress,
+		DestAddress:    order.DestAddress,
+		TotalAmount:    order.TotalAmount,
+		CreatedAt:      order.CreatedAt,
+		UpdatedAt:      order.UpdatedAt,
+	}
+}
+
+func buildOwnerWorkbenchSupplyItem(supply *model.OwnerSupply) OwnerWorkbenchSupplyItem {
+	if supply == nil {
+		return OwnerWorkbenchSupplyItem{}
+	}
+	item := OwnerWorkbenchSupplyItem{
+		ID:              supply.ID,
+		SupplyNo:        supply.SupplyNo,
+		Title:           supply.Title,
+		Status:          supply.Status,
+		DroneID:         supply.DroneID,
+		BasePriceAmount: supply.BasePriceAmount,
+		PricingUnit:     supply.PricingUnit,
+		UpdatedAt:       supply.UpdatedAt,
+	}
+	if supply.Drone != nil {
+		item.DroneBrand = supply.Drone.Brand
+		item.DroneModel = supply.Drone.Model
+		item.CertificationStatus = supply.Drone.CertificationStatus
+		item.UOMVerified = supply.Drone.UOMVerified
+		item.InsuranceVerified = supply.Drone.InsuranceVerified
+		item.AirworthinessVerified = supply.Drone.AirworthinessVerified
+	}
+	return item
 }

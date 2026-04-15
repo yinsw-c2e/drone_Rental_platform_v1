@@ -2,13 +2,14 @@
  * react-native-config Web 端替代实现
  * 从环境变量或默认值中读取配置
  * 
- * Web 版本默认使用 cpolar 公网地址，方便客户演示
+ * Web 版本默认使用 cpolar 公网地址，方便客户演示。
+ * 默认值停在 /api 根路径，由运行时再切到 v1/v2，避免继续把新页面绑死在 v1。
  */
 
 // 从 import.meta.env 读取 Vite 环境变量
 const Config = {
   // Web 版本默认使用 cpolar 固定公网地址（backend 隧道）
-  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://dronerentalplat.cpolar.top/api/v1',
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://dronerentalplat.cpolar.top/api',
   WS_BASE_URL: import.meta.env.VITE_WS_BASE_URL || 'wss://dronerentalplat.cpolar.top/ws',
   API_TIMEOUT: import.meta.env.VITE_API_TIMEOUT || '15000',
   AMAP_ANDROID_KEY: import.meta.env.VITE_AMAP_ANDROID_KEY || '',

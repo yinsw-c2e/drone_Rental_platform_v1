@@ -208,7 +208,9 @@ export interface Message {
   receiver_id: number;
   message_type: string;
   content: string;
+  extra_data?: Record<string, any> | null;
   is_read: boolean;
+  read_at?: string | null;
   created_at: string;
 }
 
@@ -406,6 +408,23 @@ export interface DirectOrderResult {
   order_no: string;
   order_source: string;
   status: string;
+  total_amount?: number;
+  platform_commission?: number;
+  owner_amount?: number;
+}
+
+export interface QuickOrderDraft {
+  cargo_scene: string;
+  cargo_type?: string;
+  cargo_weight_kg?: number;
+  cargo_volume_m3?: number;
+  departure_address?: AddressData | null;
+  destination_address?: AddressData | null;
+  scheduled_start_at?: string;
+  scheduled_end_at?: string;
+  description?: string;
+  special_requirements?: string;
+  match_region?: string;
 }
 
 export interface DemandOwnerSummary {
@@ -545,6 +564,22 @@ export interface OwnerProfile {
   updated_at?: string;
 }
 
+export interface V2PilotEligibilityBlocker {
+  code: string;
+  message: string;
+}
+
+export interface V2PilotEligibility {
+  tier: string;
+  label: string;
+  can_apply_candidate: boolean;
+  can_accept_dispatch: boolean;
+  can_start_execution: boolean;
+  can_update_availability: boolean;
+  recommended_next_step: string;
+  blockers: V2PilotEligibilityBlocker[];
+}
+
 export interface V2PilotProfile {
   id: number;
   user_id: number;
@@ -562,8 +597,69 @@ export interface V2PilotProfile {
   skill_tags?: string[];
   service_rating?: number;
   credit_score?: number;
+  eligibility?: V2PilotEligibility | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface OwnerWorkbenchSummary {
+  recommended_demand_count: number;
+  pending_quote_count: number;
+  pending_provider_confirmation_order_count: number;
+  pending_dispatch_order_count: number;
+  draft_supply_count: number;
+}
+
+export interface OwnerWorkbenchDemandItem {
+  id: number;
+  demand_no: string;
+  title: string;
+  status: string;
+  service_address_text: string;
+  scheduled_start_at?: string | null;
+  scheduled_end_at?: string | null;
+  budget_min: number;
+  budget_max: number;
+  quote_count: number;
+  candidate_pilot_count: number;
+}
+
+export interface OwnerWorkbenchOrderItem {
+  id: number;
+  order_no: string;
+  title: string;
+  status: string;
+  order_source: string;
+  service_address?: string;
+  dest_address?: string;
+  total_amount: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OwnerWorkbenchSupplyItem {
+  id: number;
+  supply_no: string;
+  title: string;
+  status: string;
+  drone_id: number;
+  base_price_amount: number;
+  pricing_unit: string;
+  updated_at?: string;
+  drone_brand?: string;
+  drone_model?: string;
+  certification_status?: string;
+  uom_verified?: string;
+  insurance_verified?: string;
+  airworthiness_verified?: string;
+}
+
+export interface OwnerWorkbenchView {
+  summary: OwnerWorkbenchSummary;
+  recommended_demands: OwnerWorkbenchDemandItem[];
+  pending_provider_confirmation_orders: OwnerWorkbenchOrderItem[];
+  pending_dispatch_orders: OwnerWorkbenchOrderItem[];
+  draft_supplies: OwnerWorkbenchSupplyItem[];
 }
 
 export interface V2OrderSummary {
@@ -599,6 +695,8 @@ export interface V2OrderSummary {
   provider_confirmed_at?: string | null;
   provider_rejected_at?: string | null;
   provider_reject_reason?: string;
+  cancel_reason?: string;
+  cancel_by?: string;
   client?: OrderPartySummary | null;
   provider?: OrderPartySummary | null;
   executor?: OrderPartySummary | null;
@@ -831,7 +929,15 @@ export interface V2SettlementSummary {
 
 export interface V2CreateOrderPaymentResult {
   payment: V2PaymentSummary;
-  pay_params?: Record<string, any>;
+  pay_params?: Record<string, any> | null;
+  payment_flow?: {
+    method: string;
+    capability?: string;
+    status?: string;
+    auto_completed?: boolean;
+    recommended_method?: string;
+    notice?: string;
+  } | null;
   order?: {
     id: number;
     order_no?: string;
@@ -849,6 +955,25 @@ export interface V2OrderTimelineItem {
   operator_id?: number;
   operator_type?: string;
   created_at?: string;
+}
+
+export interface V2OrderTimelineEvent {
+  event_id: string;
+  source_type: string;
+  source_id: number;
+  event_type: string;
+  title: string;
+  description?: string;
+  status?: string;
+  occurred_at?: string;
+  operator_id?: number;
+  operator_type?: string;
+  payload?: Record<string, any>;
+}
+
+export interface V2OrderTimelineResponse {
+  order: V2OrderSummary;
+  items: V2OrderTimelineEvent[];
 }
 
 export interface V2OrderFinancialSummary {

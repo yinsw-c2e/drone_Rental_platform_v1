@@ -20,7 +20,7 @@ import {
   AirspaceApplication,
   CreateApplicationRequest,
 } from '../../services/airspace';
-import {getPilotProfile} from '../../services/pilot';
+import {pilotV2Service} from '../../services/pilotV2';
 import AddressInputField from '../../components/AddressInputField';
 import {AddressData} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
@@ -71,24 +71,22 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
     loadPilotInfo();
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (pilotId > 0) {
-        loadApplications();
-      }
-    }, [pilotId]),
-  );
-
   const loadPilotInfo = async () => {
     try {
-      const profile = await getPilotProfile();
-      setPilotId(profile.id);
+      const res = await pilotV2Service.getProfile();
+      setPilotId(res.data.id);
     } catch {
       Alert.alert('提示', '请先完成飞手认证');
     }
   };
 
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
+    if (pilotId <= 0) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       const result = await listMyApplications(pilotId);
       setApplications(result.data || []);
@@ -98,7 +96,13 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [pilotId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadApplications();
+    }, [loadApplications]),
+  );
 
   const handleCreate = async () => {
     if (!planName.trim()) return Alert.alert('提示', '请输入飞行计划名称');
@@ -245,10 +249,10 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>飞行计划信息</Text>
+          <Text style={styles.sectionTitle}>空域报备信息</Text>
 
           <Text style={styles.label}>计划名称 *</Text>
-          <TextInput style={styles.input} placeholder="例: 成都XX区货运飞行" value={planName} onChangeText={setPlanName} />
+          <TextInput style={styles.input} placeholder="例: 南海区塔材短距吊运报备" value={planName} onChangeText={setPlanName} />
 
           <Text style={styles.label}>飞行用途 *</Text>
           <View style={styles.optionRow}>
@@ -280,7 +284,7 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
             style={styles.addrField}
           />
 
-          <Text style={styles.sectionTitle}>飞行参数</Text>
+          <Text style={styles.sectionTitle}>飞行区域与作业参数</Text>
           <Text style={styles.label}>最大飞行高度(米)</Text>
           <TextInput style={styles.input} placeholder="120" keyboardType="number-pad" value={maxAltitudeStr} onChangeText={setMaxAltitudeStr} />
 
@@ -290,8 +294,8 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
           <Text style={styles.label}>计划结束时间 * (YYYY-MM-DD HH:MM)</Text>
           <TextInput style={styles.input} placeholder="2026-03-05 11:00" value={endTime} onChangeText={setEndTime} />
 
-          <Text style={styles.label}>航线描述</Text>
-          <TextInput style={[styles.input, styles.textArea]} placeholder="描述计划飞行航线" value={routeDesc} onChangeText={setRouteDesc} multiline numberOfLines={3} />
+          <Text style={styles.label}>飞行区域描述</Text>
+          <TextInput style={[styles.input, styles.textArea]} placeholder="描述计划作业区域、起降点和绕飞关注点" value={routeDesc} onChangeText={setRouteDesc} multiline numberOfLines={3} />
 
           <View style={styles.formButtons}>
             <TouchableOpacity style={[styles.formBtn, styles.formBtnCancel]} onPress={() => {setMode('list'); resetForm();}}>
@@ -311,16 +315,16 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>空域申请管理</Text>
+        <Text style={styles.headerTitle}>空域报备管理</Text>
         <TouchableOpacity style={styles.createBtn} onPress={() => setMode('create')}>
-          <Text style={styles.createBtnText}>+ 新建申请</Text>
+          <Text style={styles.createBtnText}>+ 新建报备</Text>
         </TouchableOpacity>
       </View>
 
       {applications.length === 0 && !loading ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>暂无空域申请记录</Text>
-          <Text style={styles.emptySubText}>点击右上角"新建申请"开始</Text>
+          <Text style={styles.emptyText}>暂无空域报备记录</Text>
+          <Text style={styles.emptySubText}>点击右上角“新建报备”开始</Text>
         </View>
       ) : (
         <FlatList

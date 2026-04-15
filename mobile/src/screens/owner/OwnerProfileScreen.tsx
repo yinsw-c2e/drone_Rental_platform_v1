@@ -24,6 +24,8 @@ import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
+const formatAmount = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
+
 export default function OwnerProfileScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
@@ -38,15 +40,17 @@ export default function OwnerProfileScreen({navigation}: any) {
   const [_profile, setProfile] = useState<any>(null);
   const [draft, setDraft] = useState({service_city: '', contact_phone: '', intro: ''});
   const [stats, setStats] = useState({drones: 0, activeSupplies: 0, quotes: 0, bindings: 0});
+  const [workbench, setWorkbench] = useState<any>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [profileRes, dronesRes, suppliesRes, quotesRes, bindingsRes] = await Promise.all([
+      const [profileRes, dronesRes, suppliesRes, quotesRes, bindingsRes, workbenchRes] = await Promise.all([
         ownerService.getProfile().catch(() => null),
         droneService.myDrones({page: 1, page_size: 100}).catch(() => null),
         ownerService.listMySupplies({page: 1, page_size: 100}).catch(() => null),
         ownerService.listMyQuotes({page: 1, page_size: 100}).catch(() => null),
         ownerService.listPilotBindings({status: 'active', page: 1, page_size: 100}).catch(() => null),
+        ownerService.getWorkbench().catch(() => null),
       ]);
 
       const nextProfile = profileRes?.data || null;
@@ -58,6 +62,7 @@ export default function OwnerProfileScreen({navigation}: any) {
       });
 
       const supplyItems = suppliesRes?.data?.items || [];
+      setWorkbench(workbenchRes?.data || null);
       setStats({
         drones: Number(dronesRes?.data?.list?.length || 0),
         activeSupplies: supplyItems.filter((item: any) => item.status === 'active').length,
@@ -133,6 +138,43 @@ export default function OwnerProfileScreen({navigation}: any) {
       }),
     [viewportWidth],
   );
+  const workbenchPreviewItems = useMemo(
+    () => [
+      ...(workbench?.recommended_demands || []).slice(0, 2).map((item: any) => ({
+        key: `demand-${item.id}`,
+        eyebrow: '新需求',
+        title: item.title || '待报价任务',
+        desc: `${item.service_address_text || '待补地址'} · 预算 ${formatAmount(item.budget_min)}-${formatAmount(item.budget_max)}`,
+        actionText: '查看任务',
+        onPress: () => navigation.navigate('DemandDetail', {id: item.id}),
+      })),
+      ...(workbench?.pending_provider_confirmation_orders || []).slice(0, 1).map((item: any) => ({
+        key: `confirm-${item.id}`,
+        eyebrow: '待确认直达单',
+        title: item.title || item.order_no,
+        desc: `${item.service_address || '待补地址'} · 订单金额 ${formatAmount(item.total_amount)}`,
+        actionText: '查看订单',
+        onPress: () => navigation.navigate('OrderDetail', {id: item.id, orderId: item.id}),
+      })),
+      ...(workbench?.pending_dispatch_orders || []).slice(0, 1).map((item: any) => ({
+        key: `dispatch-${item.id}`,
+        eyebrow: '待安排执行',
+        title: item.title || item.order_no,
+        desc: `${item.service_address || '待补地址'} · 成交后待指派执行方`,
+        actionText: '查看订单',
+        onPress: () => navigation.navigate('OrderDetail', {id: item.id, orderId: item.id}),
+      })),
+      ...(workbench?.draft_supplies || []).slice(0, 1).map((item: any) => ({
+        key: `supply-${item.id}`,
+        eyebrow: '服务草稿',
+        title: item.title || item.supply_no,
+        desc: `${item.drone_brand || '无人机'} ${item.drone_model || ''} · 先补资质再上架`,
+        actionText: '继续完善',
+        onPress: () => navigation.navigate('PublishOffer', {supplyId: item.id}),
+      })),
+    ],
+    [navigation, workbench],
+  );
 
   if (loading) {
     return (
@@ -153,7 +195,7 @@ export default function OwnerProfileScreen({navigation}: any) {
           <Text style={styles.heroEyebrow}>机主档案</Text>
           <Text style={styles.heroTitle}>设备、供给、资质从这里统一管理</Text>
           <Text style={styles.heroDesc}>
-            机主不是一个模糊标签，而是围绕无人机资产、供给能力和执行协作展开的一组真实能力。
+            机主可以先建立服务草稿、后补齐无人机与飞手资质，所有资质达标后即可正式上架服务。
           </Text>
 
           <View style={styles.heroMetaRow}>
@@ -179,6 +221,48 @@ export default function OwnerProfileScreen({navigation}: any) {
               <Text style={styles.summaryLabel}>绑定飞手</Text>
             </View>
           </View>
+        </ObjectCard>
+
+        <ObjectCard style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>机主待处理</Text>
+          <Text style={styles.sectionSubText}>把新需求、待确认订单、待安排执行和服务草稿收在一个工作台里，不再到处找线索。</Text>
+          <View style={styles.workbenchSummaryRow}>
+            <View style={styles.workbenchSummaryItem}>
+              <Text style={styles.workbenchSummaryValue}>{workbench?.summary?.recommended_demand_count || 0}</Text>
+              <Text style={styles.workbenchSummaryLabel}>新需求</Text>
+            </View>
+            <View style={styles.workbenchSummaryItem}>
+              <Text style={styles.workbenchSummaryValue}>{workbench?.summary?.pending_provider_confirmation_order_count || 0}</Text>
+              <Text style={styles.workbenchSummaryLabel}>待确认</Text>
+            </View>
+            <View style={styles.workbenchSummaryItem}>
+              <Text style={styles.workbenchSummaryValue}>{workbench?.summary?.pending_dispatch_order_count || 0}</Text>
+              <Text style={styles.workbenchSummaryLabel}>待指派</Text>
+            </View>
+            <View style={styles.workbenchSummaryItem}>
+              <Text style={styles.workbenchSummaryValue}>{workbench?.summary?.draft_supply_count || 0}</Text>
+              <Text style={styles.workbenchSummaryLabel}>草稿</Text>
+            </View>
+          </View>
+          {workbenchPreviewItems.length > 0 ? (
+            <View style={styles.workbenchList}>
+              {workbenchPreviewItems.map((item: any) => (
+                <TouchableOpacity key={item.key} style={styles.workbenchItem} onPress={item.onPress}>
+                  <View style={styles.workbenchItemTextWrap}>
+                    <Text style={styles.workbenchItemEyebrow}>{item.eyebrow}</Text>
+                    <Text style={styles.workbenchItemTitle}>{item.title}</Text>
+                    <Text style={styles.workbenchItemDesc}>{item.desc}</Text>
+                  </View>
+                  <Text style={styles.workbenchItemAction}>{item.actionText}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.workbenchEmpty}>
+              <Text style={styles.workbenchEmptyTitle}>当前没有待处理线索</Text>
+              <Text style={styles.workbenchEmptyDesc}>可以先去建立服务草稿、补设备资质，或进入任务列表看看今天的新需求。</Text>
+            </View>
+          )}
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
@@ -285,6 +369,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   summaryLabel: {marginTop: 4, fontSize: 12, textAlign: 'center', color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)'},
   sectionCard: {gap: 12},
   sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
+  sectionSubText: {fontSize: 13, lineHeight: 19, color: theme.textSub},
   inputLabel: {fontSize: 13, fontWeight: '700', color: theme.text},
   input: {
     borderWidth: 1,
@@ -301,6 +386,43 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   capabilityTextWrap: {flex: 1},
   capabilityTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
   capabilityDesc: {marginTop: 4, fontSize: 13, lineHeight: 19, color: theme.textSub},
+  workbenchSummaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
+  workbenchSummaryItem: {
+    flex: 1,
+    minWidth: 74,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: theme.bgSecondary,
+    alignItems: 'center',
+  },
+  workbenchSummaryValue: {fontSize: 18, fontWeight: '800', color: theme.primaryText},
+  workbenchSummaryLabel: {marginTop: 4, fontSize: 12, color: theme.textSub},
+  workbenchList: {gap: 10},
+  workbenchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+  },
+  workbenchItemTextWrap: {flex: 1},
+  workbenchItemEyebrow: {fontSize: 12, fontWeight: '700', color: theme.primaryText},
+  workbenchItemTitle: {marginTop: 4, fontSize: 15, fontWeight: '700', color: theme.text},
+  workbenchItemDesc: {marginTop: 4, fontSize: 12, lineHeight: 18, color: theme.textSub},
+  workbenchItemAction: {fontSize: 13, fontWeight: '700', color: theme.primaryText},
+  workbenchEmpty: {
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+  },
+  workbenchEmptyTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
+  workbenchEmptyDesc: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
   quickGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 12},
   quickCard: {
     borderRadius: 18,
@@ -312,6 +434,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   quickIcon: {fontSize: 24},
   quickTitle: {marginTop: 10, fontSize: 15, fontWeight: '700', color: theme.text},
   quickDesc: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
+  todoList: {gap: 10},
+  todoItem: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.bgSecondary, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: theme.cardBorder},
+  todoIcon: {fontSize: 24, marginRight: 14},
+  todoTextWrap: {flex: 1},
+  todoItemTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
+  todoItemDesc: {fontSize: 12, color: theme.textSub, marginTop: 4},
+  todoAction: {fontSize: 13, fontWeight: '700', color: theme.primary},
   saveButton: {
     borderRadius: 14,
     backgroundColor: theme.primary,

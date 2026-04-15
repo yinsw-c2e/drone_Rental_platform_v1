@@ -3,7 +3,11 @@ package order
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"sort"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -20,6 +24,20 @@ type Handler struct {
 	dispatchService *service.DispatchService
 	flightService   *service.FlightService
 	contractService *service.ContractService
+}
+
+type aggregatedOrderTimelineEvent struct {
+	EventID      string    `json:"event_id"`
+	SourceType   string    `json:"source_type"`
+	SourceID     int64     `json:"source_id"`
+	EventType    string    `json:"event_type"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	Status       string    `json:"status,omitempty"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	OperatorID   int64     `json:"operator_id,omitempty"`
+	OperatorType string    `json:"operator_type,omitempty"`
+	Payload      gin.H     `json:"payload,omitempty"`
 }
 
 func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService) *Handler {
@@ -142,6 +160,51 @@ func (h *Handler) ProviderReject(c *gin.Context) {
 	response.V2Success(c, buildOrderSummary(order))
 }
 
+func (h *Handler) Cancel(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		response.V2ValidationError(c, "invalid cancel payload")
+		return
+	}
+
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	role := h.resolveOrderActorRole(c, order, userID)
+	if role == "" {
+		response.V2Forbidden(c, "无权操作此订单")
+		return
+	}
+
+	if err := h.orderService.CancelOrder(orderID, userID, req.Reason, role); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	updated, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, buildOrderSummary(updated))
+}
+
 func (h *Handler) Dispatch(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -182,6 +245,24 @@ func (h *Handler) Dispatch(c *gin.Context) {
 	})
 }
 
+func (h *Handler) StartPreparing(c *gin.Context) {
+	h.advanceExecutionStage(c, func(userID int64, orderID int64) error {
+		return h.orderService.StartPreparing(userID, orderID)
+	}, false)
+}
+
+func (h *Handler) StartFlight(c *gin.Context) {
+	h.advanceExecutionStage(c, func(userID int64, orderID int64) error {
+		return h.orderService.StartFlight(userID, orderID)
+	}, true)
+}
+
+func (h *Handler) ConfirmDelivery(c *gin.Context) {
+	h.advanceExecutionStage(c, func(userID int64, orderID int64) error {
+		return h.orderService.ConfirmDelivery(userID, orderID)
+	}, true)
+}
+
 func (h *Handler) Monitor(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -206,6 +287,32 @@ func (h *Handler) Monitor(c *gin.Context) {
 		return
 	}
 	response.V2Success(c, monitor)
+}
+
+func (h *Handler) Timeline(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	timeline, err := h.buildOrderTimelinePayload(order)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, timeline)
 }
 
 func (h *Handler) CreateDispute(c *gin.Context) {
@@ -386,6 +493,34 @@ func (h *Handler) buildOrderMonitor(order *model.Order) (gin.H, error) {
 	}, nil
 }
 
+func (h *Handler) buildOrderTimelinePayload(order *model.Order) (gin.H, error) {
+	payments, err := h.orderService.ListPaymentsByOrder(order.ID)
+	if err != nil {
+		return nil, err
+	}
+	refunds, err := h.orderService.ListRefundsByOrder(order.ID)
+	if err != nil {
+		return nil, err
+	}
+	timeline, err := h.orderService.GetTimeline(order.ID)
+	if err != nil {
+		return nil, err
+	}
+	dispatchHistory, err := h.dispatchService.ListFormalTasksByOrder(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	flightRecords, err := h.flightService.ListFlightRecordsByOrder(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	return gin.H{
+		"order": buildOrderSummary(order),
+		"items": buildAggregatedOrderTimeline(timeline, payments, refunds, dispatchHistory, flightRecords),
+	}, nil
+}
+
 func parseOrderID(c *gin.Context) (int64, bool) {
 	orderID, err := strconv.ParseInt(c.Param("order_id"), 10, 64)
 	if err != nil || orderID <= 0 {
@@ -422,6 +557,8 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"provider_confirmed_at":  order.ProviderConfirmedAt,
 		"provider_rejected_at":   order.ProviderRejectedAt,
 		"provider_reject_reason": order.ProviderRejectReason,
+		"cancel_reason":          order.CancelReason,
+		"cancel_by":              order.CancelBy,
 		"client":                 buildUserSummary(order.Renter, fallbackPositive(order.ClientUserID, order.RenterID), "client"),
 		"provider":               buildUserSummary(order.Owner, fallbackPositive(order.ProviderUserID, order.OwnerID), "owner"),
 		"executor":               buildExecutorSummary(order, nil),
@@ -601,16 +738,7 @@ func buildAlertList(alerts []model.FlightAlert) []gin.H {
 func buildPayments(payments []model.Payment) []gin.H {
 	items := make([]gin.H, 0, len(payments))
 	for i := range payments {
-		items = append(items, gin.H{
-			"id":             payments[i].ID,
-			"payment_no":     payments[i].PaymentNo,
-			"payment_type":   payments[i].PaymentType,
-			"payment_method": payments[i].PaymentMethod,
-			"amount":         payments[i].Amount,
-			"status":         payments[i].Status,
-			"paid_at":        payments[i].PaidAt,
-			"created_at":     payments[i].CreatedAt,
-		})
+		items = append(items, buildPaymentSummary(&payments[i]))
 	}
 	return items
 }
@@ -618,16 +746,7 @@ func buildPayments(payments []model.Payment) []gin.H {
 func buildRefunds(refunds []model.Refund) []gin.H {
 	items := make([]gin.H, 0, len(refunds))
 	for i := range refunds {
-		items = append(items, gin.H{
-			"id":         refunds[i].ID,
-			"refund_no":  refunds[i].RefundNo,
-			"payment_id": refunds[i].PaymentID,
-			"amount":     refunds[i].Amount,
-			"reason":     refunds[i].Reason,
-			"status":     refunds[i].Status,
-			"created_at": refunds[i].CreatedAt,
-			"updated_at": refunds[i].UpdatedAt,
-		})
+		items = append(items, buildRefundSummary(&refunds[i]))
 	}
 	return items
 }
@@ -682,16 +801,269 @@ func buildFinancialSummary(order *model.Order, payments []model.Payment, refunds
 func buildTimelineList(items []model.OrderTimeline) []gin.H {
 	result := make([]gin.H, 0, len(items))
 	for i := range items {
-		result = append(result, gin.H{
-			"id":            items[i].ID,
-			"status":        items[i].Status,
-			"note":          items[i].Note,
-			"operator_id":   items[i].OperatorID,
-			"operator_type": items[i].OperatorType,
-			"created_at":    items[i].CreatedAt,
-		})
+		result = append(result, buildTimelineSummary(&items[i]))
 	}
 	return result
+}
+
+func buildPaymentSummary(payment *model.Payment) gin.H {
+	if payment == nil {
+		return nil
+	}
+	return gin.H{
+		"id":             payment.ID,
+		"payment_no":     payment.PaymentNo,
+		"payment_type":   payment.PaymentType,
+		"payment_method": payment.PaymentMethod,
+		"amount":         payment.Amount,
+		"status":         payment.Status,
+		"paid_at":        payment.PaidAt,
+		"created_at":     payment.CreatedAt,
+	}
+}
+
+func buildRefundSummary(refund *model.Refund) gin.H {
+	if refund == nil {
+		return nil
+	}
+	return gin.H{
+		"id":         refund.ID,
+		"refund_no":  refund.RefundNo,
+		"payment_id": refund.PaymentID,
+		"amount":     refund.Amount,
+		"reason":     refund.Reason,
+		"status":     refund.Status,
+		"created_at": refund.CreatedAt,
+		"updated_at": refund.UpdatedAt,
+	}
+}
+
+func buildTimelineSummary(item *model.OrderTimeline) gin.H {
+	if item == nil {
+		return nil
+	}
+	return gin.H{
+		"id":            item.ID,
+		"status":        item.Status,
+		"note":          item.Note,
+		"operator_id":   item.OperatorID,
+		"operator_type": item.OperatorType,
+		"created_at":    item.CreatedAt,
+	}
+}
+
+func buildAggregatedOrderTimeline(
+	timelineItems []model.OrderTimeline,
+	payments []model.Payment,
+	refunds []model.Refund,
+	dispatchTasks []model.FormalDispatchTask,
+	flightRecords []model.FlightRecord,
+) []aggregatedOrderTimelineEvent {
+	events := make([]aggregatedOrderTimelineEvent, 0, len(timelineItems)+len(payments)+len(refunds)+(len(dispatchTasks)*2)+(len(flightRecords)*2))
+
+	for i := range timelineItems {
+		title := timelineItems[i].Note
+		if title == "" {
+			title = orderTimelineEventTitle(timelineItems[i].Status)
+		}
+		events = append(events, aggregatedOrderTimelineEvent{
+			EventID:      fmt.Sprintf("timeline-%d", timelineItems[i].ID),
+			SourceType:   "order_timeline",
+			SourceID:     timelineItems[i].ID,
+			EventType:    "order_status_changed",
+			Title:        title,
+			Description:  timelineItems[i].Status,
+			Status:       timelineItems[i].Status,
+			OccurredAt:   timelineItems[i].CreatedAt,
+			OperatorID:   timelineItems[i].OperatorID,
+			OperatorType: timelineItems[i].OperatorType,
+			Payload:      buildTimelineSummary(&timelineItems[i]),
+		})
+	}
+
+	for i := range payments {
+		occurredAt := payments[i].CreatedAt
+		if payments[i].PaidAt != nil {
+			occurredAt = *payments[i].PaidAt
+		}
+		events = append(events, aggregatedOrderTimelineEvent{
+			EventID:     fmt.Sprintf("payment-%d", payments[i].ID),
+			SourceType:  "payment",
+			SourceID:    payments[i].ID,
+			EventType:   "payment_" + payments[i].Status,
+			Title:       paymentEventTitle(payments[i].Status),
+			Description: fmt.Sprintf("支付方式：%s，金额：%d 分", payments[i].PaymentMethod, payments[i].Amount),
+			Status:      payments[i].Status,
+			OccurredAt:  occurredAt,
+			Payload:     buildPaymentSummary(&payments[i]),
+		})
+	}
+
+	for i := range refunds {
+		events = append(events, aggregatedOrderTimelineEvent{
+			EventID:     fmt.Sprintf("refund-%d", refunds[i].ID),
+			SourceType:  "refund",
+			SourceID:    refunds[i].ID,
+			EventType:   "refund_" + refunds[i].Status,
+			Title:       refundEventTitle(refunds[i].Status),
+			Description: refunds[i].Reason,
+			Status:      refunds[i].Status,
+			OccurredAt:  refunds[i].CreatedAt,
+			Payload:     buildRefundSummary(&refunds[i]),
+		})
+	}
+
+	for i := range dispatchTasks {
+		payload := buildDispatchTaskSummary(&dispatchTasks[i])
+		sentAt := dispatchTasks[i].CreatedAt
+		if dispatchTasks[i].SentAt != nil {
+			sentAt = *dispatchTasks[i].SentAt
+		}
+		events = append(events, aggregatedOrderTimelineEvent{
+			EventID:    fmt.Sprintf("dispatch-sent-%d", dispatchTasks[i].ID),
+			SourceType: "dispatch_task",
+			SourceID:   dispatchTasks[i].ID,
+			EventType:  "dispatch_sent",
+			Title:      "已发起派单",
+			Description: fmt.Sprintf(
+				"派单方式：%s",
+				dispatchTasks[i].DispatchSource,
+			),
+			Status:     dispatchTasks[i].Status,
+			OccurredAt: sentAt,
+			Payload:    payload,
+		})
+		if dispatchTasks[i].RespondedAt != nil {
+			events = append(events, aggregatedOrderTimelineEvent{
+				EventID:     fmt.Sprintf("dispatch-response-%d", dispatchTasks[i].ID),
+				SourceType:  "dispatch_task",
+				SourceID:    dispatchTasks[i].ID,
+				EventType:   "dispatch_" + dispatchTasks[i].Status,
+				Title:       dispatchTimelineTitle(dispatchTasks[i].Status),
+				Description: dispatchTasks[i].Reason,
+				Status:      dispatchTasks[i].Status,
+				OccurredAt:  *dispatchTasks[i].RespondedAt,
+				Payload:     payload,
+			})
+		}
+	}
+
+	for i := range flightRecords {
+		payload := buildFlightRecordSummary(&flightRecords[i])
+		if flightRecords[i].TakeoffAt != nil {
+			events = append(events, aggregatedOrderTimelineEvent{
+				EventID:     fmt.Sprintf("flight-takeoff-%d", flightRecords[i].ID),
+				SourceType:  "flight_record",
+				SourceID:    flightRecords[i].ID,
+				EventType:   "flight_takeoff",
+				Title:       "无人机已起飞",
+				Description: flightRecords[i].FlightNo,
+				Status:      flightRecords[i].Status,
+				OccurredAt:  *flightRecords[i].TakeoffAt,
+				Payload:     payload,
+			})
+		}
+		if flightRecords[i].LandingAt != nil {
+			events = append(events, aggregatedOrderTimelineEvent{
+				EventID:     fmt.Sprintf("flight-landing-%d", flightRecords[i].ID),
+				SourceType:  "flight_record",
+				SourceID:    flightRecords[i].ID,
+				EventType:   "flight_landing",
+				Title:       "飞行架次已完成",
+				Description: flightRecords[i].FlightNo,
+				Status:      flightRecords[i].Status,
+				OccurredAt:  *flightRecords[i].LandingAt,
+				Payload:     payload,
+			})
+			continue
+		}
+		if flightRecords[i].TakeoffAt == nil {
+			events = append(events, aggregatedOrderTimelineEvent{
+				EventID:     fmt.Sprintf("flight-created-%d", flightRecords[i].ID),
+				SourceType:  "flight_record",
+				SourceID:    flightRecords[i].ID,
+				EventType:   "flight_record_created",
+				Title:       "飞行记录已创建",
+				Description: flightRecords[i].FlightNo,
+				Status:      flightRecords[i].Status,
+				OccurredAt:  flightRecords[i].CreatedAt,
+				Payload:     payload,
+			})
+		}
+	}
+
+	sort.SliceStable(events, func(i, j int) bool {
+		if events[i].OccurredAt.Equal(events[j].OccurredAt) {
+			return events[i].EventID > events[j].EventID
+		}
+		return events[i].OccurredAt.After(events[j].OccurredAt)
+	})
+
+	return events
+}
+
+func orderTimelineEventTitle(status string) string {
+	switch status {
+	case "pending_payment":
+		return "订单待支付"
+	case "paid":
+		return "订单已支付"
+	case "pending_dispatch":
+		return "订单待派单"
+	case "assigned":
+		return "订单已分配"
+	case "preparing", "loading":
+		return "订单准备中"
+	case "in_transit":
+		return "订单执行中"
+	case "delivered":
+		return "订单已投送"
+	case "completed":
+		return "订单已完成"
+	case "cancelled":
+		return "订单已取消"
+	default:
+		return "订单状态更新"
+	}
+}
+
+func paymentEventTitle(status string) string {
+	switch status {
+	case "paid":
+		return "支付成功"
+	case "failed":
+		return "支付失败"
+	case "refunded":
+		return "支付已退款"
+	default:
+		return "支付单已创建"
+	}
+}
+
+func refundEventTitle(status string) string {
+	switch status {
+	case "success", "completed":
+		return "退款已完成"
+	case "failed":
+		return "退款失败"
+	default:
+		return "退款处理中"
+	}
+}
+
+func dispatchTimelineTitle(status string) string {
+	switch status {
+	case "accepted":
+		return "飞手已接受派单"
+	case "rejected":
+		return "飞手已拒绝派单"
+	case "expired":
+		return "派单已过期"
+	case "cancelled":
+		return "派单已取消"
+	default:
+		return "派单状态更新"
+	}
 }
 
 func buildSnapshotMap(snapshots []model.OrderSnapshot) gin.H {
@@ -716,6 +1088,65 @@ func nullableInt64(value int64) interface{} {
 		return nil
 	}
 	return value
+}
+
+func normalizeOrderActorRole(userType string) string {
+	switch userType {
+	case "owner", "drone_owner":
+		return "owner"
+	case "pilot":
+		return "pilot"
+	case "client", "renter", "cargo_owner":
+		return "client"
+	default:
+		return ""
+	}
+}
+
+func (h *Handler) resolveOrderActorRole(c *gin.Context, order *model.Order, userID int64) string {
+	if preferred := normalizeOrderActorRole(middleware.GetUserType(c)); preferred != "" && h.orderService.CanAccessOrder(order, userID, preferred) {
+		return preferred
+	}
+
+	for _, role := range []string{"client", "owner", "pilot"} {
+		if h.orderService.CanAccessOrder(order, userID, role) {
+			return role
+		}
+	}
+	return ""
+}
+
+func (h *Handler) advanceExecutionStage(c *gin.Context, action func(userID int64, orderID int64) error, syncFlight bool) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	if err := action(userID, orderID); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	if syncFlight && h.flightService != nil {
+		if err := h.flightService.SyncOrderFlightRecord(orderID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			v2common.HandleServiceError(c, err)
+			return
+		}
+	}
+
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, buildOrderSummary(order))
 }
 
 func (h *Handler) UpdateExecutionStatus(c *gin.Context) {

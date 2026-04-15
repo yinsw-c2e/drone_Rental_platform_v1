@@ -43,7 +43,50 @@ func (s *MessageService) GetConversations(userID int64) ([]repository.Conversati
 	return s.messageRepo.GetConversations(userID)
 }
 
+func (s *MessageService) ListConversations(userID int64, page, pageSize int) ([]repository.ConversationSummary, int64, error) {
+	conversations, err := s.messageRepo.GetConversations(userID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	filtered := make([]repository.ConversationSummary, 0, len(conversations))
+	for _, conversation := range conversations {
+		if conversation.PeerID <= 0 || IsSystemConversationID(conversation.ConversationID) {
+			continue
+		}
+		filtered = append(filtered, conversation)
+	}
+
+	total := int64(len(filtered))
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	start := (page - 1) * pageSize
+	if start >= len(filtered) {
+		return []repository.ConversationSummary{}, total, nil
+	}
+	end := start + pageSize
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	return filtered[start:end], total, nil
+}
+
 func (s *MessageService) GetMessages(conversationID string, page, pageSize int) ([]model.Message, int64, error) {
+	return s.messageRepo.GetConversationMessages(conversationID, page, pageSize)
+}
+
+func (s *MessageService) GetMessagesForUser(userID int64, conversationID string, page, pageSize int) ([]model.Message, int64, error) {
+	allowed, err := s.messageRepo.HasConversationAccess(conversationID, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if !allowed {
+		return nil, 0, errors.New("无权查看该会话")
+	}
 	return s.messageRepo.GetConversationMessages(conversationID, page, pageSize)
 }
 
@@ -114,6 +157,44 @@ func (s *MessageService) SendSystemNotification(receiverID int64, msgType, title
 		ExtraData:      model.JSON(payload),
 	}
 
+	if err := s.messageRepo.Create(msg); err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
+func (s *MessageService) SendConversationSystemMessage(senderID, receiverID int64, title, content string, extras map[string]interface{}) (*model.Message, error) {
+	if senderID <= 0 || receiverID <= 0 {
+		return nil, errors.New("会话双方不能为空")
+	}
+	if senderID == receiverID {
+		return nil, errors.New("系统消息需要关联另一方会话")
+	}
+	if content == "" {
+		return nil, errors.New("消息内容不能为空")
+	}
+
+	if extras == nil {
+		extras = make(map[string]interface{})
+	}
+	if title != "" {
+		extras["title"] = title
+	}
+	extras["system_generated"] = true
+
+	payload, err := json.Marshal(extras)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := &model.Message{
+		ConversationID: makeConversationID(senderID, receiverID),
+		SenderID:       senderID,
+		ReceiverID:     receiverID,
+		MessageType:    "system",
+		Content:        content,
+		ExtraData:      model.JSON(payload),
+	}
 	if err := s.messageRepo.Create(msg); err != nil {
 		return nil, err
 	}

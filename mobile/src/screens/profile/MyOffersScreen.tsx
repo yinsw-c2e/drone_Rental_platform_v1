@@ -168,7 +168,7 @@ export default function MyOffersScreen({navigation}: any) {
               <Text style={styles.heroEyebrow}>我的服务</Text>
               <Text style={styles.heroTitle}>服务与市场入口已经拆开</Text>
               <Text style={styles.heroDesc}>
-                这里只展示自己发布的服务方案。草稿、上架中、暂停、关闭各看各的，不再和任务或订单混成一页。
+                这里展示自己发布的服务方案。可先建服务草稿，等补充资质达标后再正式上架。
               </Text>
             </View>
 
@@ -372,6 +372,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   primaryBtnText: {
     fontSize: 12,
     color: theme.btnPrimaryText,
+    fontWeight: '700',
+  },
+});
+maryText,
     fontWeight: '700',
   },
 });

@@ -1,7 +1,7 @@
 import React, {useEffect, useState, useCallback} from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, SafeAreaView, FlatList, Dimensions,
+  ActivityIndicator, SafeAreaView, Dimensions,
   Alert,
 } from 'react-native';
 import {useSelector} from 'react-redux';
@@ -25,7 +25,6 @@ export default function DroneDetailScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const {id} = route.params;
-  console.log('[DroneDetailScreen] Mounted with params:', route.params, 'id:', id);
   
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const [drone, setDrone] = useState<Drone | null>(null);
@@ -37,14 +36,12 @@ export default function DroneDetailScreen({route, navigation}: any) {
   const isOwner = drone?.owner_id === currentUser?.id;
 
   const fetchData = useCallback(async () => {
-    console.log('[DroneDetailScreen] fetchData called with id:', id);
     setLoading(true);
     try {
       const [droneRes, reviewRes] = await Promise.all([
         droneService.getById(id),
         reviewService.listByTarget('drone', id, {page: 1, page_size: 10}).catch(() => null),
       ]);
-      console.log('[DroneDetailScreen] API responses:', { droneRes, reviewRes });
       setDrone(droneRes.data);
       if (reviewRes?.data?.list) {
         setReviews(reviewRes.data.list);
@@ -78,7 +75,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
     }
     Alert.alert('入口已切换', '新版下单链路统一从服务列表发起。', [
       {text: '取消', style: 'cancel'},
-      {text: '去服务列表', onPress: () => navigation.navigate('OfferList')},
+      {text: '快速下单', onPress: () => navigation.navigate('QuickOrderEntry')},
     ]);
   };
 
@@ -119,6 +116,12 @@ export default function DroneDetailScreen({route, navigation}: any) {
   const availability = AVAILABILITY_MAP[drone.availability_status] || {label: drone.availability_status, colorKey: 'textHint' as const};
     const availColor = theme[availability.colorKey];
   const images = drone.images?.length ? drone.images : [];
+  const approvedCount = [
+    drone.certification_status,
+    drone.uom_verified,
+    drone.insurance_verified,
+    drone.airworthiness_verified,
+  ].filter(value => value === 'approved' || value === 'verified').length;
 
   const renderStars = (rating: number) => {
     const stars = [];
@@ -251,6 +254,39 @@ export default function DroneDetailScreen({route, navigation}: any) {
           )}
         </View>
 
+        {/* Qualifications */}
+        {isOwner && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>资质进度总览</Text>
+            <Text style={styles.progressHint}>四项资质支持并行提交与审核，不需要按固定顺序一个个完成。</Text>
+            <View style={styles.specGrid}>
+              <View style={styles.specItem}>
+                <Text style={[styles.specValue, {color: drone.certification_status === 'approved' ? theme.success : theme.warning}]}>{drone.certification_status === 'approved' ? '已通过' : (drone.certification_status === 'pending' ? '审核中' : '未提交')}</Text>
+                <Text style={styles.specLabel}>基础资质</Text>
+              </View>
+              <View style={styles.specItem}>
+                <Text style={[styles.specValue, {color: drone.uom_verified === 'approved' ? theme.success : theme.warning}]}>{drone.uom_verified === 'approved' ? '已通过' : (drone.uom_verified === 'pending' ? '审核中' : '未提交')}</Text>
+                <Text style={styles.specLabel}>UOM 认证</Text>
+              </View>
+              <View style={styles.specItem}>
+                <Text style={[styles.specValue, {color: drone.insurance_verified === 'approved' ? theme.success : theme.warning}]}>{drone.insurance_verified === 'approved' ? '已通过' : (drone.insurance_verified === 'pending' ? '审核中' : '未提交')}</Text>
+                <Text style={styles.specLabel}>保险认证</Text>
+              </View>
+              <View style={styles.specItem}>
+                <Text style={[styles.specValue, {color: drone.airworthiness_verified === 'approved' ? theme.success : theme.warning}]}>{drone.airworthiness_verified === 'approved' ? '已通过' : (drone.airworthiness_verified === 'pending' ? '审核中' : '未提交')}</Text>
+                <Text style={styles.specLabel}>适航认证</Text>
+              </View>
+            </View>
+            <View style={styles.progressSummaryCard}>
+              <Text style={styles.progressSummaryValue}>{approvedCount}/4</Text>
+              <Text style={styles.progressSummaryLabel}>当前已通过项</Text>
+            </View>
+            <TouchableOpacity style={[styles.contactBtn, {marginTop: 4, alignSelf: 'flex-start'}]} onPress={() => navigation.navigate('DroneCertification', {id: drone.id})}>
+              <Text style={styles.contactBtnText}>去管理资质</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Owner Info */}
         {drone.owner && !isOwner && (
           <View style={styles.card}>
@@ -379,6 +415,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   specItem: {alignItems: 'center'},
   specValue: {fontSize: 16, fontWeight: '600', color: theme.text},
   specLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
+  progressHint: {fontSize: 12, lineHeight: 18, color: theme.textSub, marginBottom: 12},
+  progressSummaryCard: {
+    borderRadius: 14,
+    backgroundColor: theme.bgSecondary,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  progressSummaryValue: {fontSize: 20, fontWeight: '800', color: theme.primaryText},
+  progressSummaryLabel: {marginTop: 4, fontSize: 12, color: theme.textSub},
   featureRow: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 4},
   featureTag: {
     backgroundColor: theme.primaryBg, paddingHorizontal: 10, paddingVertical: 4,

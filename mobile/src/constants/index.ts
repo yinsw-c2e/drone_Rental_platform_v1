@@ -27,7 +27,7 @@ const getApiBaseUrl = (): string => {
   }
 
   // 远程测试配置：cpolar 固定域名（无条件优先）
-  const HARDCODED_CPOLAR_URL = 'https://dronerentalplat.cpolar.top/api/v1';
+  const HARDCODED_CPOLAR_URL = 'https://dronerentalplat.cpolar.top/api';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar，使用局域网IP
   
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_URL) {
@@ -40,7 +40,7 @@ const getApiBaseUrl = (): string => {
     // 本地真机测试：使用电脑局域网IP（手机和电脑在同一WiFi）
     const LOCAL_NETWORK_IP = '192.168.3.97';
     if (LOCAL_NETWORK_IP) {
-      const localUrl = `http://${LOCAL_NETWORK_IP}:8080/api/v1`;
+      const localUrl = `http://${LOCAL_NETWORK_IP}:8080/api`;
       console.log('[Config] Using local network IP for real device testing:', localUrl);
       return localUrl;
     }
@@ -48,14 +48,14 @@ const getApiBaseUrl = (): string => {
     // Android模拟器使用10.0.2.2访问宿主机localhost
     // iOS模拟器和Web直接使用localhost
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-    const devUrl = `http://${devHost}:8080/api/v1`;
+    const devUrl = `http://${devHost}:8080/api`;
     console.log('[Config] Using DEV default:', devUrl);
     return devUrl;
   }
 
   // 生产环境默认地址
   console.log('[Config] Using production default');
-  return 'https://api.wurenji.com/api/v1';
+  return 'https://api.wurenji.com/api';
 };
 
 const switchApiVersion = (baseUrl: string, version: 'v1' | 'v2'): string => {
@@ -113,6 +113,7 @@ const getWsBaseUrl = (): string => {
 
 // 导出配置常量
 export const API_BASE_URL = getApiBaseUrl();
+export const API_ROOT_URL = API_BASE_URL.replace(/\/api(?:\/v[12])?$/, '');
 export const API_V1_BASE_URL = switchApiVersion(API_BASE_URL, 'v1');
 export const API_V2_BASE_URL = switchApiVersion(API_BASE_URL, 'v2');
 export const WS_BASE_URL = getWsBaseUrl();
@@ -122,6 +123,7 @@ export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 console.log('='.repeat(60));
 console.log('📱 APP Configuration Loaded:');
 console.log('API_BASE_URL:', API_BASE_URL);
+console.log('API_ROOT_URL:', API_ROOT_URL);
 console.log('API_V1_BASE_URL:', API_V1_BASE_URL);
 console.log('API_V2_BASE_URL:', API_V2_BASE_URL);
 console.log('WS_BASE_URL:', WS_BASE_URL);

@@ -1,7 +1,9 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -41,43 +43,85 @@ func NewClientService(
 }
 
 type ClientProfileUpdateInput struct {
-	ClientType          *string `json:"client_type"`
-	CompanyName         *string `json:"company_name"`
-	BusinessLicenseNo   *string `json:"business_license_no"`
-	BusinessLicenseDoc  *string `json:"business_license_doc"`
-	LegalRepresentative *string `json:"legal_representative"`
-	ContactPerson       *string `json:"contact_person"`
-	ContactPhone        *string `json:"contact_phone"`
-	ContactEmail        *string `json:"contact_email"`
-	DefaultContactName  *string `json:"default_contact_name"`
-	DefaultContactPhone *string `json:"default_contact_phone"`
-	PreferredCity       *string `json:"preferred_city"`
-	Remark              *string `json:"remark"`
+	ClientType             *string   `json:"client_type"`
+	CompanyName            *string   `json:"company_name"`
+	BusinessLicenseNo      *string   `json:"business_license_no"`
+	BusinessLicenseDoc     *string   `json:"business_license_doc"`
+	LegalRepresentative    *string   `json:"legal_representative"`
+	ContactPerson          *string   `json:"contact_person"`
+	ContactPhone           *string   `json:"contact_phone"`
+	ContactEmail           *string   `json:"contact_email"`
+	PreferredCargoTypes    *[]string `json:"preferred_cargo_types"`
+	DefaultPickupAddress   *string   `json:"default_pickup_address"`
+	DefaultDeliveryAddress *string   `json:"default_delivery_address"`
+	DefaultContactName     *string   `json:"default_contact_name"`
+	DefaultContactPhone    *string   `json:"default_contact_phone"`
+	PreferredCity          *string   `json:"preferred_city"`
+	Remark                 *string   `json:"remark"`
 }
 
 type ClientProfileView struct {
-	ID                  int64      `json:"id"`
-	UserID              int64      `json:"user_id"`
-	ClientType          string     `json:"client_type"`
-	CompanyName         string     `json:"company_name,omitempty"`
-	BusinessLicenseNo   string     `json:"business_license_no,omitempty"`
-	BusinessLicenseDoc  string     `json:"business_license_doc,omitempty"`
-	LegalRepresentative string     `json:"legal_representative,omitempty"`
-	ContactPerson       string     `json:"contact_person,omitempty"`
-	ContactPhone        string     `json:"contact_phone,omitempty"`
-	ContactEmail        string     `json:"contact_email,omitempty"`
-	DefaultContactName  string     `json:"default_contact_name,omitempty"`
-	DefaultContactPhone string     `json:"default_contact_phone,omitempty"`
-	PreferredCity       string     `json:"preferred_city,omitempty"`
-	Remark              string     `json:"remark,omitempty"`
-	Status              string     `json:"status"`
-	VerificationStatus  string     `json:"verification_status"`
-	EnterpriseVerified  string     `json:"enterprise_verified"`
-	CreditCheckStatus   string     `json:"credit_check_status"`
-	PlatformCreditScore int        `json:"platform_credit_score"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	VerifiedAt          *time.Time `json:"verified_at,omitempty"`
+	ID                         int64                  `json:"id"`
+	UserID                     int64                  `json:"user_id"`
+	ClientType                 string                 `json:"client_type"`
+	CompanyName                string                 `json:"company_name,omitempty"`
+	BusinessLicenseNo          string                 `json:"business_license_no,omitempty"`
+	BusinessLicenseDoc         string                 `json:"business_license_doc,omitempty"`
+	LegalRepresentative        string                 `json:"legal_representative,omitempty"`
+	ContactPerson              string                 `json:"contact_person,omitempty"`
+	ContactPhone               string                 `json:"contact_phone,omitempty"`
+	ContactEmail               string                 `json:"contact_email,omitempty"`
+	CreditScore                int                    `json:"credit_score"`
+	DefaultContactName         string                 `json:"default_contact_name,omitempty"`
+	DefaultContactPhone        string                 `json:"default_contact_phone,omitempty"`
+	PreferredCargoTypes        []string               `json:"preferred_cargo_types,omitempty"`
+	DefaultPickupAddress       string                 `json:"default_pickup_address,omitempty"`
+	DefaultDeliveryAddress     string                 `json:"default_delivery_address,omitempty"`
+	PreferredCity              string                 `json:"preferred_city,omitempty"`
+	Remark                     string                 `json:"remark,omitempty"`
+	TotalOrders                int                    `json:"total_orders"`
+	CompletedOrders            int                    `json:"completed_orders"`
+	CancelledOrders            int                    `json:"cancelled_orders"`
+	TotalSpending              int64                  `json:"total_spending"`
+	AverageRating              float64                `json:"average_rating"`
+	Status                     string                 `json:"status"`
+	VerificationStatus         string                 `json:"verification_status"`
+	ClientVerificationStatus   string                 `json:"client_verification_status,omitempty"`
+	IdentityVerificationStatus string                 `json:"identity_verification_status"`
+	VerificationNote           string                 `json:"verification_note,omitempty"`
+	EnterpriseVerified         string                 `json:"enterprise_verified"`
+	CreditCheckStatus          string                 `json:"credit_check_status"`
+	PlatformCreditScore        int                    `json:"platform_credit_score"`
+	Eligibility                *ClientEligibilityView `json:"eligibility,omitempty"`
+	CreatedAt                  time.Time              `json:"created_at"`
+	UpdatedAt                  time.Time              `json:"updated_at"`
+	VerifiedAt                 *time.Time             `json:"verified_at,omitempty"`
+}
+
+const minClientPlatformCreditScore = 300
+
+const (
+	clientEligibilityActionPublishDemand     = "publish_demand"
+	clientEligibilityActionCreateDirectOrder = "create_direct_order"
+	clientEligibilityActionSelectProvider    = "select_provider"
+)
+
+type ClientEligibilityBlocker struct {
+	Code            string `json:"code"`
+	Message         string `json:"message"`
+	SuggestedAction string `json:"suggested_action,omitempty"`
+}
+
+type ClientEligibilityView struct {
+	Eligible                  bool                       `json:"eligible"`
+	CanPublishDemand          bool                       `json:"can_publish_demand"`
+	CanCreateDirectOrder      bool                       `json:"can_create_direct_order"`
+	AccountActive             bool                       `json:"account_active"`
+	IdentityVerified          bool                       `json:"identity_verified"`
+	CreditQualified           bool                       `json:"credit_qualified"`
+	EnterpriseUpgradeOptional bool                       `json:"enterprise_upgrade_optional"`
+	Summary                   string                     `json:"summary"`
+	Blockers                  []ClientEligibilityBlocker `json:"blockers,omitempty"`
 }
 
 type SupplyMarketQuery struct {
@@ -242,13 +286,29 @@ func (s *ClientService) GetCurrentProfile(userID int64) (*ClientProfileView, err
 	if err := s.ensureClientRoleProfile(userID); err != nil {
 		return nil, err
 	}
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, errors.New("用户不存在")
+	}
 
 	roleProfile, err := s.roleProfileRepo.GetClientProfileByUserID(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildClientProfileView(client, roleProfile), nil
+	return buildClientProfileView(client, roleProfile, user), nil
+}
+
+func (s *ClientService) GetCurrentEligibility(userID int64) (*ClientEligibilityView, error) {
+	client, err := s.ensureDefaultClient(userID)
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, errors.New("用户不存在")
+	}
+	return buildClientEligibilityView(client, user), nil
 }
 
 // GetByID 根据ID获取客户
@@ -310,11 +370,15 @@ func (s *ClientService) UpdateCurrentProfile(userID int64, input *ClientProfileU
 		if err != nil {
 			return err
 		}
+		user, err := s.userRepo.GetByID(userID)
+		if err != nil {
+			return errors.New("用户不存在")
+		}
 		roleProfile, err := roleRepo.GetClientProfileByUserID(userID)
 		if err != nil {
 			return err
 		}
-		updatedView = buildClientProfileView(updatedClient, roleProfile)
+		updatedView = buildClientProfileView(updatedClient, roleProfile, user)
 		return nil
 	})
 	if err != nil {
@@ -455,30 +519,46 @@ func (s *ClientService) GetCreditHistory(clientID int64, limit int) ([]model.Cli
 	return s.clientRepo.GetCreditChecksByClientID(clientID, limit)
 }
 
-func buildClientProfileView(client *model.Client, roleProfile *model.ClientProfile) *ClientProfileView {
+func buildClientProfileView(client *model.Client, roleProfile *model.ClientProfile, user *model.User) *ClientProfileView {
 	if client == nil {
 		return nil
 	}
 
+	identityStatus := resolveClientIdentityVerificationStatus(client, user)
+	eligibility := buildClientEligibilityView(client, user)
+
 	view := &ClientProfileView{
-		ID:                  client.ID,
-		UserID:              client.UserID,
-		ClientType:          client.ClientType,
-		CompanyName:         client.CompanyName,
-		BusinessLicenseNo:   client.BusinessLicenseNo,
-		BusinessLicenseDoc:  client.BusinessLicenseDoc,
-		LegalRepresentative: client.LegalRepresentative,
-		ContactPerson:       client.ContactPerson,
-		ContactPhone:        client.ContactPhone,
-		ContactEmail:        client.ContactEmail,
-		Status:              client.Status,
-		VerificationStatus:  client.VerificationStatus,
-		EnterpriseVerified:  client.EnterpriseVerified,
-		CreditCheckStatus:   client.CreditCheckStatus,
-		PlatformCreditScore: client.PlatformCreditScore,
-		CreatedAt:           client.CreatedAt,
-		UpdatedAt:           client.UpdatedAt,
-		VerifiedAt:          client.VerifiedAt,
+		ID:                         client.ID,
+		UserID:                     client.UserID,
+		ClientType:                 client.ClientType,
+		CompanyName:                client.CompanyName,
+		BusinessLicenseNo:          client.BusinessLicenseNo,
+		BusinessLicenseDoc:         client.BusinessLicenseDoc,
+		LegalRepresentative:        client.LegalRepresentative,
+		ContactPerson:              client.ContactPerson,
+		ContactPhone:               client.ContactPhone,
+		ContactEmail:               client.ContactEmail,
+		CreditScore:                client.CreditScore,
+		PreferredCargoTypes:        decodeClientStringSlice(client.PreferredCargoTypes),
+		DefaultPickupAddress:       client.DefaultPickupAddress,
+		DefaultDeliveryAddress:     client.DefaultDeliveryAddress,
+		TotalOrders:                client.TotalOrders,
+		CompletedOrders:            client.CompletedOrders,
+		CancelledOrders:            client.CancelledOrders,
+		TotalSpending:              client.TotalSpending,
+		AverageRating:              client.AverageRating,
+		Status:                     client.Status,
+		VerificationStatus:         identityStatus,
+		ClientVerificationStatus:   client.VerificationStatus,
+		IdentityVerificationStatus: identityStatus,
+		VerificationNote:           client.VerificationNote,
+		EnterpriseVerified:         client.EnterpriseVerified,
+		CreditCheckStatus:          client.CreditCheckStatus,
+		PlatformCreditScore:        client.PlatformCreditScore,
+		Eligibility:                eligibility,
+		CreatedAt:                  client.CreatedAt,
+		UpdatedAt:                  client.UpdatedAt,
+		VerifiedAt:                 client.VerifiedAt,
 	}
 
 	if roleProfile != nil {
@@ -519,6 +599,17 @@ func buildClientProfileUpdates(input *ClientProfileUpdateInput) map[string]inter
 	}
 	if input.ContactEmail != nil {
 		updates["contact_email"] = *input.ContactEmail
+	}
+	if input.PreferredCargoTypes != nil {
+		if encoded, err := json.Marshal(*input.PreferredCargoTypes); err == nil {
+			updates["preferred_cargo_types"] = model.JSON(encoded)
+		}
+	}
+	if input.DefaultPickupAddress != nil {
+		updates["default_pickup_address"] = *input.DefaultPickupAddress
+	}
+	if input.DefaultDeliveryAddress != nil {
+		updates["default_delivery_address"] = *input.DefaultDeliveryAddress
 	}
 	return updates
 }
@@ -750,20 +841,17 @@ func (s *ClientService) CanPlaceOrder(clientID int64) (bool, string) {
 	if err != nil {
 		return false, "客户档案不存在"
 	}
-
-	if client.Status != "active" {
-		return false, "账户状态异常"
+	eligibility, err := s.GetCurrentEligibility(client.UserID)
+	if err != nil {
+		return false, err.Error()
 	}
-
-	if client.VerificationStatus != "verified" {
-		return false, "请先完成实名认证"
+	if eligibility.CanCreateDirectOrder {
+		return true, ""
 	}
-
-	if client.PlatformCreditScore < 300 {
-		return false, "信用分过低，暂时无法下单"
+	if blocker := firstClientEligibilityBlocker(eligibility); blocker != nil {
+		return false, blocker.Message
 	}
-
-	return true, ""
+	return false, "当前客户资格未就绪"
 }
 
 // ==================== 统计更新 ====================
@@ -781,4 +869,146 @@ func (s *ClientService) RecordOrderCancellation(clientID int64) error {
 // UpdateRating 更新评分
 func (s *ClientService) UpdateRating(clientID int64, rating float64) error {
 	return s.clientRepo.UpdateAverageRating(clientID, rating)
+}
+
+func (s *ClientService) requireCurrentEligibility(userID int64, action string) (*ClientEligibilityView, error) {
+	eligibility, err := s.GetCurrentEligibility(userID)
+	if err != nil {
+		return nil, err
+	}
+	if isClientEligibilityActionAllowed(eligibility, action) {
+		return eligibility, nil
+	}
+	if blocker := firstClientEligibilityBlocker(eligibility); blocker != nil {
+		return eligibility, errors.New(blocker.Message)
+	}
+	return eligibility, errors.New("当前客户资格未就绪")
+}
+
+func buildClientEligibilityView(client *model.Client, user *model.User) *ClientEligibilityView {
+	if client == nil {
+		return nil
+	}
+
+	userStatus := "active"
+	if user != nil && strings.TrimSpace(user.Status) != "" {
+		userStatus = strings.TrimSpace(strings.ToLower(user.Status))
+	}
+
+	accountActive := client.Status == "active" && userStatus == "active"
+	identityStatus := resolveClientIdentityVerificationStatus(client, user)
+	identityVerified := identityStatus == "approved"
+	creditQualified := client.PlatformCreditScore >= minClientPlatformCreditScore
+
+	view := &ClientEligibilityView{
+		AccountActive:             accountActive,
+		IdentityVerified:          identityVerified,
+		CreditQualified:           creditQualified,
+		EnterpriseUpgradeOptional: true,
+	}
+
+	if !accountActive {
+		view.Blockers = append(view.Blockers, ClientEligibilityBlocker{
+			Code:            "account_inactive",
+			Message:         "账号状态异常，暂时无法发布需求或直达下单",
+			SuggestedAction: "contact_support",
+		})
+	}
+	if !identityVerified {
+		view.Blockers = append(view.Blockers, ClientEligibilityBlocker{
+			Code:            "identity_verification_required",
+			Message:         "请先完成实名认证后再发布需求或直达下单",
+			SuggestedAction: "verify_identity",
+		})
+	}
+	if !creditQualified {
+		view.Blockers = append(view.Blockers, ClientEligibilityBlocker{
+			Code:            "low_platform_credit",
+			Message:         "平台信用分过低，暂时无法发布需求或直达下单",
+			SuggestedAction: "repair_credit",
+		})
+	}
+
+	view.CanPublishDemand = len(view.Blockers) == 0
+	view.CanCreateDirectOrder = len(view.Blockers) == 0
+	view.Eligible = view.CanPublishDemand && view.CanCreateDirectOrder
+	view.Summary = buildClientEligibilitySummary(view)
+
+	return view
+}
+
+func buildClientEligibilitySummary(view *ClientEligibilityView) string {
+	if view == nil {
+		return ""
+	}
+	if view.Eligible {
+		return "个人实名认证通过后，可直接发布需求与直达下单；企业升级仅在需要企业主体出单时再补充。"
+	}
+	if blocker := firstClientEligibilityBlocker(view); blocker != nil {
+		switch blocker.Code {
+		case "identity_verification_required":
+			return "完成实名认证后即可直接发布需求与直达下单，企业升级不是当前主链路的默认前置条件。"
+		case "low_platform_credit":
+			return "默认个人客户档案已开通，但当前需要先恢复平台信用分后再继续下单或发需求。"
+		case "account_inactive":
+			return "客户档案已创建，但账号状态异常，暂时无法继续下单或发需求。"
+		}
+	}
+	return "默认个人客户档案已开通，企业升级不是当前主链路的默认前置条件。"
+}
+
+func firstClientEligibilityBlocker(view *ClientEligibilityView) *ClientEligibilityBlocker {
+	if view == nil || len(view.Blockers) == 0 {
+		return nil
+	}
+	return &view.Blockers[0]
+}
+
+func isClientEligibilityActionAllowed(view *ClientEligibilityView, action string) bool {
+	if view == nil {
+		return false
+	}
+	switch action {
+	case clientEligibilityActionPublishDemand:
+		return view.CanPublishDemand
+	case clientEligibilityActionCreateDirectOrder, clientEligibilityActionSelectProvider:
+		return view.CanCreateDirectOrder
+	default:
+		return view.Eligible
+	}
+}
+
+func resolveClientIdentityVerificationStatus(client *model.Client, user *model.User) string {
+	if user != nil {
+		switch strings.ToLower(strings.TrimSpace(user.IDVerified)) {
+		case "approved":
+			return "approved"
+		case "pending":
+			return "pending"
+		case "rejected":
+			return "rejected"
+		}
+	}
+	if client != nil {
+		switch strings.ToLower(strings.TrimSpace(client.VerificationStatus)) {
+		case "verified", "approved":
+			return "approved"
+		case "pending":
+			return "pending"
+		case "rejected":
+			return "rejected"
+		}
+	}
+	return "unverified"
+}
+
+func decodeClientStringSlice(raw model.JSON) []string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var items []string
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil
+	}
+	return items
 }

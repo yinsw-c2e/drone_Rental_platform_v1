@@ -116,6 +116,8 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 	if order == nil {
 		return
 	}
+	providerUserID := orderProviderUserID(order)
+	clientRecipients := orderClientReceivers(order)
 	s.notifyUsers(orderClientReceivers(order), "direct_order_confirmed", "直达订单已确认",
 		fmt.Sprintf("订单“%s”已由机主确认，请尽快完成支付。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
@@ -126,6 +128,18 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 			"business_type": "order",
 		},
 	)
+	for _, clientUserID := range clientRecipients {
+		s.notifyConversation(providerUserID, clientUserID, "direct_order_confirmed", "直达订单已确认",
+			fmt.Sprintf("订单“%s”已由机主确认，请尽快完成支付。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+			map[string]interface{}{
+				"order_id":      order.ID,
+				"order_no":      order.OrderNo,
+				"order_source":  order.OrderSource,
+				"status":        order.Status,
+				"business_type": "order",
+			},
+		)
+	}
 }
 
 func (s *EventService) NotifyDirectOrderRejected(order *model.Order) {
@@ -149,8 +163,20 @@ func (s *EventService) NotifyOrderPaid(order *model.Order) {
 	if order == nil {
 		return
 	}
+	clientUserID := orderPrimaryClientUserID(order)
+	providerUserID := orderProviderUserID(order)
 	recipients := uniqueUserIDs(order.ProviderUserID, order.OwnerID)
 	s.notifyUsers(recipients, "order_paid", "订单已支付",
+		fmt.Sprintf("订单“%s”已完成支付，请准备执行。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+		map[string]interface{}{
+			"order_id":      order.ID,
+			"order_no":      order.OrderNo,
+			"status":        order.Status,
+			"order_source":  order.OrderSource,
+			"business_type": "order",
+		},
+	)
+	s.notifyConversation(clientUserID, providerUserID, "order_paid", "订单已支付",
 		fmt.Sprintf("订单“%s”已完成支付，请准备执行。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":      order.ID,
@@ -177,6 +203,40 @@ func (s *EventService) NotifyOrderStatusChanged(order *model.Order, eventType, t
 		"order_source":  order.OrderSource,
 		"business_type": "order",
 	})
+
+	providerUserID := orderProviderUserID(order)
+	clientUserIDs := orderClientReceivers(order)
+	pilotUserID := orderExecutorUserID(order)
+	payload := map[string]interface{}{
+		"order_id":      order.ID,
+		"order_no":      order.OrderNo,
+		"status":        order.Status,
+		"order_source":  order.OrderSource,
+		"business_type": "order",
+	}
+	switch eventType {
+	case "order_preparing", "order_in_transit", "order_delivered":
+		for _, clientUserID := range clientUserIDs {
+			s.notifyConversation(providerUserID, clientUserID, eventType, title, content, payload)
+		}
+		if pilotUserID > 0 && providerUserID > 0 && pilotUserID != providerUserID {
+			s.notifyConversation(pilotUserID, providerUserID, eventType, title, content, payload)
+		}
+	case "order_completed":
+		for _, clientUserID := range clientUserIDs {
+			s.notifyConversation(clientUserID, providerUserID, eventType, title, content, payload)
+		}
+	case "order_cancelled":
+		if order.CancelBy == "client" {
+			for _, clientUserID := range clientUserIDs {
+				s.notifyConversation(clientUserID, providerUserID, eventType, title, content, payload)
+			}
+		} else {
+			for _, clientUserID := range clientUserIDs {
+				s.notifyConversation(providerUserID, clientUserID, eventType, title, content, payload)
+			}
+		}
+	}
 }
 
 func (s *EventService) NotifyDispatchCreated(task *model.FormalDispatchTask, order *model.Order) {
@@ -190,6 +250,25 @@ func (s *EventService) NotifyDispatchCreated(task *model.FormalDispatchTask, ord
 		orderID = order.ID
 	}
 	s.notifyUsers([]int64{task.TargetPilotUserID}, "dispatch_created", "收到正式派单",
+		fmt.Sprintf("您收到正式派单 %s，请尽快响应。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
+		map[string]interface{}{
+			"dispatch_task_id": task.ID,
+			"dispatch_no":      task.DispatchNo,
+			"order_id":         orderID,
+			"order_no":         orderNo,
+			"dispatch_source":  task.DispatchSource,
+			"status":           task.Status,
+			"business_type":    "dispatch",
+		},
+	)
+	providerUserID := int64(0)
+	if order != nil {
+		providerUserID = orderProviderUserID(order)
+	}
+	if providerUserID == 0 {
+		providerUserID = task.ProviderUserID
+	}
+	s.notifyConversation(providerUserID, task.TargetPilotUserID, "dispatch_created", "收到正式派单",
 		fmt.Sprintf("您收到正式派单 %s，请尽快响应。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
 		map[string]interface{}{
 			"dispatch_task_id": task.ID,
@@ -223,6 +302,31 @@ func (s *EventService) NotifyDispatchAccepted(task *model.FormalDispatchTask, or
 			"business_type":    "dispatch",
 		},
 	)
+	providerUserID := orderProviderUserID(order)
+	s.notifyConversation(task.TargetPilotUserID, providerUserID, "dispatch_accepted", "正式派单已接受",
+		fmt.Sprintf("正式派单 %s 已被飞手接受。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
+		map[string]interface{}{
+			"dispatch_task_id": task.ID,
+			"dispatch_no":      task.DispatchNo,
+			"order_id":         task.OrderID,
+			"order_no":         orderNoOrEmpty(order),
+			"status":           task.Status,
+			"business_type":    "dispatch",
+		},
+	)
+	for _, clientUserID := range orderClientReceivers(order) {
+		s.notifyConversation(providerUserID, clientUserID, "dispatch_assigned", "订单已安排执行飞手",
+			fmt.Sprintf("订单“%s”已安排飞手执行，您可以在订单详情跟进进度。", fallbackTitle(orderTitleOrEmpty(order), orderNoOrEmpty(order), "订单")),
+			map[string]interface{}{
+				"dispatch_task_id": task.ID,
+				"dispatch_no":      task.DispatchNo,
+				"order_id":         task.OrderID,
+				"order_no":         orderNoOrEmpty(order),
+				"status":           task.Status,
+				"business_type":    "dispatch",
+			},
+		)
+	}
 }
 
 func (s *EventService) NotifyDispatchReassigned(order *model.Order, newTask *model.FormalDispatchTask, reason string) {
@@ -381,6 +485,27 @@ func (s *EventService) notifyUsers(userIDs []int64, eventType, title, content st
 	}
 }
 
+func (s *EventService) notifyConversation(senderID, receiverID int64, eventType, title, content string, extras map[string]interface{}) {
+	if s == nil || s.messageService == nil {
+		return
+	}
+	if senderID <= 0 || receiverID <= 0 || senderID == receiverID {
+		return
+	}
+
+	payload := cloneExtras(extras)
+	payload["event_type"] = eventType
+	payload["title"] = title
+	if _, err := s.messageService.SendConversationSystemMessage(senderID, receiverID, title, content, payload); err != nil && s.logger != nil {
+		s.logger.Warn("send conversation system message failed",
+			zap.Int64("sender_id", senderID),
+			zap.Int64("receiver_id", receiverID),
+			zap.String("event_type", eventType),
+			zap.Error(err),
+		)
+	}
+}
+
 func uniqueUserIDs(ids ...int64) []int64 {
 	seen := make(map[int64]struct{}, len(ids))
 	result := make([]int64, 0, len(ids))
@@ -436,9 +561,49 @@ func orderClientReceivers(order *model.Order) []int64 {
 	return uniqueUserIDs(order.ClientUserID, order.RenterID)
 }
 
+func orderPrimaryClientUserID(order *model.Order) int64 {
+	if order == nil {
+		return 0
+	}
+	if order.ClientUserID > 0 {
+		return order.ClientUserID
+	}
+	return order.RenterID
+}
+
+func orderProviderUserID(order *model.Order) int64 {
+	if order == nil {
+		return 0
+	}
+	if order.ProviderUserID > 0 {
+		return order.ProviderUserID
+	}
+	if order.OwnerID > 0 {
+		return order.OwnerID
+	}
+	return order.DroneOwnerUserID
+}
+
+func orderExecutorUserID(order *model.Order) int64 {
+	if order == nil {
+		return 0
+	}
+	if order.ExecutorPilotUserID > 0 {
+		return order.ExecutorPilotUserID
+	}
+	return orderProviderUserID(order)
+}
+
 func orderNoOrEmpty(order *model.Order) string {
 	if order == nil {
 		return ""
 	}
 	return order.OrderNo
+}
+
+func orderTitleOrEmpty(order *model.Order) string {
+	if order == nil {
+		return ""
+	}
+	return order.Title
 }

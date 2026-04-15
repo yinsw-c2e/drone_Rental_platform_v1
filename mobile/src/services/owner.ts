@@ -1,6 +1,7 @@
 import {
   OwnerProfile,
   OwnerPilotBindingSummary,
+  OwnerWorkbenchView,
   SupplyDetail,
   DemandQuoteSummary,
   SupplySummary,
@@ -34,6 +35,9 @@ export type OwnerSupplyPayload = {
 export const ownerService = {
   getProfile: () =>
     apiV2.get<any, V2ApiResponse<OwnerProfile>>('/owner/profile'),
+
+  getWorkbench: () =>
+    apiV2.get<any, V2ApiResponse<OwnerWorkbenchView>>('/owner/workbench'),
 
   updateProfile: (payload: {service_city?: string; contact_phone?: string; intro?: string}) =>
     apiV2.put<any, V2ApiResponse<OwnerProfile>>('/owner/profile', payload),

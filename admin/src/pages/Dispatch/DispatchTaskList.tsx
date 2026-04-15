@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Descriptions, Input, Modal, Row, Select, Space, Table, Tag } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, Card, Col, Descriptions, Divider, Input, Modal, Row, Select, Space, Statistic, Table, Tag, Timeline, message } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/api';
@@ -32,6 +32,19 @@ const STATUS_MAP: Record<string, { text: string; color: string }> = {
   timeout: { text: '已超时', color: 'red' },
 };
 
+const formatTime = (value?: string) => value?.slice(0, 19).replace('T', ' ') || '-';
+const downloadCsv = (filename: string, headers: string[], rows: Array<Array<string | number | undefined>>) => {
+  const escapeCell = (value: string | number | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], {type: 'text/csv;charset=utf-8;'});
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};
+
 const DispatchTaskList: React.FC = () => {
   const [items, setItems] = useState<DispatchTaskItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -61,6 +74,36 @@ const DispatchTaskList: React.FC = () => {
     fetchList(page);
   }, [page, statusFilter]);
 
+  const summary = useMemo(() => items.reduce(
+    (acc, item) => {
+      acc.pendingCount += ['pending_response', 'timeout'].includes(item.status) ? 1 : 0;
+      acc.executingCount += ['accepted', 'executing'].includes(item.status) ? 1 : 0;
+      acc.closedCount += ['finished', 'rejected', 'cancelled'].includes(item.status) ? 1 : 0;
+      acc.retryCount += Number(item.retry_count || 0);
+      return acc;
+    },
+    {pendingCount: 0, executingCount: 0, closedCount: 0, retryCount: 0},
+  ), [items]);
+
+  const handleExport = () => {
+    downloadCsv(
+      `dispatch-export-${Date.now()}.csv`,
+      ['派单编号', '订单编号', '状态', '承接方', '目标飞手', '来源', '重派次数', '发起时间', '响应时间'],
+      items.map(item => [
+        item.dispatch_no,
+        item.order?.order_no || item.order_id,
+        STATUS_MAP[item.status]?.text || item.status,
+        item.provider?.nickname || item.provider_user_id,
+        item.target_pilot?.nickname || item.target_pilot_user_id,
+        item.dispatch_source,
+        item.retry_count,
+        formatTime(item.sent_at),
+        formatTime(item.responded_at),
+      ]),
+    );
+    message.success(`已导出 ${items.length} 条派单记录`);
+  };
+
   const columns: ColumnsType<DispatchTaskItem> = [
     { title: '派单编号', dataIndex: 'dispatch_no', width: 190 },
     { title: '订单编号', width: 190, render: (_, record) => record.order?.order_no || '-' },
@@ -85,6 +128,20 @@ const DispatchTaskList: React.FC = () => {
   return (
     <div>
       <h2>正式派单管理</h2>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} md={6}>
+          <Card><Statistic title="当前列表" value={items.length} suffix={`/ ${total || 0}`} /></Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card><Statistic title="待飞手响应" value={summary.pendingCount} /></Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card><Statistic title="执行中派单" value={summary.executingCount} /></Card>
+        </Col>
+        <Col xs={24} md={6}>
+          <Card><Statistic title="累计重派次数" value={summary.retryCount} /></Card>
+        </Col>
+      </Row>
       <Card size="small" style={{ marginBottom: 16 }}>
         <Row gutter={[16, 12]} align="middle">
           <Col>
@@ -99,6 +156,7 @@ const DispatchTaskList: React.FC = () => {
             <Space>
               <Button type="primary" onClick={() => { setPage(1); fetchList(1); }}>搜索</Button>
               <Button onClick={() => { setKeyword(''); setStatusFilter(''); setPage(1); fetchList(1); }}>重置</Button>
+              <Button onClick={handleExport}>导出当前列表</Button>
             </Space>
           </Col>
         </Row>
@@ -106,21 +164,55 @@ const DispatchTaskList: React.FC = () => {
 
       <Table rowKey="id" loading={loading} columns={columns} dataSource={items} scroll={{ x: 1250 }} pagination={{ current: page, total, pageSize: 20, onChange: setPage, showTotal: t => `共 ${t} 条` }} />
 
-      <Modal open={!!detail} title="正式派单详情" footer={null} width={720} onCancel={() => setDetail(null)}>
+      <Modal open={!!detail} title="正式派单详情" footer={null} width={860} onCancel={() => setDetail(null)}>
         {detail ? (
-          <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="派单编号">{detail.dispatch_no}</Descriptions.Item>
-            <Descriptions.Item label="状态">{STATUS_MAP[detail.status]?.text || detail.status}</Descriptions.Item>
-            <Descriptions.Item label="订单编号">{detail.order?.order_no || '-'}</Descriptions.Item>
-            <Descriptions.Item label="订单标题">{detail.order?.title || '-'}</Descriptions.Item>
-            <Descriptions.Item label="承接方">{detail.provider?.nickname || '-'}</Descriptions.Item>
-            <Descriptions.Item label="目标飞手">{detail.target_pilot?.nickname || '-'}</Descriptions.Item>
-            <Descriptions.Item label="派单来源">{detail.dispatch_source || '-'}</Descriptions.Item>
-            <Descriptions.Item label="重派次数">{detail.retry_count || 0}</Descriptions.Item>
-            <Descriptions.Item label="发起时间">{detail.sent_at?.slice(0, 19).replace('T', ' ') || '-'}</Descriptions.Item>
-            <Descriptions.Item label="响应时间">{detail.responded_at?.slice(0, 19).replace('T', ' ') || '-'}</Descriptions.Item>
-            <Descriptions.Item label="派单原因" span={2}>{detail.reason || '-'}</Descriptions.Item>
-          </Descriptions>
+          <>
+            <Space style={{ marginBottom: 12 }} wrap>
+              <Tag color={STATUS_MAP[detail.status]?.color || 'default'}>
+                {STATUS_MAP[detail.status]?.text || detail.status}
+              </Tag>
+              <Tag color="geekblue">{detail.dispatch_source || '-'}</Tag>
+              {detail.retry_count > 0 ? <Tag color="orange">已重派 {detail.retry_count} 次</Tag> : <Tag>首次派发</Tag>}
+            </Space>
+
+            <Row gutter={[16, 16]}>
+              <Col xs={24} md={8}>
+                <Card size="small"><Statistic title="重派次数" value={detail.retry_count || 0} /></Card>
+              </Col>
+              <Col xs={24} md={8}>
+                <Card size="small"><Statistic title="承接方用户ID" value={detail.provider_user_id || 0} /></Card>
+              </Col>
+              <Col xs={24} md={8}>
+                <Card size="small"><Statistic title="目标飞手用户ID" value={detail.target_pilot_user_id || 0} /></Card>
+              </Col>
+            </Row>
+
+            <Divider>派单信息</Divider>
+            <Descriptions column={2} bordered size="small">
+              <Descriptions.Item label="派单编号">{detail.dispatch_no}</Descriptions.Item>
+              <Descriptions.Item label="订单编号">{detail.order?.order_no || '-'}</Descriptions.Item>
+              <Descriptions.Item label="订单标题">{detail.order?.title || '-'}</Descriptions.Item>
+              <Descriptions.Item label="订单状态">{detail.order?.status || '-'}</Descriptions.Item>
+              <Descriptions.Item label="承接方">
+                {detail.provider?.nickname || '-'}
+                {detail.provider?.phone ? ` (${detail.provider.phone})` : ''}
+              </Descriptions.Item>
+              <Descriptions.Item label="目标飞手">
+                {detail.target_pilot?.nickname || '-'}
+                {detail.target_pilot?.phone ? ` (${detail.target_pilot.phone})` : ''}
+              </Descriptions.Item>
+              <Descriptions.Item label="派单原因" span={2}>{detail.reason || '-'}</Descriptions.Item>
+            </Descriptions>
+
+            <Divider>关键流转日志</Divider>
+            <Timeline
+              items={[
+                {color: 'blue', children: `记录创建：${formatTime(detail.created_at)}`},
+                {color: detail.sent_at ? 'gold' : 'gray', children: `正式发起：${formatTime(detail.sent_at)}`},
+                {color: detail.responded_at ? 'green' : 'gray', children: `飞手响应：${formatTime(detail.responded_at)}`},
+              ]}
+            />
+          </>
         ) : null}
       </Modal>
     </div>

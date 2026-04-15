@@ -401,11 +401,43 @@ response `data`:
 
 `GET /api/v2/client/profile`
 
-### 5.2 更新客户档案
+说明：
+
+- 返回客户基础档案、默认地址、常用场景、订单统计，以及嵌入式 `eligibility` 资格视图
+- `verification_status` / `identity_verification_status` 统一表示“用户实名认证状态”
+- `client_verification_status` 保留旧客户档案认证字段，仅作兼容展示，不再作为个人下单/发需求的默认判断依据
+
+### 5.2 获取当前客户资格
+
+`GET /api/v2/client/eligibility`
+
+response `data`:
+
+```json
+{
+  "eligible": true,
+  "can_publish_demand": true,
+  "can_create_direct_order": true,
+  "account_active": true,
+  "identity_verified": true,
+  "credit_qualified": true,
+  "enterprise_upgrade_optional": true,
+  "summary": "个人实名认证通过后，可直接发布需求与直达下单；企业升级仅在需要企业主体出单时再补充。",
+  "blockers": []
+}
+```
+
+阻塞口径：
+
+- 默认只收口 `账号状态`、`实名认证`、`平台信用分`
+- 企业升级不是个人客户主链路的默认前置条件
+- `blockers[].suggested_action=verify_identity` 时，移动端应直接引导去实名认证页
+
+### 5.3 更新客户档案
 
 `PATCH /api/v2/client/profile`
 
-### 5.3 获取供给市场列表
+### 5.4 获取供给市场列表
 
 `GET /api/v2/supplies`
 
@@ -426,7 +458,7 @@ query:
 - 仅返回满足平台重载门槛且 `status=active` 的供给
 - `service_type` 当前固定为 `heavy_cargo_lift_transport`
 
-### 5.4 获取供给详情
+### 5.5 获取供给详情
 
 `GET /api/v2/supplies/{supply_id}`
 
@@ -435,7 +467,7 @@ query:
 - 给客户浏览供给详情
 - 为直达下单页提供供给快照
 
-### 5.5 从供给发起直达下单
+### 5.6 从供给发起直达下单
 
 `POST /api/v2/supplies/{supply_id}/orders`
 
@@ -473,7 +505,12 @@ response `data`:
 }
 ```
 
-### 5.6 创建需求
+资格说明：
+
+- 个人实名认证通过且平台信用分合格时，可直接发起直达下单
+- 企业升级不是此接口的默认前置条件
+
+### 5.7 创建需求
 
 `POST /api/v2/demands`
 
@@ -504,7 +541,12 @@ request:
 }
 ```
 
-### 5.7 更新需求（草稿状态）
+资格说明：
+
+- 当前实现会在创建需求前先校验客户资格；默认只看实名认证、账号状态、平台信用
+- 企业升级、企业资质、复杂货物申报不作为默认阻塞项
+
+### 5.8 更新需求（草稿状态）
 
 `PATCH /api/v2/demands/{demand_id}`
 
@@ -513,7 +555,7 @@ request:
 - 仅 `status=draft` 时可调用
 - 支持部分更新，只传需要修改的字段
 
-### 5.8 发布需求
+### 5.9 发布需求
 
 `POST /api/v2/demands/{demand_id}/publish`
 
@@ -522,8 +564,9 @@ request:
 - 仅 `status=draft` 时可调用
 - 发布后需求进入 `published`，对机主和飞手可见
 - 发布时校验必填字段完整性
+- 同时校验客户资格，口径与 `GET /api/v2/client/eligibility` 一致
 
-### 5.9 取消需求
+### 5.10 取消需求
 
 `POST /api/v2/demands/{demand_id}/cancel`
 
@@ -533,7 +576,7 @@ request:
 - `quoting` 状态取消时，所有未完成的报价自动作废，通知已报价机主
 - 已转单的需求不可取消（应通过订单取消流程处理）
 
-### 5.10 获取我的需求列表
+### 5.11 获取我的需求列表
 
 `GET /api/v2/demands/my`
 
@@ -543,17 +586,17 @@ query:
 - `page`
 - `page_size`
 
-### 5.11 获取需求详情
+### 5.12 获取需求详情
 
 `GET /api/v2/demands/{demand_id}`
 
-### 5.12 获取某需求的报价列表
+### 5.13 获取某需求的报价列表
 
 `GET /api/v2/demands/{demand_id}/quotes`
 
 仅客户本人可看完整报价细节。
 
-### 5.13 选择机主并转订单
+### 5.14 选择机主并转订单
 
 `POST /api/v2/demands/{demand_id}/select-provider`
 
@@ -575,6 +618,11 @@ response `data`:
 }
 ```
 
+资格说明：
+
+- 需求转单与直达下单使用同一套客户资格判断
+- 个人实名认证通过即可继续转单，无需先升级企业客户
+
 ## 6. 机主域接口
 
 ### 6.1 获取机主档案
@@ -584,6 +632,21 @@ response `data`:
 ### 6.2 创建或更新机主档案
 
 `PUT /api/v2/owner/profile`
+
+### 6.2A 获取机主待处理工作台
+
+`GET /api/v2/owner/workbench`
+
+说明：
+
+- 返回机主视角的统一待处理聚合，用于阶段 4 的“待处理线索”入口
+- 聚合四类对象：
+  - `recommended_demands`
+  - `pending_provider_confirmation_orders`
+  - `pending_dispatch_orders`
+  - `draft_supplies`
+- `summary` 会同时返回各分类数量，便于首页和机主中心做单入口提醒
+- 这不是新的业务对象，只是把机主当前需要响应的线索集中展示
 
 ### 6.3 获取我的无人机列表
 
@@ -742,6 +805,19 @@ request:
 
 `GET /api/v2/pilot/profile`
 
+说明：
+
+- 响应中新增 `eligibility`，用于表达阶段 4 的飞手分级准入口径
+- `eligibility.tier` 当前可能为：
+  - `profile_setup`
+  - `candidate_ready`
+  - `verified_offline`
+  - `dispatch_ready`
+  - `needs_resubmission`
+- 低风险链路使用 `eligibility.can_apply_candidate`
+- 正式派单/执行链路使用 `eligibility.can_accept_dispatch` / `eligibility.can_start_execution`
+- `eligibility.recommended_next_step` 和 `eligibility.blockers` 用于前端给出“还缺什么、下一步做什么”的说明
+
 ### 7.2 创建或更新飞手档案
 
 `PUT /api/v2/pilot/profile`
@@ -809,6 +885,8 @@ request:
 
 - 只返回 `allows_pilot_candidate=true` 的公开需求
 - 只返回飞手当前可见的需求摘要
+- 从阶段 4 开始，待审核但已补齐基础执照资料的飞手也可以先浏览并报名候选需求
+- 正式派单与执行仍要求飞手认证通过
 
 ### 7.10 报名候选
 
@@ -878,6 +956,8 @@ query:
 - 执行状态摘要
 - 当前派单摘要
 - 财务摘要
+- 若订单已取消，补充 `cancel_reason / cancel_by`
+- 前端默认应基于该接口渲染“订单主视图”，把执行安排折叠为订单进度的子状态
 
 ### 8.3 机主确认直达订单
 
@@ -915,11 +995,19 @@ request:
 说明：
 
 - 当前支持 `mock / wechat / alipay`
+- 当前开发/测试阶段的正式联调路径是 `mock`
 - `mock` 会在开发测试环境直接回调支付成功，便于联调
+- `wechat / alipay` 当前只创建待回调支付单作为占位，不会发起真实扣款
+- 返回体会额外包含 `payment_flow`，用于说明当前渠道是否会自动完成支付，以及前端应给出的提示文案
 
 ### 8.6 取消订单
 
 `POST /api/v2/orders/{order_id}/cancel`
+
+说明：
+
+- 支持可选 `reason`
+- 已支付订单取消后会自动生成退款记录，前端应在订单详情中展示取消原因、退款状态和预计到账时间
 
 ### 8.7 执行人上报"开始准备"
 
@@ -963,7 +1051,19 @@ request:
 
 `GET /api/v2/orders/{order_id}/monitor`
 
-### 8.12 机主发起派单
+### 8.12 获取订单统一时间线
+
+`GET /api/v2/orders/{order_id}/timeline`
+
+说明：
+
+- 聚合返回 `order_timeline`、`payment`、`refund`、`dispatch_task`、`flight_record` 等事件源
+- 事件按 `occurred_at` 倒序排列
+- 每条事件包含 `event_type / title / description / status / source_type / source_id / payload`
+- 用于前端统一渲染订单进度，不再分别请求支付、派单、飞行节点后自行拼接
+- 客户侧应优先使用订单统一时间线理解执行过程，而不是暴露独立“派单任务”对象
+
+### 8.13 机主发起派单
 
 `POST /api/v2/orders/{order_id}/dispatch`
 
@@ -983,7 +1083,7 @@ request:
 - `dispatch_mode=bound_pilot` 时，目标飞手必填
 - `dispatch_mode=candidate_pool` / `general_pool` 时，可由系统自动筛选目标飞手
 
-### 8.13 获取正式派单列表
+### 8.14 获取正式派单列表
 
 `GET /api/v2/dispatch-tasks`
 
@@ -1000,11 +1100,11 @@ query:
 - `role=pilot` 返回当前飞手收到的正式派单
 - 只返回正式派单对象，不混旧任务池、需求候选或订单列表
 
-### 8.14 获取派单详情
+### 8.15 获取派单详情
 
 `GET /api/v2/dispatch-tasks/{dispatch_id}`
 
-### 8.15 机主重派
+### 8.16 机主重派
 
 `POST /api/v2/dispatch-tasks/{dispatch_id}/reassign`
 
@@ -1097,9 +1197,21 @@ request:
 
 `GET /api/v2/conversations`
 
+说明：
+
+- 当前只返回用户与其他角色的有效会话，不返回 `system-*` 系统通知会话
+- 关键业务状态变更会自动写入关联会话，确保用户在”会话消息”页也能看到订单推进提示
+- 返回字段沿用 `conversation_id / last_message / last_time / last_type / peer_id / unread_count`
+
 ### 11.4 获取会话消息
 
 `GET /api/v2/conversations/{conversation_id}/messages`
+
+说明：
+
+- 仅会话参与方可读取
+- 消息列表中可能包含 `message_type=system` 的业务系统消息
+- `extra_data` 中会补充 `event_type / title / business_type / order_id / dispatch_task_id` 等业务上下文
 
 ## 12. 错误码建议
 

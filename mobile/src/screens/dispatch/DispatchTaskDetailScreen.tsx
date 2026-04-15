@@ -70,6 +70,16 @@ const getPartyName = (task?: V2DispatchTaskSummary['provider'] | V2DispatchTaskS
   return fallback;
 };
 
+const getOrderSourceLabel = (orderSource?: string) => {
+  if (orderSource === 'supply_direct') {
+    return '快速下单';
+  }
+  if (orderSource === 'demand_market') {
+    return '任务转单';
+  }
+  return '订单';
+};
+
 function DetailRow({label, value}: {label: string; value?: string}) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
@@ -137,7 +147,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
 
     const actions: ActionButton[] = [
       {
-        label: '查看订单详情',
+        label: '查看关联订单',
         tone: 'ghost',
         onPress: () => navigation.navigate('OrderDetail', {id: order.id, orderId: order.id}),
       },
@@ -289,7 +299,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>订单上下文</Text>
           <DetailRow label="订单号" value={orderData?.order_no} />
-          <DetailRow label="订单来源" value={orderData?.order_source === 'supply_direct' ? '供给直达下单' : '需求市场成单'} />
+          <DetailRow label="订单来源" value={getOrderSourceLabel(orderData?.order_source)} />
           <DetailRow label="订单状态" value={getObjectStatusMeta('order', orderData?.status).label} />
           <DetailRow label="执行模式" value={orderData?.execution_mode || '-'} />
           <DetailRow label="起始地址" value={orderData?.service_address || '-'} />

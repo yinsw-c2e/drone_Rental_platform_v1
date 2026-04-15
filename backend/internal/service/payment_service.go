@@ -1,7 +1,9 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -53,6 +55,11 @@ func (s *PaymentService) SetEventService(eventService *EventService) {
 }
 
 func (s *PaymentService) CreatePayment(orderID, userID int64, method string) (*model.Payment, *payment.PaymentResult, error) {
+	method, err := normalizePaymentMethod(method)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	order, err := s.orderRepo.GetByID(orderID)
 	if err != nil {
 		return nil, nil, errors.New("订单不存在")
@@ -70,7 +77,7 @@ func (s *PaymentService) CreatePayment(orderID, userID int64, method string) (*m
 	amount := order.TotalAmount + order.DepositAmount
 	paymentNo := payment.GeneratePaymentNo()
 
-	result, err := s.provider.CreatePayment(order.OrderNo, amount, order.Title)
+	result, err := buildCreatePaymentResult(method, paymentNo)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -88,7 +95,59 @@ func (s *PaymentService) CreatePayment(orderID, userID int64, method string) (*m
 		return nil, nil, err
 	}
 
+	if s.logger != nil {
+		s.logger.Info("order payment created",
+			zap.Int64("order_id", orderID),
+			zap.Int64("user_id", userID),
+			zap.String("payment_no", paymentNo),
+			zap.String("method", method),
+		)
+	}
+
 	return p, result, nil
+}
+
+func normalizePaymentMethod(method string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(method)) {
+	case "mock":
+		return "mock", nil
+	case "wechat":
+		return "wechat", nil
+	case "alipay":
+		return "alipay", nil
+	default:
+		return "", errors.New("不支持的支付方式")
+	}
+}
+
+func buildCreatePaymentResult(method, paymentNo string) (*payment.PaymentResult, error) {
+	payload := map[string]interface{}{
+		"method":                     method,
+		"payment_no":                 paymentNo,
+		"requires_external_callback": false,
+	}
+
+	switch method {
+	case "mock":
+		payload["mock"] = true
+		payload["auto_complete"] = true
+	case "wechat", "alipay":
+		payload["deferred"] = true
+		payload["auto_complete"] = false
+		payload["requires_external_callback"] = true
+	default:
+		return nil, errors.New("不支持的支付方式")
+	}
+
+	payParamsJSON, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &payment.PaymentResult{
+		PaymentNo: paymentNo,
+		PayParams: string(payParamsJSON),
+	}, nil
 }
 
 func (s *PaymentService) HandlePaymentCallback(paymentNo, thirdPartyNo string) error {

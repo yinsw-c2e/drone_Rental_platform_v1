@@ -29,6 +29,61 @@ import {formatAmountYuan, summarizeFlexibleValue} from '../../utils/supplyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
+const getDemandProgressFocus = (demand: DemandDetail, isOwnDemand: boolean) => {
+  switch (String(demand.status || '').toLowerCase()) {
+    case 'draft':
+      return {
+        eyebrow: '下一步是发布',
+        title: '这还是一份任务草稿',
+        desc: '先把最小成单信息补齐并发布，后续运输细节、附件和说明都还可以继续补充。',
+        eta: '准备好后立即发布',
+      };
+    case 'published':
+    case 'quoting':
+      return isOwnDemand
+        ? {
+            eyebrow: '当前在等机主',
+            title: '正在等待机主提交报价方案',
+            desc: '你只需要关注报价数量和预计响应时间。没有合适方案时，也可以继续补充任务说明。',
+            eta: '通常 24 小时内会有首批响应',
+          }
+        : {
+            eyebrow: '当前可响应',
+            title: '这是一条待报价任务',
+            desc: '如果你能承接，直接提交报价方案即可，后续不会再跳回旧的订单入口。',
+            eta: '建议尽快提交报价',
+          };
+    case 'selected':
+      return {
+        eyebrow: '方案已选定',
+        title: '客户已经选定了承接方案',
+        desc: '系统会继续把任务推进成订单，后续合同、支付和执行都会收口到订单详情页。',
+        eta: '订单生成后会自动通知',
+      };
+    case 'converted_to_order':
+      return {
+        eyebrow: '任务已成交',
+        title: '这条任务已经转为订单',
+        desc: '后续不要再继续围绕任务对象跟进，直接进入订单详情查看支付、执行和签收进度。',
+        eta: '后续进度全部在订单页查看',
+      };
+    case 'cancelled':
+      return {
+        eyebrow: '任务已撤销',
+        title: '这条任务已经结束',
+        desc: '已有报价会同步失效，不会再继续推进撮合和转单。',
+        eta: '无需额外操作',
+      };
+    default:
+      return {
+        eyebrow: '任务进度',
+        title: '这条任务正在推进中',
+        desc: '后续报价、选定和转单都会在当前任务里持续更新。',
+        eta: '请留意新的报价或状态变化',
+      };
+  }
+};
+
 export default function DemandDetailScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
@@ -57,6 +112,11 @@ export default function DemandDetailScreen({route, navigation}: any) {
   const canOperateCandidate = !isOwnDemand && effectiveRoleSummary.has_pilot_role && !!demand?.allows_pilot_candidate;
   const activeCandidate = demand?.my_candidate?.status === 'active';
   const hasOwnQuote = Boolean(demand?.my_quote);
+  const progressFocus = demand ? getDemandProgressFocus(demand, isOwnDemand) : null;
+  const quoteComparisonItems = useMemo(
+    () => [...quotes].sort((left, right) => Number(left.price_amount || 0) - Number(right.price_amount || 0)).slice(0, 3),
+    [quotes],
+  );
 
   const fetchDemand = useCallback(async () => {
     setLoading(true);
@@ -198,12 +258,23 @@ export default function DemandDetailScreen({route, navigation}: any) {
           </Text>
         </View>
 
+        {progressFocus ? (
+          <View style={styles.progressCard}>
+            <Text style={styles.progressEyebrow}>{progressFocus.eyebrow}</Text>
+            <Text style={styles.progressTitle}>{progressFocus.title}</Text>
+            <Text style={styles.progressDesc}>{progressFocus.desc}</Text>
+            <View style={styles.progressEtaPill}>
+              <Text style={styles.progressEtaText}>{progressFocus.eta}</Text>
+            </View>
+          </View>
+        ) : null}
+
         {canEditOrCancel ? (
           <View style={styles.ownerActions}>
             <TouchableOpacity
               style={styles.editBtn}
               onPress={() => navigation.navigate('EditDemand', {demandId: demand.id})}>
-              <Text style={styles.editBtnText}>修改任务</Text>
+              <Text style={styles.editBtnText}>{demand.status === 'draft' ? '继续完善' : '修改任务'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelBtn}
@@ -335,23 +406,56 @@ export default function DemandDetailScreen({route, navigation}: any) {
             ) : quotes.length === 0 ? (
               <Text style={styles.emptyText}>还没有机主提交报价。</Text>
             ) : (
-              quotes.map(item => (
-                <View key={item.id} style={styles.quoteCard}>
-                  <View style={styles.quoteHeader}>
-                    <Text style={styles.quoteOwner}>{item.owner?.nickname || `机主 #${item.owner_user_id}`}</Text>
-                    <StatusBadge meta={getObjectStatusMeta('quote', item.status)} label="" />
+              <>
+                {quoteComparisonItems.length > 1 ? (
+                  <View style={styles.comparePanel}>
+                    <Text style={styles.compareTitle}>方案对比</Text>
+                    <Text style={styles.compareDesc}>先横向看价格、机型、吊重和响应速度，再决定是否选定。</Text>
+                    {quoteComparisonItems.map((item, index) => (
+                      <View key={`compare-${item.id}`} style={styles.compareItem}>
+                        <View style={styles.compareHeader}>
+                          <Text style={styles.compareOwner}>{item.owner?.nickname || `机主 #${item.owner_user_id}`}</Text>
+                          {index === 0 ? <Text style={styles.compareBadge}>当前最低价</Text> : null}
+                        </View>
+                        <View style={styles.compareRow}>
+                          <Text style={styles.compareLabel}>报价</Text>
+                          <Text style={styles.compareValueStrong}>{formatAmountYuan(item.price_amount)}</Text>
+                        </View>
+                        <View style={styles.compareRow}>
+                          <Text style={styles.compareLabel}>机型</Text>
+                          <Text style={styles.compareValue}>{item.drone?.brand || '-'} {item.drone?.model || ''}</Text>
+                        </View>
+                        <View style={styles.compareRow}>
+                          <Text style={styles.compareLabel}>最大吊重</Text>
+                          <Text style={styles.compareValue}>{item.drone?.max_payload_kg ? `${item.drone.max_payload_kg}kg` : '未填写'}</Text>
+                        </View>
+                        <View style={styles.compareRow}>
+                          <Text style={styles.compareLabel}>响应时间</Text>
+                          <Text style={styles.compareValue}>{item.created_at ? item.created_at.slice(5, 16).replace('T', ' ') : '刚刚提交'}</Text>
+                        </View>
+                        <Text style={styles.comparePlan}>{item.execution_plan || '机主未补充更多执行说明。'}</Text>
+                      </View>
+                    ))}
                   </View>
-                  <Text style={styles.quotePrice}>{formatAmountYuan(item.price_amount)}</Text>
-                  <Text style={styles.quoteDesc}>{item.execution_plan || '机主未补充更多报价说明。'}</Text>
-                  <Text style={styles.quoteMeta}>设备：{item.drone?.brand || '-'} {item.drone?.model || ''}</Text>
-                  <TouchableOpacity
-                    style={[styles.selectBtn, selectingQuoteId === item.id && styles.disabledBtn]}
-                    onPress={() => handleSelectQuote(item)}
-                    disabled={selectingQuoteId === item.id}>
-                    <Text style={styles.selectBtnText}>{selectingQuoteId === item.id ? '处理中...' : '选定此方案'}</Text>
-                  </TouchableOpacity>
-                </View>
-              ))
+                ) : null}
+                {quotes.map(item => (
+                  <View key={item.id} style={styles.quoteCard}>
+                    <View style={styles.quoteHeader}>
+                      <Text style={styles.quoteOwner}>{item.owner?.nickname || `机主 #${item.owner_user_id}`}</Text>
+                      <StatusBadge meta={getObjectStatusMeta('quote', item.status)} label="" />
+                    </View>
+                    <Text style={styles.quotePrice}>{formatAmountYuan(item.price_amount)}</Text>
+                    <Text style={styles.quoteDesc}>{item.execution_plan || '机主未补充更多报价说明。'}</Text>
+                    <Text style={styles.quoteMeta}>设备：{item.drone?.brand || '-'} {item.drone?.model || ''}</Text>
+                    <TouchableOpacity
+                      style={[styles.selectBtn, selectingQuoteId === item.id && styles.disabledBtn]}
+                      onPress={() => handleSelectQuote(item)}
+                      disabled={selectingQuoteId === item.id}>
+                      <Text style={styles.selectBtnText}>{selectingQuoteId === item.id ? '处理中...' : '选定此方案'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
             )}
           </View>
         ) : null}
@@ -376,6 +480,26 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   tagRow: {flexDirection: 'row', gap: 8, marginTop: 14},
   budget: {fontSize: 18, color: theme.isDark ? '#FFE4C4' : '#fff7e6', fontWeight: '800', marginTop: 14},
   heroDesc: {fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)', marginTop: 8},
+  progressCard: {
+    backgroundColor: theme.card,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+  },
+  progressEyebrow: {fontSize: 12, color: theme.primaryText, fontWeight: '700', marginBottom: 8},
+  progressTitle: {fontSize: 20, lineHeight: 26, color: theme.text, fontWeight: '800'},
+  progressDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub, marginTop: 8},
+  progressEtaPill: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    borderRadius: 999,
+    backgroundColor: theme.primaryBg,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  progressEtaText: {fontSize: 12, color: theme.primaryText, fontWeight: '700'},
   card: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 14},
   sectionTitle: {fontSize: 18, fontWeight: '700', color: theme.text},
   actionPanel: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 14},
@@ -400,6 +524,40 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   quoteTrigger: {marginTop: 14, alignSelf: 'flex-start'},
   quoteTriggerText: {fontSize: 14, color: theme.primaryText, fontWeight: '700'},
   emptyText: {fontSize: 13, color: theme.textSub, marginTop: 14},
+  comparePanel: {
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: theme.bgSecondary,
+    gap: 10,
+  },
+  compareTitle: {fontSize: 15, fontWeight: '800', color: theme.text},
+  compareDesc: {fontSize: 12, lineHeight: 18, color: theme.textSub},
+  compareItem: {
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    gap: 6,
+  },
+  compareHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8},
+  compareOwner: {fontSize: 14, fontWeight: '700', color: theme.text},
+  compareBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.success,
+    backgroundColor: theme.success + '18',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  compareRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
+  compareLabel: {fontSize: 12, color: theme.textSub},
+  compareValue: {flex: 1, textAlign: 'right', fontSize: 12, color: theme.text},
+  compareValueStrong: {fontSize: 14, fontWeight: '800', color: theme.danger},
+  comparePlan: {fontSize: 12, lineHeight: 18, color: theme.textSub, marginTop: 2},
   quoteCard: {borderWidth: 1, borderColor: theme.divider, borderRadius: 16, padding: 14, marginTop: 12},
   quoteHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8},
   quoteOwner: {fontSize: 15, fontWeight: '700', color: theme.text},

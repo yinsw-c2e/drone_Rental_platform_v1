@@ -13,6 +13,11 @@
 3. 降低客户、机主、飞手三条链路的心智负担
 4. 用固定样本持续回归，而不是每次临时拼数据
 
+当前状态：
+
+- 截至 `2026-04-15`， [RESTART_MASTER_TASKLIST.md](./RESTART_MASTER_TASKLIST.md) 的阶段 0 到阶段 5 已全部完成
+- 后续默认以固定样本回归、缺陷修复和暂缓清单条件成熟后的重开任务为主
+
 ## 当前核心文档
 
 | 文档 | 用途 | 什么时候先看 |
@@ -22,6 +27,7 @@
 | [RESTART_ACCEPTANCE_SAMPLE_BASELINE.md](./RESTART_ACCEPTANCE_SAMPLE_BASELINE.md) | 当前固定账号、样本对象、验收顺序 | 改代码前后要复验主链路 |
 | [USER_JOURNEY_REDESIGN.md](./USER_JOURNEY_REDESIGN.md) | 用户心智、前台对象模型、入口策略 | 改首页、市场、订单、流程体验前 |
 | [MOBILE_UX_SIMPLIFICATION_EXECUTION_PLAN.md](./MOBILE_UX_SIMPLIFICATION_EXECUTION_PLAN.md) | 移动端信息架构和页面减负执行细则 | 真正开始做移动端页面改造时 |
+| [V1_RESIDUAL_INVENTORY.md](./V1_RESIDUAL_INVENTORY.md) | 当前仍保留的 v1 依赖边界与迁移顺序 | 想继续去 v1 残留、避免新开发回挂旧接口时 |
 
 ## 推荐阅读顺序
 
@@ -94,6 +100,7 @@
 - [角色视角业务验收走查](../testing/ROLE_ACCEPTANCE_WALKTHROUGH.md)
 - [手工测试前总表](../testing/PRE_MANUAL_TEST_MASTER_TASKLIST.md)
 - [移动端关键页面回归与截图验收标准](../testing/MOBILE_REGRESSION_ACCEPTANCE.md)
+- [最小可观测性运行说明](../../backend/docs/MINIMUM_OBSERVABILITY_RUNBOOK.md)
 
 适用任务：
 
@@ -101,6 +108,8 @@
 - `N1.05`
 - `N3.01`
 - `N3.02`
+- `N4.12`
+- `N5.03`
 
 ## 当前开发前 5 分钟检查
 
@@ -122,6 +131,7 @@
 - [字段字典](../business/BUSINESS_FIELD_DICTIONARY.md)
 - [历史重构任务总表](../planning/REFACTOR_MASTER_TASKLIST.md)
 - [手工测试前总表](../testing/PRE_MANUAL_TEST_MASTER_TASKLIST.md)
+- [最小可观测性运行说明](../../backend/docs/MINIMUM_OBSERVABILITY_RUNBOOK.md)
 
 ## 目录迁移说明
 
@@ -135,4 +145,3 @@
 - `docs/ux/MOBILE_UX_SIMPLIFICATION_EXECUTION_PLAN.md`
 
 请以 `docs/restart/` 下的新位置为准。
-

@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform} from 'react-native';
 import {messageService} from '../../services/message';
 import {Message} from '../../types';
@@ -10,23 +10,30 @@ import type {AppTheme} from '../../theme/index';
 export default function ChatScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {peerId, peerName} = route.params;
+  const {conversationId, peerId, peerName} = route.params;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
-      // Use peerId to fetch messages, handles inconsistent conversation_id formats
-      const res = await messageService.getMessagesByPeer(peerId, 1, 50);
-      setMessages((res.data.list || []).reverse());
-      messageService.markReadByPeer(peerId);
+      if (conversationId) {
+        const res = await messageService.getMessages(conversationId, 1, 50);
+        setMessages((res.data?.items || []).reverse());
+        messageService.markRead(conversationId);
+      } else {
+        const res = await messageService.getMessagesByPeer(peerId, 1, 50);
+        setMessages((res.data.list || []).reverse());
+        messageService.markReadByPeer(peerId);
+      }
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [conversationId, peerId]);
 
-  useEffect(() => { fetchMessages(); }, [peerId]);
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
   // 监听页面获得焦点时刷新消息
   useEffect(() => {
@@ -76,7 +83,7 @@ export default function ChatScreen({route, navigation}: any) {
           <Text style={styles.listText}>列表</Text>
         </TouchableOpacity>
       </View>
-      <KeyboardAvoidingView style={{flex: 1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flexOne} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.noticeBanner}>
           <Text style={styles.noticeTitle}>沟通消息</Text>
           <Text style={styles.noticeText}>聊天仅用于沟通协作，订单确认、派单接受、退款处理等正式状态，请以系统通知和业务页面为准。</Text>
@@ -85,7 +92,7 @@ export default function ChatScreen({route, navigation}: any) {
           data={messages}
           keyExtractor={item => String(item.id)}
           renderItem={renderMessage}
-          contentContainerStyle={{padding: 12}}
+          contentContainerStyle={styles.listContent}
         />
         <View style={styles.inputBar}>
           <TextInput
@@ -129,6 +136,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   noticeText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: theme.warning},
   msgRow: {flexDirection: 'row', marginBottom: 12},
   msgRowRight: {justifyContent: 'flex-end'},
+  flexOne: {flex: 1},
+  listContent: {padding: 12},
   bubble: {maxWidth: '75%', padding: 12, borderRadius: 12},
   bubbleMine: {backgroundColor: theme.primary, borderBottomRightRadius: 4},
   bubbleOther: {backgroundColor: theme.card, borderBottomLeftRadius: 4},

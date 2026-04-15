@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -100,24 +101,41 @@ type PilotProfileInput struct {
 }
 
 type PilotProfileView struct {
-	ID                  int64      `json:"id"`
-	UserID              int64      `json:"user_id"`
-	CAACLicenseNo       string     `json:"caac_license_no"`
-	CAACLicenseType     string     `json:"caac_license_type"`
-	CAACLicenseExpireAt *time.Time `json:"caac_license_expire_at,omitempty"`
-	CAACLicenseImage    string     `json:"caac_license_image,omitempty"`
-	VerificationStatus  string     `json:"verification_status"`
-	AvailabilityStatus  string     `json:"availability_status"`
-	ServiceRadiusKM     int        `json:"service_radius_km"`
-	ServiceRadius       float64    `json:"service_radius"`
-	CurrentCity         string     `json:"current_city,omitempty"`
-	ServiceCities       model.JSON `json:"service_cities,omitempty"`
-	SpecialSkills       model.JSON `json:"special_skills,omitempty"`
-	SkillTags           model.JSON `json:"skill_tags,omitempty"`
-	ServiceRating       float64    `json:"service_rating"`
-	CreditScore         int        `json:"credit_score"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  int64                 `json:"id"`
+	UserID              int64                 `json:"user_id"`
+	CAACLicenseNo       string                `json:"caac_license_no"`
+	CAACLicenseType     string                `json:"caac_license_type"`
+	CAACLicenseExpireAt *time.Time            `json:"caac_license_expire_at,omitempty"`
+	CAACLicenseImage    string                `json:"caac_license_image,omitempty"`
+	VerificationStatus  string                `json:"verification_status"`
+	AvailabilityStatus  string                `json:"availability_status"`
+	ServiceRadiusKM     int                   `json:"service_radius_km"`
+	ServiceRadius       float64               `json:"service_radius"`
+	CurrentCity         string                `json:"current_city,omitempty"`
+	ServiceCities       model.JSON            `json:"service_cities,omitempty"`
+	SpecialSkills       model.JSON            `json:"special_skills,omitempty"`
+	SkillTags           model.JSON            `json:"skill_tags,omitempty"`
+	ServiceRating       float64               `json:"service_rating"`
+	CreditScore         int                   `json:"credit_score"`
+	Eligibility         *PilotEligibilityView `json:"eligibility,omitempty"`
+	CreatedAt           time.Time             `json:"created_at"`
+	UpdatedAt           time.Time             `json:"updated_at"`
+}
+
+type PilotEligibilityBlocker struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type PilotEligibilityView struct {
+	Tier                  string                    `json:"tier"`
+	Label                 string                    `json:"label"`
+	CanApplyCandidate     bool                      `json:"can_apply_candidate"`
+	CanAcceptDispatch     bool                      `json:"can_accept_dispatch"`
+	CanStartExecution     bool                      `json:"can_start_execution"`
+	CanUpdateAvailability bool                      `json:"can_update_availability"`
+	RecommendedNextStep   string                    `json:"recommended_next_step"`
+	Blockers              []PilotEligibilityBlocker `json:"blockers"`
 }
 
 type PilotDemandStats struct {
@@ -574,8 +592,16 @@ func (s *PilotService) ApplyDemandCandidate(pilotUserID, demandID int64) (*model
 	if err != nil {
 		return nil, errors.New("请先注册飞手身份")
 	}
-	if pilot.VerificationStatus != "verified" {
-		return nil, errors.New("飞手资质尚未审核通过，暂不能报名候选")
+	profile, err := s.ensurePilotRoleProfileByUserID(pilotUserID)
+	if err != nil {
+		return nil, err
+	}
+	eligibility := buildPilotEligibilityView(pilot, profile)
+	if eligibility == nil || !eligibility.CanApplyCandidate {
+		if blocker := firstPilotEligibilityBlocker(eligibility); blocker != nil {
+			return nil, errors.New(blocker.Message)
+		}
+		return nil, errors.New("当前飞手资格未就绪，暂不能报名候选")
 	}
 
 	demand, err := s.demandDomainRepo.GetDemandByID(demandID)
@@ -595,10 +621,6 @@ func (s *PilotService) ApplyDemandCandidate(pilotUserID, demandID int64) (*model
 		return nil, errors.New("当前需求已过期")
 	}
 
-	profile, err := s.ensurePilotRoleProfileByUserID(pilotUserID)
-	if err != nil {
-		return nil, err
-	}
 	snapshot := s.buildDemandCandidateSnapshot(pilot, profile)
 
 	existing, err := s.demandDomainRepo.GetDemandCandidateByDemandAndPilot(demandID, pilotUserID)
@@ -1513,6 +1535,142 @@ func buildPilotProfileView(pilot *model.Pilot, profile *model.PilotProfile) *Pil
 	} else {
 		view.ServiceRadiusKM = int(math.Round(pilot.ServiceRadius))
 	}
+	view.Eligibility = buildPilotEligibilityView(pilot, profile)
 
 	return view
+}
+
+func buildPilotEligibilityView(pilot *model.Pilot, profile *model.PilotProfile) *PilotEligibilityView {
+	if pilot == nil {
+		return nil
+	}
+
+	blockers := make([]PilotEligibilityBlocker, 0)
+	missingBasics := false
+	if strings.TrimSpace(pilot.CAACLicenseNo) == "" {
+		missingBasics = true
+		blockers = append(blockers, PilotEligibilityBlocker{
+			Code:    "pilot_license_no_required",
+			Message: "先补齐执照编号，才能参与候选报名和后续派单。",
+		})
+	}
+	if strings.TrimSpace(pilot.CAACLicenseType) == "" {
+		missingBasics = true
+		blockers = append(blockers, PilotEligibilityBlocker{
+			Code:    "pilot_license_type_required",
+			Message: "先补齐执照类型，平台才能识别你的可执行范围。",
+		})
+	}
+	if strings.TrimSpace(pilot.CAACLicenseImage) == "" {
+		missingBasics = true
+		blockers = append(blockers, PilotEligibilityBlocker{
+			Code:    "pilot_license_image_required",
+			Message: "先上传执照图片，平台才能进入飞手审核流程。",
+		})
+	}
+
+	status := normalizePilotVerificationStatus(pilot.VerificationStatus, profile)
+	switch status {
+	case "rejected":
+		blockers = append(blockers, PilotEligibilityBlocker{
+			Code:    "pilot_verification_rejected",
+			Message: "飞手认证未通过，请补充资料后重新提交。",
+		})
+	case "pending":
+		blockers = append(blockers, PilotEligibilityBlocker{
+			Code:    "pilot_dispatch_requires_verification",
+			Message: "当前可先报名低风险候选需求；正式派单需等待飞手认证通过。",
+		})
+	case "unverified":
+		blockers = append(blockers, PilotEligibilityBlocker{
+			Code:    "pilot_verification_pending_submission",
+			Message: "先提交飞手认证资料，之后才能进入候选需求和正式派单流程。",
+		})
+	}
+
+	canApplyCandidate := !missingBasics && status != "rejected" && status != "unverified"
+	canAcceptDispatch := status == "verified"
+	canStartExecution := status == "verified"
+	canUpdateAvailability := status == "verified"
+
+	tier := "profile_setup"
+	label := "待补齐飞手资料"
+	nextStep := "先补齐执照编号、执照类型和证照图片。"
+
+	switch {
+	case status == "rejected":
+		tier = "needs_resubmission"
+		label = "待重新提交"
+		nextStep = "根据审核反馈补充资料后重新提交。"
+	case canAcceptDispatch && isPilotAvailableForDispatch(pilot.AvailabilityStatus):
+		tier = "dispatch_ready"
+		label = "正式派单就绪"
+		nextStep = "当前已可接受正式派单，也可以直接进入执行任务。"
+	case canAcceptDispatch:
+		tier = "verified_offline"
+		label = "认证已通过"
+		nextStep = "把接单状态切到“接单中”，系统才会把你纳入正式派单池。"
+	case canApplyCandidate:
+		tier = "candidate_ready"
+		label = "候选报名就绪"
+		nextStep = "现在可以先浏览并报名候选需求，正式派单会在认证通过后开放。"
+	case missingBasics:
+		tier = "profile_setup"
+		label = "待补齐飞手资料"
+		nextStep = "先补齐执照编号、执照类型和证照图片。"
+	default:
+		tier = "verification_pending"
+		label = "等待飞手认证"
+		nextStep = "先提交飞手认证资料，之后可报名候选需求。"
+	}
+
+	return &PilotEligibilityView{
+		Tier:                  tier,
+		Label:                 label,
+		CanApplyCandidate:     canApplyCandidate,
+		CanAcceptDispatch:     canAcceptDispatch,
+		CanStartExecution:     canStartExecution,
+		CanUpdateAvailability: canUpdateAvailability,
+		RecommendedNextStep:   nextStep,
+		Blockers:              blockers,
+	}
+}
+
+func normalizePilotVerificationStatus(status string, profile *model.PilotProfile) string {
+	status = strings.TrimSpace(strings.ToLower(status))
+	switch status {
+	case "verified", "approved":
+		return "verified"
+	case "pending":
+		return "pending"
+	case "rejected":
+		return "rejected"
+	}
+	if profile != nil {
+		switch strings.TrimSpace(strings.ToLower(profile.VerificationStatus)) {
+		case "verified", "approved":
+			return "verified"
+		case "pending":
+			return "pending"
+		case "rejected":
+			return "rejected"
+		}
+	}
+	return "unverified"
+}
+
+func isPilotAvailableForDispatch(status string) bool {
+	switch strings.TrimSpace(strings.ToLower(status)) {
+	case "online", "available":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstPilotEligibilityBlocker(view *PilotEligibilityView) *PilotEligibilityBlocker {
+	if view == nil || len(view.Blockers) == 0 {
+		return nil
+	}
+	return &view.Blockers[0]
 }

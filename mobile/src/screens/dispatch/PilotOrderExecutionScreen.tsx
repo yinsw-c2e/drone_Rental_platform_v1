@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {getOrderByTaskId} from '../../services/dispatch';
+import {dispatchV2Service} from '../../services/dispatchV2';
 import {updateExecutionStatus} from '../../services/orderV2';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -19,8 +19,8 @@ import type {AppTheme} from '../../theme/index';
 const EXEC_STEPS = [
   {status: 'assigned',          label: '已派单',          desc: '已分配派单，等待确认',                icon: '📨'},
   {status: 'confirmed',         label: '已确认接单',    desc: '接单成功，等待出发',                  icon: '✅'},
-  {status: 'airspace_applying', label: '申请空域中',    desc: '正在申请飞行空域许可',                icon: '📋'},
-  {status: 'airspace_approved', label: '空域已批准',    desc: '空域许可已获批，准备装货',            icon: '✈️'},
+  {status: 'airspace_applying', label: '申请空域中',    desc: '正在办理空域报备或临时空域申请',      icon: '📋'},
+  {status: 'airspace_approved', label: '空域已批准',    desc: '空域报备已通过，准备装货',            icon: '✈️'},
   {status: 'loading',           label: '装货中',        desc: '飞手到达装货点，确认装货',            icon: '📦'},
   {status: 'in_transit',        label: '运输中',        desc: '货物已装载，无人机起飞',              icon: '🚁'},
   {status: 'delivered',         label: '已送达',        desc: '到达卸货点，等待客户确认签收',        icon: '🏁'},
@@ -29,7 +29,7 @@ const EXEC_STEPS = [
 // 根据当前状态获取下一步操作
 const NEXT_ACTION: Record<string, {label: string; nextStatus: string; confirmMsg: string}> = {
   assigned:          {label: '确认接单', nextStatus: 'confirmed', confirmMsg: '确认接受此任务？'},
-  confirmed:         {label: '申请空域', nextStatus: 'airspace_applying', confirmMsg: '确认申请空域许可？'},
+  confirmed:         {label: '申请空域', nextStatus: 'airspace_applying', confirmMsg: '确认开始办理本次作业的空域报备或临时空域申请？'},
   airspace_applying: {label: '空域已批准', nextStatus: 'airspace_approved', confirmMsg: '确认空域许可已获批？'},
   airspace_approved: {label: '确认装货', nextStatus: 'loading', confirmMsg: '已到达装货点，确认开始装货？'},
   loading:           {label: '开始运输', nextStatus: 'in_transit', confirmMsg: '货物已装载完毕，确认起飞运输？'},
@@ -46,10 +46,12 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
 
   const loadOrder = useCallback(async () => {
     try {
-      const data = await getOrderByTaskId(taskId);
-      setOrder(data);
+      const res = await dispatchV2Service.get(taskId);
+      const detail = res.data;
+      setOrder(detail?.order || detail?.dispatch_task?.order || null);
     } catch (e: any) {
       Alert.alert('错误', e.message || '获取订单失败');
+      setOrder(null);
     } finally {
       setLoading(false);
     }
@@ -151,6 +153,13 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
           {order.total_amount > 0 && (
             <Text style={styles.rewardText}>预估报酬：¥{(order.total_amount / 100).toFixed(0)}</Text>
           )}
+        </View>
+
+        <View style={styles.noticeCard}>
+          <Text style={styles.noticeTitle}>执行责任提醒</Text>
+          <Text style={styles.noticeText}>
+            接受他人设备派单后，表示你已知悉本次设备操作责任声明，将按照平台、机主和现场要求安全执行。相关责任条款也会同步写入合同留痕。
+          </Text>
         </View>
 
         {/* 执行步骤进度 */}
@@ -271,6 +280,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   routeAddr: {flex: 1, fontSize: 13, color: theme.textSub},
   routeLine: {width: 1, height: 12, backgroundColor: theme.divider, marginLeft: 3, marginVertical: 1},
   rewardText: {fontSize: 16, color: theme.danger, fontWeight: 'bold', marginTop: 8},
+  noticeCard: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.warning + '33',
+  },
+  noticeTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
+  noticeText: {marginTop: 8, fontSize: 13, lineHeight: 20, color: theme.textSub},
 
   stepsCard: {
     backgroundColor: theme.card, borderRadius: 12, padding: 16,

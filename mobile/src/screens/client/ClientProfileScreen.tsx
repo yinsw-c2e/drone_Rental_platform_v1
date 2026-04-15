@@ -133,7 +133,13 @@ export default function ClientProfileScreen({navigation}: any) {
     loadData();
   }, [loadData]);
 
-  const verificationStatus = VERIFY_STATUS_MAP[client?.verification_status || 'unverified'] || VERIFY_STATUS_MAP.unverified;
+  const verificationStatus =
+    VERIFY_STATUS_MAP[client?.identity_verification_status || client?.verification_status || 'unverified'] ||
+    VERIFY_STATUS_MAP.unverified;
+  const eligibility = client?.eligibility;
+  const primaryBlocker = eligibility?.blockers?.[0];
+  const canPublishDemand = eligibility?.can_publish_demand ?? false;
+  const canCreateDirectOrder = eligibility?.can_create_direct_order ?? false;
   const creditStatus = CREDIT_STATUS_MAP[client?.credit_check_status || 'unverified'] || CREDIT_STATUS_MAP.unverified;
 
   const summaryItems = useMemo(
@@ -236,9 +242,11 @@ export default function ClientProfileScreen({navigation}: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroHeader}>
-            <View style={{flex: 1}}>
+            <View style={styles.heroContent}>
               <Text style={styles.heroTitle}>客户档案</Text>
-              <Text style={styles.heroSubtitle}>默认个人客户档案已开通，可直接发布需求与直达下单。</Text>
+              <Text style={styles.heroSubtitle}>
+                {eligibility?.summary || '默认个人客户档案已开通，可直接发布需求与直达下单。'}
+              </Text>
             </View>
             <View style={styles.heroBadges}>
               <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
@@ -265,13 +273,27 @@ export default function ClientProfileScreen({navigation}: any) {
           <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionTitle}>账号与资格</Text>
-              <Text style={styles.sectionDesc}>这里确认的是“客户能力”是否就绪，而不是再次注册。</Text>
+              <Text style={styles.sectionDesc}>
+                这里确认的是“客户能力”是否就绪。默认阻塞项只看实名认证、账号状态和平台信用，企业升级不是主链路前置条件。
+              </Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>默认客户档案</Text>
             <StatusBadge label="已开通" tone="green" />
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>实名认证</Text>
+            <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>可发布需求</Text>
+            <StatusBadge label={canPublishDemand ? '已就绪' : '待补齐'} tone={canPublishDemand ? 'green' : 'orange'} />
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>可直达下单</Text>
+            <StatusBadge label={canCreateDirectOrder ? '已就绪' : '待补齐'} tone={canCreateDirectOrder ? 'green' : 'orange'} />
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>征信状态</Text>
@@ -285,6 +307,21 @@ export default function ClientProfileScreen({navigation}: any) {
             <Text style={styles.infoLabel}>外部征信分</Text>
             <Text style={styles.infoValue}>{client.credit_score || '-'}</Text>
           </View>
+          {primaryBlocker ? (
+            <Text style={styles.helperNote}>
+              当前待补齐：{primaryBlocker.message}
+            </Text>
+          ) : (
+            <Text style={styles.helperNote}>
+              当前个人账号已按主链路收口。企业升级仅在需要企业主体资料、对公身份或后续企业能力时再补。
+            </Text>
+          )}
+
+          {primaryBlocker?.suggested_action === 'verify_identity' ? (
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Verification')}>
+              <Text style={styles.secondaryButtonText}>去做实名认证</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handleCreditCheck}>
             <Text style={styles.secondaryButtonText}>发起征信查询</Text>
@@ -390,7 +427,7 @@ export default function ClientProfileScreen({navigation}: any) {
         ) : (
           <ObjectCard style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>企业客户升级</Text>
-            <Text style={styles.sectionDesc}>如果你后续要以公司名义发布需求、管理对公资料和信用主体，可在这里升级企业客户资质。</Text>
+            <Text style={styles.sectionDesc}>如果你后续要以公司名义发布需求、管理对公资料和信用主体，可在这里升级企业客户资质。这不是当前个人下单/发需求的默认前置步骤。</Text>
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={() => navigation.navigate('ClientRegister', {mode: 'enterprise'})}>
@@ -438,6 +475,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  heroContent: {
+    flex: 1,
   },
   heroTitle: {
     fontSize: 24,
@@ -504,6 +544,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.text,
   },
   sectionDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.textSub,
+  },
+  helperNote: {
     fontSize: 13,
     lineHeight: 20,
     color: theme.textSub,

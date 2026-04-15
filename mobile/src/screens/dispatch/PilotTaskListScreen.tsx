@@ -19,6 +19,7 @@ import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
+import {pilotV2Service} from '../../services/pilotV2';
 import {V2DispatchTaskSummary} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -63,14 +64,21 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTask, setSelectedTask] = useState<V2DispatchTaskSummary | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [pilotProfile, setPilotProfile] = useState<any>(null);
   const entryMode = String(route?.params?.entry || 'all');
   const entryMeta = useMemo(() => getPilotEntryMeta(entryMode), [entryMode]);
+  const eligibility = pilotProfile?.eligibility;
+  const candidateReady = eligibility?.can_apply_candidate && !eligibility?.can_accept_dispatch;
 
   const loadData = useCallback(async () => {
     try {
       const status = entryMode === 'assigned' ? 'pending_response' : (entryMode === 'accepted' ? 'accepted' : undefined);
-      const res = await dispatchV2Service.list({role: 'pilot', status, page: 1, page_size: 100});
-      setTasks(res.data?.items || []);
+      const [dispatchRes, profileRes] = await Promise.all([
+        dispatchV2Service.list({role: 'pilot', status, page: 1, page_size: 100}),
+        pilotV2Service.getProfile().catch(() => null),
+      ]);
+      setTasks(dispatchRes.data?.items || []);
+      setPilotProfile(profileRes?.data || null);
     } catch (error) {
       console.error('获取飞手正式派单失败:', error);
     } finally {
@@ -100,7 +108,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   }, [entryMode, tasks]);
 
   const handleAccept = (task: V2DispatchTaskSummary) => {
-    Alert.alert('确认接单', '确认接受这条正式派单吗？', [
+    Alert.alert('确认接单', '接受正式派单即表示你已阅读设备操作责任说明，并承诺按平台流程安全执行。确认继续吗？', [
       {text: '取消', style: 'cancel'},
       {
                 text: '确认接单',
@@ -148,6 +156,31 @@ export default function PilotTaskListScreen({navigation, route}: any) {
         <Text style={styles.bannerTitle}>{entryMeta.title}</Text>
         <Text style={styles.bannerHint}>{entryMeta.hint}</Text>
       </View>
+
+      {eligibility ? (
+        <ObjectCard style={styles.noticeCard}>
+          <View style={styles.noticeHeader}>
+            <Text style={styles.noticeTitle}>{eligibility.label || '飞手准入状态'}</Text>
+            <StatusBadge
+              label={candidateReady ? '先报名候选需求' : eligibility?.can_accept_dispatch ? '正式派单已开放' : '待补资料'}
+              tone={candidateReady ? 'orange' : eligibility?.can_accept_dispatch ? 'green' : 'gray'}
+            />
+          </View>
+          <Text style={styles.noticeDesc}>
+            {eligibility.recommended_next_step || '系统会根据认证进度逐步开放候选需求、正式派单和执行能力。'}
+          </Text>
+          {candidateReady ? (
+            <View style={styles.noticeActionRow}>
+              <TouchableOpacity style={styles.noticeGhostBtn} onPress={() => navigation.navigate('DemandList')}>
+                <Text style={styles.noticeGhostBtnText}>查看可报名任务</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.noticeGhostBtn} onPress={() => navigation.navigate('PilotRegister')}>
+                <Text style={styles.noticeGhostBtnText}>继续补资料</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </ObjectCard>
+      ) : null}
 
       <FlatList
         data={visibleTasks}
@@ -223,9 +256,9 @@ export default function PilotTaskListScreen({navigation, route}: any) {
               <EmptyState
                 icon="🧭"
                 title={entryMeta.empty}
-                description="正式派单会在这里统一收口。公开需求报名和飞行记录已经拆到其他页面。"
-                actionText="查看订单"
-                onAction={() => navigation.navigate('MyOrders')}
+                description="正式派单会在这里统一收口。若您还未完成资质认证，请先至「可报名任务」参与低风险候选需求。"
+                actionText="查看可报名任务"
+                onAction={() => navigation.navigate('DemandList')}
               />
             </ObjectCard>
           )
@@ -276,6 +309,47 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
+  },
+  noticeCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 2,
+    gap: 10,
+  },
+  noticeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  noticeTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.text,
+  },
+  noticeDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.textSub,
+  },
+  noticeActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  noticeGhostBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.bgSecondary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  noticeGhostBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.primaryText,
   },
   content: {
     padding: 14,

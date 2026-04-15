@@ -148,6 +148,34 @@ const getExactStatusLabel = (status?: string) => {
   return getObjectStatusMeta('order', status).label;
 };
 
+const getOrderProgressHint = (order: V2OrderSummary) => {
+  switch (String(order.status || '').toLowerCase()) {
+    case 'pending_provider_confirmation':
+      return '等待机主确认，通常 2 小时内回复';
+    case 'pending_payment':
+      return '完成支付后才会继续安排执行';
+    case 'pending_dispatch':
+      return '平台正在安排执行团队';
+    case 'assigned':
+      return '执行团队已就位，待进入准备阶段';
+    case 'preparing':
+    case 'loading':
+    case 'airspace_applying':
+    case 'airspace_approved':
+      return '现场准备中，稍后会继续推进飞行';
+    case 'in_transit':
+      return '运输执行中，请留意飞行与送达更新';
+    case 'delivered':
+      return '等待签收确认';
+    case 'cancelled':
+      return '订单已取消，如有支付会继续显示退款进度';
+    case 'completed':
+      return '本单已完成';
+    default:
+      return '订单正在推进中';
+  }
+};
+
 export default function OrderListScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
@@ -246,9 +274,12 @@ export default function OrderListScreen({navigation, route}: any) {
   const renderItem = ({item}: {item: OrderListItem}) => {
     const sourceKind = item.order.order_source === 'supply_direct' ? 'supply' : 'demand';
     const roleHints = item.roles.filter(role => role !== 'all').map(role => roleLabelMap[role as Exclude<RoleFilter, 'all'>]);
+    const isCancelled = String(item.order.status || '').toLowerCase() === 'cancelled';
 
     return (
-      <ObjectCard style={styles.card} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
+      <ObjectCard
+        style={[styles.card, isCancelled && styles.cardCancelled]}
+        onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <SourceTag source={sourceKind} />
@@ -265,12 +296,16 @@ export default function OrderListScreen({navigation, route}: any) {
 
         <View style={styles.metaRow}>
           <Text style={[styles.metaText, {color: theme.textSub}]}>承接方：{summarizeParty(item.order.provider, '未分配机主')}</Text>
-          <Text style={[styles.metaText, {color: theme.textSub}]}>执行方：{summarizeParty(item.order.executor, item.order.execution_mode === 'self_execute' ? '机主自执行' : '待派单')}</Text>
+          <Text style={[styles.metaText, {color: theme.textSub}]}>执行安排：{summarizeParty(item.order.executor, item.order.execution_mode === 'self_execute' ? '机主自执行' : '安排中')}</Text>
         </View>
 
         <View style={styles.metaRow}>
           <Text style={[styles.metaText, {color: theme.textSub}]}>客户：{summarizeParty(item.order.client, '客户')}</Text>
           <Text style={[styles.metaText, {color: theme.textSub}]}>{formatDateRange(item.order.start_time, item.order.end_time)}</Text>
+        </View>
+
+        <View style={[styles.progressHintRow, {backgroundColor: theme.badgeBg}]}>
+          <Text style={[styles.progressHintText, {color: theme.text}]}>{getOrderProgressHint(item.order)}</Text>
         </View>
 
         {roleHints.length > 0 ? (
@@ -286,7 +321,7 @@ export default function OrderListScreen({navigation, route}: any) {
         <View style={styles.footer}>
           <Text style={[styles.amount, {color: theme.danger}]}>{formatAmount(item.order.total_amount)}</Text>
           <TouchableOpacity style={[styles.detailBtn, {backgroundColor: theme.btnPrimary}]} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
-            <Text style={[styles.detailBtnText, {color: theme.btnPrimaryText}]}>查看订单</Text>
+            <Text style={[styles.detailBtnText, {color: theme.btnPrimaryText}]}>查看进度</Text>
           </TouchableOpacity>
         </View>
       </ObjectCard>
@@ -296,8 +331,8 @@ export default function OrderListScreen({navigation, route}: any) {
   const emptyAction = activeRole === 'owner'
     ? {text: '去任务列表', onPress: () => navigation.navigate('DemandList', {mode: 'owner'})}
     : activeRole === 'pilot'
-      ? {text: '看派单任务', onPress: () => navigation.navigate('PilotTaskList')}
-      : {text: '去服务列表', onPress: () => navigation.navigate('OfferList')};
+      ? {text: '看待接任务', onPress: () => navigation.navigate('PilotTaskList')}
+      : {text: '快速下单', onPress: () => navigation.navigate('QuickOrderEntry')};
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -312,7 +347,7 @@ export default function OrderListScreen({navigation, route}: any) {
             <View style={styles.hero}>
               <Text style={styles.heroTitle}>订单进度</Text>
               <Text style={styles.heroDesc}>
-                成交后的订单都在这里，按身份视角和状态分组筛选。
+                成交后的订单、执行安排和签收进度都会汇总在这里，按身份视角和状态分组查看。
               </Text>
             </View>
 
@@ -323,7 +358,7 @@ export default function OrderListScreen({navigation, route}: any) {
                     style={[styles.toolEntryChip, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
                     onPress={() => navigation.navigate('DispatchTaskList')}>
                     <Text style={styles.toolEntryIcon}>📡</Text>
-                    <Text style={[styles.toolEntryText, {color: theme.text}]}>派给飞手</Text>
+                    <Text style={[styles.toolEntryText, {color: theme.text}]}>执行安排</Text>
                   </TouchableOpacity>
                 )}
                 {effectiveRoleSummary.has_pilot_role && (
@@ -358,7 +393,7 @@ export default function OrderListScreen({navigation, route}: any) {
                 ))}
               </View>
 
-              <Text style={[styles.filterTitle, {marginTop: 16, color: theme.text}]}>状态分组</Text>
+              <Text style={[styles.filterTitle, styles.filterTitleSpaced, {color: theme.text}]}>状态分组</Text>
               <View style={styles.filterRow}>
                 {STATUS_TABS.map(tab => (
                   <TouchableOpacity
@@ -392,7 +427,7 @@ export default function OrderListScreen({navigation, route}: any) {
               <EmptyState
                 icon="📦"
                 title="当前没有匹配订单"
-                description="订单页已经只保留成交后的订单对象。任务、服务、派单任务请去对应页面查看。"
+                description="这里只显示成交后的订单进度。找服务、发布任务和执行安排入口已经拆开。"
                 actionText={emptyAction.text}
                 onAction={emptyAction.onPress}
               />
@@ -464,6 +499,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontWeight: '700',
     marginBottom: 12,
   },
+  filterTitleSpaced: {
+    marginTop: 16,
+  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -514,6 +552,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   card: {
     marginBottom: 12,
   },
+  cardCancelled: {
+    opacity: 0.82,
+    borderWidth: 1,
+    borderColor: theme.warning + '55',
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -553,6 +596,18 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: theme.textSub,
+  },
+  progressHintRow: {
+    marginTop: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  progressHintText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.text,
+    fontWeight: '600',
   },
   roleHintRow: {
     marginTop: 12,

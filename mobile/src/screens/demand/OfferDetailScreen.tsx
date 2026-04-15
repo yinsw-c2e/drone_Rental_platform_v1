@@ -18,7 +18,7 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
-import {SupplyDetail} from '../../types';
+import {QuickOrderDraft, SupplyDetail} from '../../types';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 import {
   formatSupplyPricing,
@@ -39,10 +39,35 @@ function SceneTag({label}: {label: string}) {
   );
 }
 
+function summarizeDraftAddress(address?: QuickOrderDraft['departure_address']): string {
+  if (!address) {
+    return '待补充';
+  }
+  return address.name || address.address || '待补充';
+}
+
+function summarizeDraftTimeRange(draft?: QuickOrderDraft): string {
+  if (!draft?.scheduled_start_at || !draft?.scheduled_end_at) {
+    return '待与机主确认';
+  }
+  return `${draft.scheduled_start_at.slice(0, 16).replace('T', ' ')} - ${draft.scheduled_end_at
+    .slice(0, 16)
+    .replace('T', ' ')}`;
+}
+
 export default function OfferDetailScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {id} = route.params;
+  const {id, quickOrderDraft, quickOrder} = route.params;
+  const draft = (quickOrderDraft ||
+    (quickOrder
+      ? {
+          cargo_scene: quickOrder.cargoScene,
+          cargo_weight_kg: Number(quickOrder.cargoWeight) || undefined,
+          departure_address: quickOrder.pickupAddress,
+          destination_address: quickOrder.deliveryAddress,
+        }
+      : undefined)) as QuickOrderDraft | undefined;
   const {user, roleSummary} = useSelector((state: RootState) => state.auth);
 
   const [supply, setSupply] = useState<SupplyDetail | null>(null);
@@ -139,6 +164,38 @@ export default function OfferDetailScreen({route, navigation}: any) {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
+        {draft ? (
+          <ObjectCard highlightColor={theme.primaryBorder}>
+            <Text style={styles.sectionTitle}>快速下单需求摘要</Text>
+            <Text style={styles.noticeText}>
+              这条服务是根据你刚才的快速下单条件筛出来的。确认方案合适后，下一步会直接把这些信息带入直达下单确认页。
+            </Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>运输路线</Text>
+              <Text style={styles.infoValue}>
+                {summarizeDraftAddress(draft.departure_address)}
+                {' -> '}
+                {summarizeDraftAddress(draft.destination_address)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>货物摘要</Text>
+              <Text style={styles.infoValue}>
+                {getSupplySceneLabel(draft.cargo_scene)} / {draft.cargo_weight_kg || '--'}kg /{' '}
+                {draft.cargo_type || '重载物资'}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>期望时间</Text>
+              <Text style={styles.infoValue}>{summarizeDraftTimeRange(draft)}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.inlineSecondaryBtn}
+              onPress={() => navigation.navigate('PublishCargo', {quickOrderDraft: draft})}>
+              <Text style={styles.inlineSecondaryBtnText}>这条不合适，改为发布任务</Text>
+            </TouchableOpacity>
+          </ObjectCard>
+        ) : null}
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroTop}>
             <View style={styles.heroTags}>
@@ -281,9 +338,11 @@ export default function OfferDetailScreen({route, navigation}: any) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryBtn, styles.footerBtn, !canCreateDirectOrder && styles.disabledBtn]}
-              onPress={() => navigation.navigate('SupplyDirectOrderConfirm', {supply})}
+              onPress={() => navigation.navigate('SupplyDirectOrderConfirm', {supply, quickOrderDraft: draft})}
               disabled={!canCreateDirectOrder}>
-              <Text style={styles.primaryBtnText}>{canCreateDirectOrder ? '发起直达下单' : '当前不可直达下单'}</Text>
+              <Text style={styles.primaryBtnText}>
+                {canCreateDirectOrder ? (draft ? '确认这条服务' : '发起直达下单') : '当前不可直达下单'}
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -313,6 +372,20 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: theme.text, fontWeight: '600'},
   description: {marginTop: 10, fontSize: 13, lineHeight: 22, color: theme.text},
   noticeText: {fontSize: 13, lineHeight: 21, color: theme.warning},
+  inlineSecondaryBtn: {
+    marginTop: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryBg,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  inlineSecondaryBtnText: {
+    fontSize: 14,
+    color: theme.primaryText,
+    fontWeight: '700',
+  },
   footer: {
     position: 'absolute',
     left: 0,

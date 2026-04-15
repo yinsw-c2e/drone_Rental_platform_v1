@@ -33,6 +33,22 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	response.V2Success(c, profile)
 }
 
+func (h *Handler) GetEligibility(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	eligibility, err := h.clientService.GetCurrentEligibility(userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, eligibility)
+}
+
 func (h *Handler) UpdateProfile(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

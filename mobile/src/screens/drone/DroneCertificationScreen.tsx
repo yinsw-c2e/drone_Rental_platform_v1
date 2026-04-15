@@ -13,15 +13,14 @@ import {
   Modal,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {API_BASE_URL} from '../../constants';
-
-const IMAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, '');
+import {API_ROOT_URL} from '../../constants';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {droneService} from '../../services/drone';
 import api from '../../services/api';
-import {Drone} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+
+const IMAGE_BASE_URL = API_ROOT_URL;
 
 const VERIFY_MAP: Record<string, {label: string; colorKey: 'warning' | 'success' | 'danger' | 'textHint'}> = {
   pending: {label: '待审核', colorKey: 'warning'},
@@ -58,7 +57,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
   const [airworthinessExpire, setAirworthinessExpire] = useState('');
   const [airworthinessDoc, setAirworthinessDoc] = useState('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const res = await droneService.getById(droneId);
       setDrone(res.data);
@@ -68,14 +67,14 @@ export default function DroneCertificationScreen({route, navigation}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [droneId]);
 
   useFocusEffect(
     useCallback(() => {
       if (droneId) {
         loadData();
       }
-    }, [droneId]),
+    }, [droneId, loadData]),
   );
 
   const onRefresh = () => {

@@ -28,6 +28,14 @@ func (r *MessageRepo) GetConversationMessages(conversationID string, page, pageS
 	return messages, total, err
 }
 
+func (r *MessageRepo) HasConversationAccess(conversationID string, userID int64) (bool, error) {
+	var count int64
+	err := r.db.Model(&model.Message{}).
+		Where("conversation_id = ? AND (sender_id = ? OR receiver_id = ?)", conversationID, userID, userID).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func (r *MessageRepo) GetConversations(userID int64) ([]ConversationSummary, error) {
 	var results []ConversationSummary
 	// MySQL 5.7 compatible query

@@ -113,7 +113,7 @@ func (s *SMSService) aliyunSend(phone, code string) error {
 		errMsg := fmt.Sprintf("aliyun sms error: code=%s, message=%s",
 			tea.StringValue(resp.Body.Code), tea.StringValue(resp.Body.Message))
 		s.logger.Error(errMsg, zap.String("phone", phone))
-		return fmt.Errorf(errMsg)
+			return fmt.Errorf("%s", errMsg)
 	}
 	s.logger.Info("aliyun sms sent", zap.String("phone", phone), zap.String("request_id", tea.StringValue(resp.Body.RequestId)))
 	return nil
