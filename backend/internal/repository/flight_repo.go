@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -136,6 +137,10 @@ func (r *FlightRepo) GetPositionsByFlightRecord(flightRecordID int64) ([]model.F
 	return positions, err
 }
 
+func (r *FlightRepo) DeletePositionsByOrder(orderID int64) error {
+	return r.db.Where("order_id = ?", orderID).Delete(&model.FlightPosition{}).Error
+}
+
 // GetPositionsByTimeRange 获取时间范围内的位置记录
 func (r *FlightRepo) GetPositionsByTimeRange(orderID int64, start, end time.Time) ([]model.FlightPosition, error) {
 	var positions []model.FlightPosition
@@ -190,6 +195,10 @@ func (r *FlightRepo) GetAlertsByFlightRecord(flightRecordID int64) ([]model.Flig
 	var alerts []model.FlightAlert
 	err := r.db.Where("flight_record_id = ?", flightRecordID).Order("triggered_at DESC").Find(&alerts).Error
 	return alerts, err
+}
+
+func (r *FlightRepo) DeleteAlertsByOrder(orderID int64) error {
+	return r.db.Where("order_id = ?", orderID).Delete(&model.FlightAlert{}).Error
 }
 
 // GetActiveAlerts 获取活跃告警
@@ -529,18 +538,42 @@ func (r *FlightRepo) GetFlightStats(orderID int64) (map[string]interface{}, erro
 	totalDuration := 0
 	totalDistance := 0.0
 	maxAltitude := 0.0
+	var earliestTakeoff *time.Time
+	var latestLanding *time.Time
 	for _, record := range records {
 		totalDuration += record.TotalDurationSeconds
 		totalDistance += record.TotalDistanceM
 		if record.MaxAltitudeM > maxAltitude {
 			maxAltitude = record.MaxAltitudeM
 		}
+		if record.TakeoffAt != nil && (earliestTakeoff == nil || record.TakeoffAt.Before(*earliestTakeoff)) {
+			t := *record.TakeoffAt
+			earliestTakeoff = &t
+		}
+		if record.LandingAt != nil && (latestLanding == nil || record.LandingAt.After(*latestLanding)) {
+			t := *record.LandingAt
+			latestLanding = &t
+		}
+	}
+
+	avgSpeed := 0.0
+	if totalDuration > 0 {
+		avgSpeed = math.Round((totalDistance/float64(totalDuration))*10) / 10
 	}
 
 	stats["flight_record_count"] = len(records)
 	stats["flight_duration"] = totalDuration
 	stats["flight_distance"] = totalDistance
 	stats["max_altitude"] = maxAltitude
+	stats["actual_flight_duration"] = totalDuration
+	stats["actual_flight_distance"] = totalDistance
+	stats["avg_speed"] = avgSpeed
+	if earliestTakeoff != nil {
+		stats["flight_start_time"] = earliestTakeoff
+	}
+	if latestLanding != nil {
+		stats["flight_end_time"] = latestLanding
+	}
 
 	// 位置点数
 	var posCount int64

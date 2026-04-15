@@ -82,11 +82,11 @@ export default function QuickOrderEntryScreen({navigation}: any) {
 
   const handleNext = () => {
     if (!pickupAddress || !deliveryAddress) {
-      Alert.alert('提示', '请先填写起点和终点地址，平台将据此匹配服务。');
+      Alert.alert('提示', '请先填写起点和终点地址。');
       return;
     }
     if (!cargoWeight || Number(cargoWeight) <= 0) {
-      Alert.alert('提示', '请填写货物预估重量，用于筛选有足够吊重的设备。');
+      Alert.alert('提示', '请填写货物预估重量，用于精准匹配机型。');
       return;
     }
     if (endDate <= startDate) {
@@ -94,12 +94,6 @@ export default function QuickOrderEntryScreen({navigation}: any) {
       return;
     }
     navigation.navigate('OfferList', {
-      quickOrderDraft: buildDraft(),
-    });
-  };
-
-  const handleFallbackToPublish = () => {
-    navigation.navigate('PublishCargo', {
       quickOrderDraft: buildDraft(),
     });
   };
@@ -124,108 +118,155 @@ export default function QuickOrderEntryScreen({navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ObjectCard style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>快速下单</Text>
-          <Text style={styles.title}>先告诉我这次怎么运</Text>
+      <View style={styles.stepHeader}>
+        <View style={styles.stepTrack}>
+          <View style={[styles.stepDot, styles.stepDotActive]} />
+          <View style={styles.stepLine} />
+          <View style={styles.stepDot} />
+          <View style={styles.stepLine} />
+          <View style={styles.stepDot} />
+        </View>
+        <View style={styles.stepLabels}>
+          <Text style={[styles.stepLabelText, styles.stepLabelTextActive]}>填写信息</Text>
+          <Text style={styles.stepLabelText}>挑选服务</Text>
+          <Text style={styles.stepLabelText}>确认下单</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroSection}>
+          <Text style={styles.title}>我们要运往哪里？</Text>
           <Text style={styles.subtitle}>
-            这里只收最小成单信息。下一步系统会直接筛出支持直达下单的服务，不让你先发完整任务再慢慢等。
+            只需填写最核心的运输需求，系统将为您即时匹配支持直达下单的专业机组。
           </Text>
-        </ObjectCard>
+        </View>
 
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>第 1 步：填写最小信息</Text>
-
-          <Text style={styles.label}>起点地址 *</Text>
-          <AddressInputField value={pickupAddress} placeholder="点击选择起点地址" onSelect={setPickupAddress} />
-
-          <Text style={styles.label}>终点地址 *</Text>
-          <AddressInputField value={deliveryAddress} placeholder="点击选择终点地址" onSelect={setDeliveryAddress} />
-
-          <Text style={styles.label}>货物重量预估 (kg) *</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="例如：120"
-            placeholderTextColor={theme.textHint}
-            value={cargoWeight}
-            onChangeText={setCargoWeight}
-          />
-
-          <Text style={styles.label}>货物类型</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="例如：塔材、设备箱、海鲜补给"
-            placeholderTextColor={theme.textHint}
-            value={cargoType}
-            onChangeText={setCargoType}
-          />
-
-          <Text style={styles.label}>作业场景 *</Text>
-          <View style={styles.optionRow}>
-            {sceneOptions.map(option => (
-              <TouchableOpacity
-                key={option.key}
-                style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
-                onPress={() => setCargoScene(option.key)}>
-                <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        <ObjectCard style={styles.inputSection}>
+          <View style={styles.inputGroup}>
+            <View style={styles.iconLabelRow}>
+              <Text style={styles.iconEmoji}>📍</Text>
+              <Text style={styles.label}>运输路线</Text>
+            </View>
+            <View style={styles.addressContainer}>
+              <AddressInputField
+                value={pickupAddress}
+                placeholder="从哪起运？"
+                onSelect={setPickupAddress}
+                style={styles.addressInput}
+              />
+              <View style={styles.addressConnector}>
+                <View style={styles.connectorLine} />
+              </View>
+              <AddressInputField
+                value={deliveryAddress}
+                placeholder="运往何处？"
+                onSelect={setDeliveryAddress}
+                style={styles.addressInput}
+              />
+            </View>
           </View>
 
-          <Text style={styles.label}>期望开始时间 *</Text>
-          <TouchableOpacity style={styles.input} onPress={() => setShowStartPicker(true)}>
-            <Text style={styles.dateText}>{formatDateTime(startDate)}</Text>
-          </TouchableOpacity>
-          {showStartPicker ? (
-            <DateTimePicker
-              value={startDate}
-              mode="datetime"
-              display="default"
-              onChange={onStartDateChange}
-              minimumDate={new Date()}
-            />
-          ) : null}
+          <View style={styles.inputGroup}>
+            <View style={styles.iconLabelRow}>
+              <Text style={styles.iconEmoji}>📦</Text>
+              <Text style={styles.label}>货物概况</Text>
+            </View>
+            <View style={styles.cargoRow}>
+              <View style={[styles.inputWrap, {flex: 2}]}>
+                <TextInput
+                  style={styles.inlineInput}
+                  placeholder="货物类型，如：塔材"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoType}
+                  onChangeText={setCargoType}
+                />
+              </View>
+              <View style={[styles.inputWrap, {flex: 1.2}]}>
+                <TextInput
+                  style={[styles.inlineInput, {textAlign: 'right'}]}
+                  keyboardType="numeric"
+                  placeholder="重量 (kg)"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoWeight}
+                  onChangeText={setCargoWeight}
+                />
+              </View>
+            </View>
+          </View>
 
-          <Text style={styles.label}>期望结束时间 *</Text>
-          <TouchableOpacity style={styles.input} onPress={() => setShowEndPicker(true)}>
-            <Text style={styles.dateText}>{formatDateTime(endDate)}</Text>
-          </TouchableOpacity>
-          {showEndPicker ? (
-            <DateTimePicker
-              value={endDate}
-              mode="datetime"
-              display="default"
-              onChange={onEndDateChange}
-              minimumDate={startDate}
-            />
-          ) : null}
+          <View style={styles.inputGroup}>
+            <View style={styles.iconLabelRow}>
+              <Text style={styles.iconEmoji}>🏗️</Text>
+              <Text style={styles.label}>作业场景</Text>
+            </View>
+            <View style={styles.optionRow}>
+              {sceneOptions.map(option => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
+                  onPress={() => setCargoScene(option.key)}>
+                  <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.iconLabelRow}>
+              <Text style={styles.iconEmoji}>🕒</Text>
+              <Text style={styles.label}>预约时间</Text>
+            </View>
+            <View style={styles.timeRow}>
+              <TouchableOpacity style={styles.timePicker} onPress={() => setShowStartPicker(true)}>
+                <Text style={styles.timePickerLabel}>开始时间</Text>
+                <Text style={styles.timePickerValue}>{formatDateTime(startDate).split(' ')[1]}</Text>
+                <Text style={styles.timePickerDate}>{formatDateTime(startDate).split(' ')[0]}</Text>
+              </TouchableOpacity>
+              <View style={styles.timeSeparator}>
+                <Text style={styles.timeSeparatorText}>至</Text>
+              </View>
+              <TouchableOpacity style={styles.timePicker} onPress={() => setShowEndPicker(true)}>
+                <Text style={styles.timePickerLabel}>结束时间</Text>
+                <Text style={styles.timePickerValue}>{formatDateTime(endDate).split(' ')[1]}</Text>
+                <Text style={styles.timePickerDate}>{formatDateTime(endDate).split(' ')[0]}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ObjectCard>
 
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>本次需求摘要</Text>
-          <Text style={styles.summaryText}>
-            {summarizeAddress(pickupAddress)}
-            {' -> '}
-            {summarizeAddress(deliveryAddress)}
-          </Text>
-          <Text style={styles.summaryText}>
-            {cargoWeight || '--'}kg / {cargoType.trim() || '重载物资'}
-          </Text>
-          <Text style={styles.summaryHint}>
-            如果下一步没有筛到合适服务，系统会保留这些信息，让你一键改为发布任务。
-          </Text>
-        </ObjectCard>
+        {showStartPicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="datetime"
+            display="default"
+            onChange={onStartDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+        {showEndPicker && (
+          <DateTimePicker
+            value={endDate}
+            mode="datetime"
+            display="default"
+            onChange={onEndDateChange}
+            minimumDate={startDate}
+          />
+        )}
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleNext}>
-          <Text style={styles.submitBtnText}>第 2 步：查看推荐服务</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryBtn} onPress={handleFallbackToPublish}>
-          <Text style={styles.secondaryBtnText}>复杂需求？直接发布任务</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomActions}>
+          <TouchableOpacity style={styles.submitBtn} onPress={handleNext}>
+            <Text style={styles.submitBtnText}>查看推荐服务</Text>
+            <Text style={styles.submitBtnSubtext}>系统将实时筛选支持直达下单的服务</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryLink}
+            onPress={() => navigation.navigate('PublishCargo', {quickOrderDraft: buildDraft()})}
+          >
+            <Text style={styles.secondaryLinkText}>需求较复杂？发布任务让机主报价</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -233,103 +274,221 @@ export default function QuickOrderEntryScreen({navigation}: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: {flex: 1, backgroundColor: theme.card},
-    content: {padding: 16, paddingBottom: 40, gap: 12},
-    heroCard: {
-      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-      borderWidth: theme.isDark ? 1 : 0,
-      borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
+    container: {flex: 1, backgroundColor: theme.bg},
+    stepHeader: {
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+      backgroundColor: theme.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.divider,
     },
-    heroEyebrow: {
-      fontSize: 12,
+    stepTrack: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.divider,
+    },
+    stepDotActive: {
+      backgroundColor: theme.primary,
+      width: 12,
+      height: 12,
+    },
+    stepLine: {
+      width: 60,
+      height: 2,
+      backgroundColor: theme.divider,
+      marginHorizontal: 4,
+    },
+    stepLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    stepLabelText: {
+      fontSize: 11,
+      color: theme.textHint,
+      fontWeight: '600',
+    },
+    stepLabelTextActive: {
+      color: theme.primary,
       fontWeight: '700',
-      color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.72)',
+    },
+    content: {paddingHorizontal: 16, paddingBottom: 40},
+    heroSection: {
+      marginTop: 24,
+      marginBottom: 20,
     },
     title: {
-      marginTop: 8,
-      fontSize: 26,
-      lineHeight: 32,
+      fontSize: 28,
       fontWeight: '800',
-      color: theme.isDark ? theme.text : '#FFFFFF',
+      color: theme.text,
+      letterSpacing: -0.5,
     },
     subtitle: {
       marginTop: 10,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
+      fontSize: 14,
+      lineHeight: 22,
+      color: theme.textSub,
     },
-    sectionTitle: {
-      fontSize: 17,
-      fontWeight: '800',
-      color: theme.text,
-      marginBottom: 4,
+    inputSection: {
+      padding: 18,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+    },
+    inputGroup: {
+      marginBottom: 24,
+    },
+    iconLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    iconEmoji: {
+      fontSize: 16,
+      marginRight: 8,
     },
     label: {
-      fontSize: 14,
-      fontWeight: '700',
+      fontSize: 15,
+      fontWeight: '800',
       color: theme.text,
-      marginBottom: 8,
-      marginTop: 16,
     },
-    input: {
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
+    addressContainer: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 16,
+      padding: 4,
+    },
+    addressInput: {
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+    },
+    addressConnector: {
+      paddingLeft: 44,
+      height: 12,
+      justifyContent: 'center',
+    },
+    connectorLine: {
+      width: 1,
+      height: '100%',
+      backgroundColor: theme.divider,
+      marginLeft: 2,
+    },
+    cargoRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    inputWrap: {
+      backgroundColor: theme.bgSecondary,
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
-      backgroundColor: theme.bgSecondary,
     },
-    dateText: {
+    inlineInput: {
       fontSize: 15,
       color: theme.text,
+      padding: 0,
     },
-    optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
+    optionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
     optionBtn: {
       paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: 18,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: theme.bgSecondary,
       borderWidth: 1,
-      borderColor: theme.cardBorder,
-      marginRight: 8,
-      marginBottom: 8,
-      backgroundColor: theme.card,
+      borderColor: 'transparent',
     },
     optionBtnActive: {
       borderColor: theme.primary,
-      backgroundColor: theme.primary + '22',
+      backgroundColor: theme.primaryBg,
     },
-    optionText: {fontSize: 13, color: theme.textSub},
-    optionTextActive: {color: theme.primary, fontWeight: '700'},
-    summaryText: {
-      fontSize: 14,
-      lineHeight: 22,
-      color: theme.text,
-      marginTop: 6,
-    },
-    summaryHint: {
-      fontSize: 12,
-      lineHeight: 18,
+    optionText: {
+      fontSize: 13,
       color: theme.textSub,
-      marginTop: 10,
+      fontWeight: '600',
+    },
+    optionTextActive: {
+      color: theme.primaryText,
+      fontWeight: '800',
+    },
+    timeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    timePicker: {
+      flex: 1,
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 12,
+      padding: 12,
+      alignItems: 'center',
+    },
+    timePickerLabel: {
+      fontSize: 10,
+      color: theme.textHint,
+      textTransform: 'uppercase',
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    timePickerValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    timePickerDate: {
+      fontSize: 11,
+      color: theme.textSub,
+      marginTop: 2,
+    },
+    timeSeparator: {
+      paddingHorizontal: 10,
+    },
+    timeSeparatorText: {
+      fontSize: 12,
+      color: theme.textHint,
+      fontWeight: '700',
+    },
+    bottomActions: {
+      marginTop: 24,
+      gap: 16,
     },
     submitBtn: {
-      marginTop: 8,
-      height: 50,
-      borderRadius: 14,
+      height: 64,
+      borderRadius: 18,
       backgroundColor: theme.primary,
       justifyContent: 'center',
       alignItems: 'center',
+      shadowColor: theme.primary,
+      shadowOffset: {width: 0, height: 6},
+      shadowOpacity: 0.2,
+      shadowRadius: 10,
+      elevation: 4,
     },
-    submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '800'},
-    secondaryBtn: {
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      justifyContent: 'center',
+    submitBtnText: {
+      color: '#FFFFFF',
+      fontSize: 17,
+      fontWeight: '800',
+    },
+    submitBtnSubtext: {
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: 11,
+      marginTop: 4,
+      fontWeight: '600',
+    },
+    secondaryLink: {
+      paddingVertical: 8,
       alignItems: 'center',
     },
-    secondaryBtnText: {color: theme.text, fontSize: 15, fontWeight: '700'},
+    secondaryLinkText: {
+      fontSize: 14,
+      color: theme.textSub,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+    },
   });

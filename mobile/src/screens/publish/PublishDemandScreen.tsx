@@ -16,6 +16,10 @@ import AddressInputField from '../../components/AddressInputField';
 import {getClientEligibility} from '../../services/client';
 import {demandV2Service} from '../../services/demandV2';
 import {AddressData} from '../../types';
+import {
+  DEMAND_SCENE_OPTIONS,
+  generateSuggestedTitle,
+} from './demandComposerShared';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -93,6 +97,19 @@ export default function PublishDemandScreen({navigation}: any) {
     d.setHours(23, 59, 59, 0);
     return d.toISOString();
   }, []);
+
+  const suggestedTitle = useMemo(
+    () =>
+      generateSuggestedTitle({
+        sceneKey: cargoScene,
+        serviceAddress,
+      }),
+    [cargoScene, serviceAddress],
+  );
+
+  const handleMagicTitle = () => {
+    setTitle(suggestedTitle);
+  };
 
   const onStartDateChange = (_event: any, selected?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
@@ -179,7 +196,7 @@ export default function PublishDemandScreen({navigation}: any) {
 
   const handleSaveDraft = async () => {
     if (!title.trim()) return Alert.alert('提示', '请输入需求标题 (至少填写标题才能保存草稿)');
-    
+
     setSubmitting(true);
     try {
       await demandV2Service.create(getPayload());
@@ -224,256 +241,531 @@ export default function PublishDemandScreen({navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      {/* Progress Header */}
       <View style={styles.header}>
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressStep, step >= 1 && styles.progressStepActive]} />
-          <View style={[styles.progressStep, step >= 2 && styles.progressStepActive]} />
+        <View style={styles.progressHeader}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressPin, step >= 1 && styles.progressPinActive]} />
+            <View style={[styles.progressLine, step >= 2 && styles.progressLineActive]} />
+            <View style={[styles.progressPin, step >= 2 && styles.progressPinActive]} />
+          </View>
+          <View style={styles.progressLabels}>
+            <Text style={[styles.progressLabelText, step >= 1 && styles.progressLabelTextActive]}>基础信息</Text>
+            <Text style={[styles.progressLabelText, step >= 2 && styles.progressLabelTextActive]}>更多细节</Text>
+          </View>
         </View>
-        <Text style={styles.headerTitle}>
-          {step === 1 ? '第 1/2 步：基础信息' : '第 2/2 步：运输细节与说明'}
-        </Text>
-        <Text style={styles.headerSubtitle}>
-          {step === 1 ? '填写真实核心信息，方便快速成单' : '详细要求有助于获得更精准的报价'}
-        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {step === 1 && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.label}>需求标题 *</Text>
-            <TextInput style={styles.input} placeholder="例如：山区电网建设塔材吊运" value={title} onChangeText={setTitle} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {step === 1 ? (
+          <View style={styles.formSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>1. 基础信息</Text>
+              <Text style={styles.sectionSubtitle}>填写真实核心信息，方便快速成单</Text>
+            </View>
 
-            <Text style={styles.label}>作业场景 *</Text>
-            <View style={styles.optionRow}>
-              {sceneOptions.map(option => (
+            <View style={styles.inputCard}>
+              <Text style={styles.label}>需求标题</Text>
+              <View style={styles.titleInputRow}>
+                <TextInput
+                  style={[styles.input, {flex: 1}]}
+                  placeholder="例如：山区电网建设塔材吊运"
+                  placeholderTextColor={theme.textHint}
+                  value={title}
+                  onChangeText={setTitle}
+                />
                 <TouchableOpacity
-                  key={option.key}
-                  style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
-                  onPress={() => setCargoScene(option.key)}>
-                  <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>{option.label}</Text>
+                  style={[styles.magicBtn, title === suggestedTitle && styles.magicBtnActive]}
+                  onPress={handleMagicTitle}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.magicEmoji}>✨</Text>
                 </TouchableOpacity>
-              ))}
+              </View>
+              {title !== suggestedTitle && (
+                <TouchableOpacity onPress={handleMagicTitle} style={styles.suggestedLink}>
+                  <Text style={styles.suggestedLinkText}>推荐：{suggestedTitle}</Text>
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.label}>作业场景</Text>
+              <View style={styles.sceneGrid}>
+                {sceneOptions.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[styles.sceneBtn, cargoScene === option.key && styles.sceneBtnActive]}
+                    onPress={() => setCargoScene(option.key)}>
+                    <Text style={[styles.sceneBtnText, cargoScene === option.key && styles.sceneBtnTextActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>服务地址</Text>
+              <AddressInputField
+                value={serviceAddress}
+                placeholder="点击选择主要作业地址"
+                onSelect={setServiceAddress}
+                style={styles.formAddressInput}
+              />
+
+              <Text style={styles.label}>货物重量 (kg)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="例如：80"
+                placeholderTextColor={theme.textHint}
+                value={cargoWeight}
+                onChangeText={setCargoWeight}
+              />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.formSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>2. 细节与说明</Text>
+              <Text style={styles.sectionSubtitle}>详细要求有助于获得更精准的报价</Text>
             </View>
 
-            <Text style={styles.label}>服务地址 *</Text>
-            <AddressInputField value={serviceAddress} placeholder="点击选择主要作业地址" onSelect={setServiceAddress} />
+            <View style={styles.inputCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.label}>任务计划时间</Text>
+                <Text style={styles.sectionSubtitle}>请设置预期的作业时段</Text>
+              </View>
 
-            <Text style={styles.label}>货物重量 (kg) *</Text>
-            <TextInput style={styles.input} keyboardType="numeric" placeholder="例如：80" value={cargoWeight} onChangeText={setCargoWeight} />
+              <View style={styles.timePickerContainer}>
+                <TouchableOpacity
+                  style={[styles.timePickerBox, startConfirmed && styles.timePickerBoxActive]}
+                  onPress={() => setShowStartPicker(true)}
+                >
+                  <Text style={styles.timePickerLabel}>开始时间</Text>
+                  <Text style={[styles.timePickerValue, !startConfirmed && styles.timePickerValuePlaceholder]}>
+                    {startConfirmed ? formatDateTime(startDate).split(' ')[1] : '点击设置'}
+                  </Text>
+                  <Text style={styles.timePickerDate}>
+                    {formatDateTime(startDate).split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
 
-            <View style={styles.tipCard}>
-              <Text style={styles.tipTitle}>💡 草稿提示</Text>
-              <Text style={styles.tipText}>您可以随时保存当前进度为草稿，之后在“我的需求”里继续编辑。</Text>
-            </View>
+                <View style={styles.timeConnector}>
+                  <Text style={styles.timeConnectorText}>至</Text>
+                </View>
 
-            <View style={styles.actionRow}>
-              <TouchableOpacity style={[styles.btnSecondary, submitting && styles.btnDisabled]} onPress={handleSaveDraft} disabled={submitting}>
-                <Text style={styles.btnSecondaryText}>保存草稿</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnPrimary, submitting && styles.btnDisabled]} onPress={handleNextStep} disabled={submitting}>
-                <Text style={styles.btnPrimaryText}>下一步</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.timePickerBox, endConfirmed && styles.timePickerBoxActive]}
+                  onPress={() => setShowEndPicker(true)}
+                >
+                  <Text style={styles.timePickerLabel}>结束时间</Text>
+                  <Text style={[styles.timePickerValue, !endConfirmed && styles.timePickerValuePlaceholder]}>
+                    {endConfirmed ? formatDateTime(endDate).split(' ')[1] : '点击设置'}
+                  </Text>
+                  <Text style={styles.timePickerDate}>
+                    {formatDateTime(endDate).split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {!startConfirmed && !endConfirmed && (
+                <View style={styles.timeHintBox}>
+                  <Text style={styles.timeHintText}>💡 建议：预留至少 2 小时作业时间</Text>
+                </View>
+              )}
+
+              <Text style={styles.label}>预计架次</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="默认 1"
+                placeholderTextColor={theme.textHint}
+                value={tripCount}
+                onChangeText={setTripCount}
+              />
+
+              <Text style={styles.label}>预算范围 (元)</Text>
+              <View style={styles.budgetRow}>
+                <TextInput
+                  style={[styles.input, {flex: 1}]}
+                  keyboardType="numeric"
+                  placeholder="最低"
+                  placeholderTextColor={theme.textHint}
+                  value={budgetMin}
+                  onChangeText={setBudgetMin}
+                />
+                <Text style={styles.budgetSplit}>至</Text>
+                <TextInput
+                  style={[styles.input, {flex: 1}]}
+                  keyboardType="numeric"
+                  placeholder="最高"
+                  placeholderTextColor={theme.textHint}
+                  value={budgetMax}
+                  onChangeText={setBudgetMax}
+                />
+              </View>
+
+              <Text style={styles.label}>需求说明</Text>
+              <TextInput
+                style={[styles.input, styles.textarea]}
+                placeholder="补充货物类型、现场条件等..."
+                placeholderTextColor={theme.textHint}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
+              />
             </View>
           </View>
         )}
 
-        {step === 2 && (
-          <View style={styles.stepContainer}>
-            <Text style={styles.label}>预计架次</Text>
-            <TextInput style={styles.input} keyboardType="numeric" placeholder="默认 1 架次" value={tripCount} onChangeText={setTripCount} />
-
-            <Text style={styles.label}>预约开始时间 *</Text>
-            <Text style={styles.timeHint}>请主动确认期望执行时间，系统不再直接替你使用默认值。</Text>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
-              <Text style={[styles.dateText, !startConfirmed && styles.datePlaceholderText]}>
-                {startConfirmed ? formatDateTime(startDate) : '请选择期望开始时间'}
-              </Text>
-            </TouchableOpacity>
-            {!startConfirmed ? <Text style={styles.timeRecommend}>建议参考：{formatDateTime(startDate)}</Text> : null}
-            {showStartPicker && (
-              <DateTimePicker
-                value={startDate}
-                mode="datetime"
-                display="default"
-                onChange={onStartDateChange}
-                minimumDate={new Date()}
-              />
-            )}
-
-            <Text style={styles.label}>预约结束时间 *</Text>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
-              <Text style={[styles.dateText, !endConfirmed && styles.datePlaceholderText]}>
-                {endConfirmed ? formatDateTime(endDate) : '请选择期望结束时间'}
-              </Text>
-            </TouchableOpacity>
-            {!endConfirmed ? <Text style={styles.timeRecommend}>建议参考：{formatDateTime(endDate)}</Text> : null}
-            {showEndPicker && (
-              <DateTimePicker
-                value={endDate}
-                mode="datetime"
-                display="default"
-                onChange={onEndDateChange}
-                minimumDate={startDate}
-              />
-            )}
-
-            <Text style={styles.label}>预算范围 (元)</Text>
-            <View style={styles.budgetRow}>
-              <TextInput style={[styles.input, styles.flexInput]} keyboardType="numeric" placeholder="最低预算" value={budgetMin} onChangeText={setBudgetMin} />
-              <Text style={styles.split}>-</Text>
-              <TextInput style={[styles.input, styles.flexInput]} keyboardType="numeric" placeholder="最高预算" value={budgetMax} onChangeText={setBudgetMax} />
-            </View>
-
-            <Text style={styles.label}>需求说明</Text>
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              placeholder="补充货物类型、现场条件、时效要求等"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              textAlignVertical="top"
-            />
-
-            <View style={styles.actionRowMulti}>
-              <TouchableOpacity style={[styles.btnTertiary, submitting && styles.btnDisabled]} onPress={() => setStep(1)} disabled={submitting}>
-                <Text style={styles.btnTertiaryText}>上一步</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnSecondary, submitting && styles.btnDisabled]} onPress={handleSaveDraft} disabled={submitting}>
+        <View style={styles.footerActions}>
+          {step === 1 ? (
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.btnSecondary, submitting && styles.btnDisabled]}
+                onPress={handleSaveDraft}
+                disabled={submitting}>
                 <Text style={styles.btnSecondaryText}>保存草稿</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnPrimary, submitting && styles.btnDisabled]} onPress={handlePublish} disabled={submitting}>
+              <TouchableOpacity
+                style={[styles.btnPrimary, submitting && styles.btnDisabled]}
+                onPress={handleNextStep}
+                disabled={submitting}>
+                <Text style={styles.btnPrimaryText}>下一步</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.actionRowMulti}>
+              <TouchableOpacity
+                style={[styles.btnTertiary, submitting && styles.btnDisabled]}
+                onPress={() => setStep(1)}
+                disabled={submitting}>
+                <Text style={styles.btnTertiaryText}>上一步</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnSecondary, submitting && styles.btnDisabled]}
+                onPress={handleSaveDraft}
+                disabled={submitting}>
+                <Text style={styles.btnSecondaryText}>存草稿</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnPrimary, submitting && styles.btnDisabled]}
+                onPress={handlePublish}
+                disabled={submitting}>
                 <Text style={styles.btnPrimaryText}>{submitting ? '发布中...' : '确认发布'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          )}
+        </View>
+
+        {showStartPicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="datetime"
+            display="default"
+            onChange={onStartDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+        {showEndPicker && (
+          <DateTimePicker
+            value={endDate}
+            mode="datetime"
+            display="default"
+            onChange={onEndDateChange}
+            minimumDate={startDate}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.card},
-  header: {
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    backgroundColor: theme.bgSecondary,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.cardBorder,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    gap: 8,
-  },
-  progressStep: {
-    flex: 1,
-    height: 4,
-    backgroundColor: theme.cardBorder,
-    borderRadius: 2,
-  },
-  progressStepActive: {
-    backgroundColor: theme.primary,
-  },
-  headerTitle: {fontSize: 18, fontWeight: '700', color: theme.text, marginBottom: 4},
-  headerSubtitle: {fontSize: 13, color: theme.textSub},
-  content: {padding: 20, paddingBottom: 60},
-  stepContainer: {flex: 1},
-  label: {fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 8, marginTop: 18},
-  input: {
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    backgroundColor: theme.bgSecondary,
-  },
-  textarea: {height: 96},
-  dateInput: {
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    backgroundColor: theme.bgSecondary,
-  },
-  dateText: {fontSize: 15, color: theme.text},
-  datePlaceholderText: {color: theme.textHint},
-  timeHint: {fontSize: 12, color: theme.textSub, marginBottom: 8},
-  timeRecommend: {fontSize: 12, color: theme.primaryText, marginTop: 6},
-  optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
-  optionBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    marginRight: 8,
-    marginBottom: 8,
-    backgroundColor: theme.card,
-  },
-  optionBtnActive: {
-    borderColor: theme.primary,
-    backgroundColor: theme.primaryBg,
-  },
-  optionText: {fontSize: 13, color: theme.textSub},
-  optionTextActive: {color: theme.primaryText, fontWeight: '600'},
-  budgetRow: {flexDirection: 'row', alignItems: 'center'},
-  flexInput: {flex: 1},
-  split: {marginHorizontal: 10, color: theme.textHint},
-  tipCard: {
-    marginTop: 24,
-    backgroundColor: theme.info + '18',
-    borderWidth: 1,
-    borderColor: theme.info + '44',
-    borderRadius: 14,
-    padding: 14,
-  },
-  tipTitle: {fontSize: 14, fontWeight: '700', color: theme.info, marginBottom: 6},
-  tipText: {fontSize: 12, lineHeight: 18, color: theme.info},
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 32,
-    gap: 12,
-  },
-  actionRowMulti: {
-    flexDirection: 'row',
-    marginTop: 32,
-    gap: 8,
-  },
-  btnPrimary: {
-    flex: 2,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: theme.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnSecondary: {
-    flex: 1.5,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: theme.bgSecondary,
-    borderWidth: 1,
-    borderColor: theme.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnTertiary: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: theme.bgSecondary,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  btnDisabled: {opacity: 0.6},
-  btnPrimaryText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '700'},
-  btnSecondaryText: {color: theme.primary, fontSize: 16, fontWeight: '600'},
-  btnTertiaryText: {color: theme.textSub, fontSize: 16, fontWeight: '600'},
-});
+const getStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {flex: 1, backgroundColor: theme.bg},
+    header: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: theme.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.divider,
+    },
+    progressHeader: {
+      marginBottom: 4,
+    },
+    progressTrack: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 40,
+    },
+    progressPin: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.divider,
+    },
+    progressPinActive: {
+      backgroundColor: theme.primary,
+    },
+    progressLine: {
+      flex: 1,
+      height: 2,
+      backgroundColor: theme.divider,
+      marginHorizontal: 4,
+    },
+    progressLineActive: {
+      backgroundColor: theme.primary,
+    },
+    progressLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+      paddingHorizontal: 20,
+    },
+    progressLabelText: {
+      fontSize: 11,
+      color: theme.textHint,
+      fontWeight: '600',
+    },
+    progressLabelTextActive: {
+      color: theme.primary,
+      fontWeight: '700',
+    },
+    content: {paddingBottom: 40},
+    formSection: {
+      padding: 16,
+    },
+    sectionHeader: {
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    sectionSubtitle: {
+      fontSize: 13,
+      color: theme.textSub,
+      marginTop: 4,
+    },
+    inputCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.textSub,
+      marginBottom: 8,
+      marginTop: 16,
+    },
+    input: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: theme.text,
+    },
+    titleInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    magicBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: theme.bgSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    magicBtnActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryBg,
+    },
+    magicEmoji: {
+      fontSize: 18,
+    },
+    suggestedLink: {
+      marginTop: 8,
+      paddingLeft: 4,
+    },
+    suggestedLinkText: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: '600',
+    },
+    sceneGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    sceneBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: theme.bgSecondary,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    sceneBtnActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryBg,
+    },
+    sceneBtnText: {
+      fontSize: 13,
+      color: theme.textSub,
+      fontWeight: '600',
+    },
+    sceneBtnTextActive: {
+      color: theme.primaryText,
+      fontWeight: '700',
+    },
+    formAddressInput: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 12,
+    },
+    timeBtn: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 12,
+      padding: 12,
+      justifyContent: 'center',
+    },
+    timeBtnText: {
+      fontSize: 14,
+      color: theme.text,
+      fontWeight: '600',
+    },
+    timePickerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    timePickerBox: {
+      flex: 1,
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.divider,
+      alignItems: 'center',
+    },
+    timePickerBoxActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryBg,
+    },
+    timePickerLabel: {
+      fontSize: 10,
+      color: theme.textSub,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    timePickerValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    timePickerValuePlaceholder: {
+      color: theme.textHint,
+    },
+    timePickerDate: {
+      fontSize: 11,
+      color: theme.textHint,
+      marginTop: 2,
+    },
+    timeConnector: {
+      paddingHorizontal: 4,
+    },
+    timeConnectorText: {
+      fontSize: 12,
+      color: theme.textHint,
+      fontWeight: '700',
+    },
+    timeHintBox: {
+      backgroundColor: theme.info + '10',
+      padding: 10,
+      borderRadius: 10,
+      marginBottom: 16,
+    },
+    timeHintText: {
+      fontSize: 12,
+      color: theme.info,
+      textAlign: 'center',
+    },
+    budgetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    budgetSplit: {
+      fontSize: 13,
+      color: theme.textHint,
+    },
+    textarea: {
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    footerActions: {
+      padding: 16,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    actionRowMulti: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    btnPrimary: {
+      flex: 2,
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: theme.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: theme.primary,
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    btnSecondary: {
+      flex: 1.2,
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: theme.bgSecondary,
+      borderWidth: 1,
+      borderColor: theme.divider,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    btnTertiary: {
+      flex: 1,
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: theme.bgSecondary,
+      borderWidth: 1,
+      borderColor: theme.divider,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    btnPrimaryText: {color: '#FFFFFF', fontSize: 16, fontWeight: '800'},
+    btnSecondaryText: {color: theme.textSub, fontSize: 15, fontWeight: '600'},
+    btnTertiaryText: {color: theme.textSub, fontSize: 15, fontWeight: '600'},
+    btnDisabled: {opacity: 0.6},
+    rowInputs: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+  });

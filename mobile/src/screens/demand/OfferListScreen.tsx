@@ -529,6 +529,21 @@ export default function OfferListScreen({route, navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+      <View style={styles.stepHeader}>
+        <View style={styles.stepTrack}>
+          <View style={[styles.stepDot, styles.stepDotCompleted]} />
+          <View style={[styles.stepLine, styles.stepLineCompleted]} />
+          <View style={[styles.stepDot, styles.stepDotActive]} />
+          <View style={styles.stepLine} />
+          <View style={styles.stepDot} />
+        </View>
+        <View style={styles.stepLabels}>
+          <Text style={[styles.stepLabelText, styles.stepLabelTextCompleted]}>填写信息</Text>
+          <Text style={[styles.stepLabelText, styles.stepLabelTextActive]}>挑选服务</Text>
+          <Text style={styles.stepLabelText}>确认下单</Text>
+        </View>
+      </View>
+
       <FlatList
         data={supplies}
         keyExtractor={item => String(item.id)}
@@ -541,16 +556,73 @@ export default function OfferListScreen({route, navigation}: any) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
-            <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>{quickOrderMode ? '快速下单' : '服务市场'}</Text>
-              <Text style={styles.heroTitle}>{heroTitle}</Text>
-              <Text style={styles.heroDesc}>{heroDesc}</Text>
-              <View style={styles.heroActionRow}>
-                {quickOrderMode ? (
-                  <TouchableOpacity style={styles.heroGhostBtn} onPress={handleBrowseMode}>
-                    <Text style={styles.heroGhostBtnText}>先浏览全部服务</Text>
+            {quickOrderMode ? (
+              <View style={styles.quickOrderHeader}>
+                <View style={styles.headerTitleRow}>
+                  <Text style={styles.headerTitle}>为您匹配到以下机组</Text>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => setEditQuickOrder(!editQuickOrder)}>
+                    <Text style={styles.editBtnText}>{editQuickOrder ? '收起' : '修改条件'}</Text>
                   </TouchableOpacity>
+                </View>
+
+                {editQuickOrder ? (
+                  <ObjectCard style={styles.editCard}>
+                    <Text style={styles.inputLabel}>起点地址</Text>
+                    <AddressInputField
+                      value={departureAddress}
+                      onSelect={setDepartureAddress}
+                    />
+                    <Text style={styles.inputLabel}>终点地址</Text>
+                    <AddressInputField
+                      value={destinationAddress}
+                      onSelect={setDestinationAddress}
+                    />
+                    <View style={styles.cargoRow}>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.inputLabel}>重量 (kg)</Text>
+                        <TextInput
+                          style={styles.inlineInput}
+                          keyboardType="numeric"
+                          value={quickCargoWeight}
+                          onChangeText={setQuickCargoWeight}
+                        />
+                      </View>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.inputLabel}>场景</Text>
+                        <TouchableOpacity
+                          style={styles.sceneSelect}
+                          onPress={() => {
+                            const currentIndex = SCENE_FILTERS.findIndex(f => f.key === quickCargoScene);
+                            const nextIndex = (currentIndex + 1) % SCENE_FILTERS.length;
+                            setQuickCargoScene(SCENE_FILTERS[nextIndex === 0 ? 1 : nextIndex].key);
+                          }}
+                        >
+                          <Text style={styles.sceneSelectText}>{getSupplySceneLabel(quickCargoScene)}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.applyBtn} onPress={handleQuickOrderSearch}>
+                      <Text style={styles.applyBtnText}>重新匹配</Text>
+                    </TouchableOpacity>
+                  </ObjectCard>
                 ) : (
+                  <View style={styles.summaryBadge}>
+                    <Text style={styles.summaryBadgeText} numberOfLines={1}>
+                      {summarizeAddress(departureAddress)} → {summarizeAddress(destinationAddress)} | {quickCargoWeight}kg
+                    </Text>
+                  </View>
+                )}
+
+                {supplies.length > 0 && !loading && (
+                  <Text style={styles.resultCount}>找到 {supplies.length} 个支持直接下单的优质服务</Text>
+                )}
+              </View>
+            ) : (
+              <View style={styles.hero}>
+                <Text style={styles.heroEyebrow}>服务市场</Text>
+                <Text style={styles.heroTitle}>{heroTitle}</Text>
+                <Text style={styles.heroDesc}>{heroDesc}</Text>
+                <View style={styles.heroActionRow}>
                   <TouchableOpacity
                     style={styles.heroGhostBtn}
                     onPress={() => {
@@ -559,198 +631,14 @@ export default function OfferListScreen({route, navigation}: any) {
                       setLastQuickOrderDraft(null);
                       setSupplies([]);
                     }}>
-                    <Text style={styles.heroGhostBtnText}>切到快速下单</Text>
+                    <Text style={styles.heroGhostBtnText}>切换到快速下单模式</Text>
                   </TouchableOpacity>
-                )}
+                </View>
               </View>
-            </View>
-
-            {quickOrderMode ? (
-              <ObjectCard style={styles.filterCard}>
-                <Text style={styles.filterTitle}>
-                  {hasQuickOrderSearch && !editQuickOrder ? '第 2 步：挑选推荐服务' : '第 1 步：先补最小下单信息'}
-                </Text>
-                <Text style={styles.helperText}>
-                  {hasQuickOrderSearch && !editQuickOrder
-                    ? '系统已经按你的起终点、吊重和场景筛了一遍。觉得不合适时，再展开修改条件。'
-                    : '标准化场景先走这里。你只需要告诉我起终点、货物和时间，剩下的先交给系统筛服务。'}
-                </Text>
-
-                <View style={styles.quickSummaryCard}>
-                  <Text style={styles.quickSummaryTitle}>本次输入摘要</Text>
-                  <Text style={styles.quickSummaryText}>
-                    {summarizeAddress(departureAddress)}
-                    {' -> '}
-                    {summarizeAddress(destinationAddress)}
-                  </Text>
-                  <Text style={styles.quickSummaryText}>
-                    {getSupplySceneLabel(quickCargoScene)} / {quickCargoWeight || '--'}kg /{' '}
-                    {quickCargoType.trim() || '重载物资'}
-                  </Text>
-                  <Text style={styles.quickSummaryText}>
-                    {formatDateTime(startDate)} - {formatDateTime(endDate)}
-                  </Text>
-                  {quickOrderBlockedMessage ? (
-                    <Text style={styles.quickSummaryHint}>{quickOrderBlockedMessage}</Text>
-                  ) : (
-                    <Text style={styles.quickSummaryHint}>
-                      系统会优先按送达区域和吊重能力筛选支持直达下单的服务。
-                    </Text>
-                  )}
-                </View>
-
-                {hasQuickOrderSearch && !editQuickOrder ? (
-                  <View style={styles.primaryActionRow}>
-                    <TouchableOpacity style={styles.searchBtn} onPress={() => setEditQuickOrder(true)}>
-                      <Text style={styles.searchBtnText}>修改条件重新匹配</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.secondaryActionBtn} onPress={handlePublishTask}>
-                      <Text style={styles.secondaryActionBtnText}>这条路不合适，改为发布任务</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <>
-                    <Text style={styles.inputLabel}>起点地址 *</Text>
-                    <AddressInputField
-                      value={departureAddress}
-                      placeholder="点击选择起点地址"
-                      onSelect={setDepartureAddress}
-                    />
-
-                    <Text style={styles.inputLabel}>终点地址 *</Text>
-                    <AddressInputField
-                      value={destinationAddress}
-                      placeholder="点击选择终点地址"
-                      onSelect={setDestinationAddress}
-                    />
-
-                    <Text style={styles.inputLabel}>作业场景 *</Text>
-                    <View style={styles.filterChipRow}>
-                      {SCENE_FILTERS.filter(filter => filter.key).map(filter => (
-                        <TouchableOpacity
-                          key={filter.key}
-                          style={[
-                            styles.filterChip,
-                            quickCargoScene === filter.key && styles.filterChipActive,
-                          ]}
-                          onPress={() => setQuickCargoScene(filter.key)}>
-                          <Text
-                            style={[
-                              styles.filterChipText,
-                              quickCargoScene === filter.key && styles.filterChipTextActive,
-                            ]}>
-                            {filter.label}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    <Text style={styles.inputLabel}>货物类型</Text>
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="例如：塔材、设备箱、救援物资"
-                      placeholderTextColor={theme.textHint}
-                      value={quickCargoType}
-                      onChangeText={setQuickCargoType}
-                    />
-
-                    <Text style={styles.inputLabel}>货物重量 (kg) *</Text>
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="例如：120"
-                      placeholderTextColor={theme.textHint}
-                      keyboardType="numeric"
-                      value={quickCargoWeight}
-                      onChangeText={setQuickCargoWeight}
-                    />
-
-                    <Text style={styles.inputLabel}>期望开始时间 *</Text>
-                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
-                      <Text style={styles.dateText}>{formatDateTime(startDate)}</Text>
-                    </TouchableOpacity>
-                    {showStartPicker ? (
-                      <DateTimePicker
-                        value={startDate}
-                        mode="datetime"
-                        display="default"
-                        onChange={onStartDateChange}
-                        minimumDate={new Date()}
-                      />
-                    ) : null}
-
-                    <Text style={styles.inputLabel}>期望结束时间 *</Text>
-                    <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
-                      <Text style={styles.dateText}>{formatDateTime(endDate)}</Text>
-                    </TouchableOpacity>
-                    {showEndPicker ? (
-                      <DateTimePicker
-                        value={endDate}
-                        mode="datetime"
-                        display="default"
-                        onChange={onEndDateChange}
-                        minimumDate={startDate}
-                      />
-                    ) : null}
-
-                    <View style={styles.primaryActionRow}>
-                      <TouchableOpacity
-                        style={[styles.searchBtn, Boolean(quickOrderBlockedMessage) && styles.disabledBtn]}
-                        onPress={handleQuickOrderSearch}
-                        disabled={Boolean(quickOrderBlockedMessage)}>
-                        <Text style={styles.searchBtnText}>第 2 步：查看推荐服务</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.secondaryActionBtn} onPress={handlePublishTask}>
-                        <Text style={styles.secondaryActionBtnText}>改为发布任务</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </ObjectCard>
-            ) : (
-              <ObjectCard style={styles.filterCard}>
-                <Text style={styles.filterTitle}>筛选条件</Text>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="按作业区域筛选，例如：广东、海岛、高原"
-                  placeholderTextColor={theme.textHint}
-                  value={region}
-                  onChangeText={setRegion}
-                  onSubmitEditing={onSearch}
-                />
-
-                <View style={styles.filterChipRow}>
-                  {SCENE_FILTERS.map(filter => (
-                    <TouchableOpacity
-                      key={filter.key || 'all'}
-                      style={[
-                        styles.filterChip,
-                        activeScene === filter.key && styles.filterChipActive,
-                      ]}
-                      onPress={() => setActiveScene(filter.key)}>
-                      <Text
-                        style={[
-                          styles.filterChipText,
-                          activeScene === filter.key && styles.filterChipTextActive,
-                        ]}>
-                        {filter.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <TouchableOpacity style={styles.searchBtn} onPress={onSearch}>
-                  <Text style={styles.searchBtnText}>更新筛选结果</Text>
-                </TouchableOpacity>
-              </ObjectCard>
             )}
           </View>
         }
         ListEmptyComponent={listEmptyComponent}
-        ListFooterComponent={
-          hasMore && supplies.length > 0 ? (
-            <ActivityIndicator style={styles.footerLoading} color={theme.primary} />
-          ) : null
-        }
       />
     </SafeAreaView>
   );
@@ -760,268 +648,277 @@ const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.bg,
+    },
+    stepHeader: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      backgroundColor: theme.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.divider,
+    },
+    stepTrack: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.divider,
+    },
+    stepDotActive: {
+      backgroundColor: theme.primary,
+      width: 10,
+      height: 10,
+    },
+    stepDotCompleted: {
+      backgroundColor: theme.primary,
+    },
+    stepLine: {
+      width: 50,
+      height: 2,
+      backgroundColor: theme.divider,
+      marginHorizontal: 4,
+    },
+    stepLineCompleted: {
+      backgroundColor: theme.primary,
+    },
+    stepLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 6,
+    },
+    stepLabelText: {
+      fontSize: 10,
+      color: theme.textHint,
+      fontWeight: '600',
+    },
+    stepLabelTextActive: {
+      color: theme.primary,
+      fontWeight: '700',
+    },
+    stepLabelTextCompleted: {
+      color: theme.textSub,
     },
     content: {
-      padding: 14,
+      padding: 16,
       paddingBottom: 28,
+    },
+    quickOrderHeader: {
+      marginBottom: 16,
+    },
+    headerTitleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    editBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    editBtnText: {
+      fontSize: 13,
+      color: theme.primary,
+      fontWeight: '700',
+    },
+    summaryBadge: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    summaryBadgeText: {
+      fontSize: 12,
+      color: theme.textSub,
+      fontWeight: '600',
+    },
+    editCard: {
+      padding: 14,
+      borderRadius: 16,
+      marginBottom: 10,
+    },
+    inputLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.textHint,
+      marginBottom: 4,
+    },
+    cargoRow: {
+      flexDirection: 'row',
       gap: 12,
+      marginTop: 8,
+    },
+    inlineInput: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      fontSize: 14,
+      color: theme.text,
+    },
+    sceneSelect: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      justifyContent: 'center',
+    },
+    sceneSelectText: {
+      fontSize: 14,
+      color: theme.text,
+      fontWeight: '600',
+    },
+    applyBtn: {
+      marginTop: 14,
+      backgroundColor: theme.primary,
+      borderRadius: 10,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    applyBtnText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    resultCount: {
+      marginTop: 16,
+      fontSize: 13,
+      color: theme.textSub,
+      fontWeight: '600',
     },
     hero: {
-      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
+      backgroundColor: theme.primary,
       borderRadius: 24,
       padding: 20,
-      marginBottom: 12,
-      borderWidth: theme.isDark ? 1 : 0,
-      borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
+      marginBottom: 16,
     },
     heroEyebrow: {
-      fontSize: 12,
-      color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
+      fontSize: 11,
+      color: 'rgba(255,255,255,0.7)',
       fontWeight: '700',
     },
     heroTitle: {
-      marginTop: 8,
-      fontSize: 28,
-      lineHeight: 34,
-      color: theme.isDark ? theme.text : '#FFFFFF',
-      fontWeight: '800',
-    },
-    heroDesc: {
-      marginTop: 10,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
-    },
-    heroActionRow: {
-      marginTop: 14,
-      flexDirection: 'row',
-      justifyContent: 'flex-start',
-    },
-    heroGhostBtn: {
-      borderRadius: 999,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      backgroundColor: 'rgba(255,255,255,0.16)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.22)',
-    },
-    heroGhostBtnText: {
-      fontSize: 12,
+      marginTop: 4,
+      fontSize: 24,
       color: '#FFFFFF',
       fontWeight: '800',
     },
-    filterCard: {
-      marginBottom: 12,
-    },
-    filterTitle: {
-      fontSize: 16,
-      color: theme.text,
-      fontWeight: '800',
-      marginBottom: 8,
-    },
-    helperText: {
+    heroDesc: {
+      marginTop: 8,
       fontSize: 13,
-      lineHeight: 20,
-      color: theme.textSub,
-      marginBottom: 12,
+      lineHeight: 18,
+      color: 'rgba(255,255,255,0.85)',
     },
-    inputLabel: {
-      marginTop: 6,
-      marginBottom: 8,
-      fontSize: 13,
-      color: theme.textSub,
-      fontWeight: '700',
-    },
-    searchInput: {
-      borderWidth: 1,
-      borderColor: theme.inputBorder,
-      borderRadius: 12,
-      backgroundColor: theme.bgSecondary,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 14,
-      color: theme.text,
-    },
-    dateInput: {
-      borderWidth: 1,
-      borderColor: theme.inputBorder,
-      borderRadius: 12,
-      backgroundColor: theme.bgSecondary,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-    },
-    dateText: {
-      fontSize: 14,
-      color: theme.text,
-    },
-    filterChipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
+    heroActionRow: {
       marginTop: 12,
     },
-    filterChip: {
-      borderWidth: 1,
-      borderColor: theme.inputBorder,
-      borderRadius: 999,
+    heroGhostBtn: {
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.15)',
       paddingHorizontal: 12,
       paddingVertical: 8,
-      backgroundColor: theme.card,
-    },
-    filterChipActive: {
-      borderColor: theme.primaryBorder,
-      backgroundColor: theme.primaryBg,
-    },
-    filterChipText: {
-      fontSize: 12,
-      color: theme.textSub,
-      fontWeight: '700',
-    },
-    filterChipTextActive: {
-      color: theme.primaryText,
-    },
-    quickSummaryCard: {
-      marginTop: 14,
-      borderRadius: 14,
-      padding: 14,
-      backgroundColor: theme.bgSecondary,
+      borderRadius: 8,
       borderWidth: 1,
-      borderColor: theme.inputBorder,
-      gap: 6,
+      borderColor: 'rgba(255,255,255,0.3)',
     },
-    quickSummaryTitle: {
-      fontSize: 13,
-      color: theme.text,
-      fontWeight: '800',
-    },
-    quickSummaryText: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.text,
-    },
-    quickSummaryHint: {
+    heroGhostBtnText: {
+      color: '#FFFFFF',
       fontSize: 12,
-      lineHeight: 18,
-      color: theme.textSub,
-    },
-    primaryActionRow: {
-      marginTop: 14,
-      gap: 10,
-    },
-    searchBtn: {
-      marginTop: 12,
-      backgroundColor: theme.primary,
-      borderRadius: 12,
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
-    searchBtnText: {
-      fontSize: 14,
-      color: theme.btnPrimaryText,
-      fontWeight: '800',
-    },
-    secondaryActionBtn: {
-      borderRadius: 12,
-      paddingVertical: 12,
-      alignItems: 'center',
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.inputBorder,
-    },
-    secondaryActionBtnText: {
-      fontSize: 14,
-      color: theme.text,
       fontWeight: '700',
     },
     card: {
       marginBottom: 12,
+      borderRadius: 20,
+      overflow: 'hidden',
     },
     cardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: 12,
     },
     cardHeaderLeft: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-      alignItems: 'center',
+      gap: 6,
     },
     directPill: {
-      borderRadius: 999,
-      backgroundColor: theme.success + '18',
-      borderWidth: 1,
-      borderColor: theme.success + '44',
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      backgroundColor: theme.success + '15',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
     },
     directPillText: {
-      fontSize: 11,
+      fontSize: 10,
       color: theme.success,
       fontWeight: '800',
     },
     supplyNo: {
-      marginTop: 12,
-      fontSize: 12,
+      marginTop: 10,
+      fontSize: 10,
       color: theme.textHint,
       fontWeight: '700',
     },
     title: {
-      marginTop: 6,
-      fontSize: 17,
-      lineHeight: 24,
-      color: theme.text,
+      fontSize: 16,
       fontWeight: '800',
+      color: theme.text,
+      marginTop: 4,
     },
     sceneRow: {
-      marginTop: 10,
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 8,
+      gap: 6,
+      marginTop: 10,
     },
     sceneTag: {
       backgroundColor: theme.bgSecondary,
-      borderWidth: 1,
-      borderColor: theme.inputBorder,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
     },
     sceneTagText: {
-      fontSize: 11,
-      color: theme.text,
+      fontSize: 10,
+      color: theme.textSub,
       fontWeight: '700',
     },
     metricRow: {
-      marginTop: 12,
       flexDirection: 'row',
-      flexWrap: 'wrap',
+      marginTop: 12,
       gap: 12,
     },
     metricText: {
-      fontSize: 12,
+      fontSize: 11,
       color: theme.textSub,
+      fontWeight: '500',
     },
     cardFooter: {
-      marginTop: 14,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: 12,
+      marginTop: 14,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.divider,
     },
     price: {
-      flex: 1,
-      fontSize: 16,
+      fontSize: 17,
       color: theme.danger,
       fontWeight: '800',
     },
     detailBtn: {
-      borderRadius: 999,
       backgroundColor: theme.primary,
       paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingVertical: 8,
+      borderRadius: 10,
     },
     detailBtnOwner: {
       backgroundColor: theme.card,
@@ -1029,20 +926,14 @@ const getStyles = (theme: AppTheme) =>
       borderColor: theme.primary,
     },
     detailBtnText: {
-      fontSize: 12,
-      color: theme.btnPrimaryText,
-      fontWeight: '800',
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '700',
     },
     detailBtnTextOwner: {
       color: theme.primaryText,
     },
     loading: {
-      paddingVertical: 36,
-    },
-    footerLoading: {
-      paddingVertical: 18,
-    },
-    disabledBtn: {
-      opacity: 0.55,
+      paddingVertical: 40,
     },
   });

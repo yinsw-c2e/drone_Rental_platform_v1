@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -130,6 +130,14 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
   const order = detail?.order || task?.order;
   const isOwner = currentUserId > 0 && currentUserId === Number(task?.provider?.user_id || 0);
   const isPilot = currentUserId > 0 && currentUserId === Number(task?.target_pilot?.user_id || 0);
+  const isClient = !isOwner && !isPilot;
+
+  useEffect(() => {
+    if (detail && isClient && order?.id) {
+      navigation.replace('OrderDetail', {orderId: order.id, id: order.id});
+    }
+  }, [detail, isClient, order, navigation]);
+
   const canRespond = String(task?.status || '').toLowerCase() === 'pending_response' && isPilot;
   const canReassign = Boolean(
     isOwner &&
@@ -139,6 +147,12 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
       ['assigned', 'pending_dispatch'].includes(String(order?.status || '').toLowerCase()),
   );
   const canOpenFlightMonitor = Boolean(order?.id && MONITORABLE_ORDER_STATUSES.includes(String(order?.status || '').toLowerCase()));
+  const canEnterExecutionWorkspace = Boolean(
+    isPilot &&
+      task?.id &&
+      String(task?.status || '').toLowerCase() === 'accepted' &&
+      !['cancelled'].includes(String(order?.status || '').toLowerCase()),
+  );
 
   const actionButtons = useMemo<ActionButton[]>(() => {
     if (!task || !order || actionLoading) {
@@ -152,6 +166,14 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
         onPress: () => navigation.navigate('OrderDetail', {id: order.id, orderId: order.id}),
       },
     ];
+
+    if (canEnterExecutionWorkspace) {
+      actions.unshift({
+        label: '进入执行工作台',
+        tone: 'primary',
+        onPress: () => navigation.navigate('PilotOrderExecution', {taskId: task.id}),
+      });
+    }
 
     if (canOpenFlightMonitor) {
       actions.unshift({
@@ -201,7 +223,17 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
                   try {
                     await dispatchV2Service.accept(task.id);
                     await loadData();
-                    Alert.alert('已接受', '正式派单已接受，你现在可以继续进入订单详情或飞行监控。');
+                    Alert.alert('已接受', '正式派单已接受，你现在可以直接进入执行工作台继续推进任务。', [
+                      {
+                        text: '进入执行',
+                        onPress: () => navigation.navigate('PilotOrderExecution', {taskId: task.id}),
+                      },
+                      {
+                        text: '查看订单',
+                        onPress: () => order?.id && navigation.navigate('OrderDetail', {id: order.id, orderId: order.id}),
+                      },
+                      {text: '稍后'},
+                    ]);
                   } catch (error: any) {
                     Alert.alert('操作失败', error?.message || '请稍后重试');
                   } finally {
@@ -216,7 +248,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
     }
 
     return actions;
-  }, [actionLoading, canOpenFlightMonitor, canReassign, canRespond, loadData, navigation, order, task]);
+  }, [actionLoading, canEnterExecutionWorkspace, canOpenFlightMonitor, canReassign, canRespond, loadData, navigation, order, task]);
 
   const handleReject = async () => {
     if (!task?.id) {

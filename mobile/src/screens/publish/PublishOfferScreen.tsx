@@ -81,6 +81,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
   const supplyId = Number(route?.params?.supplyId || route?.params?.id || 0) || 0;
   const isEditing = supplyId > 0;
 
+  const [currentStep, setCurrentStep] = useState(1);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [pricingText, setPricingText] = useState('');
@@ -99,20 +100,23 @@ export default function PublishOfferScreen({route, navigation}: any) {
     () => drones.find(item => item.id === selectedDroneId) || null,
     [drones, selectedDroneId],
   );
-  const isDroneMarketReady = useMemo(
-    () =>
-      Boolean(
-        selectedDrone &&
-          isApprovedStatus(selectedDrone.certification_status) &&
-          isApprovedStatus(selectedDrone.uom_verified) &&
-          isApprovedStatus(selectedDrone.insurance_verified) &&
-          isApprovedStatus(selectedDrone.airworthiness_verified),
-      ),
-    [selectedDrone],
-  );
+
+  const droneCertStatus = useMemo(() => {
+    if (!selectedDrone) return {ready: false, count: 0};
+    const certs = [
+      selectedDrone.certification_status,
+      selectedDrone.uom_verified,
+      selectedDrone.insurance_verified,
+      selectedDrone.airworthiness_verified,
+    ];
+    const approved = certs.filter(v => isApprovedStatus(v)).length;
+    return {ready: approved === 4, count: approved};
+  }, [selectedDrone]);
+
+  const isDroneMarketReady = droneCertStatus.ready;
 
   useEffect(() => {
-    navigation.setOptions({title: isEditing ? '编辑供给' : '发布供给'});
+    navigation.setOptions({title: isEditing ? '完善供给方案' : '创建供给方案'});
   }, [isEditing, navigation]);
 
   const hydrateForm = useCallback((supply: SupplyDetail) => {
@@ -203,11 +207,9 @@ export default function PublishOfferScreen({route, navigation}: any) {
       return;
     }
     if (status === 'active' && !isDroneMarketReady) {
-      Alert.alert('暂时不能上架', '当前设备资质还没有全部通过，建议先保存服务草稿，等基础资质、UOM、保险和适航状态都达标后再正式上架。', [
-        {text: '知道了', style: 'cancel'},
-        selectedDroneId
-          ? {text: '去管理资质', onPress: () => navigation.navigate('DroneCertification', {id: selectedDroneId})}
-          : {text: '好的'},
+      Alert.alert('暂时不能上架', '当前设备资质还没有全部通过（目前已通过 ' + droneCertStatus.count + '/4）。建议先保存服务草稿，等基础资质、UOM、保险和适航状态都达标后再正式上架。', [
+        {text: '先存草稿', onPress: () => handleSubmit('draft')},
+        {text: '去管理资质', onPress: () => navigation.navigate('DroneCertification', {id: selectedDroneId})},
       ]);
       return;
     }
@@ -219,8 +221,8 @@ export default function PublishOfferScreen({route, navigation}: any) {
       } else {
         await ownerService.createSupply(buildPayload(status));
       }
-      Alert.alert('成功', status === 'active' ? '供给已保存并上架' : '供给草稿已保存', [
-        {text: '确定', onPress: () => navigation.navigate('MyOffers')},
+      Alert.alert('成功', status === 'active' ? '供给已保存并成功上架市场' : '供给草稿已妥善保存', [
+        {text: '查看我的服务', onPress: () => navigation.navigate('MyOffers')},
       ]);
     } catch (error: any) {
       Alert.alert('保存失败', error?.message || '请稍后重试');
@@ -241,11 +243,11 @@ export default function PublishOfferScreen({route, navigation}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyIcon}>🛩️</Text>
-          <Text style={styles.emptyTitle}>还没有可用无人机</Text>
-          <Text style={styles.emptyDesc}>请先添加无人机基础信息（无需立即完成所有资质），再来建立服务草稿。</Text>
+          <Text style={styles.emptyIcon}>🚁</Text>
+          <Text style={styles.emptyTitle}>名下暂无可用无人机</Text>
+          <Text style={styles.emptyDesc}>请先在“我的无人机”中添加设备基础信息，再来创建对应的服务方案。</Text>
           <TouchableOpacity style={styles.primaryAction} onPress={() => navigation.navigate('AddDrone')}>
-            <Text style={styles.primaryActionText}>去添加无人机</Text>
+            <Text style={styles.primaryActionText}>去添加设备</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -254,179 +256,232 @@ export default function PublishOfferScreen({route, navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+      <View style={styles.stepHeader}>
+        <View style={styles.stepTrack}>
+          <View style={[styles.stepDot, currentStep >= 1 && styles.stepDotActive]} />
+          <View style={[styles.stepLine, currentStep >= 2 && styles.stepLineActive]} />
+          <View style={[styles.stepDot, currentStep >= 2 && styles.stepDotActive]} />
+        </View>
+        <View style={styles.stepLabels}>
+          <Text style={[styles.stepLabel, currentStep === 1 && styles.stepLabelActive]}>设备与方案</Text>
+          <Text style={[styles.stepLabel, currentStep === 2 && styles.stepLabelActive]}>价格与规则</Text>
+        </View>
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <Text style={styles.heroEyebrow}>机主供给</Text>
-          <Text style={styles.heroTitle}>{isEditing ? '编辑你的供给方案' : '创建新的供给方案'}</Text>
-          <Text style={styles.heroDesc}>
-            先把无人机、服务能力和价格规则整理成草稿，再逐步补齐资质。只有资质达标后的服务，才会正式进入公开市场。
-          </Text>
+        {currentStep === 1 ? (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>1. 执行设备资产</Text>
+              <Text style={styles.sectionDesc}>选择本方案关联的无人机，系统会自动关联其最大吊重与资质状态。</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.droneRow}>
+                {drones.map(drone => {
+                  const active = drone.id === selectedDroneId;
+                  const certs = [drone.certification_status, drone.uom_verified, drone.insurance_verified, drone.airworthiness_verified];
+                  const approved = certs.filter(v => isApprovedStatus(v)).length;
+                  return (
+                    <TouchableOpacity
+                      key={drone.id}
+                      style={[styles.droneCard, active && styles.droneCardActive]}
+                      onPress={() => setSelectedDroneId(drone.id)}>
+                      <View style={styles.droneCardTop}>
+                        <Text style={[styles.droneTitle, active && {color: theme.primaryText}]}>{drone.brand} {drone.model}</Text>
+                        {active && <Text style={{fontSize: 14}}>✓</Text>}
+                      </View>
+                      <Text style={styles.droneMeta}>吊重 {drone.max_load || 0}kg · 航程 {drone.max_distance || 0}km</Text>
+                      <View style={styles.droneCertRow}>
+                        <View style={[styles.certPill, {backgroundColor: approved === 4 ? theme.success + '15' : theme.warning + '15'}]}>
+                          <Text style={[styles.certPillText, {color: approved === 4 ? theme.success : theme.warning}]}>
+                            资质 {approved}/4
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              {selectedDrone && !isDroneMarketReady && (
+                <TouchableOpacity style={styles.certAlert} onPress={() => navigation.navigate('DroneCertification', {id: selectedDrone.id})}>
+                  <Text style={styles.certAlertText}>⚠️ 当前设备资质未齐，仅能作为草稿保存 ˃</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>2. 服务方案设置</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>服务标题</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="例如：海岛补给重载吊运服务"
+                  value={title}
+                  onChangeText={setTitle}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>适用场景</Text>
+                <View style={styles.sceneGrid}>
+                  {SCENE_OPTIONS.map(option => {
+                    const active = selectedScenes.includes(option.key);
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[styles.sceneBtn, active && styles.sceneBtnActive]}
+                        onPress={() => toggleScene(option.key)}>
+                        <Text style={[styles.sceneBtnText, active && styles.sceneBtnTextActive]}>{option.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>服务说明</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.fieldArea]}
+                  placeholder="说明你的执行经验、具体适用范围和交付保障能力"
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>服务区域</Text>
+                <AddressInputField
+                  value={address}
+                  placeholder={isEditing ? summarizeServiceArea(address?.address || '') : '点击选择主要作业省市'}
+                  onSelect={setAddress}
+                  style={styles.addressInput}
+                />
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>3. 经营价格规则</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>基础价格（元）</Text>
+                <View style={styles.priceInputRow}>
+                  <Text style={styles.currency}>¥</Text>
+                  <TextInput
+                    style={[styles.fieldInput, {flex: 1, borderWidth: 0, backgroundColor: 'transparent'}]}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                    value={pricingText}
+                    onChangeText={setPricingText}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>计价方式</Text>
+                <View style={styles.sceneGrid}>
+                  {PRICING_OPTIONS.map(option => {
+                    const active = pricingUnit === option.key;
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        style={[styles.sceneBtn, active && styles.sceneBtnActive]}
+                        onPress={() => setPricingUnit(option.key)}>
+                        <Text style={[styles.sceneBtnText, active && styles.sceneBtnTextActive]}>{option.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>价格详情说明</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.fieldArea]}
+                  placeholder="例如：基础价含 1 架次，超出的按 300/架计算，不含现场二次搬运费"
+                  value={pricingRuleSummary}
+                  onChangeText={setPricingRuleSummary}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>4. 响应与成交</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.fieldLabel}>可响应时段</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.fieldArea]}
+                  placeholder="例如：工作日 09:00-18:00；紧急任务请提前 4 小时电话预约"
+                  value={availableSlotsSummary}
+                  onChangeText={setAvailableSlotsSummary}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.switchBox}>
+                <View style={{flex: 1, paddingRight: 16}}>
+                  <Text style={styles.switchTitle}>开启客户直达下单</Text>
+                  <Text style={styles.switchDesc}>允许客户直接根据当前价格创建订单。关闭后则仅参与市场展示和后续撮合报价。</Text>
+                </View>
+                <Switch
+                  value={acceptsDirectOrder}
+                  onValueChange={setAcceptsDirectOrder}
+                  trackColor={{false: theme.divider, true: theme.primary}}
+                />
+              </View>
+            </View>
+          </>
+        )}
+
+        <View style={styles.bottomSummary}>
+          <Text style={styles.summaryTitle}>方案预览</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>关联设备</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>{selectedDrone?.brand || '-'} {selectedDrone?.model || ''}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>资质状态</Text>
+              <Text style={[styles.summaryValue, {color: isDroneMarketReady ? theme.success : theme.warning}]}>
+                {isDroneMarketReady ? '通过 (4/4)' : `待补齐 (${droneCertStatus.count}/4)`}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>基础价格</Text>
+              <Text style={styles.summaryValue}>¥{Number(pricingText || 0).toFixed(0)}/{PRICING_OPTIONS.find(i => i.key === pricingUnit)?.label || '-'}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>直达下单</Text>
+              <Text style={styles.summaryValue}>{acceptsDirectOrder ? '已开启' : '已关闭'}</Text>
+            </View>
+          </View>
         </View>
 
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>草稿优先，不用一次到位</Text>
-          <Text style={styles.tipText}>
-            这一步的目标不是一次把所有资质都补完，而是先形成一份可经营的服务草稿。设备资料、服务场景、价格和时间准备好后，随时都可以回来继续完善。
-          </Text>
-          {!isDroneMarketReady && selectedDrone ? (
-            <TouchableOpacity style={styles.tipAction} onPress={() => navigation.navigate('DroneCertification', {id: selectedDrone.id})}>
-              <Text style={styles.tipActionText}>当前设备资质未齐，去查看并行审核进度</Text>
+        <View style={styles.formActions}>
+          {currentStep === 1 ? (
+            <TouchableOpacity style={styles.nextBtn} onPress={() => setCurrentStep(2)}>
+              <Text style={styles.nextBtnText}>下一步：设置价格规则</Text>
             </TouchableOpacity>
-          ) : null}
-        </ObjectCard>
-
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>1. 选择执行设备</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.droneRow}>
-            {drones.map(drone => {
-              const active = drone.id === selectedDroneId;
-              return (
-                <TouchableOpacity
-                  key={drone.id}
-                  style={[styles.droneCard, active && styles.droneCardActive]}
-                  onPress={() => setSelectedDroneId(drone.id)}>
-                  <Text style={styles.droneTitle}>{drone.brand} {drone.model}</Text>
-                  <Text style={styles.droneMeta}>吊重 {drone.max_load || 0}kg</Text>
-                  <Text style={styles.droneMeta}>航程 {drone.max_distance || 0}km</Text>
-                  <Text style={styles.droneMeta}>状态 {drone.availability_status || 'unknown'}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </ObjectCard>
-
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>2. 服务能力</Text>
-          <Text style={styles.label}>供给标题</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="例如：海岛给养重载吊运服务"
-            value={title}
-            onChangeText={setTitle}
-          />
-
-          <Text style={styles.label}>供给说明</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="说明你的设备能力、执行经验、适用场景和交付范围"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            textAlignVertical="top"
-          />
-
-          <Text style={styles.label}>服务场景</Text>
-          <View style={styles.chipRow}>
-            {SCENE_OPTIONS.map(option => {
-              const active = selectedScenes.includes(option.key);
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => toggleScene(option.key)}>
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <Text style={styles.label}>服务区域</Text>
-          <AddressInputField
-            value={address}
-            placeholder={isEditing ? summarizeServiceArea(address?.address || '') : '点击选择主要服务区域'}
-            onSelect={setAddress}
-          />
-        </ObjectCard>
-
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>3. 价格规则</Text>
-          <Text style={styles.label}>基础价格（元）</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="例如：680"
-            keyboardType="numeric"
-            value={pricingText}
-            onChangeText={setPricingText}
-          />
-
-          <Text style={styles.label}>计价单位</Text>
-          <View style={styles.chipRow}>
-            {PRICING_OPTIONS.map(option => {
-              const active = pricingUnit === option.key;
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setPricingUnit(option.key)}>
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <Text style={styles.label}>价格规则说明</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="例如：基础价含 1 架次，不含二次转运和特殊夜航"
-            value={pricingRuleSummary}
-            onChangeText={setPricingRuleSummary}
-            multiline
-            textAlignVertical="top"
-          />
-        </ObjectCard>
-
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>4. 时间与成交方式</Text>
-          <Text style={styles.label}>可服务时间</Text>
-          <TextInput
-            style={[styles.input, styles.multilineInput]}
-            placeholder="例如：工作日 08:00-18:00；紧急任务可提前 2 小时响应"
-            value={availableSlotsSummary}
-            onChangeText={setAvailableSlotsSummary}
-            multiline
-            textAlignVertical="top"
-          />
-
-          <View style={styles.switchRow}>
-            <View style={{flex: 1}}>
-              <Text style={styles.switchTitle}>接受客户直达下单</Text>
-              <Text style={styles.switchDesc}>关闭后，这个供给只参与市场展示与后续撮合，不支持客户直接下单。</Text>
+          ) : (
+            <View style={styles.submitRow}>
+              <TouchableOpacity style={styles.prevBtn} onPress={() => setCurrentStep(1)}>
+                <Text style={styles.prevBtnText}>上一步</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.draftBtn} onPress={() => handleSubmit('draft')} disabled={submitting}>
+                <Text style={styles.draftBtnText}>保存草稿</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.publishBtn, (!isDroneMarketReady || submitting) && styles.publishBtnDisabled]}
+                onPress={() => handleSubmit('active')}
+                disabled={submitting}
+              >
+                <Text style={styles.publishBtnText}>正式上架</Text>
+              </TouchableOpacity>
             </View>
-            <Switch value={acceptsDirectOrder} onValueChange={setAcceptsDirectOrder} />
-          </View>
-        </ObjectCard>
-
-        <ObjectCard>
-          <Text style={styles.summaryTitle}>当前选择摘要</Text>
-          <Text style={styles.summaryLine}>设备：{selectedDrone?.brand || '未选'} {selectedDrone?.model || ''}</Text>
-          <Text style={styles.summaryLine}>场景：{selectedScenes.map(scene => SCENE_OPTIONS.find(item => item.key === scene)?.label || scene).join(' / ')}</Text>
-          <Text style={styles.summaryLine}>价格：¥{Number(pricingText || 0).toFixed(0)} / {PRICING_OPTIONS.find(item => item.key === pricingUnit)?.label || pricingUnit}</Text>
-          <Text style={styles.summaryLine}>直达下单：{acceptsDirectOrder ? '开启' : '关闭'}</Text>
-          <Text style={styles.summaryLine}>市场状态：{isDroneMarketReady ? '资质已满足，可正式上架' : '建议先保存草稿，补齐资质后再上架'}</Text>
-          {!isDroneMarketReady ? <Text style={styles.summaryHint}>基础资质、UOM、保险、适航四项可并行提交，无需串行等待。</Text> : null}
-        </ObjectCard>
-
-        <View style={styles.footerActions}>
-          <TouchableOpacity
-            style={[styles.secondaryAction, submitting && styles.actionDisabled]}
-            disabled={submitting}
-            onPress={() => handleSubmit('draft')}>
-            <Text style={styles.secondaryActionText}>{submitting ? '保存中...' : '保存草稿'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.primaryAction, (!isDroneMarketReady || submitting) && styles.actionDisabled]}
-            disabled={!isDroneMarketReady || submitting}
-            onPress={() => handleSubmit('active')}>
-            <Text style={styles.primaryActionText}>
-              {!isDroneMarketReady
-                ? '资质未齐，暂不能上架'
-                : submitting
-                ? '提交中...'
-                : isEditing
-                ? '保存并上架'
-                : '创建并上架'}
-            </Text>
-          </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -434,227 +489,331 @@ export default function PublishOfferScreen({route, navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {
+  container: {flex: 1, backgroundColor: theme.bg},
+  stepHeader: {
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+    backgroundColor: theme.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.divider,
+  },
+  stepTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.divider,
+  },
+  stepDotActive: {
+    backgroundColor: theme.primary,
+  },
+  stepLine: {
     flex: 1,
-    backgroundColor: theme.bgSecondary,
+    height: 2,
+    backgroundColor: theme.divider,
+    marginHorizontal: 4,
   },
-  loading: {
-    marginTop: 120,
+  stepLineActive: {
+    backgroundColor: theme.primary,
   },
-  content: {
-    padding: 14,
-    paddingBottom: 36,
-    gap: 12,
-  },
-  hero: {
-    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: theme.isDark ? 1 : 0,
-    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
-  },
-  heroEyebrow: {
-    fontSize: 12,
-    color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
-    fontWeight: '700',
-  },
-  heroTitle: {
+  stepLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 8,
-    fontSize: 28,
-    lineHeight: 34,
-    color: theme.isDark ? theme.text : '#FFFFFF',
+  },
+  stepLabel: {
+    fontSize: 11,
+    color: theme.textHint,
+    fontWeight: '600',
+  },
+  stepLabelActive: {
+    color: theme.primaryText,
     fontWeight: '800',
   },
-  heroDesc: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
-  },
-  tipText: {
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
-  },
-  tipAction: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.primaryBorder,
-    backgroundColor: theme.bgSecondary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  tipActionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.primaryText,
+  content: {paddingBottom: 40},
+  loading: {marginTop: 120},
+  section: {
+    padding: 20,
+    borderBottomWidth: 8,
+    borderBottomColor: theme.bgSecondary,
   },
   sectionTitle: {
-    fontSize: 16,
-    color: theme.text,
+    fontSize: 18,
     fontWeight: '800',
-    marginBottom: 12,
-  },
-  label: {
-    marginTop: 10,
-    marginBottom: 8,
-    fontSize: 13,
     color: theme.text,
-    fontWeight: '700',
+    marginBottom: 4,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.divider,
+  sectionDesc: {
+    fontSize: 13,
+    color: theme.textSub,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  inputGroup: {
+    marginTop: 16,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.textSub,
+    marginBottom: 8,
+  },
+  fieldInput: {
+    backgroundColor: theme.bgSecondary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 14,
-    backgroundColor: theme.bgSecondary,
+    fontSize: 15,
     color: theme.text,
-  },
-  multilineInput: {
-    minHeight: 88,
-  },
-  droneRow: {
-    gap: 10,
-  },
-  droneCard: {
-    width: 170,
-    borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.divider,
+  },
+  fieldArea: {
+    minHeight: 80,
+  },
+  priceInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.bgSecondary,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.divider,
+    paddingHorizontal: 14,
+  },
+  currency: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.text,
+    marginRight: 4,
+  },
+  addressInput: {
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.divider,
+    borderRadius: 12,
+  },
+  droneRow: {
+    gap: 12,
+    paddingVertical: 4,
+  },
+  droneCard: {
+    width: 180,
     backgroundColor: theme.card,
+    borderRadius: 16,
     padding: 14,
+    borderWidth: 1,
+    borderColor: theme.divider,
   },
   droneCardActive: {
     borderColor: theme.primary,
     backgroundColor: theme.primaryBg,
   },
+  droneCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   droneTitle: {
     fontSize: 14,
-    color: theme.text,
     fontWeight: '800',
+    color: theme.text,
   },
   droneMeta: {
-    marginTop: 6,
-    fontSize: 12,
+    fontSize: 11,
     color: theme.textSub,
   },
-  chipRow: {
+  droneCertRow: {
+    marginTop: 10,
+  },
+  certPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  certPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  certAlert: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: theme.warning + '10',
+    borderRadius: 8,
+  },
+  certAlertText: {
+    fontSize: 12,
+    color: theme.warning,
+    fontWeight: '700',
+  },
+  sceneGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.divider,
+  sceneBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: theme.card,
+    borderRadius: 10,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  chipActive: {
+  sceneBtnActive: {
     borderColor: theme.primary,
     backgroundColor: theme.primaryBg,
   },
-  chipText: {
-    fontSize: 12,
+  sceneBtnText: {
+    fontSize: 13,
     color: theme.textSub,
+    fontWeight: '600',
+  },
+  sceneBtnTextActive: {
+    color: theme.primaryText,
     fontWeight: '700',
   },
-  chipTextActive: {
-    color: theme.primaryText,
-  },
-  switchRow: {
-    marginTop: 10,
+  switchBox: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
+    backgroundColor: theme.bgSecondary,
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 8,
   },
   switchTitle: {
-    fontSize: 14,
-    color: theme.text,
+    fontSize: 15,
     fontWeight: '700',
+    color: theme.text,
   },
   switchDesc: {
-    marginTop: 6,
     fontSize: 12,
-    lineHeight: 18,
     color: theme.textSub,
-  },
-  summaryTitle: {
-    fontSize: 15,
-    color: theme.text,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  summaryLine: {
-    fontSize: 13,
-    color: theme.textSub,
-    lineHeight: 22,
-  },
-  summaryHint: {
-    marginTop: 8,
-    fontSize: 12,
-    lineHeight: 18,
-    color: theme.textSub,
-  },
-  footerActions: {
-    flexDirection: 'row',
-    gap: 10,
     marginTop: 4,
+    lineHeight: 18,
   },
-  secondaryAction: {
-    flex: 1,
-    borderRadius: 16,
+  bottomSummary: {
+    margin: 20,
+    padding: 16,
+    backgroundColor: theme.card,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: theme.divider,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: theme.card,
   },
-  secondaryActionText: {
+  summaryTitle: {
     fontSize: 14,
-    color: theme.textSub,
     fontWeight: '800',
-  },
-  primaryAction: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: theme.primary,
-  },
-  primaryActionText: {
-    fontSize: 14,
-    color: theme.btnPrimaryText,
-    fontWeight: '800',
-  },
-  actionDisabled: {
-    opacity: 0.65,
-  },
-  emptyWrap: {
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingTop: 120,
-  },
-  emptyIcon: {
-    fontSize: 52,
+    color: theme.textHint,
+    textTransform: 'uppercase',
     marginBottom: 12,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  summaryItem: {
+    width: '45%',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: theme.textSub,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontWeight: '700',
     color: theme.text,
   },
-  emptyDesc: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
-    textAlign: 'center',
-    marginBottom: 20,
+  formActions: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
+  nextBtn: {
+    backgroundColor: theme.primary,
+    height: 54,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.primary,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  nextBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  submitRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  prevBtn: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prevBtnText: {
+    fontSize: 15,
+    color: theme.textSub,
+    fontWeight: '700',
+  },
+  draftBtn: {
+    flex: 1.5,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  draftBtnText: {
+    fontSize: 15,
+    color: theme.primaryText,
+    fontWeight: '700',
+  },
+  publishBtn: {
+    flex: 2,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: theme.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  publishBtnDisabled: {
+    opacity: 0.5,
+  },
+  publishBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  emptyIcon: {fontSize: 64, marginBottom: 20},
+  emptyTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
+  emptyDesc: {fontSize: 14, color: theme.textSub, textAlign: 'center', marginTop: 12, lineHeight: 22, marginBottom: 32},
+  primaryAction: {
+    backgroundColor: theme.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  primaryActionText: {color: '#FFFFFF', fontSize: 16, fontWeight: '800'},
 });

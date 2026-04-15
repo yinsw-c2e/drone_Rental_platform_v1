@@ -95,60 +95,71 @@ export default function MyOffersScreen({navigation}: any) {
   const renderItem = ({item}: {item: SupplySummary}) => {
     const action = NEXT_STATUS_ACTIONS[item.status];
     const isUpdating = updatingId === item.id;
+    const isDraft = item.status === 'draft';
+    const isPaused = item.status === 'paused';
 
     return (
-      <ObjectCard style={styles.card}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[styles.offerCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}, isPaused && styles.cardPaused]}
+        onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
+
         <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <SourceTag source="supply" />
+          <View style={styles.headerLeft}>
             <StatusBadge label="" meta={getObjectStatusMeta('supply', item.status)} />
+            <Text style={styles.supplyNo}>{item.supply_no}</Text>
           </View>
-          <Text style={styles.code}>{item.supply_no}</Text>
+          {isDraft && (
+            <View style={styles.draftHintBadge}>
+              <Text style={styles.draftHintText}>待补资质</Text>
+            </View>
+          )}
         </View>
 
-        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+
+        <View style={styles.droneInfoRow}>
+          <View style={styles.droneIconBox}>
+            <Text style={{fontSize: 16}}>🚁</Text>
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.droneName}>{item.drone?.brand || '未关联'} {item.drone?.model || ''}</Text>
+            <Text style={styles.droneSpecs}>最大载重 {item.max_payload_kg || 0}kg · 起飞重量 {item.mtow_kg || 0}kg</Text>
+          </View>
+        </View>
 
         <View style={styles.sceneRow}>
           {(item.cargo_scenes || []).slice(0, 3).map(scene => (
-            <View key={scene} style={styles.sceneTag}>
-              <Text style={styles.sceneTagText}>{getSupplySceneLabel(scene)}</Text>
+            <View key={scene} style={styles.sceneBadge}>
+              <Text style={styles.sceneBadgeText}>{getSupplySceneLabel(scene)}</Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.metricRow}>
-          <Text style={styles.metricText}>关联无人机：{item.drone?.brand || '未关联'} {item.drone?.model || ''}</Text>
-          <Text style={styles.metricText}>最大吊重：{item.max_payload_kg || 0}kg</Text>
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricText}>起飞重量：{item.mtow_kg || 0}kg</Text>
-          <Text style={styles.metricText}>报价方式：{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
-        </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
-            onPress={() => navigation.navigate('PublishOffer', {supplyId: item.id})}>
-            <Text style={styles.secondaryBtnText}>编辑供给</Text>
-          </TouchableOpacity>
-          {item.status === 'active' ? (
+        <View style={styles.cardFooter}>
+          <View style={styles.pricingBox}>
+            <Text style={styles.pricingLabel}>基准价</Text>
+            <Text style={styles.pricingValue}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
+          </View>
+          <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
-              <Text style={styles.secondaryBtnText}>查看详情</Text>
+              style={styles.inlineGhostBtn}
+              onPress={() => navigation.navigate('PublishOffer', {supplyId: item.id})}>
+              <Text style={styles.inlineGhostBtnText}>{isDraft ? '去完善' : '编辑'}</Text>
             </TouchableOpacity>
-          ) : null}
-          {action ? (
-            <TouchableOpacity
-              style={[styles.primaryBtn, isUpdating && styles.primaryBtnDisabled]}
-              disabled={isUpdating}
-              onPress={() => handleStatusAction(item)}>
-              <Text style={styles.primaryBtnText}>{isUpdating ? '处理中...' : action.label}</Text>
-            </TouchableOpacity>
-          ) : null}
+            {action && (
+              <TouchableOpacity
+                style={[styles.inlineMainBtn, isDraft && styles.draftMainBtn, isUpdating && styles.btnDisabled]}
+                disabled={isUpdating}
+                onPress={() => handleStatusAction(item)}>
+                <Text style={[styles.inlineMainBtnText, isDraft && styles.draftMainBtnText]}>
+                  {isUpdating ? '...' : action.label}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </ObjectCard>
+      </TouchableOpacity>
     );
   };
 
@@ -288,94 +299,159 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   loading: {
     paddingVertical: 48,
   },
-  card: {
-    marginBottom: 12,
+  offerCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  cardPaused: {
+    opacity: 0.7,
+    backgroundColor: theme.bgSecondary,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 14,
   },
-  cardHeaderLeft: {
+  headerLeft: {
     flexDirection: 'row',
-    gap: 8,
     alignItems: 'center',
+    gap: 8,
   },
-  code: {
-    fontSize: 12,
-    color: theme.textSub,
-    fontWeight: '600',
-  },
-  title: {
-    marginTop: 14,
-    fontSize: 17,
-    lineHeight: 24,
-    color: theme.text,
+  supplyNo: {
+    fontSize: 11,
+    color: theme.textHint,
     fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  draftHintBadge: {
+    backgroundColor: theme.warning + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  draftHintText: {
+    fontSize: 10,
+    color: theme.warning,
+    fontWeight: '800',
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: theme.text,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  droneInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: theme.bgSecondary,
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 16,
+  },
+  droneIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  droneName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.text,
+  },
+  droneSpecs: {
+    fontSize: 11,
+    color: theme.textSub,
+    marginTop: 2,
   },
   sceneRow: {
-    marginTop: 12,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 18,
   },
-  sceneTag: {
-    borderRadius: 999,
+  sceneBadge: {
     backgroundColor: theme.primaryBg,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  sceneTagText: {
+  sceneBadgeText: {
     fontSize: 11,
     color: theme.primaryText,
     fontWeight: '700',
   },
-  metricRow: {
-    marginTop: 12,
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.divider,
+    paddingTop: 16,
   },
-  metricText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
-    color: theme.textSub,
+  pricingBox: {
+    gap: 2,
   },
-  footer: {
-    marginTop: 16,
+  pricingLabel: {
+    fontSize: 10,
+    color: theme.textHint,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  pricingValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.danger,
+  },
+  actionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     gap: 10,
   },
-  secondaryBtn: {
-    borderRadius: 999,
+  inlineGhostBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.divider,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
   },
-  secondaryBtnText: {
-    fontSize: 12,
+  inlineGhostBtnText: {
+    fontSize: 13,
     color: theme.textSub,
     fontWeight: '700',
   },
-  primaryBtn: {
-    borderRadius: 999,
-    backgroundColor: theme.primary,
+  inlineMainBtn: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: theme.primary,
   },
-  primaryBtnDisabled: {
-    opacity: 0.6,
+  inlineMainBtnText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
-  primaryBtnText: {
-    fontSize: 12,
-    color: theme.btnPrimaryText,
-    fontWeight: '700',
+  draftMainBtn: {
+    backgroundColor: theme.warning,
   },
-});
-maryText,
-    fontWeight: '700',
+  draftMainBtnText: {
+    color: '#FFFFFF',
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  card: {
+    marginBottom: 12,
   },
 });

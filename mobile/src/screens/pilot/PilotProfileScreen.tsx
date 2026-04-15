@@ -165,9 +165,6 @@ export default function PilotProfileScreen({navigation}: any) {
   const availabilityStatus = availabilityMap[pilot?.availability_status || 'offline'] || availabilityMap.offline;
   const eligibility = pilot?.eligibility;
   const hoursText = formatHoursFromSeconds(flightStats.totalDurationSeconds);
-  const serviceRadiusText = Number(draft.service_radius || 0) > 0 ? `${Number(draft.service_radius)}km` : '未设置';
-  const isOnline = ['online', 'available'].includes(pilot?.availability_status || 'offline');
-  const canUpdateAvailability = eligibility?.can_update_availability ?? ['verified', 'approved'].includes(pilot?.verification_status || '');
   const readinessTone: 'green' | 'orange' | 'red' | 'gray' =
     eligibility?.tier === 'dispatch_ready'
       ? 'green'
@@ -176,21 +173,9 @@ export default function PilotProfileScreen({navigation}: any) {
       : eligibility?.tier === 'needs_resubmission'
       ? 'red'
       : 'gray';
-  const readinessActions = [
-    eligibility?.can_apply_candidate ? '可报名候选需求' : null,
-    eligibility?.can_accept_dispatch ? '可承接正式派单' : null,
-    eligibility?.can_start_execution ? '可进入执行流程' : null,
-  ].filter(Boolean) as string[];
 
-  const summaryItems = useMemo(
-    () => [
-      {label: '待响应派单', value: dispatchStats.pending},
-      {label: '执行中任务', value: dispatchStats.active},
-      {label: '真实飞行记录', value: flightStats.totalFlights},
-      {label: '总飞行时长', value: hoursText},
-    ],
-    [dispatchStats.active, dispatchStats.pending, flightStats.totalFlights, hoursText],
-  );
+  const canUpdateAvailability = eligibility?.can_update_availability ?? ['verified', 'approved'].includes(pilot?.verification_status || '');
+  const isOnline = ['online', 'available'].includes(pilot?.availability_status || 'offline');
 
   if (loading) {
     return (
@@ -219,219 +204,420 @@ export default function PilotProfileScreen({navigation}: any) {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        <ObjectCard style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>飞手档案</Text>
-          <Text style={styles.heroTitle}>认证、接单、服务范围在这里统一设置</Text>
-          <Text style={styles.heroDesc}>飞手中心现在只保留执行相关能力：认证状态、接单状态、服务区域、技能标签和真实履约统计。</Text>
 
-          <View style={styles.heroBadgeRow}>
-            <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
-            <StatusBadge label={availabilityStatus.label} tone={availabilityStatus.tone} />
+        <View style={styles.headerHero}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.headerGreeting}>飞手工作台</Text>
+              <Text style={styles.headerSubtitle}>执照、接单与飞行统计</Text>
+            </View>
+            <View style={styles.headerStatusRow}>
+              <StatusBadge label={availabilityStatus.label} tone={availabilityStatus.tone} />
+            </View>
           </View>
 
-          <View style={styles.heroMeta}>
-            <Text style={styles.heroMetaLine}>执照类型：{pilot.caac_license_type || '-'}</Text>
-            <Text style={styles.heroMetaLine}>执照编号：{pilot.caac_license_no || '-'}</Text>
-            <Text style={styles.heroMetaLine}>服务城市：{draft.current_city || '未设置'} · 服务半径：{serviceRadiusText}</Text>
-            <Text style={[styles.heroMetaLine, {marginTop: 4}]}>
-              当前阶段：{eligibility?.label || verificationStatus.label}
-            </Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statsCard}>
+              <Text style={styles.statsValue}>{dispatchStats.pending}</Text>
+              <Text style={styles.statsLabel}>待办派单</Text>
+            </View>
+            <View style={styles.statsCard}>
+              <Text style={styles.statsValue}>{dispatchStats.active}</Text>
+              <Text style={styles.statsLabel}>进行中</Text>
+            </View>
+            <View style={styles.statsCard}>
+              <Text style={styles.statsValue}>{flightStats.totalFlights}</Text>
+              <Text style={styles.statsLabel}>总飞行</Text>
+            </View>
+            <View style={styles.statsCard}>
+              <Text style={styles.statsValue}>{hoursText}</Text>
+              <Text style={styles.statsLabel}>飞行时数</Text>
+            </View>
           </View>
+        </View>
 
-          <View style={styles.summaryRow}>
-            {summaryItems.map(item => (
-              <View key={item.label} style={styles.summaryItem}>
-                <Text style={styles.summaryValue}>{item.value}</Text>
-                <Text style={styles.summaryLabel}>{item.label}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>市场准入状态</Text>
+          <View style={styles.readinessCard}>
+            <View style={styles.readinessHeader}>
+              <View style={styles.readinessInfo}>
+                <Text style={styles.readinessTier}>{eligibility?.label || verificationStatus.label}</Text>
+                <Text style={styles.readinessNext}>{eligibility?.recommended_next_step || '完善资料以获得更多权限'}</Text>
               </View>
-            ))}
-          </View>
-        </ObjectCard>
+              <StatusBadge label={eligibility?.tier === 'dispatch_ready' ? '已就绪' : '待达标'} tone={readinessTone} />
+            </View>
 
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>当前阶段与下一步</Text>
-          <View style={styles.readinessRow}>
-            <StatusBadge label={eligibility?.label || verificationStatus.label} tone={readinessTone} />
-            {eligibility?.can_accept_dispatch ? (
-              <StatusBadge label="正式派单已开放" tone="green" />
-            ) : eligibility?.can_apply_candidate ? (
-              <StatusBadge label="先参与候选需求" tone="orange" />
-            ) : (
-              <StatusBadge label="需补资料" tone="gray" />
+            {eligibility?.blockers?.length > 0 && (
+              <View style={styles.blockerBox}>
+                <Text style={styles.blockerTitle}>需要处理以下事项：</Text>
+                {eligibility.blockers.map((blocker: any) => (
+                  <Text key={blocker.code || blocker.message} style={styles.blockerItem}>
+                    • {blocker.message}
+                  </Text>
+                ))}
+              </View>
             )}
-          </View>
-          <Text style={styles.readinessDesc}>
-            {eligibility?.recommended_next_step || '先补齐飞手资料，后续可以逐步开放候选需求、正式派单和执行能力。'}
-          </Text>
-          {readinessActions.length > 0 ? (
-            <View style={styles.readinessTagRow}>
-              {readinessActions.map(item => (
-                <View key={item} style={styles.readinessTag}>
-                  <Text style={styles.readinessTagText}>{item}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          {eligibility?.blockers?.length ? (
-            <View style={styles.blockerList}>
-              {eligibility.blockers.map((blocker: any) => (
-                <Text key={blocker.code || blocker.message} style={styles.blockerText}>
-                  {`\u2022 ${blocker.message}`}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-          <View style={styles.readinessActionRow}>
-            <TouchableOpacity style={styles.secondaryMiniButton} onPress={() => navigation.navigate('DemandList')}>
-              <Text style={styles.secondaryMiniButtonText}>查看可报名任务</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryMiniButton} onPress={() => navigation.navigate('PilotRegister')}>
-              <Text style={styles.secondaryMiniButtonText}>补充认证资料</Text>
-            </TouchableOpacity>
-          </View>
-        </ObjectCard>
 
-        <ObjectCard style={styles.sectionCard}>
-          <View style={styles.switchRow}>
-            <View style={styles.switchTextWrap}>
-              <Text style={styles.sectionTitle}>接单状态</Text>
-              <Text style={styles.sectionDesc}>
-                {canUpdateAvailability
-                  ? '当前已具备正式派单准入，可随时切换是否接受新的正式派单。'
-                  : '正式派单开关会在认证通过后解锁。当前仍可先浏览并报名候选需求。'}
+            <View style={styles.readinessActions}>
+              <TouchableOpacity style={styles.readinessBtn} onPress={() => navigation.navigate('PilotRegister')}>
+                <Text style={styles.readinessBtnText}>补充/更新认证资料 ˃</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.switchBox}>
+            <View style={styles.switchText}>
+              <Text style={styles.switchLabel}>正式派单接单开关</Text>
+              <Text style={styles.switchSub}>
+                {canUpdateAvailability ? '开启后，机主和系统可直接向你指派任务。' : '完成飞手认证后解锁正式接单开关。'}
               </Text>
             </View>
             <Switch
               value={isOnline}
               onValueChange={toggleAvailability}
               disabled={!canUpdateAvailability}
-              trackColor={{false: '#d8e1eb', true: '#22c55e'}}
-              thumbColor="#fff"
+              trackColor={{false: theme.divider, true: theme.success}}
             />
           </View>
-        </ObjectCard>
+        </View>
 
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>服务设置</Text>
-          <Text style={styles.inputLabel}>当前服务城市</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="例如：佛山"
-            value={draft.current_city}
-            onChangeText={text => setDraft(prev => ({...prev, current_city: text}))}
-          />
-
-          <Text style={styles.inputLabel}>服务半径（公里）</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="默认 50"
-            keyboardType="number-pad"
-            value={draft.service_radius}
-            onChangeText={text => setDraft(prev => ({...prev, service_radius: text}))}
-          />
-
-          <Text style={styles.inputLabel}>技能标签</Text>
-          <View style={styles.skillRow}>
-            {skillOptions.map(skill => {
-              const active = draft.special_skills.includes(skill);
-              return (
-                <TouchableOpacity key={skill} style={[styles.skillChip, active && styles.skillChipActive]} onPress={() => toggleSkill(skill)}>
-                  <Text style={[styles.skillChipText, active && styles.skillChipTextActive]}>{skill}</Text>
-                </TouchableOpacity>
-              );
-            })}
+        <ObjectCard style={styles.settingsCard}>
+          <Text style={styles.sectionTitle}>接单偏好</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>常驻服务城市</Text>
+            <TextInput
+              style={styles.fieldInput}
+              placeholder="例如：佛山"
+              value={draft.current_city}
+              onChangeText={text => setDraft(prev => ({...prev, current_city: text}))}
+            />
           </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>最大服务半径 (公里)</Text>
+            <TextInput
+              style={styles.fieldInput}
+              placeholder="默认 50"
+              keyboardType="number-pad"
+              value={draft.service_radius}
+              onChangeText={text => setDraft(prev => ({...prev, service_radius: text}))}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>专业技能</Text>
+            <View style={styles.skillGrid}>
+              {skillOptions.map(skill => {
+                const active = draft.special_skills.includes(skill);
+                return (
+                  <TouchableOpacity
+                    key={skill}
+                    style={[styles.skillBtn, active && styles.skillBtnActive]}
+                    onPress={() => toggleSkill(skill)}
+                  >
+                    <Text style={[styles.skillBtnText, active && styles.skillBtnTextActive]}>{skill}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Text style={styles.saveBtnText}>{saving ? '正在保存...' : '保存接单设置'}</Text>
+          </TouchableOpacity>
         </ObjectCard>
 
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>认证与执行入口</Text>
-          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('PilotTaskList')}>
-            <Text style={styles.actionTitle}>正式派单</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionRow} onPress={handleEnterFlightMonitoring}>
-            <Text style={styles.actionTitle}>飞行监控</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('FlightLog')}>
-            <Text style={styles.actionTitle}>飞行记录</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('PilotOwnerBindings')}>
-            <Text style={styles.actionTitle}>绑定机主</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionRow} onPress={() => navigation.navigate('PilotRegister')}>
-            <Text style={styles.actionTitle}>补充/更新认证资料</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-        </ObjectCard>
-
-        <TouchableOpacity style={[styles.primaryButton, saving && styles.primaryButtonDisabled]} onPress={handleSave} disabled={saving}>
-          <Text style={styles.primaryButtonText}>{saving ? '保存中...' : '保存飞手设置'}</Text>
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>任务与记录</Text>
+          <View style={styles.entryGrid}>
+            <EntryItem title="正式派单" icon="🎯" count={dispatchStats.pending} onPress={() => navigation.navigate('PilotTaskList')} />
+            <EntryItem title="报名需求" icon="🛰️" onPress={() => navigation.navigate('DemandList', {mode: 'pilot'})} />
+            <EntryItem title="飞行监控" icon="📍" onPress={handleEnterFlightMonitoring} />
+            <EntryItem title="飞行记录" icon="🛫" onPress={() => navigation.navigate('FlightLog')} />
+            <EntryItem title="绑定机主" icon="🤝" onPress={() => navigation.navigate('PilotOwnerBindings')} />
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function EntryItem({title, icon, count, onPress}: {title: string; icon: string; count?: number; onPress: () => void}) {
+  const {theme} = useTheme();
+  const styles = getStyles(theme);
+  return (
+    <TouchableOpacity style={[styles.entryCard, {backgroundColor: theme.card, borderColor: theme.divider}]} onPress={onPress}>
+      <Text style={styles.entryIcon}>{icon}</Text>
+      <Text style={[styles.entryTitle, {color: theme.text}]}>{title}</Text>
+      {typeof count === 'number' && count > 0 && (
+        <View style={[styles.entryBadge, {backgroundColor: theme.danger}]}>
+          <Text style={styles.entryBadgeText}>{count}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {flex: 1, backgroundColor: theme.bgSecondary},
-  content: {padding: 16, paddingBottom: 32, gap: 14},
+  content: {paddingBottom: 40},
   loadingWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   loadingText: {fontSize: 15, color: theme.textSub},
+
+  headerHero: {
+    backgroundColor: theme.primary,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerGreeting: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  headerStatusRow: {
+    marginTop: 2,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    marginTop: 24,
+    gap: 10,
+  },
+  statsCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  statsValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  statsLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+
+  section: {
+    marginTop: 20,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.text,
+    marginBottom: 12,
+  },
+
+  readinessCard: {
+    backgroundColor: theme.card,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  readinessHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  readinessInfo: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  readinessTier: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.text,
+  },
+  readinessNext: {
+    fontSize: 13,
+    color: theme.textSub,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  blockerBox: {
+    marginTop: 16,
+    padding: 14,
+    backgroundColor: theme.warning + '10',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.warning + '20',
+  },
+  blockerTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: theme.warning,
+    marginBottom: 6,
+  },
+  blockerItem: {
+    fontSize: 12,
+    color: theme.textSub,
+    lineHeight: 18,
+  },
+  readinessActions: {
+    marginTop: 16,
+    alignItems: 'flex-end',
+  },
+  readinessBtn: {
+    paddingVertical: 6,
+  },
+  readinessBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.primaryText,
+  },
+
+  switchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  switchText: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  switchLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.text,
+  },
+  switchSub: {
+    fontSize: 12,
+    color: theme.textSub,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+
+  settingsCard: {
+    margin: 16,
+    padding: 20,
+    gap: 16,
+  },
+  inputGroup: {
+    gap: 8,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.textSub,
+  },
+  fieldInput: {
+    backgroundColor: theme.bgSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: theme.text,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  skillGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skillBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  skillBtnActive: {
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryBg,
+  },
+  skillBtnText: {
+    fontSize: 13,
+    color: theme.textSub,
+    fontWeight: '600',
+  },
+  skillBtnTextActive: {
+    color: theme.primaryText,
+    fontWeight: '700',
+  },
+  saveBtn: {
+    backgroundColor: theme.primary,
+    borderRadius: 14,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  saveBtnDisabled: {opacity: 0.6},
+  saveBtnText: {fontSize: 15, fontWeight: '800', color: '#FFFFFF'},
+
+  entryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  entryCard: {
+    width: '30.5%',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.divider,
+    position: 'relative',
+  },
+  entryIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  entryTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  entryBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  entryBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   emptyWrap: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28},
   emptyTitle: {fontSize: 22, fontWeight: '800', color: theme.text, textAlign: 'center'},
   emptyDesc: {marginTop: 10, fontSize: 14, lineHeight: 22, color: theme.textSub, textAlign: 'center'},
-  heroCard: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
-  heroEyebrow: {fontSize: 12, fontWeight: '700', color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)'},
-  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, fontWeight: '800', color: theme.isDark ? theme.text : '#FFFFFF'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
-  heroBadgeRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16},
-  heroMeta: {marginTop: 16, gap: 6},
-  heroMetaLine: {fontSize: 13, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
-  summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
-  summaryItem: {flex: 1, backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.12)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center'},
-  summaryValue: {fontSize: 18, fontWeight: '800', color: theme.isDark ? theme.primary : '#FFFFFF'},
-  summaryLabel: {marginTop: 4, fontSize: 12, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)', textAlign: 'center'},
-  sectionCard: {gap: 12},
-  readinessRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  readinessDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub},
-  readinessTagRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  readinessTag: {
-    borderRadius: 999,
-    backgroundColor: theme.primaryBg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  readinessTagText: {fontSize: 12, color: theme.primaryText, fontWeight: '700'},
-  blockerList: {gap: 6},
-  blockerText: {fontSize: 13, lineHeight: 19, color: theme.warning},
-  readinessActionRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  secondaryMiniButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.primaryBorder,
-    backgroundColor: theme.bgSecondary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  secondaryMiniButtonText: {fontSize: 13, fontWeight: '700', color: theme.primaryText},
-  sectionTitle: {fontSize: 20, fontWeight: '800', color: theme.text},
-  sectionDesc: {marginTop: 6, fontSize: 13, lineHeight: 19, color: theme.textSub},
-  switchRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'center'},
-  switchTextWrap: {flex: 1},
-  inputLabel: {fontSize: 13, fontWeight: '700', color: theme.text},
-  input: {borderWidth: 1, borderColor: theme.cardBorder, borderRadius: 12, backgroundColor: theme.bgSecondary, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text},
-  skillRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
-  skillChip: {paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: theme.primaryBg},
-  skillChipActive: {backgroundColor: theme.success + '22'},
-  skillChipText: {fontSize: 13, fontWeight: '600', color: theme.textSub},
-  skillChipTextActive: {color: theme.success},
-  actionRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.divider},
-  actionTitle: {fontSize: 15, fontWeight: '700', color: theme.text},
-  actionArrow: {fontSize: 18, color: theme.textHint},
-  primaryButton: {borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 15},
-  primaryButtonDisabled: {opacity: 0.6},
+  primaryButton: {borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', paddingVertical: 15, marginTop: 20},
   primaryButtonText: {fontSize: 15, fontWeight: '800', color: theme.btnPrimaryText},
 });

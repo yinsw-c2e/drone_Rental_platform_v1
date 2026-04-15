@@ -1,8 +1,8 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useState, useCallback, useMemo} from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   ActivityIndicator, SafeAreaView, Dimensions,
-  Alert,
+  Alert, Platform,
 } from 'react-native';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
@@ -21,11 +21,13 @@ const AVAILABILITY_MAP: Record<string, {label: string; colorKey: 'success' | 'wa
   offline: {label: '已下线', colorKey: 'textHint'},
 };
 
+const isApprovedStatus = (value?: string) => value === 'approved' || value === 'verified';
+
 export default function DroneDetailScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const {id} = route.params;
-  
+
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const [drone, setDrone] = useState<Drone | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -57,13 +59,13 @@ export default function DroneDetailScreen({route, navigation}: any) {
   }, [fetchData]);
 
   const handleContact = () => {
-    if (!drone?.owner) {
+    if (!drone?.owner_id) {
       Alert.alert('提示', '无法获取机主信息');
       return;
     }
     navigation.navigate('Messages', {
       screen: 'Chat',
-      params: {peerId: drone.owner_id, peerName: drone.owner.nickname},
+      params: {peerId: drone.owner_id, peerName: drone.owner?.nickname || '机主'},
     });
   };
 
@@ -84,9 +86,9 @@ export default function DroneDetailScreen({route, navigation}: any) {
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>{'<'} 返回</Text>
+            <Text style={styles.backText}>˂ 返回</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>无人机详情</Text>
+          <Text style={styles.headerTitle}>资产详情</Text>
           <View style={{width: 60}} />
         </View>
         <View style={styles.center}>
@@ -101,9 +103,9 @@ export default function DroneDetailScreen({route, navigation}: any) {
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>{'<'} 返回</Text>
+            <Text style={styles.backText}>˂ 返回</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>无人机详情</Text>
+          <Text style={styles.headerTitle}>资产详情</Text>
           <View style={{width: 60}} />
         </View>
         <View style={styles.center}>
@@ -114,14 +116,14 @@ export default function DroneDetailScreen({route, navigation}: any) {
   }
 
   const availability = AVAILABILITY_MAP[drone.availability_status] || {label: drone.availability_status, colorKey: 'textHint' as const};
-    const availColor = theme[availability.colorKey];
+  const availColor = theme[availability.colorKey];
   const images = drone.images?.length ? drone.images : [];
   const approvedCount = [
     drone.certification_status,
     drone.uom_verified,
     drone.insurance_verified,
     drone.airworthiness_verified,
-  ].filter(value => value === 'approved' || value === 'verified').length;
+  ].filter(value => isApprovedStatus(value)).length;
 
   const renderStars = (rating: number) => {
     const stars = [];
@@ -139,13 +141,13 @@ export default function DroneDetailScreen({route, navigation}: any) {
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>{'<'} 返回</Text>
+          <Text style={styles.backText}>˂ 返回</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>无人机详情</Text>
+        <Text style={styles.headerTitle}>资产详情</Text>
         <View style={{width: 60}} />
       </View>
 
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Image Gallery */}
         {images.length > 0 ? (
           <View>
@@ -159,8 +161,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
               {images.map((uri, idx) => (
                 <View key={idx} style={styles.imageSlide}>
                   <View style={styles.imagePlaceholder}>
-                    <Text style={{fontSize: 48}}>{'🚁'}</Text>
-                    <Text style={styles.imageUri} numberOfLines={1}>{uri}</Text>
+                    <Text style={{fontSize: 64}}>{'🚁'}</Text>
                   </View>
                 </View>
               ))}
@@ -179,185 +180,123 @@ export default function DroneDetailScreen({route, navigation}: any) {
         ) : (
           <View style={styles.noImage}>
             <Text style={{fontSize: 64}}>{'🚁'}</Text>
-            <Text style={styles.noImageText}>暂无图片</Text>
+            <Text style={styles.noImageText}>暂无实拍图</Text>
           </View>
         )}
 
-        {/* Basic Info */}
-        <View style={styles.card}>
+        {/* Hero Info */}
+        <View style={styles.heroInfoCard}>
           <View style={styles.titleRow}>
-            <Text style={styles.droneName}>{drone.brand} {drone.model}</Text>
-            <View style={[styles.statusBadge, {backgroundColor: availColor}]}>
-              <Text style={styles.statusText}>{availability.label}</Text>
+            <View style={{flex: 1}}>
+              <Text style={styles.droneName}>{drone.brand} {drone.model}</Text>
+              <Text style={styles.droneSn}>SN: {(drone as any).sn || '未录入'}</Text>
+            </View>
+            <View style={[styles.statusBadge, {backgroundColor: availColor + '20'}]}>
+              <View style={[styles.statusDot, {backgroundColor: availColor}]} />
+              <Text style={[styles.statusText, {color: availColor}]}>{availability.label}</Text>
             </View>
           </View>
-          {drone.description ? (
-            <Text style={styles.description}>{drone.description}</Text>
-          ) : null}
-          <View style={styles.ratingRow}>
+          <View style={styles.ratingBar}>
             {renderStars(Math.round(drone.rating || 0))}
-            <Text style={styles.ratingText}>{drone.rating?.toFixed(1) || '0.0'}</Text>
-            <Text style={styles.orderCount}>{drone.order_count || 0}次履约</Text>
+            <Text style={styles.ratingVal}>{drone.rating?.toFixed(1) || '5.0'}</Text>
+            <View style={styles.ratingDivider} />
+            <Text style={styles.usageCount}>{drone.order_count || 0} 次任务执行</Text>
           </View>
         </View>
 
-        {/* Price Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>价格信息</Text>
-          <View style={styles.priceRow}>
-            {drone.daily_price > 0 && (
-              <View style={styles.priceItem}>
-                <Text style={styles.priceValue}>{'¥'}{(drone.daily_price / 100).toFixed(0)}</Text>
-                <Text style={styles.priceLabel}>日租金</Text>
-              </View>
-            )}
-            {drone.hourly_price > 0 && (
-              <View style={styles.priceItem}>
-                <Text style={styles.priceValue}>{'¥'}{(drone.hourly_price / 100).toFixed(0)}</Text>
-                <Text style={styles.priceLabel}>时租金</Text>
-              </View>
-            )}
-            {drone.deposit > 0 && (
-              <View style={styles.priceItem}>
-                <Text style={[styles.priceValue, {color: theme.warning}]}>{'¥'}{(drone.deposit / 100).toFixed(0)}</Text>
-                <Text style={styles.priceLabel}>押金</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Specs */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>设备规格</Text>
-          <View style={styles.specGrid}>
-            <View style={styles.specItem}>
-              <Text style={styles.specValue}>{drone.max_load || '-'} kg</Text>
-              <Text style={styles.specLabel}>最大载重</Text>
-            </View>
-            <View style={styles.specItem}>
-              <Text style={styles.specValue}>{drone.max_flight_time || '-'} min</Text>
-              <Text style={styles.specLabel}>最大续航</Text>
-            </View>
-            <View style={styles.specItem}>
-              <Text style={styles.specValue}>{drone.max_distance || '-'} km</Text>
-              <Text style={styles.specLabel}>最远距离</Text>
-            </View>
-          </View>
-          {drone.features?.length > 0 && (
-            <View style={styles.featureRow}>
-              {drone.features.map((f, i) => (
-                <View key={i} style={styles.featureTag}>
-                  <Text style={styles.featureText}>{f}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Qualifications */}
+        {/* Qualifications - Market Readiness */}
         {isOwner && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>资质进度总览</Text>
-            <Text style={styles.progressHint}>四项资质支持并行提交与审核，不需要按固定顺序一个个完成。</Text>
-            <View style={styles.specGrid}>
-              <View style={styles.specItem}>
-                <Text style={[styles.specValue, {color: drone.certification_status === 'approved' ? theme.success : theme.warning}]}>{drone.certification_status === 'approved' ? '已通过' : (drone.certification_status === 'pending' ? '审核中' : '未提交')}</Text>
-                <Text style={styles.specLabel}>基础资质</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={[styles.specValue, {color: drone.uom_verified === 'approved' ? theme.success : theme.warning}]}>{drone.uom_verified === 'approved' ? '已通过' : (drone.uom_verified === 'pending' ? '审核中' : '未提交')}</Text>
-                <Text style={styles.specLabel}>UOM 认证</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={[styles.specValue, {color: drone.insurance_verified === 'approved' ? theme.success : theme.warning}]}>{drone.insurance_verified === 'approved' ? '已通过' : (drone.insurance_verified === 'pending' ? '审核中' : '未提交')}</Text>
-                <Text style={styles.specLabel}>保险认证</Text>
-              </View>
-              <View style={styles.specItem}>
-                <Text style={[styles.specValue, {color: drone.airworthiness_verified === 'approved' ? theme.success : theme.warning}]}>{drone.airworthiness_verified === 'approved' ? '已通过' : (drone.airworthiness_verified === 'pending' ? '审核中' : '未提交')}</Text>
-                <Text style={styles.specLabel}>适航认证</Text>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>准入合规进度</Text>
+              <View style={styles.readyCountBadge}>
+                <Text style={styles.readyCountText}>{approvedCount}/4</Text>
               </View>
             </View>
-            <View style={styles.progressSummaryCard}>
-              <Text style={styles.progressSummaryValue}>{approvedCount}/4</Text>
-              <Text style={styles.progressSummaryLabel}>当前已通过项</Text>
+            <Text style={styles.progressSub}>上架主市场需完成以下四项核心资质审核：</Text>
+            <View style={styles.checklist}>
+              <ChecklistItem label="基础资质备案" status={drone.certification_status} theme={theme} />
+              <ChecklistItem label="UOM 实名认证" status={drone.uom_verified} theme={theme} />
+              <ChecklistItem label="三者险/机身险" status={drone.insurance_verified} theme={theme} />
+              <ChecklistItem label="适航证/登记证" status={drone.airworthiness_verified} theme={theme} />
             </View>
-            <TouchableOpacity style={[styles.contactBtn, {marginTop: 4, alignSelf: 'flex-start'}]} onPress={() => navigation.navigate('DroneCertification', {id: drone.id})}>
-              <Text style={styles.contactBtnText}>去管理资质</Text>
+            <TouchableOpacity
+              style={styles.manageCertBtn}
+              onPress={() => navigation.navigate('DroneCertification', {id: drone.id})}
+            >
+              <Text style={styles.manageCertText}>管理资质证明 ˃</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Owner Info */}
+        {/* Key Specs Datasheet */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>核心规格参数</Text>
+          <View style={styles.specGridRow}>
+            <View style={styles.specBox}>
+              <Text style={styles.specVal}>{drone.max_load || '-'} <Text style={styles.specUnit}>kg</Text></Text>
+              <Text style={styles.specLab}>最大载重</Text>
+            </View>
+            <View style={styles.specBox}>
+              <Text style={styles.specVal}>{drone.max_flight_time || '-'} <Text style={styles.specUnit}>min</Text></Text>
+              <Text style={styles.specLab}>最大续航</Text>
+            </View>
+            <View style={styles.specBox}>
+              <Text style={styles.specVal}>{drone.max_distance || '-'} <Text style={styles.specUnit}>km</Text></Text>
+              <Text style={styles.specLab}>最远航程</Text>
+            </View>
+          </View>
+          <View style={styles.featureTagsRow}>
+            {(drone.features || []).map((f, i) => (
+              <View key={i} style={styles.fTag}>
+                <Text style={styles.fTagText}>{f}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Detailed Info */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>设备说明</Text>
+          <Text style={styles.longDesc}>{drone.description || '机主未提供详细文字描述。'}</Text>
+          <View style={styles.infoList}>
+            <InfoItem label="目前位置" value={drone.address || '机主未公开'} theme={theme} />
+            <InfoItem label="日常维护" value={drone.availability_status === 'maintenance' ? '维护中' : '正常'} theme={theme} />
+          </View>
+        </View>
+
+        {/* Owner context if not owner */}
         {drone.owner && !isOwner && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>机主信息</Text>
-            <View style={styles.ownerRow}>
+            <Text style={styles.cardTitle}>所属机主</Text>
+            <View style={styles.ownerBrief}>
               <View style={styles.ownerAvatar}>
-                <Text style={styles.ownerAvatarText}>
-                  {drone.owner.nickname?.charAt(0) || 'U'}
-                </Text>
+                <Text style={styles.ownerInitial}>{drone.owner.nickname?.charAt(0) || 'U'}</Text>
               </View>
               <View style={{flex: 1}}>
-                <Text style={styles.ownerName}>{drone.owner.nickname}</Text>
-                <Text style={styles.ownerMeta}>
-                  {drone.owner.id_verified === 'approved' ? '已实名认证' : '未认证'}
-                  {' '}|{' '}信用分 {drone.owner.credit_score || 100}
-                </Text>
+                <Text style={styles.ownerNick}>{drone.owner.nickname}</Text>
+                <Text style={styles.ownerBadge}>{drone.owner.id_verified === 'approved' ? '✅ 已实名认证' : '⚠️ 身份待核实'}</Text>
               </View>
-              <TouchableOpacity style={styles.contactBtn} onPress={handleContact}>
-                <Text style={styles.contactBtnText}>联系</Text>
+              <TouchableOpacity style={styles.inlineContactBtn} onPress={handleContact}>
+                <Text style={styles.inlineContactText}>联系</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Location */}
-        {drone.address ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>设备位置</Text>
-            <Text style={styles.address}>{drone.address}</Text>
-          </View>
-        ) : null}
-
-        {/* Reviews */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            用户评价 {reviews.length > 0 ? `(${reviews.length})` : ''}
-          </Text>
-          {reviews.length > 0 ? (
-            reviews.map(review => (
-              <View key={review.id} style={styles.reviewItem}>
-                <View style={styles.reviewHeader}>
-                  {renderStars(review.rating)}
-                  <Text style={styles.reviewDate}>
-                    {review.created_at?.slice(0, 10)}
-                  </Text>
-                </View>
-                <Text style={styles.reviewContent}>{review.content}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.emptyReview}>暂无评价</Text>
-          )}
-        </View>
-
-        <View style={{height: 100}} />
+        <View style={{height: 120}} />
       </ScrollView>
 
-      {/* Bottom Action Bar */}
       {!isOwner && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.bottomContactBtn} onPress={handleContact}>
-            <Text style={styles.bottomContactText}>联系机主</Text>
+        <View style={styles.footerBar}>
+          <TouchableOpacity style={styles.footerGhostBtn} onPress={handleContact}>
+            <Text style={styles.footerGhostText}>咨询机主</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.bottomRentBtn,
-              drone.availability_status !== 'available' && styles.bottomBtnDisabled,
-            ]}
+            style={[styles.footerMainBtn, drone.availability_status !== 'available' && styles.footerDisabledBtn]}
             onPress={handleRent}>
-            <Text style={styles.bottomRentText}>
-              {drone.availability_status === 'available' ? '去服务列表' : availability.label}
+            <Text style={styles.footerMainText}>
+              {drone.availability_status === 'available' ? '找相关服务' : availability.label}
             </Text>
           </TouchableOpacity>
         </View>
@@ -366,112 +305,137 @@ export default function DroneDetailScreen({route, navigation}: any) {
   );
 }
 
+function ChecklistItem({label, status, theme}: {label: string; status?: string; theme: AppTheme}) {
+  const isOk = isApprovedStatus(status);
+  const isPending = status === 'pending';
+  const styles = getStyles(theme);
+  return (
+    <View style={styles.checkItem}>
+      <Text style={styles.checkLabel}>{label}</Text>
+      <View style={[styles.checkStatus, {backgroundColor: isOk ? theme.success + '15' : (isPending ? theme.warning + '15' : theme.bgSecondary)}]}>
+        <Text style={[styles.checkStatusText, {color: isOk ? theme.success : (isPending ? theme.warning : theme.textHint)}]}>
+          {isOk ? '已达标' : (isPending ? '审核中' : '未就绪')}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function InfoItem({label, value, theme}: {label: string; value: string; theme: AppTheme}) {
+  const styles = getStyles(theme);
+  return (
+    <View style={styles.infoRowItem}>
+      <Text style={styles.infoRowLabel}>{label}</Text>
+      <Text style={styles.infoRowValue}>{value}</Text>
+    </View>
+  );
+}
+
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  container: {flex: 1, backgroundColor: theme.bg},
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: theme.card, paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: theme.bg, paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: theme.divider,
   },
   backBtn: {width: 60},
-  backText: {fontSize: 16, color: theme.primaryText},
-  headerTitle: {fontSize: 18, fontWeight: '600', color: theme.text},
+  backText: {fontSize: 16, color: theme.primaryText, fontWeight: '600'},
+  headerTitle: {fontSize: 17, fontWeight: '800', color: theme.text},
   center: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   emptyText: {fontSize: 16, color: theme.textSub},
   scrollContent: {flex: 1},
 
-  // Image gallery
-  imageSlide: {width: SCREEN_WIDTH, height: 240, backgroundColor: theme.primaryBg},
+  imageSlide: {width: SCREEN_WIDTH, height: 260, backgroundColor: theme.bgSecondary},
   imagePlaceholder: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  imageUri: {fontSize: 12, color: theme.textSub, marginTop: 8, paddingHorizontal: 20},
-  imageDots: {flexDirection: 'row', justifyContent: 'center', paddingVertical: 8, backgroundColor: theme.card},
-  dot: {width: 6, height: 6, borderRadius: 3, backgroundColor: theme.divider, marginHorizontal: 3},
-  dotActive: {backgroundColor: theme.primary, width: 16},
-  noImage: {height: 200, backgroundColor: theme.primaryBg, justifyContent: 'center', alignItems: 'center'},
-  noImageText: {fontSize: 14, color: theme.textSub, marginTop: 8},
+  imageDots: {flexDirection: 'row', justifyContent: 'center', paddingVertical: 10, backgroundColor: theme.bg},
+  dot: {width: 6, height: 6, borderRadius: 3, backgroundColor: theme.divider, marginHorizontal: 4},
+  dotActive: {backgroundColor: theme.primary, width: 18},
+  noImage: {height: 220, backgroundColor: theme.bgSecondary, justifyContent: 'center', alignItems: 'center'},
+  noImageText: {fontSize: 13, color: theme.textHint, marginTop: 12},
 
-  // Cards
-  card: {backgroundColor: theme.card, padding: 16, marginBottom: 10},
-  cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 12},
-
-  // Title
-  titleRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  droneName: {fontSize: 20, fontWeight: 'bold', color: theme.text, flex: 1},
-  statusBadge: {paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12},
-  statusText: {color: theme.btnPrimaryText, fontSize: 12, fontWeight: '500'},
-  description: {fontSize: 14, color: theme.textSub, marginTop: 8, lineHeight: 20},
-  ratingRow: {flexDirection: 'row', alignItems: 'center', marginTop: 10},
-  ratingText: {fontSize: 14, color: theme.warning, fontWeight: '600', marginLeft: 6},
-  orderCount: {fontSize: 12, color: theme.textSub, marginLeft: 12},
-
-  // Price
-  priceRow: {flexDirection: 'row', justifyContent: 'space-around'},
-  priceItem: {alignItems: 'center'},
-  priceValue: {fontSize: 20, fontWeight: 'bold', color: theme.danger},
-  priceLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
-
-  // Specs
-  specGrid: {flexDirection: 'row', justifyContent: 'space-around', marginBottom: 12},
-  specItem: {alignItems: 'center'},
-  specValue: {fontSize: 16, fontWeight: '600', color: theme.text},
-  specLabel: {fontSize: 12, color: theme.textSub, marginTop: 4},
-  progressHint: {fontSize: 12, lineHeight: 18, color: theme.textSub, marginBottom: 12},
-  progressSummaryCard: {
-    borderRadius: 14,
-    backgroundColor: theme.bgSecondary,
-    paddingVertical: 12,
+  heroInfoCard: {
+    backgroundColor: theme.card,
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.divider,
+  },
+  titleRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'},
+  droneName: {fontSize: 22, fontWeight: '900', color: theme.text},
+  droneSn: {fontSize: 12, color: theme.textHint, marginTop: 4, letterSpacing: 0.5},
+  statusBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  progressSummaryValue: {fontSize: 20, fontWeight: '800', color: theme.primaryText},
-  progressSummaryLabel: {marginTop: 4, fontSize: 12, color: theme.textSub},
-  featureRow: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 4},
-  featureTag: {
-    backgroundColor: theme.primaryBg, paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 12, marginRight: 8, marginBottom: 6,
+  statusDot: {width: 6, height: 6, borderRadius: 3, marginRight: 6},
+  statusText: {fontSize: 12, fontWeight: '800'},
+  ratingBar: {flexDirection: 'row', alignItems: 'center', marginTop: 16},
+  ratingVal: {fontSize: 14, fontWeight: '800', color: theme.warning, marginLeft: 8},
+  ratingDivider: {width: 1, height: 12, backgroundColor: theme.divider, marginHorizontal: 12},
+  usageCount: {fontSize: 12, color: theme.textSub, fontWeight: '600'},
+
+  card: {backgroundColor: theme.card, padding: 20, marginTop: 10},
+  cardHeaderRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
+  cardTitle: {fontSize: 16, fontWeight: '800', color: theme.text},
+  readyCountBadge: {backgroundColor: theme.primaryBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6},
+  readyCountText: {fontSize: 13, fontWeight: '800', color: theme.primaryText},
+  progressSub: {fontSize: 12, color: theme.textSub, marginBottom: 16, lineHeight: 18},
+  checklist: {gap: 10},
+  checkItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: theme.bgSecondary,
+    padding: 12,
+    borderRadius: 12,
   },
-  featureText: {fontSize: 12, color: theme.primaryText},
+  checkLabel: {fontSize: 14, fontWeight: '600', color: theme.text},
+  checkStatus: {paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6},
+  checkStatusText: {fontSize: 11, fontWeight: '800'},
+  manageCertBtn: {marginTop: 16, alignSelf: 'flex-end'},
+  manageCertText: {fontSize: 13, fontWeight: '700', color: theme.primaryText},
 
-  // Owner
-  ownerRow: {flexDirection: 'row', alignItems: 'center'},
-  ownerAvatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: theme.primary,
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  specGridRow: {flexDirection: 'row', gap: 12, marginBottom: 16},
+  specBox: {
+    flex: 1,
+    backgroundColor: theme.bgSecondary,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'flex-start',
   },
-  ownerAvatarText: {fontSize: 18, color: theme.btnPrimaryText, fontWeight: 'bold'},
-  ownerName: {fontSize: 15, fontWeight: '600', color: theme.text},
-  ownerMeta: {fontSize: 12, color: theme.textSub, marginTop: 2},
-  contactBtn: {
-    borderWidth: 1, borderColor: theme.primary, paddingHorizontal: 14,
-    paddingVertical: 6, borderRadius: 16,
-  },
-  contactBtnText: {color: theme.primaryText, fontSize: 13},
+  specVal: {fontSize: 18, fontWeight: '800', color: theme.text},
+  specUnit: {fontSize: 11, color: theme.textHint, fontWeight: '600'},
+  specLab: {fontSize: 11, color: theme.textSub, marginTop: 4, fontWeight: '600'},
+  featureTagsRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
+  fTag: {backgroundColor: theme.primaryBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8},
+  fTagText: {fontSize: 12, color: theme.primaryText, fontWeight: '600'},
 
-  // Location
-  address: {fontSize: 14, color: theme.textSub},
+  longDesc: {fontSize: 14, color: theme.textSub, lineHeight: 22, marginBottom: 16},
+  infoList: {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.divider},
+  infoRowItem: {flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider},
+  infoRowLabel: {fontSize: 13, color: theme.textHint, fontWeight: '600'},
+  infoRowValue: {fontSize: 13, color: theme.text, fontWeight: '700'},
 
-  // Reviews
-  reviewItem: {paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.divider},
-  reviewHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  reviewDate: {fontSize: 12, color: theme.textSub},
-  reviewContent: {fontSize: 14, color: theme.text, marginTop: 6, lineHeight: 20},
-  emptyReview: {textAlign: 'center', color: theme.textSub, paddingVertical: 16},
+  ownerBrief: {flexDirection: 'row', alignItems: 'center', gap: 12},
+  ownerAvatar: {width: 44, height: 44, borderRadius: 22, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center'},
+  ownerInitial: {fontSize: 18, color: '#FFFFFF', fontWeight: '800'},
+  ownerNick: {fontSize: 15, fontWeight: '700', color: theme.text},
+  ownerBadge: {fontSize: 11, color: theme.textSub, marginTop: 2},
+  inlineContactBtn: {borderWidth: 1, borderColor: theme.primary, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10},
+  inlineContactText: {fontSize: 13, color: theme.primaryText, fontWeight: '700'},
 
-  // Bottom bar
-  bottomBar: {
-    flexDirection: 'row', backgroundColor: theme.card, padding: 12,
+  footerBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', backgroundColor: theme.card, padding: 16,
     borderTopWidth: 1, borderTopColor: theme.divider,
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    gap: 12,
   },
-  bottomContactBtn: {
-    flex: 1, height: 44, borderWidth: 1, borderColor: theme.primary,
-    borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12,
-  },
-  bottomContactText: {color: theme.primaryText, fontSize: 16, fontWeight: '600'},
-  bottomRentBtn: {
-    flex: 2, height: 44, backgroundColor: theme.primary,
-    borderRadius: 22, justifyContent: 'center', alignItems: 'center',
-  },
-  bottomRentText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
-  bottomBtnDisabled: {backgroundColor: theme.cardBorder},
+  footerGhostBtn: {flex: 1, height: 50, borderRadius: 14, borderWidth: 1, borderColor: theme.divider, alignItems: 'center', justifyContent: 'center'},
+  footerGhostText: {fontSize: 15, fontWeight: '700', color: theme.text},
+  footerMainBtn: {flex: 2, height: 50, borderRadius: 14, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center'},
+  footerMainText: {fontSize: 15, fontWeight: '800', color: '#FFFFFF'},
+  footerDisabledBtn: {backgroundColor: theme.divider, opacity: 0.6},
 });

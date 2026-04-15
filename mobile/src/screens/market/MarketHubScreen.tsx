@@ -108,42 +108,55 @@ export default function MarketHubScreen({navigation}: any) {
   }, [navigation]);
 
   const renderDemandItem = ({item}: {item: DemandSummary}) => (
-    <ObjectCard
-      style={styles.card}
+    <TouchableOpacity
+      activeOpacity={0.8}
+      style={[styles.demandCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
       onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
       <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderLeft}>
-          <SourceTag source="demand" />
-          <StatusBadge meta={getObjectStatusMeta('demand', item.status)} label="" />
+        <View style={styles.cardTitleWrap}>
+          <Text style={[styles.title, {color: theme.text}]} numberOfLines={2}>{item.title}</Text>
         </View>
+      </View>
+      <View style={styles.metaBlockRow}>
+        <View style={[styles.metaBadge, {backgroundColor: theme.bgSecondary}]}>
+          <Text style={[styles.metaBadgeText, {color: theme.textSub}]}>{getDemandSceneLabel(item.cargo_scene)}</Text>
+        </View>
+        <View style={[styles.metaBadge, {backgroundColor: theme.bgSecondary}]}>
+          <Text style={[styles.metaBadgeText, {color: theme.textSub}]}>{resolveDemandPrimaryAddress(item)}</Text>
+        </View>
+      </View>
+      <View style={styles.cardFooter}>
+        <Text style={[styles.timeText, {color: theme.textHint}]}>{formatDemandSchedule(item.scheduled_start_at, item.scheduled_end_at)}</Text>
         <Text style={styles.budget}>{formatDemandBudget(item.budget_min, item.budget_max)}</Text>
       </View>
-      <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-      <View style={styles.metaBlock}>
-        <Text style={styles.metaText}>场景：{getDemandSceneLabel(item.cargo_scene)}</Text>
-        <Text style={styles.metaText}>区域：{resolveDemandPrimaryAddress(item)}</Text>
-        <Text style={styles.metaText}>时间：{formatDemandSchedule(item.scheduled_start_at, item.scheduled_end_at)}</Text>
-      </View>
-    </ObjectCard>
+    </TouchableOpacity>
   );
 
   const renderSupplyItem = ({item}: {item: SupplySummary}) => (
-    <ObjectCard
-      style={styles.card}
+    <TouchableOpacity
+      activeOpacity={0.8}
+      style={[styles.serviceCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
       onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardHeaderLeft}>
-          <SourceTag source="supply" />
-          <StatusBadge meta={getObjectStatusMeta('supply', item.status)} label="" />
+      <View style={styles.serviceImagePlaceholder}>
+        <Text style={styles.serviceEmoji}>🚁</Text>
+      </View>
+      <View style={styles.serviceInfo}>
+        <Text style={[styles.title, {color: theme.text}]} numberOfLines={2}>{item.title}</Text>
+        <View style={styles.metaBlockRow}>
+          <Text style={[styles.metaText, {color: theme.textSub}]}>最大载重 {item.max_payload_kg || 0}kg</Text>
+          <Text style={[styles.metaText, {color: theme.textHint}]}> • </Text>
+          <Text style={[styles.metaText, {color: theme.textSub}]} numberOfLines={1}>
+            {(item.cargo_scenes || []).map(s => getSupplySceneLabel(s)).join('/')}
+          </Text>
         </View>
-        <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
+          <TouchableOpacity style={[styles.orderBtn, {backgroundColor: theme.primary}]} onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
+            <Text style={styles.orderBtnText}>去下单</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-      <View style={styles.metaBlock}>
-        <Text style={styles.metaText}>吊重：{item.max_payload_kg || 0}kg</Text>
-        <Text style={styles.metaText}>场景：{(item.cargo_scenes || []).map(s => getSupplySceneLabel(s)).join('、')}</Text>
-      </View>
-    </ObjectCard>
+    </TouchableOpacity>
   );
 
   const mainAction = useMemo(() => {
@@ -215,7 +228,7 @@ export default function MarketHubScreen({navigation}: any) {
         </View>
       </View>
 
-      <FlatList
+      <FlatList<any>
         data={activeTab === 'demand' ? demands : supplies}
         keyExtractor={item => String(item.id)}
         renderItem={activeTab === 'demand' ? renderDemandItem : renderSupplyItem}
@@ -422,43 +435,107 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     lineHeight: 18,
     color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
-  card: {
-    marginBottom: 12,
+  demandCard: {
+    marginBottom: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  serviceCard: {
+    marginBottom: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    flexDirection: 'row',
+  },
+  serviceImagePlaceholder: {
+    width: 100,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceEmoji: {
+    fontSize: 32,
+  },
+  serviceInfo: {
+    flex: 1,
+    padding: 14,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
+    paddingTop: 14,
+    paddingHorizontal: 14,
   },
-  cardHeaderLeft: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
+  cardTitleWrap: {
+    flex: 1,
   },
   budget: {
-    fontSize: 16,
+    fontSize: 18,
     color: theme.danger,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   price: {
-    fontSize: 16,
+    fontSize: 18,
     color: theme.danger,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   title: {
     fontSize: 16,
     lineHeight: 22,
-    color: theme.text,
-    fontWeight: '700',
-    marginBottom: 10,
+    fontWeight: '800',
+    marginBottom: 8,
   },
-  metaBlock: {
-    gap: 4,
+  metaBlockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 14,
+  },
+  metaBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  metaBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   metaText: {
     fontSize: 12,
-    color: theme.textSub,
+    fontWeight: '500',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  timeText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  orderBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 14,
+  },
+  orderBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   loading: {
     paddingVertical: 40,

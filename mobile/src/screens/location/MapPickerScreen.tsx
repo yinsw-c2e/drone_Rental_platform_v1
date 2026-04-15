@@ -18,6 +18,7 @@ export default function MapPickerScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
+  const selectionReturnDepth = Number(route.params?.selectionReturnDepth) || 1;
   const initialLat: number | undefined = route.params?.latitude;
   const initialLng: number | undefined = route.params?.longitude;
 
@@ -128,7 +129,7 @@ export default function MapPickerScreen({navigation, route}: any) {
       setLatitude(lat);
       setLongitude(lng);
       await fetchAddressAndNearby(lng, lat);
-    } catch (e: any) {
+    } catch {
       if (!isMountedRef.current) { return; }
       setCurrentAddr('获取地址失败');
     } finally {
@@ -228,6 +229,10 @@ export default function MapPickerScreen({navigation, route}: any) {
     }
 
     beginSafeExit(() => {
+      if (selectionReturnDepth > 1 && typeof navigation.pop === 'function') {
+        navigation.pop(selectionReturnDepth);
+        return;
+      }
       navigation.goBack();
     });
   };
@@ -248,6 +253,10 @@ export default function MapPickerScreen({navigation, route}: any) {
     }
 
     beginSafeExit(() => {
+      if (selectionReturnDepth > 1 && typeof navigation.pop === 'function') {
+        navigation.pop(selectionReturnDepth);
+        return;
+      }
       navigation.goBack();
     });
   };

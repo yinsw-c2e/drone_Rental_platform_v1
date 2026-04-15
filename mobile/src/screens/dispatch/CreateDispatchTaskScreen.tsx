@@ -25,20 +25,20 @@ import type {AppTheme} from '../../theme/index';
 const MODE_OPTIONS = [
   {
     key: 'bound_pilot',
-    title: '绑定飞手',
-    desc: '优先从你已激活的绑定飞手里发起正式派单，适合长期合作关系。',
+    title: '合作飞手',
+    desc: '优先联系你已建立长期合作的飞手，适合固定班底任务。',
     accent: '#1677ff',
   },
   {
     key: 'candidate_pool',
-    title: '候选飞手池',
-    desc: '让系统优先从该需求已报名候选的飞手里选择执行方。',
+    title: '优先候选',
+    desc: '优先从更匹配当前任务的候选执行方里继续安排。',
     accent: '#7c3aed',
   },
   {
     key: 'general_pool',
-    title: '普通飞手池',
-    desc: '在当前可用的普通飞手池中自动寻找可执行飞手，适合兜底重派。',
+    title: '平台协调',
+    desc: '由平台继续协调当前可用的执行团队，适合补位或重派。',
     accent: '#d46b08',
   },
 ] as const;
@@ -281,7 +281,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
                   <View style={[styles.modeDot, {backgroundColor: disabled ? '#d9d9d9' : option.accent}]} />
                 </View>
                 <Text style={styles.modeDesc}>{option.desc}</Text>
-                {disabled ? <Text style={styles.modeHint}>当前没有可用的绑定飞手</Text> : null}
+                {disabled ? <Text style={styles.modeHint}>当前还没有可用的合作飞手</Text> : null}
               </TouchableOpacity>
             );
           })}
@@ -289,9 +289,9 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
 
         {selectedMode === 'bound_pilot' ? (
           <ObjectCard style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>选择绑定飞手</Text>
+            <Text style={styles.sectionTitle}>选择合作飞手</Text>
             {bindings.length === 0 ? (
-              <Text style={styles.emptyInline}>当前没有激活中的绑定飞手，建议改用候选飞手池或普通飞手池。</Text>
+              <Text style={styles.emptyInline}>当前还没有可直接联系的合作飞手，建议改为优先候选或平台协调。</Text>
             ) : (
               bindings.map(binding => {
                 const selected = Number(selectedPilotUserId || 0) === Number(binding.pilot_user_id || 0);
@@ -320,7 +320,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
             multiline
             value={reason}
             onChangeText={setReason}
-            placeholder={selectedMode === 'bound_pilot' ? '例如：优先指派熟悉该山区吊运线路的绑定飞手' : `例如：按${selectedModeMeta.title}优先策略发起正式派单`}
+            placeholder={selectedMode === 'bound_pilot' ? '例如：优先联系熟悉该山区吊运线路的合作飞手' : `例如：按${selectedModeMeta.title}方式继续安排执行`}
           />
         </ObjectCard>
       </ScrollView>

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"fmt"
+	"strings"
+	"time"
 	"wurenji-backend/internal/model"
 
 	"gorm.io/gorm"
@@ -9,6 +11,18 @@ import (
 
 type OrderRepo struct {
 	db *gorm.DB
+}
+
+type DirectOrderReuseLookup struct {
+	SourceSupplyID int64
+	RenterID       int64
+	ServiceType    string
+	StartTime      time.Time
+	EndTime        time.Time
+	ServiceAddress string
+	DestAddress    string
+	TotalAmount    int64
+	CreatedAfter   time.Time
 }
 
 func NewOrderRepo(db *gorm.DB) *OrderRepo {
@@ -23,7 +37,7 @@ func (r *OrderRepo) Create(order *model.Order) error {
 	if order == nil {
 		return nil
 	}
-	tx := r.db
+	tx := omitUnsupportedOrderOptionalColumns(r.db)
 	if order.PilotID == 0 {
 		tx = tx.Omit("PilotID", "pilot_id")
 	}
@@ -59,7 +73,7 @@ func (r *OrderRepo) Update(order *model.Order) error {
 	if order == nil {
 		return nil
 	}
-	tx := r.db
+	tx := omitUnsupportedOrderOptionalColumns(r.db)
 	if order.PilotID == 0 {
 		tx = tx.Omit("PilotID", "pilot_id")
 	}
@@ -67,7 +81,7 @@ func (r *OrderRepo) Update(order *model.Order) error {
 }
 
 func (r *OrderRepo) UpdateFields(id int64, fields map[string]interface{}) error {
-	return r.db.Model(&model.Order{}).Where("id = ?", id).Updates(normalizeOrderNullableFields(fields)).Error
+	return r.db.Model(&model.Order{}).Where("id = ?", id).Updates(normalizeOrderNullableFields(filterUnsupportedOrderOptionalFields(r.db, fields))).Error
 }
 
 func (r *OrderRepo) UpdateStatus(id int64, status string) error {
@@ -85,6 +99,58 @@ func (r *OrderRepo) UpdateStatusWithFields(orderID int64, pilotID int64, status 
 		updates[k] = v
 	}
 	return r.db.Model(&model.Order{}).Where("id = ?", orderID).Updates(updates).Error
+}
+
+func (r *OrderRepo) FindReusableDirectSupplyOrder(query DirectOrderReuseLookup) (*model.Order, error) {
+	var orders []model.Order
+	err := r.db.Model(&model.Order{}).
+		Where("order_source = ?", "supply_direct").
+		Where("source_supply_id = ?", query.SourceSupplyID).
+		Where("renter_id = ?", query.RenterID).
+		Where("created_at >= ?", query.CreatedAfter).
+		Where("status IN ?", []string{
+			"pending_provider_confirmation",
+			"pending_payment",
+			"paid",
+			"pending_dispatch",
+			"assigned",
+			"confirmed",
+			"airspace_applying",
+			"airspace_approved",
+			"loading",
+			"preparing",
+			"in_progress",
+			"in_transit",
+			"delivered",
+		}).
+		Order("created_at ASC, id ASC").
+		Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range orders {
+		order := orders[i]
+		if order.ServiceType != query.ServiceType {
+			continue
+		}
+		if order.TotalAmount != query.TotalAmount {
+			continue
+		}
+		if strings.TrimSpace(order.ServiceAddress) != strings.TrimSpace(query.ServiceAddress) {
+			continue
+		}
+		if strings.TrimSpace(order.DestAddress) != strings.TrimSpace(query.DestAddress) {
+			continue
+		}
+		if order.StartTime.Unix() != query.StartTime.Unix() {
+			continue
+		}
+		if order.EndTime.Unix() != query.EndTime.Unix() {
+			continue
+		}
+		return &order, nil
+	}
+	return nil, nil
 }
 
 func normalizeOrderNullableFields(fields map[string]interface{}) map[string]interface{} {
@@ -114,6 +180,82 @@ func normalizeOrderNullableFields(fields map[string]interface{}) map[string]inte
 		}
 	}
 	return fields
+}
+
+func orderOptionalColumns() []struct {
+	field  string
+	column string
+} {
+	return []struct {
+		field  string
+		column string
+	}{
+		{field: "FlightStartTime", column: "flight_start_time"},
+		{field: "FlightEndTime", column: "flight_end_time"},
+		{field: "LoadingConfirmedAt", column: "loading_confirmed_at"},
+		{field: "LoadingConfirmedBy", column: "loading_confirmed_by"},
+		{field: "UnloadingConfirmedAt", column: "unloading_confirmed_at"},
+		{field: "UnloadingConfirmedBy", column: "unloading_confirmed_by"},
+	}
+}
+
+func unsupportedOrderOptionalColumnOmissions(hasColumn func(string) bool) []string {
+	if hasColumn == nil {
+		return nil
+	}
+
+	optionalColumns := orderOptionalColumns()
+	omissions := make([]string, 0, len(optionalColumns)*2)
+	for _, item := range optionalColumns {
+		if hasColumn(item.column) {
+			continue
+		}
+		omissions = append(omissions, item.field, item.column)
+	}
+	return omissions
+}
+
+func unsupportedOrderOptionalColumnOmissionsForDB(db *gorm.DB) []string {
+	if db == nil {
+		return nil
+	}
+	return unsupportedOrderOptionalColumnOmissions(func(column string) bool {
+		return db.Migrator().HasColumn(&model.Order{}, column)
+	})
+}
+
+func omitUnsupportedOrderOptionalColumns(db *gorm.DB) *gorm.DB {
+	if db == nil {
+		return db
+	}
+	omissions := unsupportedOrderOptionalColumnOmissionsForDB(db)
+	if len(omissions) == 0 {
+		return db
+	}
+	return db.Omit(omissions...)
+}
+
+func filterUnsupportedOrderOptionalFields(db *gorm.DB, fields map[string]interface{}) map[string]interface{} {
+	if db == nil || len(fields) == 0 {
+		return fields
+	}
+
+	unsupported := map[string]struct{}{}
+	for _, omission := range unsupportedOrderOptionalColumnOmissionsForDB(db) {
+		unsupported[omission] = struct{}{}
+	}
+	if len(unsupported) == 0 {
+		return fields
+	}
+
+	filtered := make(map[string]interface{}, len(fields))
+	for key, value := range fields {
+		if _, skip := unsupported[key]; skip {
+			continue
+		}
+		filtered[key] = value
+	}
+	return filtered
 }
 
 func (r *OrderRepo) ListByPilot(pilotID int64, status string, page, pageSize int) ([]model.Order, int64, error) {

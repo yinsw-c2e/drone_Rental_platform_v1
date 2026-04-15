@@ -81,6 +81,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 	api.Use(middleware.PaginationMiddleware(1, 20, 100))
 
 	api.GET("/status", h.Base.Status)
+	api.GET("/orders/:order_id/contract/pdf", h.Order.DownloadContractPDF)
 
 	authGroup := api.Group("/auth")
 	{
@@ -178,6 +179,9 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.POST("/:order_id/confirm-receipt", h.Order.ConfirmReceipt)
 			orderGroup.POST("/:order_id/execution-status", h.Order.UpdateExecutionStatus)
 			orderGroup.GET("/:order_id/monitor", h.Order.Monitor)
+			orderGroup.GET("/:order_id/dev-flight-simulation", h.Order.GetDevelopmentFlightSimulation)
+			orderGroup.POST("/:order_id/dev-flight-simulation/start", h.Order.StartDevelopmentFlightSimulation)
+			orderGroup.POST("/:order_id/dev-flight-simulation/stop", h.Order.StopDevelopmentFlightSimulation)
 			orderGroup.GET("/:order_id/timeline", h.Order.Timeline)
 			orderGroup.POST("/:order_id/dispatch", h.Order.Dispatch)
 			orderGroup.GET("/:order_id/payments", h.Payment.ListOrderPayments)
@@ -190,6 +194,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.GET("/:order_id/reviews", h.Review.ListOrderReviews)
 			orderGroup.GET("/:order_id/contract", h.Order.GetContract)
 			orderGroup.POST("/:order_id/contract/sign", h.Order.SignContract)
+			orderGroup.GET("/:order_id/contract/pdf-download", h.Order.GetContractPDFDownloadInfo)
 		}
 
 		dispatchGroup := authenticated.Group("/dispatch-tasks")
