@@ -86,6 +86,27 @@ export function getSceneLabel(sceneKey: string): string {
   return DEMAND_SCENE_OPTIONS.find(option => option.key === sceneKey)?.label || '重载吊运';
 }
 
+export function generateSuggestedTitle(params: {
+  sceneKey: string;
+  serviceAddress?: AddressData | null;
+  departureAddress?: AddressData | null;
+  destinationAddress?: AddressData | null;
+}) {
+  const sceneLabel = getSceneLabel(params.sceneKey);
+  if (params.departureAddress || params.destinationAddress) {
+    const from = params.departureAddress?.city || params.departureAddress?.district || params.departureAddress?.name || '起点';
+    const to = params.destinationAddress?.city || params.destinationAddress?.district || params.destinationAddress?.name || '终点';
+    return `${sceneLabel}任务：${from}至${to}`;
+  }
+  const addressText =
+    params.serviceAddress?.city ||
+    params.serviceAddress?.district ||
+    params.serviceAddress?.name ||
+    params.serviceAddress?.address ||
+    '作业点';
+  return `${sceneLabel}任务：${addressText}`;
+}
+
 export function deriveDraftTitle(params: {
   title?: string;
   sceneKey: string;
@@ -97,20 +118,7 @@ export function deriveDraftTitle(params: {
   if (trimmed) {
     return trimmed;
   }
-
-  const sceneLabel = getSceneLabel(params.sceneKey);
-  if (params.departureAddress || params.destinationAddress) {
-    const from = params.departureAddress?.city || params.departureAddress?.district || '起点';
-    const to = params.destinationAddress?.city || params.destinationAddress?.district || '终点';
-    return `${sceneLabel}任务：${from} -> ${to}`;
-  }
-  const addressText =
-    params.serviceAddress?.city ||
-    params.serviceAddress?.district ||
-    params.serviceAddress?.name ||
-    params.serviceAddress?.address ||
-    '作业点';
-  return `${sceneLabel}任务：${addressText}`;
+  return generateSuggestedTitle(params);
 }
 
 export function formatSavedAt(value?: string | null) {

@@ -40,7 +40,7 @@ export default function NearbyDronesScreen({navigation}: any) {
     } catch (error: any) {
       const errMsg = error.message || '定位失败';
       setLocationError(errMsg);
-      
+
       // 开发模式：定位失败时使用默认坐标
       if (DEV_MODE) {
         console.warn('[DEV] 定位失败，使用数据库真实坐标:', DEV_DEFAULT_COORDS, '错误:', errMsg);
@@ -48,7 +48,7 @@ export default function NearbyDronesScreen({navigation}: any) {
         setCurrentLocation(devLocation);
         return devLocation;
       }
-      
+
       // 生产环境：定位失败时提示用户
       throw new Error(errMsg);
     }
@@ -58,13 +58,13 @@ export default function NearbyDronesScreen({navigation}: any) {
     try {
       setLocationError(null);
       const location = await getUserLocation();
-      
+
       // 调用后端API查询附近无人机（默认半径50公里）
       const res = await droneService.nearby(location.lat, location.lng, 50);
       setDrones(res.data?.list || []);
     } catch (e: any) {
       console.warn('获取附近无人机失败:', e);
-      
+
       // 生产环境：定位失败时提示用户
       if (!DEV_MODE && e.message) {
         Alert.alert(
@@ -103,24 +103,22 @@ export default function NearbyDronesScreen({navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      {/* 开发模式提示 */}
       {DEV_MODE && locationError && (
         <View style={styles.devBanner}>
           <Text style={styles.devText}>
-            🔧 开发模式：使用数据库真实坐标 ({DEV_DEFAULT_COORDS.description})
+            📍 暂时无法获取你的定位，已先按常用服务区域为你推荐附近机组
           </Text>
         </View>
       )}
-      
-      {/* 当前定位显示（可选） */}
+
       {currentLocation && !locationError && (
         <View style={styles.locationBanner}>
           <Text style={styles.locationText}>
-            📍 当前位置: {currentLocation.lat.toFixed(4)}, {currentLocation.lng.toFixed(4)}
+            📍 已按当前位置为你推荐附近可用机组
           </Text>
         </View>
       )}
-      
+
       <FlatList
         data={drones}
         keyExtractor={item => String(item.id)}
@@ -131,11 +129,11 @@ export default function NearbyDronesScreen({navigation}: any) {
           <View style={{alignItems: 'center', paddingTop: 80}}>
             <Text style={{fontSize: 48, marginBottom: 12}}>📍</Text>
             <Text style={{fontSize: 16, color: theme.textSub}}>
-              {loading ? '搜索中...' : locationError ? '定位失败，无法查询附近无人机' : '附近暂无可用无人机'}
+              {loading ? '搜索中...' : locationError ? '暂时无法获取定位，未能查询附近无人机' : '附近暂无可用无人机'}
             </Text>
             {locationError && !DEV_MODE && (
-              <TouchableOpacity 
-                style={styles.retryButton} 
+              <TouchableOpacity
+                style={styles.retryButton}
                 onPress={() => {
                   setLoading(true);
                   fetchDrones();

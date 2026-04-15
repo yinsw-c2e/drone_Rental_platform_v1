@@ -271,10 +271,10 @@ create_direct_order() {
     --arg description "$description" \
     '{
       service_type:"heavy_cargo_lift_transport",
-      cargo_scene:"grid_power_material_transport",
-      departure_address:{text:"广东省佛山市南海区电网仓库", city:"佛山", district:"南海区"},
-      destination_address:{text:"广东省佛山市三水区施工吊运点", city:"佛山", district:"三水区"},
-      service_address:{text:"广东省佛山市南海区电网仓库", city:"佛山", district:"南海区"},
+      cargo_scene:"power_grid",
+      departure_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
+      destination_address:{text:"广东省佛山市南海区施工吊运点", city:"佛山", district:"南海区"},
+      service_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
       scheduled_start_at:$start,
       scheduled_end_at:$end,
       cargo_weight_kg:55,

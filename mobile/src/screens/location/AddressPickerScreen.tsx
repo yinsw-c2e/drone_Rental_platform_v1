@@ -13,6 +13,7 @@ export default function AddressPickerScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
+  const selectionReturnDepth = Number(route.params?.selectionReturnDepth) || 1;
 
   const [savedAddresses, setSavedAddresses] = useState<AddressData[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
@@ -86,6 +87,7 @@ export default function AddressPickerScreen({navigation, route}: any) {
   const handleMapPicker = () => {
     navigation.navigate('MapPicker', {
       onSelect: notifyAddressSelected,
+      selectionReturnDepth: selectionReturnDepth + 1,
     });
   };
 
@@ -93,6 +95,7 @@ export default function AddressPickerScreen({navigation, route}: any) {
     navigation.navigate('AddressSearch', {
       onSelect: notifyAddressSelected,
       city: currentCity,
+      selectionReturnDepth: selectionReturnDepth + 1,
     });
   };
 

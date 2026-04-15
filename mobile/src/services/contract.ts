@@ -1,5 +1,5 @@
-import {apiV2} from './api';
-import {V2ApiResponse} from '../types';
+import { apiV2 } from './api';
+import { V2ApiResponse } from '../types';
 
 export interface ContractDetail {
   id: number;
@@ -20,10 +20,25 @@ export interface ContractDetail {
   updated_at: string;
 }
 
+export interface ContractPDFDownloadInfo {
+  filename: string;
+  download_url: string;
+  expires_at: string;
+}
+
 export const contractService = {
   getByOrder: (orderId: number) =>
-    apiV2.get<any, V2ApiResponse<ContractDetail>>(`/orders/${orderId}/contract`),
+    apiV2.get<any, V2ApiResponse<ContractDetail>>(
+      `/orders/${orderId}/contract`,
+    ),
 
   sign: (orderId: number) =>
-    apiV2.post<any, V2ApiResponse<ContractDetail>>(`/orders/${orderId}/contract/sign`),
+    apiV2.post<any, V2ApiResponse<ContractDetail>>(
+      `/orders/${orderId}/contract/sign`,
+    ),
+
+  getPdfDownloadInfo: (orderId: number) =>
+    apiV2.get<any, V2ApiResponse<ContractPDFDownloadInfo>>(
+      `/orders/${orderId}/contract/pdf-download`,
+    ),
 };

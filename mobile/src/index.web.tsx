@@ -1,10 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider, useSelector, useDispatch } from 'react-redux';
-import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+  useLocation,
+} from 'react-router-dom';
 import { store } from './store/store';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { markMeInitialized, setCredentials, setMeSummary, logout } from './store/slices/authSlice';
+import {
+  markMeInitialized,
+  setCredentials,
+  setMeSummary,
+  logout,
+} from './store/slices/authSlice';
 import { API_V2_BASE_URL } from './constants';
 import { sessionService } from './services/session';
 
@@ -19,6 +31,8 @@ import OrderDetailScreen from './screens/order/OrderDetailScreen';
 import PaymentScreen from './screens/order/PaymentScreen';
 import ReviewScreen from './screens/order/ReviewScreen';
 import OrderAfterSaleScreen from './screens/order/OrderAfterSaleScreen';
+import ContractScreen from './screens/order/ContractScreen';
+import ContractDocumentScreen from './screens/order/ContractDocumentScreen';
 import ChatScreen from './screens/message/ChatScreen';
 import ConversationListScreen from './screens/message/ConversationListScreen';
 import ProfileScreen from './screens/profile/ProfileScreen';
@@ -63,7 +77,7 @@ function createRouterNavigation(navigate: any) {
   return {
     navigate: (screen: string, params?: any) => {
       console.log('[Router] Navigate called:', { screen, params });
-      
+
       // Helper to get ID from params
       const getId = (paramObj: any, ...keys: string[]): string => {
         for (const key of keys) {
@@ -76,10 +90,10 @@ function createRouterNavigation(navigate: any) {
         console.error('[Router] No valid ID found in params:', paramObj);
         return '';
       };
-      
+
       // Convert screen name to route path
       let path: string | null = null;
-      
+
       switch (screen) {
         case 'OrderDetail': {
           const id = getId(params, 'orderId', 'id');
@@ -99,6 +113,16 @@ function createRouterNavigation(navigate: any) {
         case 'OrderAfterSale': {
           const id = getId(params, 'orderId', 'id');
           path = id ? `/order/${id}/after-sale` : null;
+          break;
+        }
+        case 'Contract': {
+          const id = getId(params, 'orderId', 'id');
+          path = id ? `/order/${id}/contract` : null;
+          break;
+        }
+        case 'ContractDocument': {
+          const id = getId(params, 'orderId', 'id');
+          path = id ? `/order/${id}/contract/document` : null;
           break;
         }
         case 'DroneDetail': {
@@ -234,13 +258,15 @@ function createRouterNavigation(navigate: any) {
         default:
           console.warn(`[Router] Unknown screen: ${screen}`);
       }
-      
+
       console.log('[Router] Resolved path:', path);
-      
+
       if (path) {
         navigate(path, { state: params });
       } else {
-        console.error(`[Router] Failed to navigate to ${screen} - invalid params or unknown route`);
+        console.error(
+          `[Router] Failed to navigate to ${screen} - invalid params or unknown route`,
+        );
       }
     },
     goBack: () => navigate(-1),
@@ -271,10 +297,16 @@ const mainStyles = StyleSheet.create({
     minHeight: 0,
   },
 });
-function TabBar({ activeTab, onTabPress }: { activeTab: string; onTabPress: (tab: string) => void }) {
+function TabBar({
+  activeTab,
+  onTabPress,
+}: {
+  activeTab: string;
+  onTabPress: (tab: string) => void;
+}) {
   const tabs = [
     { key: 'Home', label: '首页', icon: 'home' as const },
-    { key: 'Market', label: '发现', icon: 'discover' as const },
+    { key: 'Market', label: '服务', icon: 'discover' as const },
     { key: 'Orders', label: '进度', icon: 'orders' as const },
     { key: 'Messages', label: '消息', icon: 'messages' as const },
     { key: 'Profile', label: '我的', icon: 'profile' as const },
@@ -288,13 +320,24 @@ function TabBar({ activeTab, onTabPress }: { activeTab: string; onTabPress: (tab
           style={tabStyles.tab}
           onPress={() => onTabPress(tab.key)}
         >
-          <View style={[tabStyles.iconWrap, activeTab === tab.key && tabStyles.iconActive]}>
+          <View
+            style={[
+              tabStyles.iconWrap,
+              activeTab === tab.key && tabStyles.iconActive,
+            ]}
+          >
             <TabGlyph
               name={tab.icon}
               color={activeTab === tab.key ? '#1890ff' : '#999'}
+              size={20}
             />
           </View>
-          <Text style={[tabStyles.label, activeTab === tab.key && tabStyles.labelActive]}>
+          <Text
+            style={[
+              tabStyles.label,
+              activeTab === tab.key && tabStyles.labelActive,
+            ]}
+          >
             {tab.label}
           </Text>
         </TouchableOpacity>
@@ -308,28 +351,31 @@ const tabStyles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e8e8e8',
-    paddingBottom: 4,
+    borderTopColor: '#f0f0f0',
+    paddingBottom: 6,
+    paddingTop: 4,
+    height: 56,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 6,
+    justifyContent: 'center',
   },
   iconWrap: {
-    opacity: 0.55,
+    opacity: 0.6,
+    marginBottom: 2,
   },
   iconActive: {
     opacity: 1,
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#999',
-    marginTop: 2,
+    fontWeight: '500',
   },
   labelActive: {
     color: '#1890ff',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
 
@@ -338,10 +384,31 @@ function AuthView({ onLogin: _onLogin }: { onLogin: () => void }) {
   return (
     <View style={{ flex: 1 }}>
       <Routes>
-        <Route path="/register" element={<RegisterScreen navigation={{ navigate: () => {}, goBack: () => window.history.back() }} />} />
-        <Route path="/*" element={<LoginScreen navigation={{ navigate: (s: string) => {
-          if (s === 'Register') window.history.pushState({}, '', '/register');
-        }, goBack: () => {} }} />} />
+        <Route
+          path="/register"
+          element={
+            <RegisterScreen
+              navigation={{
+                navigate: () => {},
+                goBack: () => window.history.back(),
+              }}
+            />
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <LoginScreen
+              navigation={{
+                navigate: (s: string) => {
+                  if (s === 'Register')
+                    window.history.pushState({}, '', '/register');
+                },
+                goBack: () => {},
+              }}
+            />
+          }
+        />
       </Routes>
       {/* Quick demo login button */}
       {/* <TouchableOpacity
@@ -373,7 +440,12 @@ function OrderDetailWrapper() {
   const { id } = useParams();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <OrderDetailScreen route={createMockRoute({ id, orderId: id })} navigation={nav} />;
+  return (
+    <OrderDetailScreen
+      route={createMockRoute({ id, orderId: id })}
+      navigation={nav}
+    />
+  );
 }
 
 function PaymentWrapper() {
@@ -381,7 +453,16 @@ function PaymentWrapper() {
   const location = useLocation();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <PaymentScreen route={createMockRoute({ orderId, id: orderId, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <PaymentScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
 }
 
 function ReviewWrapper() {
@@ -389,7 +470,16 @@ function ReviewWrapper() {
   const location = useLocation();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <ReviewScreen route={createMockRoute({ orderId, id: orderId, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <ReviewScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
 }
 
 function AfterSaleWrapper() {
@@ -397,14 +487,62 @@ function AfterSaleWrapper() {
   const location = useLocation();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <OrderAfterSaleScreen route={createMockRoute({ orderId, id: orderId, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <OrderAfterSaleScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
+}
+
+function ContractWrapper() {
+  const { orderId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return (
+    <ContractScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
+}
+
+function ContractDocumentWrapper() {
+  const { orderId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const nav = createRouterNavigation(navigate);
+  return (
+    <ContractDocumentScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
 }
 
 function DroneDetailWrapper() {
   const { id } = useParams();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <DroneDetailScreen route={createMockRoute({ id, droneId: id, offerId: id })} navigation={nav} />;
+  return (
+    <DroneDetailScreen
+      route={createMockRoute({ id, droneId: id, offerId: id })}
+      navigation={nav}
+    />
+  );
 }
 
 function DemandDetailWrapper() {
@@ -412,7 +550,12 @@ function DemandDetailWrapper() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = createRouterNavigation(navigate);
-  return <DemandDetailScreen route={createMockRoute({ id, demandId: id, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <DemandDetailScreen
+      route={createMockRoute({ id, demandId: id, ...(location.state || {}) })}
+      navigation={nav}
+    />
+  );
 }
 
 function DemandQuoteComposeWrapper() {
@@ -420,7 +563,12 @@ function DemandQuoteComposeWrapper() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = createRouterNavigation(navigate);
-  return <DemandQuoteComposeScreen route={createMockRoute({ id, demandId: id, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <DemandQuoteComposeScreen
+      route={createMockRoute({ id, demandId: id, ...(location.state || {}) })}
+      navigation={nav}
+    />
+  );
 }
 
 function OfferDetailWrapper() {
@@ -428,21 +576,33 @@ function OfferDetailWrapper() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = createRouterNavigation(navigate);
-  return <OfferDetailScreen route={createMockRoute({ id, offerId: id, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <OfferDetailScreen
+      route={createMockRoute({ id, offerId: id, ...(location.state || {}) })}
+      navigation={nav}
+    />
+  );
 }
 
 function ChatWrapper() {
   const { id } = useParams();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <ChatScreen route={createMockRoute({ peerId: id, id })} navigation={nav} />;
+  return (
+    <ChatScreen route={createMockRoute({ peerId: id, id })} navigation={nav} />
+  );
 }
 
 function DispatchTaskDetailWrapper() {
   const { id } = useParams();
   const navigate = useNavigate();
   const nav = createRouterNavigation(navigate);
-  return <DispatchTaskDetailScreen route={createMockRoute({ id, dispatchId: id })} navigation={nav} />;
+  return (
+    <DispatchTaskDetailScreen
+      route={createMockRoute({ id, dispatchId: id })}
+      navigation={nav}
+    />
+  );
 }
 
 function CreateDispatchTaskWrapper() {
@@ -452,7 +612,12 @@ function CreateDispatchTaskWrapper() {
   const nav = createRouterNavigation(navigate);
   return (
     <CreateDispatchTaskScreen
-      route={createMockRoute({ orderId, id: orderId, dispatchId, ...(location.state || {}) })}
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        dispatchId,
+        ...(location.state || {}),
+      })}
       navigation={nav}
     />
   );
@@ -463,7 +628,16 @@ function FlightMonitoringWrapper() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = createRouterNavigation(navigate);
-  return <FlightMonitoringScreen route={createMockRoute({ orderId, id: orderId, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <FlightMonitoringScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
 }
 
 function TrajectoryWrapper() {
@@ -471,7 +645,16 @@ function TrajectoryWrapper() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = createRouterNavigation(navigate);
-  return <TrajectoryScreen route={createMockRoute({ orderId, id: orderId, ...(location.state || {}) })} navigation={nav} />;
+  return (
+    <TrajectoryScreen
+      route={createMockRoute({
+        orderId,
+        id: orderId,
+        ...(location.state || {}),
+      })}
+      navigation={nav}
+    />
+  );
 }
 
 // Screen wrappers with navigation
@@ -479,7 +662,9 @@ function ScreenWrapper({ Component }: { Component: any }) {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = createRouterNavigation(navigate);
-  return <Component navigation={nav} route={createMockRoute(location.state || {})} />;
+  return (
+    <Component navigation={nav} route={createMockRoute(location.state || {})} />
+  );
 }
 
 // Main app with tabs and routes
@@ -487,7 +672,7 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('Home');
-  
+
   const nav = createRouterNavigation(navigate);
 
   useEffect(() => {
@@ -541,7 +726,7 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
       case 'Market':
         return <MarketHubScreen navigation={nav} />;
       case 'Orders':
-        return <OrderListScreen navigation={nav} route={{params: {}}} />;
+        return <OrderListScreen navigation={nav} route={{ params: {} }} />;
       case 'Messages':
         return <ConversationListScreen navigation={nav} />;
       case 'Profile':
@@ -557,12 +742,12 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
       tab === 'Home'
         ? '/'
         : tab === 'Market'
-          ? '/market'
-          : tab === 'Orders'
-            ? '/fulfillment'
-            : tab === 'Messages'
-              ? '/messages'
-              : '/profile';
+        ? '/market'
+        : tab === 'Orders'
+        ? '/fulfillment'
+        : tab === 'Messages'
+        ? '/messages'
+        : '/profile';
     navigate(basePath);
   };
 
@@ -574,53 +759,163 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
           <Route path="/order/:id" element={<OrderDetailWrapper />} />
           <Route path="/order/:orderId/payment" element={<PaymentWrapper />} />
           <Route path="/order/:orderId/review" element={<ReviewWrapper />} />
-          <Route path="/order/:orderId/after-sale" element={<AfterSaleWrapper />} />
+          <Route
+            path="/order/:orderId/after-sale"
+            element={<AfterSaleWrapper />}
+          />
+          <Route
+            path="/order/:orderId/contract"
+            element={<ContractWrapper />}
+          />
+          <Route
+            path="/order/:orderId/contract/document"
+            element={<ContractDocumentWrapper />}
+          />
           <Route path="/drone/:id" element={<DroneDetailWrapper />} />
           <Route path="/demand/:id" element={<DemandDetailWrapper />} />
-          <Route path="/demand/:id/quote" element={<DemandQuoteComposeWrapper />} />
+          <Route
+            path="/demand/:id/quote"
+            element={<DemandQuoteComposeWrapper />}
+          />
           <Route path="/offer/:id" element={<OfferDetailWrapper />} />
-          
+
           {/* Message pages */}
           <Route path="/chat/:id" element={<ChatWrapper />} />
-          <Route path="/messages" element={<ScreenWrapper Component={ConversationListScreen} />} />
-          <Route path="/market" element={<ScreenWrapper Component={MarketHubScreen} />} />
-          <Route path="/fulfillment" element={<ScreenWrapper Component={FulfillmentHubScreen} />} />
-          <Route path="/profile" element={<ScreenWrapper Component={ProfileScreen} />} />
-          
+          <Route
+            path="/messages"
+            element={<ScreenWrapper Component={ConversationListScreen} />}
+          />
+          <Route
+            path="/market"
+            element={<ScreenWrapper Component={MarketHubScreen} />}
+          />
+          <Route
+            path="/fulfillment"
+            element={<ScreenWrapper Component={FulfillmentHubScreen} />}
+          />
+          <Route
+            path="/profile"
+            element={<ScreenWrapper Component={ProfileScreen} />}
+          />
+
           {/* List pages */}
-          <Route path="/nearby-drones" element={<ScreenWrapper Component={NearbyDronesScreen} />} />
-          <Route path="/my-drones" element={<ScreenWrapper Component={MyDronesScreen} />} />
-          <Route path="/demands" element={<ScreenWrapper Component={DemandListScreen} />} />
-          <Route path="/offers" element={<ScreenWrapper Component={OfferListScreen} />} />
-          
+          <Route
+            path="/nearby-drones"
+            element={<ScreenWrapper Component={NearbyDronesScreen} />}
+          />
+          <Route
+            path="/my-drones"
+            element={<ScreenWrapper Component={MyDronesScreen} />}
+          />
+          <Route
+            path="/demands"
+            element={<ScreenWrapper Component={DemandListScreen} />}
+          />
+          <Route
+            path="/offers"
+            element={<ScreenWrapper Component={OfferListScreen} />}
+          />
+
           {/* Profile pages */}
-          <Route path="/my-orders" element={<ScreenWrapper Component={OrderListScreen} />} />
-          <Route path="/my-offers" element={<ScreenWrapper Component={MyOffersScreen} />} />
-          <Route path="/my-quotes" element={<ScreenWrapper Component={MyQuotesScreen} />} />
-          <Route path="/my-demands" element={<ScreenWrapper Component={MyDemandsScreen} />} />
-          <Route path="/owner-profile" element={<ScreenWrapper Component={OwnerProfileScreen} />} />
-          <Route path="/owner-pilot-bindings" element={<ScreenWrapper Component={OwnerPilotBindingsScreen} />} />
-          <Route path="/pilot-register" element={<ScreenWrapper Component={PilotRegisterScreen} />} />
-          <Route path="/pilot-profile" element={<ScreenWrapper Component={PilotProfileScreen} />} />
-          <Route path="/pilot-owner-bindings" element={<ScreenWrapper Component={PilotOwnerBindingsScreen} />} />
-          <Route path="/client-profile" element={<ScreenWrapper Component={ClientProfileScreen} />} />
-          <Route path="/dispatch-tasks" element={<ScreenWrapper Component={DispatchTaskListScreen} />} />
-          <Route path="/dispatch-tasks/:id" element={<DispatchTaskDetailWrapper />} />
-          <Route path="/dispatch-tasks/:dispatchId/reassign" element={<CreateDispatchTaskWrapper />} />
-          <Route path="/pilot-dispatch-tasks" element={<ScreenWrapper Component={PilotTaskListScreen} />} />
-          <Route path="/order/:orderId/dispatch" element={<CreateDispatchTaskWrapper />} />
-          <Route path="/order/:orderId/monitor" element={<FlightMonitoringWrapper />} />
-          <Route path="/order/:orderId/trajectory" element={<TrajectoryWrapper />} />
-          <Route path="/verification" element={<ScreenWrapper Component={VerificationScreen} />} />
-          <Route path="/settings" element={<ScreenWrapper Component={SettingsScreen} />} />
-          <Route path="/edit-profile" element={<ScreenWrapper Component={EditProfileScreen} />} />
-          
+          <Route
+            path="/my-orders"
+            element={<ScreenWrapper Component={OrderListScreen} />}
+          />
+          <Route
+            path="/my-offers"
+            element={<ScreenWrapper Component={MyOffersScreen} />}
+          />
+          <Route
+            path="/my-quotes"
+            element={<ScreenWrapper Component={MyQuotesScreen} />}
+          />
+          <Route
+            path="/my-demands"
+            element={<ScreenWrapper Component={MyDemandsScreen} />}
+          />
+          <Route
+            path="/owner-profile"
+            element={<ScreenWrapper Component={OwnerProfileScreen} />}
+          />
+          <Route
+            path="/owner-pilot-bindings"
+            element={<ScreenWrapper Component={OwnerPilotBindingsScreen} />}
+          />
+          <Route
+            path="/pilot-register"
+            element={<ScreenWrapper Component={PilotRegisterScreen} />}
+          />
+          <Route
+            path="/pilot-profile"
+            element={<ScreenWrapper Component={PilotProfileScreen} />}
+          />
+          <Route
+            path="/pilot-owner-bindings"
+            element={<ScreenWrapper Component={PilotOwnerBindingsScreen} />}
+          />
+          <Route
+            path="/client-profile"
+            element={<ScreenWrapper Component={ClientProfileScreen} />}
+          />
+          <Route
+            path="/dispatch-tasks"
+            element={<ScreenWrapper Component={DispatchTaskListScreen} />}
+          />
+          <Route
+            path="/dispatch-tasks/:id"
+            element={<DispatchTaskDetailWrapper />}
+          />
+          <Route
+            path="/dispatch-tasks/:dispatchId/reassign"
+            element={<CreateDispatchTaskWrapper />}
+          />
+          <Route
+            path="/pilot-dispatch-tasks"
+            element={<ScreenWrapper Component={PilotTaskListScreen} />}
+          />
+          <Route
+            path="/order/:orderId/dispatch"
+            element={<CreateDispatchTaskWrapper />}
+          />
+          <Route
+            path="/order/:orderId/monitor"
+            element={<FlightMonitoringWrapper />}
+          />
+          <Route
+            path="/order/:orderId/trajectory"
+            element={<TrajectoryWrapper />}
+          />
+          <Route
+            path="/verification"
+            element={<ScreenWrapper Component={VerificationScreen} />}
+          />
+          <Route
+            path="/settings"
+            element={<ScreenWrapper Component={SettingsScreen} />}
+          />
+          <Route
+            path="/edit-profile"
+            element={<ScreenWrapper Component={EditProfileScreen} />}
+          />
+
           {/* Publish pages */}
-          <Route path="/add-drone" element={<ScreenWrapper Component={AddDroneScreen} />} />
-          <Route path="/publish-offer" element={<ScreenWrapper Component={PublishOfferScreen} />} />
-          <Route path="/publish-demand" element={<ScreenWrapper Component={PublishDemandScreen} />} />
-          <Route path="/publish-cargo" element={<ScreenWrapper Component={PublishCargoScreen} />} />
-          
+          <Route
+            path="/add-drone"
+            element={<ScreenWrapper Component={AddDroneScreen} />}
+          />
+          <Route
+            path="/publish-offer"
+            element={<ScreenWrapper Component={PublishOfferScreen} />}
+          />
+          <Route
+            path="/publish-demand"
+            element={<ScreenWrapper Component={PublishDemandScreen} />}
+          />
+          <Route
+            path="/publish-cargo"
+            element={<ScreenWrapper Component={PublishCargoScreen} />}
+          />
+
           {/* Main tabs - default route */}
           <Route path="/" element={<ScreenWrapper Component={HomeScreen} />} />
           <Route path="*" element={renderTabContent()} />
@@ -683,20 +978,22 @@ function WebAppInner() {
       });
 
       const result = await response.json();
-      
+
       if (result.code === 'OK' && result.data) {
         // 登录成功，保存用户信息和 token（Redux会自动触发重新渲染）
-        store.dispatch(setCredentials({
-          user: result.data.user,
-          token: result.data.token,
-          roleSummary: result.data.role_summary || null,
-        }));
+        store.dispatch(
+          setCredentials({
+            user: result.data.user,
+            token: result.data.token,
+            roleSummary: result.data.role_summary || null,
+          }),
+        );
       } else {
         alert('演示登录失败: ' + (result.message || '未知错误'));
       }
     } catch (error) {
       console.error('Demo login error:', error);
-      alert('演示登录失败，请检查后端服务是否启动');
+      alert('演示登录失败，请稍后重试或确认当前服务是否可用');
     } finally {
       setIsLoading(false);
     }
@@ -711,16 +1008,18 @@ function WebAppInner() {
           <AuthView onLogin={handleDemoLogin} />
         )}
         {isLoading && (
-          <View style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
             <Text style={{ color: '#fff', fontSize: 16 }}>登录中...</Text>
           </View>
         )}

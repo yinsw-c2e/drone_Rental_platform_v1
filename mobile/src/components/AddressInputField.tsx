@@ -23,7 +23,10 @@ export default function AddressInputField({
   const navigation = useNavigation<any>();
 
   const handlePress = () => {
-    navigation.navigate('AddressPicker', {onSelect});
+    navigation.navigate('AddressPicker', {
+      onSelect,
+      selectionReturnDepth: 1,
+    });
   };
 
   const displayText = value

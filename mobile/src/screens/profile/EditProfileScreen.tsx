@@ -82,7 +82,7 @@ export default function EditProfileScreen({navigation}: any) {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>当前身份摘要</Text>
-          <Text style={styles.sectionDesc}>身份由后端档案和能力摘要统一判断，不再通过前端直接修改</Text>
+          <Text style={styles.sectionDesc}>你的可用身份会根据已完成的资料和当前能力自动更新。</Text>
 
           <View style={styles.roleSummaryBox}>
             {roleLabels.length > 0 ? (

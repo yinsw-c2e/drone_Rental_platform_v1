@@ -18,23 +18,23 @@ import * as WeChat from 'react-native-wechat-lib';
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
-import {API_BASE_URL} from '../../constants';
 import {THIRD_PARTY_LOGIN} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
 const QUICK_LOGIN_ACCOUNTS = {
   client: [
-    {label: '客户样本 (13800000004)', phone: '13800000004', password: 'password123', role: '客户'},
+    {label: '客户账号 (13800000004)', phone: '13800000004', password: 'password123', role: '客户'},
   ],
   owner: [
-    {label: '机主样本 (13800000007)', phone: '13800000007', password: 'password123', role: '机主'},
+    {label: '机主账号 (13800000007)', phone: '13800000007', password: 'password123', role: '机主'},
   ],
   pilot: [
-    {label: '飞手样本 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手'},
+    {label: '陈飞手 (13900000017)', phone: '13900000017', password: 'password123', role: '飞手'},
+    {label: '飞手账号 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手'},
   ],
   composite: [
-    {label: '复合身份样本 (13800000002)', phone: '13800000002', password: 'password123', role: '复合身份'},
+    {label: '综合角色账号 (13800000002)', phone: '13800000002', password: 'password123', role: '复合身份'},
   ],
   admin: [
     {label: '管理员 (13800000001)', phone: '13800000001', password: 'password123', role: '管理员'},
@@ -54,7 +54,6 @@ export default function LoginScreen({navigation}: any) {
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState<'code' | 'password'>('code');
   const [countdown, setCountdown] = useState(0);
-  const [debugError, setDebugError] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [dropdown, setDropdown] = useState<{key: DropdownKey; visible: boolean} | null>(null);
   const [selected, setSelected] = useState<{[k in DropdownKey]?: AccountItem}>({});
@@ -142,7 +141,7 @@ export default function LoginScreen({navigation}: any) {
   };
 
   const handleQQLogin = () => {
-    Alert.alert('QQ登录', 'QQ登录需要在QQ互联平台注册应用并集成SDK。\n\n当前开发模式，请使用手机号登录。', [{text: '确定'}]);
+    Alert.alert('QQ登录', 'QQ 登录暂未开放，请先使用手机号登录。', [{text: '确定'}]);
   };
 
   const sendCode = async () => {
@@ -152,7 +151,7 @@ export default function LoginScreen({navigation}: any) {
     }
     try {
       await authService.sendCode(phone);
-      Alert.alert('提示', '验证码已发送（开发模式请查看控制台）');
+      Alert.alert('提示', '验证码已发送，请留意短信；若暂未收到，也可以切换为密码登录。');
       setCountdown(60);
       const timer = setInterval(() => {
         setCountdown(prev => {
@@ -193,24 +192,18 @@ export default function LoginScreen({navigation}: any) {
   const quickLogin = async (userPhone: string, userPassword: string, role: string) => {
     const requestId = beginSubmit();
     if (!requestId) return;
-    setDebugError('');
     try {
-      const startTime = Date.now();
       const res = await authService.login(userPhone, userPassword);
       if (!isLatestRequest(requestId)) return;
-      const elapsed = Date.now() - startTime;
       dispatch(setCredentials({
         user: res.data.user,
         token: res.data.token,
         roleSummary: res.data.role_summary || null,
       }));
-      setDebugError(`✅ 登录成功\n角色: ${role}\n耗时: ${elapsed}ms\nAPI: ${API_BASE_URL}`);
     } catch (e: any) {
       if (!isLatestRequest(requestId)) return;
       const errorMsg = e.message || '未知错误';
-      const errorDetails = `❌ 快速登录失败\n\n账号: ${userPhone}\n密码: ${userPassword}\n角色: ${role}\n\nAPI: ${API_BASE_URL}\n\n错误信息:\n${errorMsg}\n\n原始错误:\n${JSON.stringify(e, null, 2)}`;
-      setDebugError(errorDetails);
-      Alert.alert('快速登录失败', `${errorMsg}\n\n详细错误信息请查看下方红色区域`);
+      Alert.alert('登录失败', `${role}账号暂时无法登录，请稍后重试。${errorMsg ? `\n\n原因：${errorMsg}` : ''}`);
     } finally {
       finishSubmit(requestId);
     }
@@ -323,7 +316,7 @@ export default function LoginScreen({navigation}: any) {
           </View>
 
           <View style={styles.devSection}>
-            <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
+            <Text style={styles.devTitle}>常用体验账号</Text>
             {([
               {key: 'client' as DropdownKey, label: '📦 客户', color: theme.primary},
               {key: 'owner' as DropdownKey, label: '🚁 机主', color: theme.success},

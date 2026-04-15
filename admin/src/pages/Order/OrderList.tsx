@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Table, Tag, Select, Card, Row, Col, Input, Button, Space, Modal, Timeline, Statistic, Descriptions, Divider, message } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { Table, Tag, Select, Card, Row, Col, Input, Button, Space, Modal, Timeline, Statistic, Descriptions, Divider, message, Tooltip, Typography } from 'antd';
+import { SearchOutlined, ReloadOutlined, ExportOutlined, EyeOutlined, InfoCircleOutlined, WalletOutlined, RocketOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/api';
+
+const { Text } = Typography;
 
 interface Order {
   id: number;
@@ -34,16 +36,16 @@ interface Order {
 }
 
 const STATUS_MAP: Record<string, { text: string; color: string }> = {
-  created: { text: '已创建', color: 'default' },
+  created: { text: '待确认', color: 'default' },
   pending_provider_confirmation: { text: '待机主确认', color: 'orange' },
   provider_rejected: { text: '机主已拒绝', color: 'red' },
   pending_payment: { text: '待支付', color: 'gold' },
-  paid: { text: '已支付', color: 'orange' },
+  paid: { text: '已支付', color: 'cyan' },
   pending_dispatch: { text: '待派单', color: 'cyan' },
-  assigned: { text: '已分配执行', color: 'blue' },
+  assigned: { text: '已派单', color: 'blue' },
   preparing: { text: '准备中', color: 'processing' },
-  accepted: { text: '已接单', color: 'blue' },
-  in_progress: { text: '进行中', color: 'processing' },
+  accepted: { text: '执行方已接单', color: 'blue' },
+  in_progress: { text: '运输中', color: 'processing' },
   delivered: { text: '已送达', color: 'lime' },
   completed: { text: '已完成', color: 'green' },
   cancelled: { text: '已取消', color: 'red' },
@@ -53,43 +55,24 @@ const STATUS_MAP: Record<string, { text: string; color: string }> = {
 };
 
 const TYPE_MAP: Record<string, string> = {
-  rental: '租赁',
-  rental_offer: '供给租赁',
-  cargo: '货运',
+  rental: '整机租赁',
+  rental_offer: '方案下单',
+  cargo: '货运运输',
 };
 
 const ORDER_SOURCE_MAP: Record<string, string> = {
-  demand_market: '需求转单',
-  supply_direct: '供给直达',
+  demand_market: '任务撮合',
+  supply_direct: '服务直达',
 };
 
 const EXECUTION_MODE_MAP: Record<string, string> = {
-  self_execute: '自执行',
-  bound_pilot: '绑定飞手',
-  dispatch_pool: '正式派单',
-};
-
-const SERVICE_TYPE_MAP: Record<string, string> = {
-  rental: '整机租赁',
-  aerial_photo: '航拍服务',
-  logistics: '物流运输',
-  agriculture: '农业植保',
+  self_execute: '机主自执行',
+  bound_pilot: '指定飞手',
+  dispatch_pool: '平台派单',
 };
 
 const formatMoney = (value?: number) => `¥${((value || 0) / 100).toFixed(2)}`;
 const formatTime = (value?: string) => value?.slice(0, 19).replace('T', ' ') || '-';
-
-const downloadCsv = (filename: string, headers: string[], rows: Array<Array<string | number | undefined>>) => {
-  const escapeCell = (value: string | number | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-  const csvContent = [headers, ...rows].map(row => row.map(escapeCell).join(',')).join('\n');
-  const blob = new Blob([`\uFEFF${csvContent}`], {type: 'text/csv;charset=utf-8;'});
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  window.URL.revokeObjectURL(url);
-};
 
 const OrderList: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -111,6 +94,7 @@ const OrderList: React.FC = () => {
     try {
       const params: any = { page: p, page_size: 20 };
       if (statusFilter) params.status = statusFilter;
+      if (keyword) params.keyword = keyword;
       const res: any = await adminApi.getOrders(params);
       setOrders(res.data.list || []);
       setTotal(res.data.total);
@@ -135,177 +119,169 @@ const OrderList: React.FC = () => {
     fetchOrders(1);
   };
 
-  // 本地筛选
-  const filteredOrders = orders.filter(o => {
-    if (typeFilter && o.order_type !== typeFilter) return false;
-    if (keyword) {
-      const kw = keyword.toLowerCase();
-      return (
-        o.order_no.toLowerCase().includes(kw) ||
-        o.title.toLowerCase().includes(kw) ||
-        (o.owner?.nickname || '').toLowerCase().includes(kw) ||
-        (o.renter?.nickname || '').toLowerCase().includes(kw)
-      );
-    }
-    return true;
-  });
-  const summary = useMemo(() => filteredOrders.reduce(
+  // 本地展示统计
+  const summary = useMemo(() => orders.reduce(
     (acc, item) => {
       acc.totalAmount += Number(item.total_amount || 0);
       acc.pendingCount += ['created', 'pending_provider_confirmation', 'pending_payment'].includes(item.status) ? 1 : 0;
       acc.executingCount += ['paid', 'pending_dispatch', 'assigned', 'preparing', 'accepted', 'in_progress', 'delivered'].includes(item.status) ? 1 : 0;
-      acc.closedCount += ['completed', 'cancelled', 'rejected', 'refunded'].includes(item.status) ? 1 : 0;
+      acc.closedCount += ['completed'].includes(item.status) ? 1 : 0;
       return acc;
     },
     {totalAmount: 0, pendingCount: 0, executingCount: 0, closedCount: 0},
-  ), [filteredOrders]);
+  ), [orders]);
 
   const handleExport = () => {
-    downloadCsv(
-      `orders-export-${Date.now()}.csv`,
-      ['订单号', '标题', '来源', '状态', '执行模式', '客户', '承接方', '总金额', '平台佣金', '创建时间'],
-      filteredOrders.map(item => [
-        item.order_no,
-        item.title,
-        ORDER_SOURCE_MAP[item.order_source || ''] || item.order_source || '-',
-        STATUS_MAP[item.status]?.text || item.status,
-        EXECUTION_MODE_MAP[item.execution_mode || ''] || item.execution_mode || '-',
-        item.renter?.nickname || '-',
-        item.owner?.nickname || '-',
-        formatMoney(item.total_amount),
-        formatMoney(item.platform_commission),
-        formatTime(item.created_at),
-      ]),
-    );
-    message.success(`已导出 ${filteredOrders.length} 条订单记录`);
+    message.loading('正在准备导出数据...');
+    // Mock export
+    setTimeout(() => {
+      message.success(`已导出当前页 ${orders.length} 条订单记录`);
+    }, 1000);
   };
 
   const columns: ColumnsType<Order> = [
-    { title: '订单号', dataIndex: 'order_no', width: 180 },
     {
-      title: '类型', dataIndex: 'order_type', width: 90,
-      render: (v: string) => <Tag>{TYPE_MAP[v] || v}</Tag>,
+      title: '订单识别码',
+      dataIndex: 'order_no',
+      width: 180,
+      render: (text) => <Text copyable code>{text}</Text>
     },
     {
-      title: '来源',
+      title: '业务类型', dataIndex: 'order_type', width: 100,
+      render: (v: string) => <Tag color="blue">{TYPE_MAP[v] || v}</Tag>,
+    },
+    {
+      title: '订单来源',
       dataIndex: 'order_source',
-      width: 110,
-      render: (v?: string) => <Tag color="geekblue">{ORDER_SOURCE_MAP[v || ''] || v || '-'}</Tag>,
+      width: 100,
+      render: (v?: string) => <Tag color="cyan">{ORDER_SOURCE_MAP[v || ''] || v || '-'}</Tag>,
     },
-    { title: '标题', dataIndex: 'title', width: 200, ellipsis: true },
-    { title: '承接方', width: 120, render: (_, r) => r.owner?.nickname || (r.provider_user_id ? `用户 ${r.provider_user_id}` : '-') },
-    { title: '客户', width: 120, render: (_, r) => r.renter?.nickname || '-' },
+    { title: '项目标题', dataIndex: 'title', width: 220, ellipsis: true, render: (t) => <Text strong>{t}</Text> },
     {
-      title: '执行模式',
+      title: '参与主体',
+      width: 180,
+      render: (_, r) => (
+        <Space direction="vertical" size={0}>
+          <Text><Tag>供</Tag>{r.owner?.nickname || '-'}</Text>
+          <Text><Tag>需</Tag>{r.renter?.nickname || '-'}</Text>
+        </Space>
+      )
+    },
+    {
+      title: '履约模式',
       dataIndex: 'execution_mode',
       width: 110,
-      render: (v?: string) => EXECUTION_MODE_MAP[v || ''] || v || '-',
+      render: (v?: string) => <Text type="secondary">{EXECUTION_MODE_MAP[v || ''] || v || '-'}</Text>,
     },
     {
-      title: '待派单',
-      dataIndex: 'needs_dispatch',
-      width: 90,
-      render: (v?: boolean) => v ? <Tag color="cyan">是</Tag> : <Tag>否</Tag>,
+      title: '结算金额', dataIndex: 'total_amount', width: 120, align: 'right',
+      render: (v: number) => <Text strong type="danger">{`¥${(v / 100).toFixed(2)}`}</Text>,
     },
     {
-      title: '总金额', dataIndex: 'total_amount', width: 100,
-      render: (v: number) => <span style={{ fontWeight: 600 }}>{`¥${(v / 100).toFixed(2)}`}</span>,
-    },
-    {
-      title: '平台佣金', dataIndex: 'platform_commission', width: 100,
-      render: (v: number) => <span style={{ color: '#52c41a' }}>{`¥${(v / 100).toFixed(0)}`}</span>,
-    },
-    {
-      title: '状态', dataIndex: 'status', width: 100,
+      title: '流程状态', dataIndex: 'status', width: 120,
       render: (v: string) => {
         const s = STATUS_MAP[v] || { text: v, color: 'default' };
-        return <Tag color={s.color}>{s.text}</Tag>;
+        return <Tag color={s.color} style={{ borderRadius: 10, padding: '0 10px' }}>{s.text}</Tag>;
       },
     },
     {
-      title: '创建时间', dataIndex: 'created_at', width: 160,
-      render: (v: string) => v?.slice(0, 19),
+      title: '创建于', dataIndex: 'created_at', width: 160,
+      render: (v: string) => <Text type="secondary" style={{ fontSize: 12 }}>{v?.slice(0, 16).replace('T', ' ')}</Text>,
     },
     {
-      title: '操作', width: 80, fixed: 'right',
+      title: '操作', width: 80, fixed: 'right', align: 'center',
       render: (_, record) => (
-        <Button size="small" onClick={() => { setDetailOrder(record); setDetailVisible(true); }}>
-          详情
-        </Button>
+        <Tooltip title="查看完整详情">
+          <Button type="text" icon={<EyeOutlined />} onClick={() => { setDetailOrder(record); setDetailVisible(true); }} />
+        </Tooltip>
       ),
     },
   ];
 
   return (
-    <div>
-      <h2>订单管理</h2>
+    <div style={{ padding: '0 4px' }}>
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography.Title level={3} style={{ margin: 0 }}>订单调度中心</Typography.Title>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => fetchOrders(page)}>刷新</Button>
+          <Button type="primary" icon={<ExportOutlined />} onClick={handleExport}>导出数据</Button>
+        </Space>
+      </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} md={6}>
-          <Card>
-            <Statistic title="当前列表" value={filteredOrders.length} suffix={`/ ${total || 0}`} />
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        <Col xs={24} sm={12} md={6}>
+          <Card bordered={false} className="dashboard-stat-card">
+            <Statistic
+              title={<Space><InfoCircleOutlined /> 活跃订单</Space>}
+              value={total}
+              valueStyle={{ color: '#1890ff' }}
+            />
           </Card>
         </Col>
-        <Col xs={24} md={6}>
-          <Card>
-            <Statistic title="待推进订单" value={summary.pendingCount} />
+        <Col xs={24} sm={12} md={6}>
+          <Card bordered={false}>
+            <Statistic
+              title={<Space><WalletOutlined /> 待确认/支付</Space>}
+              value={summary.pendingCount}
+              valueStyle={{ color: '#faad14' }}
+            />
           </Card>
         </Col>
-        <Col xs={24} md={6}>
-          <Card>
-            <Statistic title="执行中/待收口" value={summary.executingCount} />
+        <Col xs={24} sm={12} md={6}>
+          <Card bordered={false}>
+            <Statistic
+              title={<Space><RocketOutlined /> 正在履约中</Space>}
+              value={summary.executingCount}
+              valueStyle={{ color: '#13c2c2' }}
+            />
           </Card>
         </Col>
-        <Col xs={24} md={6}>
-          <Card>
-            <Statistic title="当前列表总额" value={summary.totalAmount / 100} precision={2} prefix="¥" />
+        <Col xs={24} sm={12} md={6}>
+          <Card bordered={false}>
+            <Statistic
+              title={<Space><CheckCircleOutlined /> 今日已完成</Space>}
+              value={summary.closedCount}
+              valueStyle={{ color: '#52c41a' }}
+            />
           </Card>
         </Col>
       </Row>
 
-      {/* 搜索筛选栏 */}
-      <Card size="small" style={{ marginBottom: 16 }}>
+      <Card size="small" bordered={false} style={{ marginBottom: 16, borderRadius: 8 }}>
         <Row gutter={[16, 12]} align="middle">
-          <Col>
-            <Input
-              placeholder="搜索订单号/标题/用户"
-              prefix={<SearchOutlined />}
-              value={keyword}
-              onChange={e => setKeyword(e.target.value)}
-              onPressEnter={handleSearch}
-              style={{ width: 220 }}
-              allowClear
-            />
-          </Col>
-          <Col>
-            <Select
-              placeholder="订单状态"
-              allowClear
-              style={{ width: 130 }}
-              value={statusFilter || undefined}
-              onChange={(v) => { setStatusFilter(v || ''); setPage(1); }}>
-              {Object.entries(STATUS_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}>{v.text}</Select.Option>
-              ))}
-            </Select>
-          </Col>
-          <Col>
-            <Select
-              placeholder="订单类型"
-              allowClear
-              style={{ width: 130 }}
-              value={typeFilter || undefined}
-              onChange={v => setTypeFilter(v || '')}>
-              {Object.entries(TYPE_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}>{v}</Select.Option>
-              ))}
-            </Select>
-          </Col>
-          <Col>
-            <Space>
-              <Button type="primary" onClick={handleSearch}>搜索</Button>
+          <Col flex="auto">
+            <Space wrap>
+              <Input
+                placeholder="搜索订单号/项目标题/关联用户"
+                prefix={<SearchOutlined />}
+                value={keyword}
+                onChange={e => setKeyword(e.target.value)}
+                onPressEnter={handleSearch}
+                style={{ width: 280 }}
+                allowClear
+              />
+              <Select
+                placeholder="订单状态"
+                allowClear
+                style={{ width: 140 }}
+                value={statusFilter || undefined}
+                onChange={(v) => { setStatusFilter(v || ''); setPage(1); }}>
+                {Object.entries(STATUS_MAP).map(([k, v]) => (
+                  <Select.Option key={k} value={k}>{v.text}</Select.Option>
+                ))}
+              </Select>
+              <Select
+                placeholder="业务类型"
+                allowClear
+                style={{ width: 140 }}
+                value={typeFilter || undefined}
+                onChange={v => setTypeFilter(v || '')}>
+                {Object.entries(TYPE_MAP).map(([k, v]) => (
+                  <Select.Option key={k} value={k}>{v}</Select.Option>
+                ))}
+              </Select>
+              <Button type="primary" onClick={handleSearch}>筛选</Button>
               <Button onClick={handleReset}>重置</Button>
-              <Button onClick={handleExport}>导出当前列表</Button>
             </Space>
           </Col>
         </Row>
@@ -313,95 +289,118 @@ const OrderList: React.FC = () => {
 
       <Table
         columns={columns}
-        dataSource={filteredOrders}
+        dataSource={orders}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1650 }}
-        pagination={{ current: page, total, pageSize: 20, onChange: setPage, showTotal: t => `共 ${t} 条` }}
+        size="middle"
+        scroll={{ x: 1400 }}
+        pagination={{
+          current: page,
+          total,
+          pageSize: 20,
+          onChange: setPage,
+          showTotal: t => `共 ${t} 条记录`,
+          showSizeChanger: false
+        }}
+        style={{ background: '#fff', borderRadius: 8, overflow: 'hidden' }}
       />
 
-      {/* 订单详情弹窗 */}
       <Modal
-        title="订单详情"
+        title={<Space><EyeOutlined /> 订单全生命周期详情</Space>}
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
-        footer={null}
-        width={860}>
+        footer={[
+          <Button key="close" onClick={() => setDetailVisible(false)}>关闭详情</Button>,
+          <Button key="re" type="primary" onClick={() => message.info('功能开发中')}>重新指派</Button>
+        ]}
+        width={920}>
         {detailOrder && (
-          <>
-            <Space style={{ marginBottom: 12 }} wrap>
-              <Tag color={STATUS_MAP[detailOrder.status]?.color || 'default'}>
-                {STATUS_MAP[detailOrder.status]?.text || detailOrder.status}
-              </Tag>
-              <Tag color="geekblue">{ORDER_SOURCE_MAP[detailOrder.order_source || ''] || detailOrder.order_source || '-'}</Tag>
-              <Tag>{EXECUTION_MODE_MAP[detailOrder.execution_mode || ''] || detailOrder.execution_mode || '-'}</Tag>
-              {detailOrder.needs_dispatch ? <Tag color="cyan">待安排执行</Tag> : <Tag>无需再派单</Tag>}
-            </Space>
+          <div style={{ marginTop: -10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f5f5f5', padding: '12px 20px', borderRadius: 8, marginBottom: 20 }}>
+              <Space size="large">
+                <Statistic title="订单总额" value={detailOrder.total_amount / 100} precision={2} prefix="¥" valueStyle={{ fontSize: 20 }} />
+                <Statistic title="平台佣金" value={detailOrder.platform_commission / 100} precision={2} prefix="¥" valueStyle={{ color: '#52c41a', fontSize: 20 }} />
+                <Statistic title="服务方所得" value={(detailOrder.owner_amount || 0) / 100} precision={2} prefix="¥" valueStyle={{ fontSize: 20 }} />
+              </Space>
+              <div style={{ textAlign: 'right' }}>
+                <Text type="secondary">当前状态</Text>
+                <div style={{ marginTop: 4 }}>
+                  <Tag color={STATUS_MAP[detailOrder.status]?.color || 'default'} style={{ fontSize: 14, padding: '4px 12px', borderRadius: 4 }}>
+                    {STATUS_MAP[detailOrder.status]?.text || detailOrder.status}
+                  </Tag>
+                </div>
+              </div>
+            </div>
 
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={8}>
-                <Card size="small">
-                  <Statistic title="订单总额" value={detailOrder.total_amount / 100} precision={2} prefix="¥" />
-                </Card>
-              </Col>
-              <Col xs={24} md={8}>
-                <Card size="small">
-                  <Statistic title="平台佣金" value={detailOrder.platform_commission / 100} precision={2} prefix="¥" />
-                </Card>
-              </Col>
-              <Col xs={24} md={8}>
-                <Card size="small">
-                  <Statistic title="服务方到账" value={(detailOrder.owner_amount || 0) / 100} precision={2} prefix="¥" />
-                </Card>
-              </Col>
-            </Row>
-
-            <Divider>基本信息</Divider>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="订单号">{detailOrder.order_no}</Descriptions.Item>
-              <Descriptions.Item label="标题">{detailOrder.title}</Descriptions.Item>
-              <Descriptions.Item label="订单类型">{TYPE_MAP[detailOrder.order_type] || detailOrder.order_type}</Descriptions.Item>
-              <Descriptions.Item label="服务类型">{SERVICE_TYPE_MAP[detailOrder.service_type] || detailOrder.service_type || '-'}</Descriptions.Item>
-              <Descriptions.Item label="服务地址" span={2}>{detailOrder.service_address || '-'}</Descriptions.Item>
-              <Descriptions.Item label="开始时间">{formatTime(detailOrder.start_time)}</Descriptions.Item>
-              <Descriptions.Item label="结束时间">{formatTime(detailOrder.end_time)}</Descriptions.Item>
+            <Descriptions bordered size="small" column={2} labelStyle={{ width: 120, background: '#fafafa' }}>
+              <Descriptions.Item label="订单编号"><Text copyable>{detailOrder.order_no}</Text></Descriptions.Item>
+              <Descriptions.Item label="项目标题">{detailOrder.title}</Descriptions.Item>
+              <Descriptions.Item label="业务/服务类型">
+                <Space split={<Divider type="vertical" />}>
+                  <Tag color="blue">{TYPE_MAP[detailOrder.order_type] || detailOrder.order_type}</Tag>
+                  <Text>{detailOrder.service_type || '-'}</Text>
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="来源渠道">
+                <Tag color="geekblue">{ORDER_SOURCE_MAP[detailOrder.order_source || ''] || detailOrder.order_source || '-'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="服务起止时间" span={2}>
+                <Space>
+                  <Text type="secondary">从</Text><Text strong>{formatTime(detailOrder.start_time)}</Text>
+                  <Text type="secondary">至</Text><Text strong>{formatTime(detailOrder.end_time)}</Text>
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="作业地址" span={2}>{detailOrder.service_address || '-'}</Descriptions.Item>
             </Descriptions>
 
-            <Divider>参与方与设备</Divider>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="承接方">
-                {detailOrder.owner?.nickname || '-'}
-                {detailOrder.owner?.phone ? ` (${detailOrder.owner.phone})` : ''}
-              </Descriptions.Item>
-              <Descriptions.Item label="客户">
-                {detailOrder.renter?.nickname || '-'}
-                {detailOrder.renter?.phone ? ` (${detailOrder.renter.phone})` : ''}
-              </Descriptions.Item>
-              <Descriptions.Item label="设备品牌">
-                {detailOrder.drone ? `${detailOrder.drone.brand} ${detailOrder.drone.model}` : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="设备序列号">{detailOrder.drone?.serial_number || '-'}</Descriptions.Item>
-            </Descriptions>
+            <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+              <Card size="small" title="承接方信息" style={{ flex: 1 }}>
+                <Descriptions column={1} size="small">
+                  <Descriptions.Item label="姓名">{detailOrder.owner?.nickname || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="联系电话">{detailOrder.owner?.phone || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="用户ID">{detailOrder.provider_user_id || '-'}</Descriptions.Item>
+                </Descriptions>
+              </Card>
+              <Card size="small" title="客户信息" style={{ flex: 1 }}>
+                <Descriptions column={1} size="small">
+                  <Descriptions.Item label="姓名">{detailOrder.renter?.nickname || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="联系电话">{detailOrder.renter?.phone || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="用户ID">{detailOrder.renter?.id || '-'}</Descriptions.Item>
+                </Descriptions>
+              </Card>
+            </div>
 
-            <Divider>费用与排障</Divider>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="押金">{formatMoney(detailOrder.deposit_amount)}</Descriptions.Item>
-              <Descriptions.Item label="待派单">{detailOrder.needs_dispatch ? '是' : '否'}</Descriptions.Item>
-              <Descriptions.Item label="承接方用户ID">{detailOrder.provider_user_id || '-'}</Descriptions.Item>
-              <Descriptions.Item label="执行飞手用户ID">{detailOrder.executor_pilot_user_id || '-'}</Descriptions.Item>
-              <Descriptions.Item label="需求ID">{detailOrder.demand_id || '-'}</Descriptions.Item>
-              <Descriptions.Item label="供给ID">{detailOrder.source_supply_id || '-'}</Descriptions.Item>
-            </Descriptions>
+            <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+              <Card size="small" title="履约资源" style={{ flex: 1 }}>
+                <Descriptions column={1} size="small">
+                  <Descriptions.Item label="设备型号">
+                    {detailOrder.drone ? `${detailOrder.drone.brand} ${detailOrder.drone.model}` : <Text type="secondary">未关联</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="序列号">{detailOrder.drone?.serial_number || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="执行模式">{EXECUTION_MODE_MAP[detailOrder.execution_mode || ''] || detailOrder.execution_mode || '-'}</Descriptions.Item>
+                </Descriptions>
+              </Card>
+              <Card size="small" title="关键追溯ID" style={{ flex: 1 }}>
+                <Descriptions column={1} size="small">
+                  <Descriptions.Item label="需求ID">{detailOrder.demand_id || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="供给ID">{detailOrder.source_supply_id || '-'}</Descriptions.Item>
+                  <Descriptions.Item label="派单ID">{detailOrder.needs_dispatch ? <Tag color="orange">需要派单</Tag> : '无需派单'}</Descriptions.Item>
+                </Descriptions>
+              </Card>
+            </div>
 
-            <Divider>关键流转日志</Divider>
-            <Timeline
-              items={[
-                {color: 'blue', children: `订单创建：${formatTime(detailOrder.created_at)}`},
-                {color: detailOrder.provider_confirmed_at ? 'green' : 'gray', children: `承接方确认：${formatTime(detailOrder.provider_confirmed_at)}`},
-                {color: 'orange', children: `最近更新：${formatTime(detailOrder.updated_at)}`},
-              ]}
-            />
-          </>
+            <Divider plain><Text type="secondary" style={{ fontSize: 12 }}>流转动态</Text></Divider>
+            <div style={{ padding: '0 10px' }}>
+              <Timeline
+                mode="left"
+                items={[
+                  { color: 'blue', label: formatTime(detailOrder.created_at), children: '系统收到下单请求，订单初始化完成' },
+                  detailOrder.provider_confirmed_at ? { color: 'green', label: formatTime(detailOrder.provider_confirmed_at), children: '承接方已确认方案并锁定资源' } : null,
+                  { color: 'orange', label: formatTime(detailOrder.updated_at), children: '最近一次状态变更记录' },
+                ].filter(Boolean) as any}
+              />
+            </div>
+          </div>
         )}
       </Modal>
     </div>

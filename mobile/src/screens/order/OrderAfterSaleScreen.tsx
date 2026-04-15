@@ -160,7 +160,7 @@ export default function OrderAfterSaleScreen({route}: any) {
     if (!detail) {
       return;
     }
-    Alert.alert('处理退款', '会按当前订单已有退款记录继续推进退款。开发测试环境下，这一步会直接调用后端退款逻辑。', [
+    Alert.alert('处理退款', '系统会根据当前订单进度继续处理退款，提交后可在本页查看最新状态。', [
       {text: '取消', style: 'cancel'},
       {
         text: '继续处理',
@@ -237,7 +237,7 @@ export default function OrderAfterSaleScreen({route}: any) {
         <View style={styles.hero}>
           <Text style={styles.heroOrderNo}>{detail.order_no}</Text>
           <Text style={styles.heroTitle}>售后处理</Text>
-          <Text style={styles.heroHint}>退款、争议和结算信息现在都按订单聚合，后续排查问题只需要回到这一笔订单。</Text>
+          <Text style={styles.heroHint}>退款、争议和结算信息都会汇总在这里，处理进度也会持续同步更新。</Text>
         </View>
 
         <ObjectCard style={styles.sectionCard}>
@@ -251,7 +251,7 @@ export default function OrderAfterSaleScreen({route}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>退款处理</Text>
-          <Text style={styles.sectionHint}>退款动作仍受后端状态机约束。当前订单如果没有生成退款记录，后端会明确返回原因。</Text>
+          <Text style={styles.sectionHint}>是否可以退款会根据当前订单进度自动判断，如暂不满足条件，系统会说明原因。</Text>
           {refunds.length === 0 ? (
             <EmptyState
               icon="💸"

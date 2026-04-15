@@ -29,7 +29,7 @@ const getApiBaseUrl = (): string => {
   // 远程测试配置：cpolar 固定域名（无条件优先）
   const HARDCODED_CPOLAR_URL = 'https://dronerentalplat.cpolar.top/api';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar，使用局域网IP
-  
+
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_URL) {
     console.log('[Config] Using cpolar URL for remote testing:', HARDCODED_CPOLAR_URL);
     return HARDCODED_CPOLAR_URL;
@@ -44,7 +44,7 @@ const getApiBaseUrl = (): string => {
       console.log('[Config] Using local network IP for real device testing:', localUrl);
       return localUrl;
     }
-    
+
     // Android模拟器使用10.0.2.2访问宿主机localhost
     // iOS模拟器和Web直接使用localhost
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
@@ -84,7 +84,7 @@ const getWsBaseUrl = (): string => {
   // 远程测试配置：cpolar 内网穿透（无条件优先）
   const HARDCODED_CPOLAR_WS_URL = 'wss://dronerentalplat.cpolar.top/ws';
   const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar
-  
+
   if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_WS_URL) {
     console.log('[Config] Using cpolar WS URL for remote testing:', HARDCODED_CPOLAR_WS_URL);
     return HARDCODED_CPOLAR_WS_URL;
@@ -99,7 +99,7 @@ const getWsBaseUrl = (): string => {
       console.log('[Config] Using local network IP for WS:', localWsUrl);
       return localWsUrl;
     }
-    
+
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
     const devWsUrl = `ws://${devHost}:8080/ws`;
     console.log('[Config] Using WS DEV default:', devWsUrl);
@@ -180,11 +180,11 @@ export const APP_CONFIG = {
 
 // 订单状态枚举
 export const ORDER_STATUS = {
-  created: '待接单',
-  accepted: '已接单',
-  rejected: '已拒绝',
+  created: '待确认',
+  accepted: '已接受',
+  rejected: '机主已拒绝',
   paid: '已支付',
-  in_progress: '进行中',
+  in_progress: '正在运输',
   completed: '已完成',
   cancelled: '已取消',
   refunded: '已退款',
@@ -192,10 +192,10 @@ export const ORDER_STATUS = {
 
 // 服务类型枚举
 export const SERVICE_TYPES = {
-  rental: '整机租赁',
-  aerial_photo: '航拍服务',
-  logistics: '物流运输',
-  agriculture: '农业植保',
+  rental: '无人机租赁',
+  aerial_photo: '专业航拍',
+  logistics: '重载运输',
+  agriculture: '农林植保',
 } as const;
 
 // 货物类型枚举

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
 	"strconv"
 	"time"
@@ -315,6 +316,67 @@ func (h *Handler) Timeline(c *gin.Context) {
 	response.V2Success(c, timeline)
 }
 
+func (h *Handler) GetDevelopmentFlightSimulation(c *gin.Context) {
+	order, ok := h.loadAuthorizedPilotDevelopmentOrder(c)
+	if !ok {
+		return
+	}
+
+	state, err := h.flightService.InspectDevelopmentSimulation(order)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, state)
+}
+
+func (h *Handler) StartDevelopmentFlightSimulation(c *gin.Context) {
+	order, ok := h.loadAuthorizedPilotDevelopmentOrder(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		ResetExistingData  *bool `json:"reset_existing_data"`
+		InjectSampleAlerts *bool `json:"inject_sample_alerts"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		response.V2ValidationError(c, "invalid development simulation payload")
+		return
+	}
+
+	options := service.DevelopmentFlightSimulationOptions{}
+	if req.ResetExistingData != nil {
+		options.ResetExistingData = *req.ResetExistingData
+	}
+	if req.InjectSampleAlerts != nil {
+		options.InjectSampleAlerts = *req.InjectSampleAlerts
+	} else {
+		options.InjectSampleAlerts = true
+	}
+
+	state, err := h.flightService.StartDevelopmentSimulation(order, options)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, state)
+}
+
+func (h *Handler) StopDevelopmentFlightSimulation(c *gin.Context) {
+	order, ok := h.loadAuthorizedPilotDevelopmentOrder(c)
+	if !ok {
+		return
+	}
+
+	state, err := h.flightService.StopDevelopmentSimulation(order.ID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, state)
+}
+
 func (h *Handler) CreateDispute(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -528,6 +590,31 @@ func parseOrderID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return orderID, true
+}
+
+func (h *Handler) loadAuthorizedPilotDevelopmentOrder(c *gin.Context) (*model.Order, bool) {
+	if gin.Mode() == gin.ReleaseMode {
+		response.V2Forbidden(c, "测试飞行模拟仅在非生产环境开放")
+		return nil, false
+	}
+
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return nil, false
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return nil, false
+	}
+
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "pilot")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return nil, false
+	}
+	return order, true
 }
 
 func buildOrderSummary(order *model.Order) gin.H {
@@ -1264,6 +1351,103 @@ func (h *Handler) SignContract(c *gin.Context) {
 	response.V2Success(c, buildContractResponse(contract))
 }
 
+// GetContractPDFDownloadInfo 获取合同 PDF 下载链接
+func (h *Handler) GetContractPDFDownloadInfo(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, ""); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	if h.contractService == nil {
+		response.V2Error(c, 500, "INTERNAL_ERROR", "合同服务未初始化")
+		return
+	}
+
+	contract, err := h.contractService.GetContractByOrder(orderID)
+	if err != nil {
+		response.V2Error(c, 404, "NOT_FOUND", "该订单暂无合同")
+		return
+	}
+
+	token, expiresAt, err := h.contractService.GenerateContractPDFDownloadToken(orderID, userID)
+	if err != nil {
+		response.V2Error(c, 500, "INTERNAL_ERROR", err.Error())
+		return
+	}
+
+	filename := service.BuildContractPDFFilename(contract)
+	downloadURL := fmt.Sprintf(
+		"%s/api/v2/orders/%d/contract/pdf?download_token=%s",
+		requestBaseURL(c),
+		orderID,
+		url.QueryEscape(token),
+	)
+
+	response.V2Success(c, gin.H{
+		"filename":     filename,
+		"download_url": downloadURL,
+		"expires_at":   expiresAt,
+	})
+}
+
+// DownloadContractPDF 下载订单合同 PDF
+func (h *Handler) DownloadContractPDF(c *gin.Context) {
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	if h.contractService == nil {
+		response.V2Error(c, 500, "INTERNAL_ERROR", "合同服务未初始化")
+		return
+	}
+
+	downloadToken := c.Query("download_token")
+	if downloadToken == "" {
+		response.V2Unauthorized(c, "missing contract download token")
+		return
+	}
+
+	userID, tokenOrderID, err := h.contractService.ParseContractPDFDownloadToken(downloadToken)
+	if err != nil {
+		response.V2Unauthorized(c, err.Error())
+		return
+	}
+	if tokenOrderID != orderID {
+		response.V2Forbidden(c, "合同下载链接与订单不匹配")
+		return
+	}
+
+	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, ""); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	pdfBytes, contract, err := h.contractService.BuildContractPDFByOrder(orderID)
+	if err != nil {
+		response.V2Error(c, 500, "PDF_EXPORT_FAILED", err.Error())
+		return
+	}
+
+	filename := service.BuildContractPDFFilename(contract)
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", service.BuildContractPDFFilenameHeader(filename))
+	c.Header("Content-Length", strconv.Itoa(len(pdfBytes)))
+	c.Header("Cache-Control", "private, max-age=60")
+	c.Data(200, "application/pdf", pdfBytes)
+}
+
 func buildContractResponse(c *model.OrderContract) gin.H {
 	if c == nil {
 		return nil
@@ -1286,4 +1470,22 @@ func buildContractResponse(c *model.OrderContract) gin.H {
 		"created_at":          c.CreatedAt,
 		"updated_at":          c.UpdatedAt,
 	}
+}
+
+func requestBaseURL(c *gin.Context) string {
+	scheme := c.GetHeader("X-Forwarded-Proto")
+	if scheme == "" {
+		if c.Request.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+
+	host := c.GetHeader("X-Forwarded-Host")
+	if host == "" {
+		host = c.Request.Host
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, host)
 }

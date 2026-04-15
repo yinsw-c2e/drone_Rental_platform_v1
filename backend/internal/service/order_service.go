@@ -365,13 +365,13 @@ type DirectOrderInput struct {
 }
 
 type DirectOrderResult struct {
-	OrderID             int64  `json:"order_id"`
-	OrderNo             string `json:"order_no"`
-	OrderSource         string `json:"order_source"`
-	Status              string `json:"status"`
-	TotalAmount         int64  `json:"total_amount"`
-	PlatformCommission  int64  `json:"platform_commission"`
-	OwnerAmount         int64  `json:"owner_amount"`
+	OrderID            int64  `json:"order_id"`
+	OrderNo            string `json:"order_no"`
+	OrderSource        string `json:"order_source"`
+	Status             string `json:"status"`
+	TotalAmount        int64  `json:"total_amount"`
+	PlatformCommission int64  `json:"platform_commission"`
+	OwnerAmount        int64  `json:"owner_amount"`
 }
 
 func (s *OrderService) CreateDirectSupplyOrder(renterUserID int64, client *model.Client, supplyID int64, input *DirectOrderInput) (*model.Order, error) {
@@ -508,6 +508,24 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 		OwnerAmount:            ownerAmount,
 		DepositAmount:          drone.Deposit,
 		Status:                 "pending_provider_confirmation",
+	}
+
+	existingOrder, err := orderRepo.FindReusableDirectSupplyOrder(repository.DirectOrderReuseLookup{
+		SourceSupplyID: supply.ID,
+		RenterID:       renterUserID,
+		ServiceType:    serviceType,
+		StartTime:      startAt,
+		EndTime:        endAt,
+		ServiceAddress: serviceAddr,
+		DestAddress:    destAddr,
+		TotalAmount:    totalAmount,
+		CreatedAfter:   time.Now().Add(-24 * time.Hour),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if existingOrder != nil {
+		return existingOrder, nil
 	}
 
 	if err := orderRepo.Create(order); err != nil {

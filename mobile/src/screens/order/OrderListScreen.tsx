@@ -67,19 +67,6 @@ const formatDateRange = (start?: string, end?: string) => {
   return values.join(' - ');
 };
 
-const summarizeParty = (party: V2OrderSummary['provider'] | V2OrderSummary['client'] | V2OrderSummary['executor'], fallbackLabel: string) => {
-  if (!party) {
-    return fallbackLabel;
-  }
-  if (party.nickname) {
-    return party.nickname;
-  }
-  if (party.user_id) {
-    return `${fallbackLabel} #${party.user_id}`;
-  }
-  return fallbackLabel;
-};
-
 const getStatusBucket = (status?: string): StatusFilter => {
   const normalized = String(status || '').toLowerCase();
   if (
@@ -180,6 +167,7 @@ export default function OrderListScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
+  const currentUserId = Number(user?.id || 0);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
 
@@ -273,58 +261,76 @@ export default function OrderListScreen({navigation, route}: any) {
 
   const renderItem = ({item}: {item: OrderListItem}) => {
     const sourceKind = item.order.order_source === 'supply_direct' ? 'supply' : 'demand';
-    const roleHints = item.roles.filter(role => role !== 'all').map(role => roleLabelMap[role as Exclude<RoleFilter, 'all'>]);
     const isCancelled = String(item.order.status || '').toLowerCase() === 'cancelled';
+    const progressHint = getOrderProgressHint(item.order);
+    const isPilotOrder = item.roles.includes('pilot');
+    const hasDispatchTask = Number(item.order.dispatch_task_id || 0) > 0;
+    const canPilotExecute =
+      isPilotOrder &&
+      hasDispatchTask &&
+      currentUserId > 0 &&
+      currentUserId === Number(item.order.executor_pilot_user_id || 0) &&
+      !['cancelled', 'completed'].includes(String(item.order.status || '').toLowerCase());
+
+    const openPrimaryEntry = () => {
+      if (canPilotExecute) {
+        navigation.navigate('PilotOrderExecution', {taskId: item.order.dispatch_task_id});
+        return;
+      }
+      if (isPilotOrder && hasDispatchTask) {
+        navigation.navigate('DispatchTaskDetail', {
+          id: item.order.dispatch_task_id,
+          dispatchId: item.order.dispatch_task_id,
+        });
+        return;
+      }
+      navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id});
+    };
 
     return (
-      <ObjectCard
-        style={[styles.card, isCancelled && styles.cardCancelled]}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[styles.orderCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}, isCancelled && styles.cardCancelled]}
         onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <SourceTag source={sourceKind} />
             <StatusBadge label="" meta={getObjectStatusMeta('order', item.order.status)} />
           </View>
-          <Text style={[styles.code, {color: theme.textHint}]}>{item.order.order_no}</Text>
+          <Text style={styles.orderNo}>{item.order.order_no}</Text>
         </View>
 
-        <Text style={[styles.title, {color: theme.text}]}>{item.order.title}</Text>
-        <Text style={[styles.address, {color: theme.textSub}]} numberOfLines={2}>
-          {item.order.service_address || '未设置起点'}
-          {item.order.dest_address ? ` -> ${item.order.dest_address}` : ''}
-        </Text>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.order.title}</Text>
 
-        <View style={styles.metaRow}>
-          <Text style={[styles.metaText, {color: theme.textSub}]}>承接方：{summarizeParty(item.order.provider, '未分配机主')}</Text>
-          <Text style={[styles.metaText, {color: theme.textSub}]}>执行安排：{summarizeParty(item.order.executor, item.order.execution_mode === 'self_execute' ? '机主自执行' : '安排中')}</Text>
+        <View style={styles.cardRoute}>
+          <Text style={styles.routeText} numberOfLines={1}>
+            📍 {item.order.service_address || '起点'}
+            {item.order.dest_address ? ` → ${item.order.dest_address}` : ''}
+          </Text>
         </View>
 
-        <View style={styles.metaRow}>
-          <Text style={[styles.metaText, {color: theme.textSub}]}>客户：{summarizeParty(item.order.client, '客户')}</Text>
-          <Text style={[styles.metaText, {color: theme.textSub}]}>{formatDateRange(item.order.start_time, item.order.end_time)}</Text>
-        </View>
-
-        <View style={[styles.progressHintRow, {backgroundColor: theme.badgeBg}]}>
-          <Text style={[styles.progressHintText, {color: theme.text}]}>{getOrderProgressHint(item.order)}</Text>
-        </View>
-
-        {roleHints.length > 0 ? (
-          <View style={styles.roleHintRow}>
-            {roleHints.map(label => (
-              <View key={label} style={[styles.roleHintChip, {backgroundColor: theme.badgeBg}]}>
-                <Text style={[styles.roleHintText, {color: theme.textSub}]}>{label}</Text>
-              </View>
-            ))}
+        <View style={styles.progressBanner}>
+          <View style={styles.progressInner}>
+            <Text style={styles.progressLabel}>当前进展：</Text>
+            <Text style={styles.progressText} numberOfLines={1}>{progressHint}</Text>
           </View>
-        ) : null}
+        </View>
 
-        <View style={styles.footer}>
-          <Text style={[styles.amount, {color: theme.danger}]}>{formatAmount(item.order.total_amount)}</Text>
-          <TouchableOpacity style={[styles.detailBtn, {backgroundColor: theme.btnPrimary}]} onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
-            <Text style={[styles.detailBtnText, {color: theme.btnPrimaryText}]}>查看进度</Text>
+        <View style={styles.cardFooter}>
+          <View style={styles.footerInfo}>
+            <Text style={styles.timeLabel}>{formatDateRange(item.order.start_time, item.order.end_time).split(' ')[0]}</Text>
+            <Text style={styles.amountText}>{formatAmount(item.order.total_amount)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={openPrimaryEntry}
+          >
+            <Text style={styles.actionBtnText}>
+              {canPilotExecute ? '去执行' : isPilotOrder && hasDispatchTask ? '执行安排' : '详情'}
+            </Text>
           </TouchableOpacity>
         </View>
-      </ObjectCard>
+      </TouchableOpacity>
     );
   };
 
@@ -549,104 +555,105 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   loading: {
     paddingVertical: 48,
   },
-  card: {
-    marginBottom: 12,
+  orderCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardCancelled: {
-    opacity: 0.82,
-    borderWidth: 1,
-    borderColor: theme.warning + '55',
+    opacity: 0.7,
+    borderColor: theme.divider,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
   },
   cardHeaderLeft: {
     flexDirection: 'row',
     gap: 8,
     alignItems: 'center',
   },
-  code: {
-    fontSize: 12,
-    color: theme.textSub,
-    fontWeight: '600',
-  },
-  title: {
-    marginTop: 14,
-    fontSize: 17,
-    lineHeight: 24,
-    color: theme.text,
+  orderNo: {
+    fontSize: 11,
+    color: theme.textHint,
     fontWeight: '700',
   },
-  address: {
-    marginTop: 8,
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: theme.text,
+    marginBottom: 8,
+  },
+  cardRoute: {
+    marginBottom: 12,
+  },
+  routeText: {
     fontSize: 13,
-    lineHeight: 20,
     color: theme.textSub,
   },
-  metaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+  progressBanner: {
+    backgroundColor: theme.bgSecondary,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 16,
   },
-  metaText: {
+  progressInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressLabel: {
+    fontSize: 11,
+    color: theme.textHint,
+    fontWeight: '700',
+  },
+  progressText: {
     flex: 1,
     fontSize: 12,
-    lineHeight: 18,
-    color: theme.textSub,
-  },
-  progressHintRow: {
-    marginTop: 12,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  progressHintText: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: theme.text,
-    fontWeight: '600',
-  },
-  roleHintRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  roleHintChip: {
-    borderRadius: 999,
-    backgroundColor: theme.bgSecondary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  roleHintText: {
-    fontSize: 11,
-    color: theme.textSub,
+    color: theme.primaryText,
     fontWeight: '700',
   },
-  footer: {
-    marginTop: 16,
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'flex-end',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.divider,
+    paddingTop: 12,
   },
-  amount: {
-    fontSize: 22,
+  footerInfo: {
+    gap: 4,
+  },
+  timeLabel: {
+    fontSize: 11,
+    color: theme.textHint,
+  },
+  amountText: {
+    fontSize: 18,
     color: theme.danger,
     fontWeight: '800',
   },
-  detailBtn: {
-    borderRadius: 999,
-    backgroundColor: theme.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  actionBtn: {
+    backgroundColor: theme.bgSecondary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.divider,
   },
-  detailBtnText: {
-    fontSize: 12,
-    color: theme.btnPrimaryText,
+  actionBtnText: {
+    fontSize: 13,
+    color: theme.text,
     fontWeight: '700',
+  },
+  card: {
+    marginBottom: 12,
   },
 });

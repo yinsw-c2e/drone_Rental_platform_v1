@@ -14,7 +14,6 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import AddressInputField from '../../components/AddressInputField';
-import ObjectCard from '../../components/business/ObjectCard';
 import {demandV2Service, type DemandUpsertPayload} from '../../services/demandV2';
 import {AddressData, DemandDetail} from '../../types';
 import {
@@ -25,6 +24,7 @@ import {
   deriveDraftTitle,
   formatDemandDateTime,
   formatSavedAt,
+  generateSuggestedTitle,
   getSceneLabel,
   parseDemandDate,
   snapshotToAddressData,
@@ -79,15 +79,18 @@ export default function EditDemandScreen({navigation, route}: any) {
 
   const suggestedTitle = useMemo(
     () =>
-      deriveDraftTitle({
-        title,
+      generateSuggestedTitle({
         sceneKey: cargoScene,
         serviceAddress,
         departureAddress,
         destinationAddress,
       }),
-    [cargoScene, departureAddress, destinationAddress, serviceAddress, title],
+    [cargoScene, departureAddress, destinationAddress, serviceAddress],
   );
+
+  const handleMagicTitle = () => {
+    setTitle(suggestedTitle);
+  };
 
   const buildPayload = useCallback(
     (): DemandUpsertPayload => {
@@ -410,294 +413,289 @@ export default function EditDemandScreen({navigation, route}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ObjectCard style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>{isDraft ? '继续完善草稿' : '修改任务'}</Text>
-          <Text style={styles.pageTitle}>{isDraft ? '草稿可以边改边存，不用一次改完' : '继续补充任务信息'}</Text>
-          <Text style={styles.heroDesc}>
-            {isDraft
-              ? '草稿模式下，系统会自动帮你保存修改。你可以先把核心信息梳理清楚，再慢慢补预算和说明。'
-              : '已发布或询价中的任务也支持继续完善信息，但会按保存动作生效。'}
-          </Text>
-        </ObjectCard>
-
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>编辑进度</Text>
-          <View style={styles.stepRow}>
-            <TouchableOpacity
-              style={[styles.stepCard, currentStep === 1 && styles.stepCardActive]}
-              onPress={() => setCurrentStep(1)}>
-              <Text style={[styles.stepIndex, currentStep === 1 && styles.stepIndexActive]}>1</Text>
-              <Text style={[styles.stepTitle, currentStep === 1 && styles.stepTitleActive]}>核心信息</Text>
-              <Text style={styles.stepDesc}>地址、时间、重量</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.stepCard, currentStep === 2 && styles.stepCardActive]}
-              onPress={() => setCurrentStep(2)}>
-              <Text style={[styles.stepIndex, currentStep === 2 && styles.stepIndexActive]}>2</Text>
-              <Text style={[styles.stepTitle, currentStep === 2 && styles.stepTitleActive]}>专业细节</Text>
-              <Text style={styles.stepDesc}>预算、说明、货物属性</Text>
-            </TouchableOpacity>
+      <View style={styles.header}>
+        <View style={styles.progressHeader}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressPin, styles.progressPinActive]} />
+            <View style={[styles.progressLine, currentStep === 2 && styles.progressLineActive]} />
+            <View style={[styles.progressPin, currentStep === 2 && styles.progressPinActive]} />
           </View>
-        </ObjectCard>
+          <View style={styles.progressLabels}>
+            <Text style={[styles.progressLabelText, styles.progressLabelTextActive]}>核心需求</Text>
+            <Text style={[styles.progressLabelText, currentStep === 2 && styles.progressLabelTextActive]}>更多细节</Text>
+          </View>
+        </View>
 
-        <ObjectCard highlightColor={draftSaveState === 'error' ? theme.danger + '66' : theme.primaryBorder}>
-          <Text style={styles.sectionTitle}>保存状态</Text>
-          <Text style={styles.draftStatusText}>{draftStatusText}</Text>
-        </ObjectCard>
+        <View style={styles.draftStatusRow}>
+          <View style={[styles.draftDot, draftSaveState === 'saving' ? styles.draftDotSaving : draftSaveState === 'error' ? styles.draftDotError : styles.draftDotSaved]} />
+          <Text style={styles.draftStatusSmallText}>{draftStatusText}</Text>
+        </View>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {currentStep === 1 ? (
-          <ObjectCard>
-            <Text style={styles.sectionTitle}>第 1 步：核心信息</Text>
+          <View style={styles.formSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>1. 核心需求信息</Text>
+              <Text style={styles.sectionSubtitle}>必填项，用于发布后匹配合适的机组</Text>
+            </View>
 
-            <Text style={styles.label}>任务标题</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="例如：山区电网建设塔材吊运"
-              placeholderTextColor={theme.textHint}
-              value={title}
-              onChangeText={setTitle}
-            />
-            <Text style={styles.helperText}>可先用系统建议标题：{suggestedTitle}</Text>
-
-            <Text style={styles.label}>作业场景 *</Text>
-            <View style={styles.optionRow}>
-              {DEMAND_SCENE_OPTIONS.map(option => (
+            <View style={styles.inputCard}>
+              <Text style={styles.label}>任务标题</Text>
+              <View style={styles.titleInputRow}>
+                <TextInput
+                  style={[styles.input, {flex: 1}]}
+                  placeholder="例如：山区设备吊运"
+                  placeholderTextColor={theme.textHint}
+                  value={title}
+                  onChangeText={setTitle}
+                />
                 <TouchableOpacity
-                  key={option.key}
-                  style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
-                  onPress={() => setCargoScene(option.key)}>
-                  <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>
-                    {option.label}
+                  style={[styles.magicBtn, title === suggestedTitle && styles.magicBtnActive]}
+                  onPress={handleMagicTitle}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.magicEmoji}>✨</Text>
+                </TouchableOpacity>
+              </View>
+              {title !== suggestedTitle && (
+                <TouchableOpacity onPress={handleMagicTitle} style={styles.suggestedLink}>
+                  <Text style={styles.suggestedLinkText}>推荐：{suggestedTitle}</Text>
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.label}>作业场景</Text>
+              <View style={styles.sceneGrid}>
+                {DEMAND_SCENE_OPTIONS.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[styles.sceneBtn, cargoScene === option.key && styles.sceneBtnActive]}
+                    onPress={() => setCargoScene(option.key)}>
+                    <Text style={[styles.sceneBtnText, cargoScene === option.key && styles.sceneBtnTextActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.addressSection}>
+                {hasRoute ? (
+                  <>
+                    <Text style={styles.label}>起运地</Text>
+                    <AddressInputField
+                      value={departureAddress}
+                      placeholder="点击选择起点"
+                      onSelect={setDepartureAddress}
+                      style={styles.formAddressInput}
+                    />
+                    <View style={styles.addressSpacer} />
+                    <Text style={styles.label}>目的地</Text>
+                    <AddressInputField
+                      value={destinationAddress}
+                      placeholder="点击选择终点"
+                      onSelect={setDestinationAddress}
+                      style={styles.formAddressInput}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.label}>作业地址</Text>
+                    <AddressInputField
+                      value={serviceAddress}
+                      placeholder="点击选择作业地点"
+                      onSelect={setServiceAddress}
+                      style={styles.formAddressInput}
+                    />
+                  </>
+                )}
+              </View>
+
+              <Text style={styles.label}>货物重量 (kg)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="例如：120"
+                placeholderTextColor={theme.textHint}
+                value={cargoWeight}
+                onChangeText={setCargoWeight}
+              />
+
+              <View style={styles.sectionHeader}>
+                <Text style={styles.label}>任务计划时间</Text>
+                <Text style={styles.sectionSubtitle}>请设置预期的作业时段</Text>
+              </View>
+
+              <View style={styles.timePickerContainer}>
+                <TouchableOpacity
+                  style={[styles.timePickerBox, startConfirmed && styles.timePickerBoxActive]}
+                  onPress={() => setShowStartPicker(true)}
+                >
+                  <Text style={styles.timePickerLabel}>开始时间</Text>
+                  <Text style={[styles.timePickerValue, !startConfirmed && styles.timePickerValuePlaceholder]}>
+                    {startConfirmed ? formatDemandDateTime(startDate).split(' ')[1] : '点击设置'}
+                  </Text>
+                  <Text style={styles.timePickerDate}>
+                    {formatDemandDateTime(startDate).split(' ')[0]}
                   </Text>
                 </TouchableOpacity>
-              ))}
+
+                <View style={styles.timeConnector}>
+                  <Text style={styles.timeConnectorText}>至</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.timePickerBox, endConfirmed && styles.timePickerBoxActive]}
+                  onPress={() => setShowEndPicker(true)}
+                >
+                  <Text style={styles.timePickerLabel}>结束时间</Text>
+                  <Text style={[styles.timePickerValue, !endConfirmed && styles.timePickerValuePlaceholder]}>
+                    {endConfirmed ? formatDemandDateTime(endDate).split(' ')[1] : '点击设置'}
+                  </Text>
+                  <Text style={styles.timePickerDate}>
+                    {formatDemandDateTime(endDate).split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {!startConfirmed && !endConfirmed && (
+                <View style={styles.timeHintBox}>
+                  <Text style={styles.timeHintText}>💡 建议：预留至少 2 小时作业时间</Text>
+                </View>
+              )}
             </View>
-
-            {hasRoute ? (
-              <>
-                <Text style={styles.label}>起点地址 *</Text>
-                <AddressInputField
-                  value={departureAddress}
-                  placeholder="点击选择起点地址"
-                  onSelect={setDepartureAddress}
-                />
-
-                <Text style={styles.label}>终点地址 *</Text>
-                <AddressInputField
-                  value={destinationAddress}
-                  placeholder="点击选择终点地址"
-                  onSelect={setDestinationAddress}
-                />
-              </>
-            ) : (
-              <>
-                <Text style={styles.label}>主要作业地址 *</Text>
-                <AddressInputField
-                  value={serviceAddress}
-                  placeholder="点击选择主要作业地址"
-                  onSelect={setServiceAddress}
-                />
-              </>
-            )}
-
-            <Text style={styles.label}>货物重量 (kg) *</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              placeholder="例如：80"
-              placeholderTextColor={theme.textHint}
-              value={cargoWeight}
-              onChangeText={setCargoWeight}
-            />
-
-            <Text style={styles.label}>预约开始时间 *</Text>
-            <Text style={styles.helperText}>修改时间后，请重新确认，避免误用系统建议时间。</Text>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
-              <Text style={[styles.dateText, !startConfirmed && styles.datePlaceholderText]}>
-                {startConfirmed ? formatDemandDateTime(startDate) : '请重新确认开始时间'}
-              </Text>
-            </TouchableOpacity>
-            {!startConfirmed ? <Text style={styles.timeRecommend}>建议参考：{formatDemandDateTime(startDate)}</Text> : null}
-            {showStartPicker ? (
-              <DateTimePicker
-                value={startDate}
-                mode="datetime"
-                display="default"
-                onChange={onStartDateChange}
-                minimumDate={new Date()}
-              />
-            ) : null}
-
-            <Text style={styles.label}>预约结束时间 *</Text>
-            <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
-              <Text style={[styles.dateText, !endConfirmed && styles.datePlaceholderText]}>
-                {endConfirmed ? formatDemandDateTime(endDate) : '请重新确认结束时间'}
-              </Text>
-            </TouchableOpacity>
-            {!endConfirmed ? <Text style={styles.timeRecommend}>建议参考：{formatDemandDateTime(endDate)}</Text> : null}
-            {showEndPicker ? (
-              <DateTimePicker
-                value={endDate}
-                mode="datetime"
-                display="default"
-                onChange={onEndDateChange}
-                minimumDate={startDate}
-              />
-            ) : null}
-
-            <View style={styles.summaryBox}>
-              <Text style={styles.summaryTitle}>当前摘要</Text>
-              <Text style={styles.summaryText}>
-                {hasRoute ? (
-                  <>
-                    {summarizeAddress(departureAddress)}
-                    {' -> '}
-                    {summarizeAddress(destinationAddress)}
-                  </>
-                ) : (
-                  summarizeAddress(serviceAddress)
-                )}
-              </Text>
-              <Text style={styles.summaryText}>
-                {getSceneLabel(cargoScene)} / {cargoWeight || '--'}kg
-              </Text>
-            </View>
-          </ObjectCard>
+          </View>
         ) : (
-          <ObjectCard>
-            <Text style={styles.sectionTitle}>第 2 步：专业细节</Text>
-            <Text style={styles.helperText}>
-              这里继续补预算、货物属性和说明。草稿状态下会自动保存，你不需要一次性把所有字段都填完。
-            </Text>
-
-            <View style={styles.summaryBox}>
-              <Text style={styles.summaryTitle}>已保存的核心信息</Text>
-              <Text style={styles.summaryText}>
-                {hasRoute ? (
-                  <>
-                    {summarizeAddress(departureAddress)}
-                    {' -> '}
-                    {summarizeAddress(destinationAddress)}
-                  </>
-                ) : (
-                  summarizeAddress(serviceAddress)
-                )}
-              </Text>
-              <Text style={styles.summaryText}>
-                {getSceneLabel(cargoScene)} / {cargoWeight || '--'}kg / {formatDemandDateTime(startDate)}
-              </Text>
+          <View style={styles.formSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>2. 更多细节 (选填)</Text>
+              <Text style={styles.sectionSubtitle}>详细的要求能帮您获得更精准的报价方案</Text>
             </View>
 
-            <Text style={styles.label}>货物类型</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="例如：塔材、设备箱、给养物资"
-              placeholderTextColor={theme.textHint}
-              value={cargoType}
-              onChangeText={setCargoType}
-            />
+            <View style={styles.inputCard}>
+              <View style={styles.rowInputs}>
+                <View style={{flex: 1}}>
+                  <Text style={styles.label}>货物类型</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="如：塔材"
+                    placeholderTextColor={theme.textHint}
+                    value={cargoType}
+                    onChangeText={setCargoType}
+                  />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.label}>体积 (m³)</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholder="可选"
+                    placeholderTextColor={theme.textHint}
+                    value={cargoVolume}
+                    onChangeText={setCargoVolume}
+                  />
+                </View>
+              </View>
 
-            <Text style={styles.label}>货物体积 (m³，可选)</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              placeholder="例如：2.5"
-              placeholderTextColor={theme.textHint}
-              value={cargoVolume}
-              onChangeText={setCargoVolume}
-            />
+              <View style={styles.rowInputs}>
+                <View style={{flex: 1}}>
+                  <Text style={styles.label}>预计架次</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholder="默认 1"
+                    placeholderTextColor={theme.textHint}
+                    value={tripCount}
+                    onChangeText={setTripCount}
+                  />
+                </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.label}>预算上限 (元)</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholder="待议"
+                    placeholderTextColor={theme.textHint}
+                    value={budgetMax}
+                    onChangeText={setBudgetMax}
+                  />
+                </View>
+              </View>
 
-            <Text style={styles.label}>预计架次</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              placeholder="默认 1 架次"
-              placeholderTextColor={theme.textHint}
-              value={tripCount}
-              onChangeText={setTripCount}
-            />
-
-            <Text style={styles.label}>预算范围 (元)</Text>
-            <View style={styles.budgetRow}>
+              <Text style={styles.label}>特殊要求</Text>
               <TextInput
-                style={[styles.input, styles.flexInput]}
-                keyboardType="numeric"
-                placeholder="最低预算"
+                style={[styles.input, styles.textarea]}
+                placeholder="例如：需要防水、防震包装..."
                 placeholderTextColor={theme.textHint}
-                value={budgetMin}
-                onChangeText={setBudgetMin}
+                value={specialRequirements}
+                onChangeText={setSpecialRequirements}
+                multiline
+                textAlignVertical="top"
               />
-              <Text style={styles.split}>-</Text>
+
+              <Text style={styles.label}>任务说明</Text>
               <TextInput
-                style={[styles.input, styles.flexInput]}
-                keyboardType="numeric"
-                placeholder="最高预算"
+                style={[styles.input, styles.textarea]}
+                placeholder="补充现场环境、装卸条件等信息..."
                 placeholderTextColor={theme.textHint}
-                value={budgetMax}
-                onChangeText={setBudgetMax}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
               />
             </View>
-
-            <Text style={styles.label}>特殊要求</Text>
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              placeholder="例如：限时交付、吊点受限、需要防震包装等"
-              placeholderTextColor={theme.textHint}
-              value={specialRequirements}
-              onChangeText={setSpecialRequirements}
-              multiline
-              textAlignVertical="top"
-            />
-
-            <Text style={styles.label}>任务说明</Text>
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              placeholder="补充现场条件、运输背景、注意事项等"
-              placeholderTextColor={theme.textHint}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              textAlignVertical="top"
-            />
-          </ObjectCard>
+          </View>
         )}
 
-        <View style={styles.actionStack}>
+        <View style={styles.footerActions}>
           {currentStep === 1 ? (
-            <>
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleContinue}>
-                <Text style={styles.primaryBtnText}>继续补充细节</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.secondaryBtn, saving && styles.disabledBtn]}
-                onPress={() => persistChanges({showSuccess: true})}
-                disabled={saving}>
-                <Text style={styles.secondaryBtnText}>{saving ? '保存中...' : '手动保存'}</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity style={styles.mainActionBtn} onPress={handleContinue}>
+              <Text style={styles.mainActionBtnText}>保存并继续</Text>
+              <Text style={styles.mainActionBtnSub}>下一步可完善预算和详细说明</Text>
+            </TouchableOpacity>
           ) : (
-            <>
-              <TouchableOpacity style={styles.ghostBtn} onPress={() => setCurrentStep(1)}>
-                <Text style={styles.ghostBtnText}>返回修改核心信息</Text>
+            <View style={styles.publishRow}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(1)}>
+                <Text style={styles.backBtnText}>修改核心信息</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.secondaryBtn, saving && styles.disabledBtn]}
-                onPress={() => persistChanges({showSuccess: true})}
-                disabled={saving}>
-                <Text style={styles.secondaryBtnText}>{saving ? '保存中...' : '保存修改'}</Text>
+                style={[styles.publishBtn, publishing && styles.btnDisabled]}
+                onPress={isDraft ? handlePublish : () => persistChanges({showSuccess: true})}
+                disabled={publishing}
+              >
+                <Text style={styles.publishBtnText}>
+                  {publishing ? '正在处理...' : isDraft ? '发布任务' : '保存修改'}
+                </Text>
               </TouchableOpacity>
-              {isDraft ? (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, publishing && styles.disabledBtn]}
-                  onPress={handlePublish}
-                  disabled={publishing}>
-                  <Text style={styles.primaryBtnText}>{publishing ? '发布中...' : '发布草稿任务'}</Text>
-                </TouchableOpacity>
-              ) : null}
-            </>
+            </View>
           )}
+
+          <TouchableOpacity
+            style={[styles.saveDraftLink, saving && styles.btnDisabled]}
+            onPress={() => persistChanges({showSuccess: true})}
+            disabled={saving}
+          >
+            <Text style={styles.saveDraftLinkText}>{saving ? '正在保存...' : '手动保存修改'}</Text>
+          </TouchableOpacity>
         </View>
+
+        {showStartPicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="datetime"
+            display="default"
+            onChange={onStartDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+        {showEndPicker && (
+          <DateTimePicker
+            value={endDate}
+            mode="datetime"
+            display="default"
+            onChange={onEndDateChange}
+            minimumDate={startDate}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -705,136 +703,323 @@ export default function EditDemandScreen({navigation, route}: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: {flex: 1, backgroundColor: theme.card},
-    content: {padding: 16, paddingBottom: 40, gap: 12},
-    loader: {marginTop: 120},
-    heroCard: {
-      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-      borderWidth: theme.isDark ? 1 : 0,
-      borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
+    container: {flex: 1, backgroundColor: theme.bg},
+    header: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: theme.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.divider,
     },
-    heroEyebrow: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.72)',
+    progressHeader: {
+      marginBottom: 12,
     },
-    pageTitle: {
-      marginTop: 8,
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: '800',
-      color: theme.isDark ? theme.text : '#FFFFFF',
+    progressTrack: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 40,
     },
-    heroDesc: {
-      marginTop: 10,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.86)',
+    progressPin: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: theme.divider,
     },
-    sectionTitle: {fontSize: 17, fontWeight: '800', color: theme.text, marginBottom: 6},
-    stepRow: {flexDirection: 'row', gap: 10, marginTop: 8},
-    stepCard: {
+    progressPinActive: {
+      backgroundColor: theme.primary,
+    },
+    progressLine: {
       flex: 1,
-      borderRadius: 16,
-      padding: 14,
-      backgroundColor: theme.bgSecondary,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
+      height: 2,
+      backgroundColor: theme.divider,
+      marginHorizontal: 4,
     },
-    stepCardActive: {backgroundColor: theme.primaryBg, borderColor: theme.primaryBorder},
-    stepIndex: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      textAlign: 'center',
-      lineHeight: 26,
-      fontSize: 13,
-      fontWeight: '800',
+    progressLineActive: {
+      backgroundColor: theme.primary,
+    },
+    progressLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+      paddingHorizontal: 20,
+    },
+    progressLabelText: {
+      fontSize: 11,
+      color: theme.textHint,
+      fontWeight: '600',
+    },
+    progressLabelTextActive: {
+      color: theme.primary,
+      fontWeight: '700',
+    },
+    draftStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    draftDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginRight: 6,
+    },
+    draftDotSaved: {backgroundColor: theme.success},
+    draftDotSaving: {backgroundColor: theme.warning},
+    draftDotError: {backgroundColor: theme.danger},
+    draftStatusSmallText: {
+      fontSize: 10,
       color: theme.textSub,
-      backgroundColor: theme.card,
-      overflow: 'hidden',
+      fontWeight: '500',
     },
-    stepIndexActive: {color: theme.primaryText, backgroundColor: theme.card},
-    stepTitle: {marginTop: 10, fontSize: 14, fontWeight: '800', color: theme.text},
-    stepTitleActive: {color: theme.primaryText},
-    stepDesc: {marginTop: 4, fontSize: 12, lineHeight: 18, color: theme.textSub},
-    draftStatusText: {fontSize: 13, lineHeight: 20, color: theme.text},
-    label: {fontSize: 14, fontWeight: '700', color: theme.text, marginBottom: 8, marginTop: 16},
+    content: {paddingBottom: 40},
+    loader: {marginTop: 120},
+    formSection: {
+      padding: 16,
+    },
+    sectionHeader: {
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    sectionSubtitle: {
+      fontSize: 13,
+      color: theme.textSub,
+      marginTop: 4,
+    },
+    inputCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.textSub,
+      marginBottom: 8,
+      marginTop: 16,
+    },
     input: {
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
+      backgroundColor: theme.bgSecondary,
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 15,
-      backgroundColor: theme.bgSecondary,
       color: theme.text,
     },
-    helperText: {marginTop: 8, fontSize: 12, lineHeight: 18, color: theme.textSub},
-    optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
-    optionBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      marginRight: 8,
-      marginBottom: 8,
-      backgroundColor: theme.card,
-    },
-    optionBtnActive: {borderColor: theme.primary, backgroundColor: theme.primaryBg},
-    optionText: {fontSize: 13, color: theme.textSub},
-    optionTextActive: {color: theme.primaryText, fontWeight: '700'},
-    dateInput: {
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 14,
-      backgroundColor: theme.bgSecondary,
-    },
-    dateText: {fontSize: 15, color: theme.text},
-    datePlaceholderText: {color: theme.textHint},
-    timeRecommend: {fontSize: 12, color: theme.primaryText, marginTop: 6},
-    budgetRow: {flexDirection: 'row', alignItems: 'center'},
-    flexInput: {flex: 1},
-    split: {marginHorizontal: 10, color: theme.textHint},
-    summaryBox: {
-      marginTop: 18,
-      borderRadius: 14,
-      padding: 14,
-      backgroundColor: theme.bgSecondary,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      gap: 6,
-    },
-    summaryTitle: {fontSize: 13, fontWeight: '800', color: theme.text},
-    summaryText: {fontSize: 13, lineHeight: 20, color: theme.text},
-    textarea: {minHeight: 96, textAlignVertical: 'top'},
-    actionStack: {gap: 10},
-    primaryBtn: {
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: theme.primary,
-      justifyContent: 'center',
+    titleInputRow: {
+      flexDirection: 'row',
       alignItems: 'center',
+      gap: 10,
     },
-    primaryBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '800'},
-    secondaryBtn: {
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    secondaryBtnText: {color: theme.text, fontSize: 15, fontWeight: '700'},
-    ghostBtn: {
+    magicBtn: {
+      width: 44,
       height: 44,
+      borderRadius: 12,
+      backgroundColor: theme.bgSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    magicBtnActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryBg,
+    },
+    magicEmoji: {
+      fontSize: 18,
+    },
+    suggestedLink: {
+      marginTop: 8,
+      paddingLeft: 4,
+    },
+    suggestedLinkText: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: '600',
+    },
+    suggestedTitleLink: {
+      fontSize: 12,
+      color: theme.primary,
+      marginTop: 8,
+      textDecorationLine: 'underline',
+    },
+    sceneGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    sceneBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: theme.bgSecondary,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    sceneBtnActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryBg,
+    },
+    sceneBtnText: {
+      fontSize: 13,
+      color: theme.textSub,
+      fontWeight: '600',
+    },
+    sceneBtnTextActive: {
+      color: theme.primaryText,
+      fontWeight: '700',
+    },
+    addressSection: {
+      marginTop: 8,
+    },
+    formAddressInput: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 12,
+    },
+    addressSpacer: {
+      height: 2,
+    },
+    timePickerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 12,
+      marginBottom: 16,
+    },
+    timePickerBox: {
+      flex: 1,
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.divider,
+      alignItems: 'center',
+    },
+    timePickerBoxActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primaryBg,
+    },
+    timePickerLabel: {
+      fontSize: 10,
+      color: theme.textSub,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    timePickerValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    timePickerValuePlaceholder: {
+      color: theme.textHint,
+    },
+    timePickerDate: {
+      fontSize: 11,
+      color: theme.textHint,
+      marginTop: 2,
+    },
+    timeConnector: {
+      paddingHorizontal: 4,
+    },
+    timeConnectorText: {
+      fontSize: 12,
+      color: theme.textHint,
+      fontWeight: '700',
+    },
+    timeHintBox: {
+      backgroundColor: theme.info + '10',
+      padding: 10,
+      borderRadius: 10,
+      marginBottom: 16,
+    },
+    timeHintText: {
+      fontSize: 12,
+      color: theme.info,
+      textAlign: 'center',
+    },
+    rowInputs: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    textarea: {
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    footerActions: {
+      padding: 16,
+      gap: 16,
+    },
+    mainActionBtn: {
+      backgroundColor: theme.primary,
+      borderRadius: 18,
+      height: 64,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: theme.primary,
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    mainActionBtnText: {
+      color: '#FFFFFF',
+      fontSize: 17,
+      fontWeight: '800',
+    },
+    mainActionBtnSub: {
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: 11,
+      marginTop: 2,
+    },
+    publishRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    backBtn: {
+      flex: 1,
+      height: 54,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.divider,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    ghostBtnText: {color: theme.textSub, fontSize: 14, fontWeight: '600'},
-    disabledBtn: {opacity: 0.6},
+    backBtnText: {
+      fontSize: 15,
+      color: theme.textSub,
+      fontWeight: '600',
+    },
+    publishBtn: {
+      flex: 2,
+      height: 54,
+      borderRadius: 16,
+      backgroundColor: theme.success,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    publishBtnText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '800',
+    },
+    saveDraftLink: {
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    saveDraftLinkText: {
+      color: theme.textSub,
+      fontSize: 14,
+      fontWeight: '600',
+      textDecorationLine: 'underline',
+    },
+    btnDisabled: {opacity: 0.6},
   });
