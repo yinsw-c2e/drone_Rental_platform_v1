@@ -51,6 +51,7 @@ func generateContractNo() string {
 type contractTemplateData struct {
 	ContractNo         string
 	Title              string
+	ServiceTitle       string
 	ClientName         string
 	ClientPhone        string
 	ProviderName       string
@@ -65,7 +66,10 @@ type contractTemplateData struct {
 	PlatformCommission string
 	ProviderAmount     string
 	CommissionRate     float64
-	SignDate           string
+	ClientSignDate     string
+	ProviderSignDate   string
+	GeneratedDate      string
+	EffectiveDate      string
 }
 
 var contractHTMLTemplate = template.Must(template.New("contract").Parse(`
@@ -99,7 +103,7 @@ td:first-child{width:30%;background:#f8f8f8;font-weight:600}
 
 <h2>二、服务内容</h2>
 <table>
-<tr><td>服务项目</td><td>{{.Title}}</td></tr>
+<tr><td>服务项目</td><td>{{.ServiceTitle}}</td></tr>
 <tr><td>服务说明</td><td>{{.ServiceDescription}}</td></tr>
 <tr><td>服务地址</td><td>{{.ServiceAddress}}</td></tr>
 <tr><td>预约开始时间</td><td>{{.ScheduledStart}}</td></tr>
@@ -133,21 +137,149 @@ td:first-child{width:30%;background:#f8f8f8;font-weight:600}
 <div class="sign-box">
 <h3>甲方（委托方）</h3>
 <p>姓名：{{.ClientName}}</p>
-<p>日期：<span id="client-sign-date">待签署</span></p>
+<p>日期：<span id="client-sign-date">{{.ClientSignDate}}</span></p>
 </div>
 <div class="sign-box">
 <h3>乙方（服务方）</h3>
 <p>姓名：{{.ProviderName}}</p>
-<p>日期：<span id="provider-sign-date">待签署</span></p>
+<p>日期：<span id="provider-sign-date">{{.ProviderSignDate}}</span></p>
 </div>
 </div>
 
-<p class="footer">本合同通过无人机服务平台电子签署，具有同等法律效力。签署日期：{{.SignDate}}</p>
+<p class="footer">本合同通过无人机服务平台电子签署，具有同等法律效力。合同生成日期：{{.GeneratedDate}}{{if .EffectiveDate}}；生效日期：{{.EffectiveDate}}{{else}}；待双方完成签署后生效{{end}}</p>
 </body>
 </html>
 `))
 
 // ─── 核心方法 ─────────────────────────────────────────
+
+func buildContractSnapshot(order *model.Order, contractNo string) *model.OrderContract {
+	serviceDesc := order.Title
+	serviceAddr := order.ServiceAddress
+	if order.DestAddress != "" {
+		serviceAddr += " → " + order.DestAddress
+	}
+
+	var startAt, endAt *time.Time
+	if !order.StartTime.IsZero() {
+		st := order.StartTime
+		startAt = &st
+	}
+	if !order.EndTime.IsZero() {
+		et := order.EndTime
+		endAt = &et
+	}
+
+	cargoWeight := 0.0
+	tripCount := 1
+	if order.Demand != nil {
+		cargoWeight = order.Demand.CargoWeightKG
+		if order.Demand.EstimatedTripCount > 0 {
+			tripCount = order.Demand.EstimatedTripCount
+		}
+		if order.Demand.Description != "" {
+			serviceDesc = order.Demand.Description
+		}
+	}
+
+	return &model.OrderContract{
+		ContractNo:         contractNo,
+		OrderID:            order.ID,
+		OrderNo:            order.OrderNo,
+		TemplateKey:        "heavy_cargo_standard",
+		ClientUserID:       order.ClientUserID,
+		ProviderUserID:     order.ProviderUserID,
+		Title:              "无人机重载吊运服务合同",
+		ServiceDescription: serviceDesc,
+		ServiceAddress:     serviceAddr,
+		ScheduledStartAt:   startAt,
+		ScheduledEndAt:     endAt,
+		CargoWeightKG:      cargoWeight,
+		EstimatedTripCount: tripCount,
+		ContractAmount:     order.TotalAmount,
+		PlatformCommission: order.PlatformCommission,
+		ProviderAmount:     order.OwnerAmount,
+		Status:             "pending",
+	}
+}
+
+func renderContractHTML(contract *model.OrderContract, clientUser, providerUser *model.User) (string, error) {
+	if contract == nil {
+		return "", errors.New("合同不能为空")
+	}
+
+	data := contractTemplateData{
+		ContractNo:         contract.ContractNo,
+		Title:              contract.Title,
+		ServiceTitle:       resolveContractServiceTitle(contract),
+		ClientName:         clientUser.Nickname,
+		ClientPhone:        maskPhone(clientUser.Phone),
+		ProviderName:       providerUser.Nickname,
+		ProviderPhone:      maskPhone(providerUser.Phone),
+		ServiceDescription: contract.ServiceDescription,
+		ServiceAddress:     contract.ServiceAddress,
+		ScheduledStart:     formatContractTime(contract.ScheduledStartAt),
+		ScheduledEnd:       formatContractTime(contract.ScheduledEndAt),
+		CargoWeightKG:      contract.CargoWeightKG,
+		EstimatedTripCount: contract.EstimatedTripCount,
+		ContractAmount:     formatCentToYuan(contract.ContractAmount),
+		PlatformCommission: formatCentToYuan(contract.PlatformCommission),
+		ProviderAmount:     formatCentToYuan(contract.ProviderAmount),
+		CommissionRate:     0,
+		ClientSignDate:     formatContractSignDate(contract.ClientSignedAt),
+		ProviderSignDate:   formatContractSignDate(contract.ProviderSignedAt),
+		GeneratedDate:      resolveContractGeneratedDate(contract),
+		EffectiveDate:      resolveContractEffectiveDate(contract),
+	}
+	if contract.ContractAmount > 0 {
+		data.CommissionRate = computeCommissionRate(contract.ContractAmount, contract.PlatformCommission)
+	}
+
+	var htmlBuf bytes.Buffer
+	if err := contractHTMLTemplate.Execute(&htmlBuf, data); err != nil {
+		return "", fmt.Errorf("合同模板渲染失败: %w", err)
+	}
+	return htmlBuf.String(), nil
+}
+
+func (s *ContractService) refreshContractHTML(contractRepo *repository.ContractRepo, contract *model.OrderContract) (*model.OrderContract, error) {
+	if contract == nil {
+		return nil, errors.New("合同不存在")
+	}
+
+	clientRepo := s.userRepo
+	providerRepo := s.userRepo
+	if repoDB := contractRepo.DB(); repoDB != nil {
+		clientRepo = repository.NewUserRepo(repoDB)
+		providerRepo = repository.NewUserRepo(repoDB)
+	}
+
+	clientUser, err := clientRepo.GetByID(contract.ClientUserID)
+	if err != nil {
+		return nil, errors.New("甲方用户不存在")
+	}
+	providerUser, err := providerRepo.GetByID(contract.ProviderUserID)
+	if err != nil {
+		return nil, errors.New("乙方用户不存在")
+	}
+
+	html, err := renderContractHTML(contract, clientUser, providerUser)
+	if err != nil {
+		return nil, err
+	}
+	if html == contract.ContractHTML {
+		return contract, nil
+	}
+
+	now := time.Now()
+	if err := contractRepo.UpdateFields(contract.ID, map[string]interface{}{
+		"contract_html": html,
+		"updated_at":    now,
+	}); err != nil {
+		return nil, fmt.Errorf("合同正文同步失败: %w", err)
+	}
+	return contractRepo.GetByID(contract.ID)
+}
 
 // GenerateContractForOrder 为订单自动生成合同（在 SelectProvider 成功后调用）
 func (s *ContractService) GenerateContractForOrder(orderID int64) (*model.OrderContract, error) {
@@ -172,91 +304,13 @@ func (s *ContractService) GenerateContractForOrder(orderID int64) (*model.OrderC
 	}
 
 	contractNo := generateContractNo()
-	commissionRate := float64(s.cfg.Payment.CommissionRate)
+	contract := buildContractSnapshot(order, contractNo)
 
-	// 从订单快照构建合同核心数据
-	contractAmount := order.TotalAmount
-	commission := order.PlatformCommission
-	ownerAmount := order.OwnerAmount
-
-	serviceDesc := order.Title
-	serviceAddr := order.ServiceAddress
-	if order.DestAddress != "" {
-		serviceAddr += " → " + order.DestAddress
+	html, err := renderContractHTML(contract, clientUser, providerUser)
+	if err != nil {
+		return nil, err
 	}
-
-	var startAt, endAt *time.Time
-	var startStr, endStr string
-	if !order.StartTime.IsZero() {
-		st := order.StartTime
-		startAt = &st
-		startStr = order.StartTime.Format("2006-01-02 15:04")
-	}
-	if !order.EndTime.IsZero() {
-		et := order.EndTime
-		endAt = &et
-		endStr = order.EndTime.Format("2006-01-02 15:04")
-	}
-
-	var cargoWeight float64
-	var tripCount int = 1
-	// 从需求快照获取货物信息
-	if order.Demand != nil {
-		cargoWeight = order.Demand.CargoWeightKG
-		if order.Demand.EstimatedTripCount > 0 {
-			tripCount = order.Demand.EstimatedTripCount
-		}
-		if order.Demand.Description != "" {
-			serviceDesc = order.Demand.Description
-		}
-	}
-
-	// 生成合同 HTML
-	data := contractTemplateData{
-		ContractNo:         contractNo,
-		Title:              order.Title,
-		ClientName:         clientUser.Nickname,
-		ClientPhone:        maskPhone(clientUser.Phone),
-		ProviderName:       providerUser.Nickname,
-		ProviderPhone:      maskPhone(providerUser.Phone),
-		ServiceDescription: serviceDesc,
-		ServiceAddress:     serviceAddr,
-		ScheduledStart:     startStr,
-		ScheduledEnd:       endStr,
-		CargoWeightKG:      cargoWeight,
-		EstimatedTripCount: tripCount,
-		ContractAmount:     formatCentToYuan(contractAmount),
-		PlatformCommission: formatCentToYuan(commission),
-		ProviderAmount:     formatCentToYuan(ownerAmount),
-		CommissionRate:     commissionRate,
-		SignDate:           time.Now().Format("2006-01-02"),
-	}
-
-	var htmlBuf bytes.Buffer
-	if err := contractHTMLTemplate.Execute(&htmlBuf, data); err != nil {
-		return nil, fmt.Errorf("合同模板渲染失败: %w", err)
-	}
-
-	contract := &model.OrderContract{
-		ContractNo:         contractNo,
-		OrderID:            order.ID,
-		OrderNo:            order.OrderNo,
-		TemplateKey:        "heavy_cargo_standard",
-		ClientUserID:       order.ClientUserID,
-		ProviderUserID:     order.ProviderUserID,
-		Title:              "无人机重载吊运服务合同",
-		ServiceDescription: serviceDesc,
-		ServiceAddress:     serviceAddr,
-		ScheduledStartAt:   startAt,
-		ScheduledEndAt:     endAt,
-		CargoWeightKG:      cargoWeight,
-		EstimatedTripCount: tripCount,
-		ContractAmount:     contractAmount,
-		PlatformCommission: commission,
-		ProviderAmount:     ownerAmount,
-		Status:             "pending",
-		ContractHTML:       htmlBuf.String(),
-	}
+	contract.ContractHTML = html
 
 	if err := s.contractRepo.Create(contract); err != nil {
 		return nil, fmt.Errorf("合同保存失败: %w", err)
@@ -278,98 +332,25 @@ func (s *ContractService) GenerateContractForOrderTx(tx *gorm.DB, order *model.O
 		return existing, nil
 	}
 
-	clientUser, err := s.userRepo.GetByID(order.ClientUserID)
+	userRepo := repository.NewUserRepo(tx)
+
+	clientUser, err := userRepo.GetByID(order.ClientUserID)
 	if err != nil {
 		return nil, errors.New("甲方用户不存在")
 	}
-	providerUser, err := s.userRepo.GetByID(order.ProviderUserID)
+	providerUser, err := userRepo.GetByID(order.ProviderUserID)
 	if err != nil {
 		return nil, errors.New("乙方用户不存在")
 	}
 
 	contractNo := generateContractNo()
-	commissionRate := float64(s.cfg.Payment.CommissionRate)
+	contract := buildContractSnapshot(order, contractNo)
 
-	contractAmount := order.TotalAmount
-	commission := order.PlatformCommission
-	ownerAmount := order.OwnerAmount
-
-	serviceDesc := order.Title
-	serviceAddr := order.ServiceAddress
-	if order.DestAddress != "" {
-		serviceAddr += " → " + order.DestAddress
+	html, err := renderContractHTML(contract, clientUser, providerUser)
+	if err != nil {
+		return nil, err
 	}
-
-	var startAt, endAt *time.Time
-	var startStr, endStr string
-	if !order.StartTime.IsZero() {
-		st := order.StartTime
-		startAt = &st
-		startStr = order.StartTime.Format("2006-01-02 15:04")
-	}
-	if !order.EndTime.IsZero() {
-		et := order.EndTime
-		endAt = &et
-		endStr = order.EndTime.Format("2006-01-02 15:04")
-	}
-
-	var cargoWeight float64
-	var tripCount int = 1
-	if order.Demand != nil {
-		cargoWeight = order.Demand.CargoWeightKG
-		if order.Demand.EstimatedTripCount > 0 {
-			tripCount = order.Demand.EstimatedTripCount
-		}
-		if order.Demand.Description != "" {
-			serviceDesc = order.Demand.Description
-		}
-	}
-
-	data := contractTemplateData{
-		ContractNo:         contractNo,
-		Title:              order.Title,
-		ClientName:         clientUser.Nickname,
-		ClientPhone:        maskPhone(clientUser.Phone),
-		ProviderName:       providerUser.Nickname,
-		ProviderPhone:      maskPhone(providerUser.Phone),
-		ServiceDescription: serviceDesc,
-		ServiceAddress:     serviceAddr,
-		ScheduledStart:     startStr,
-		ScheduledEnd:       endStr,
-		CargoWeightKG:      cargoWeight,
-		EstimatedTripCount: tripCount,
-		ContractAmount:     formatCentToYuan(contractAmount),
-		PlatformCommission: formatCentToYuan(commission),
-		ProviderAmount:     formatCentToYuan(ownerAmount),
-		CommissionRate:     commissionRate,
-		SignDate:           time.Now().Format("2006-01-02"),
-	}
-
-	var htmlBuf bytes.Buffer
-	if err := contractHTMLTemplate.Execute(&htmlBuf, data); err != nil {
-		return nil, fmt.Errorf("合同模板渲染失败: %w", err)
-	}
-
-	contract := &model.OrderContract{
-		ContractNo:         contractNo,
-		OrderID:            order.ID,
-		OrderNo:            order.OrderNo,
-		TemplateKey:        "heavy_cargo_standard",
-		ClientUserID:       order.ClientUserID,
-		ProviderUserID:     order.ProviderUserID,
-		Title:              "无人机重载吊运服务合同",
-		ServiceDescription: serviceDesc,
-		ServiceAddress:     serviceAddr,
-		ScheduledStartAt:   startAt,
-		ScheduledEndAt:     endAt,
-		CargoWeightKG:      cargoWeight,
-		EstimatedTripCount: tripCount,
-		ContractAmount:     contractAmount,
-		PlatformCommission: commission,
-		ProviderAmount:     ownerAmount,
-		Status:             "pending",
-		ContractHTML:       htmlBuf.String(),
-	}
+	contract.ContractHTML = html
 
 	if err := contractRepo.Create(contract); err != nil {
 		return nil, fmt.Errorf("合同保存失败: %w", err)
@@ -389,7 +370,7 @@ func (s *ContractService) SignContract(contractID, userID int64) (*model.OrderCo
 
 	if userID == contract.ClientUserID {
 		if contract.ClientSignedAt != nil {
-			return contract, nil // 已签署
+			return s.refreshContractHTML(s.contractRepo, contract)
 		}
 		updates["client_signed_at"] = &now
 		if contract.ProviderSignedAt != nil {
@@ -399,7 +380,7 @@ func (s *ContractService) SignContract(contractID, userID int64) (*model.OrderCo
 		}
 	} else if userID == contract.ProviderUserID {
 		if contract.ProviderSignedAt != nil {
-			return contract, nil
+			return s.refreshContractHTML(s.contractRepo, contract)
 		}
 		updates["provider_signed_at"] = &now
 		if contract.ClientSignedAt != nil {
@@ -416,6 +397,10 @@ func (s *ContractService) SignContract(contractID, userID int64) (*model.OrderCo
 	}
 
 	updatedContract, err := s.contractRepo.GetByID(contract.ID)
+	if err != nil {
+		return nil, err
+	}
+	updatedContract, err = s.refreshContractHTML(s.contractRepo, updatedContract)
 	if err != nil {
 		return nil, err
 	}
@@ -457,8 +442,17 @@ func (s *ContractService) ProviderAutoSign(tx *gorm.DB, orderID, providerUserID 
 	if err := contractRepo.UpdateFields(contract.ID, updates); err != nil {
 		return err
 	}
+	reloaded, err := contractRepo.GetByID(contract.ID)
+	if err != nil {
+		return err
+	}
+	reloaded, err = s.refreshContractHTML(contractRepo, reloaded)
+	if err != nil {
+		return err
+	}
+
 	note := "服务方已签署合同，待客户确认"
-	if updates["status"] == "fully_signed" {
+	if reloaded.Status == "fully_signed" {
 		note = "双方已完成合同签署，待客户支付"
 	}
 	return repository.NewOrderRepo(tx).AddTimeline(&model.OrderTimeline{
@@ -472,7 +466,11 @@ func (s *ContractService) ProviderAutoSign(tx *gorm.DB, orderID, providerUserID 
 
 // GetContractByOrder 获取订单合同
 func (s *ContractService) GetContractByOrder(orderID int64) (*model.OrderContract, error) {
-	return s.contractRepo.GetByOrderID(orderID)
+	contract, err := s.contractRepo.GetByOrderID(orderID)
+	if err != nil {
+		return nil, err
+	}
+	return s.refreshContractHTML(s.contractRepo, contract)
 }
 
 // ─── 工具函数 ─────────────────────────────────────────
@@ -534,4 +532,65 @@ func (s *ContractService) afterContractSigned(contract *model.OrderContract, use
 	case "fully_signed":
 		s.eventService.NotifyContractFullySigned(order)
 	}
+}
+
+func formatContractTime(value *time.Time) string {
+	if value == nil || value.IsZero() {
+		return ""
+	}
+	return value.Format("2006-01-02 15:04")
+}
+
+func formatContractSignDate(value *time.Time) string {
+	if value == nil || value.IsZero() {
+		return "待签署"
+	}
+	return value.Format("2006-01-02")
+}
+
+func resolveContractGeneratedDate(contract *model.OrderContract) string {
+	if contract == nil {
+		return ""
+	}
+	if !contract.CreatedAt.IsZero() {
+		return contract.CreatedAt.Format("2006-01-02")
+	}
+	return time.Now().Format("2006-01-02")
+}
+
+func resolveContractEffectiveDate(contract *model.OrderContract) string {
+	if contract == nil {
+		return ""
+	}
+	if contract.ClientSignedAt == nil || contract.ProviderSignedAt == nil {
+		return ""
+	}
+	if contract.ClientSignedAt.After(*contract.ProviderSignedAt) {
+		return contract.ClientSignedAt.Format("2006-01-02")
+	}
+	return contract.ProviderSignedAt.Format("2006-01-02")
+}
+
+func computeCommissionRate(totalAmount, platformCommission int64) float64 {
+	if totalAmount <= 0 {
+		return 0
+	}
+	return (float64(platformCommission) / float64(totalAmount)) * 100
+}
+
+func resolveContractServiceTitle(contract *model.OrderContract) string {
+	if contract == nil {
+		return "无人机吊运服务"
+	}
+
+	serviceTitle := contract.ServiceDescription
+	if serviceTitle == "" {
+		return "无人机吊运服务"
+	}
+
+	runes := []rune(serviceTitle)
+	if len(runes) <= 28 {
+		return serviceTitle
+	}
+	return string(runes[:28]) + "..."
 }

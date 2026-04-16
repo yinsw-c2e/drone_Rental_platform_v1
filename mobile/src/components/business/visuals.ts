@@ -13,6 +13,7 @@ export type BusinessObjectKind =
   | 'supply'
   | 'order'
   | 'dispatch_task'
+  | 'airspace_application'
   | 'flight_record';
 
 export type BusinessSourceKind =
@@ -21,6 +22,7 @@ export type BusinessSourceKind =
   | 'supply'
   | 'order'
   | 'dispatch_task'
+  | 'airspace_application'
   | 'flight_record'
   | 'pilot_task'
   | 'client_task';
@@ -125,6 +127,15 @@ const DISPATCH_STATUS: Record<string, BadgeMeta> = {
   finished: {label: '已完成', tone: 'green'},
 };
 
+const AIRSPACE_STATUS: Record<string, BadgeMeta> = {
+  draft: {label: '待提交', tone: 'gray'},
+  pending_review: {label: '报备审核中', tone: 'orange'},
+  approved: {label: '已批准存证', tone: 'green'},
+  rejected: {label: '已拒绝', tone: 'red'},
+  submitted_to_uom: {label: '已报备UOM', tone: 'blue'},
+  cancelled: {label: '已取消', tone: 'gray'},
+};
+
 const FLIGHT_RECORD_STATUS: Record<string, BadgeMeta> = {
   pending: {label: '待起飞', tone: 'orange'},
   created: {label: '待起飞', tone: 'orange'},
@@ -141,6 +152,7 @@ const SOURCE_META: Record<BusinessSourceKind, BadgeMeta> = {
   supply: {label: '服务', tone: 'teal'},
   order: {label: '订单', tone: 'blue'},
   dispatch_task: {label: '执行安排', tone: 'green'},
+  airspace_application: {label: '空域报备', tone: 'blue'},
   flight_record: {label: '飞行记录', tone: 'purple'},
   pilot_task: {label: '飞手任务', tone: 'orange'},
   client_task: {label: '执行任务', tone: 'green'},
@@ -157,6 +169,7 @@ export const getObjectStatusMeta = (
   if (kind === 'supply') return SUPPLY_STATUS[key] || fallback;
   if (kind === 'order') return ORDER_STATUS[key] || fallback;
   if (kind === 'dispatch_task') return DISPATCH_STATUS[key] || fallback;
+  if (kind === 'airspace_application') return AIRSPACE_STATUS[key] || fallback;
   if (kind === 'flight_record') return FLIGHT_RECORD_STATUS[key] || {label: key || '飞行记录', tone: 'purple'};
   return {label: '已留痕', tone: 'purple'};
 };

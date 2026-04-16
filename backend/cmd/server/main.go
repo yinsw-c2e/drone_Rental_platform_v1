@@ -233,6 +233,7 @@ func main() {
 
 	// Init AMap service
 	amapService := amap.NewAmapService(cfg.Amap.APIKey, zapLogger)
+	flightService.SetAmapService(amapService)
 
 	// Init handlers
 	handlers := &v1.Handlers{

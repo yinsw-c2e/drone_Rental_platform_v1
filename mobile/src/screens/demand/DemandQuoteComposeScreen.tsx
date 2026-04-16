@@ -48,8 +48,8 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
             d.availability_status === 'available',
         );
         setDrones(list);
-        if (!selectedDroneId && list.length > 0) {
-          setSelectedDroneId(list[0].id);
+        if (list.length > 0) {
+          setSelectedDroneId(current => current || list[0].id);
         }
       } catch (error: any) {
         if (mounted) {
@@ -168,7 +168,7 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
             keyboardType="decimal-pad"
             placeholder="请输入金额（元）"
           />
-          <Text style={styles.helpText}>提交时会自动换算为分，和后端金额口径保持一致。</Text>
+          <Text style={styles.helpText}>提交后会自动按系统金额规则保存，无需自行换算。</Text>
         </View>
 
         <View style={styles.section}>

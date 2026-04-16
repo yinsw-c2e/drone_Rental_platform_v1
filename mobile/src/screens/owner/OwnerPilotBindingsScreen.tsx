@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   Alert,
   FlatList,
@@ -72,7 +72,7 @@ export default function OwnerPilotBindingsScreen() {
 
   const handleInvite = useCallback(async () => {
     if (!pilotUserId.trim()) {
-      Alert.alert('请补充信息', '请填写飞手用户 ID。');
+      Alert.alert('请补充信息', '请填写飞手账号编号。');
       return;
     }
     setSubmitting(true);
@@ -182,13 +182,13 @@ export default function OwnerPilotBindingsScreen() {
             <View style={styles.hero}>
               <Text style={styles.heroEyebrow}>绑定飞手</Text>
               <Text style={styles.heroTitle}>长期合作关系从这里管理</Text>
-              <Text style={styles.heroDesc}>绑定关系不等于直接授予执行权限。它只是机主后续发起正式派单时的第一优先层。</Text>
+              <Text style={styles.heroDesc}>建立长期合作后，后续安排执行会更高效；每次任务仍会单独确认。</Text>
             </View>
 
             <ObjectCard style={styles.formCard}>
               <Text style={styles.formTitle}>邀请飞手</Text>
-              <Text style={styles.formDesc}>当前开发阶段先通过飞手用户 ID 建立关系，后面再补搜索选择体验。</Text>
-              <TextInput style={styles.input} placeholder="飞手用户 ID" keyboardType="number-pad" value={pilotUserId} onChangeText={setPilotUserId} />
+              <Text style={styles.formDesc}>当前可先输入对方账号编号发起邀请，确认后即可建立长期合作。</Text>
+              <TextInput style={styles.input} placeholder="飞手账号编号" keyboardType="number-pad" value={pilotUserId} onChangeText={setPilotUserId} />
               <TextInput style={[styles.input, styles.noteInput]} placeholder="合作说明（选填）" value={note} onChangeText={setNote} multiline textAlignVertical="top" />
               <View style={styles.priorityRow}>
                 <Text style={styles.priorityLabel}>设为优先合作</Text>

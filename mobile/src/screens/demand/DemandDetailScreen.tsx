@@ -238,345 +238,583 @@ export default function DemandDetailScreen({route, navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <View style={styles.heroHeader}>
-            <View style={styles.heroTitleWrap}>
-              <Text style={styles.demandNo}>{demand.demand_no}</Text>
-              <Text style={styles.title}>{demand.title}</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={[styles.heroCard, {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary}]}>
+          <View style={styles.heroTop}>
+            <View style={styles.heroBadgeRow}>
+              <SourceTag source="demand" />
+              <StatusBadge meta={getObjectStatusMeta('demand', demand.status)} label="" />
             </View>
-            <StatusBadge meta={getObjectStatusMeta('demand', demand.status)} label="" />
+            <Text style={styles.heroNo}>{demand.demand_no}</Text>
           </View>
-
-          <View style={styles.tagRow}>
-            <SourceTag source="demand" />
+          <Text style={styles.heroTitle}>{demand.title}</Text>
+          <View style={styles.heroBudgetBox}>
+            <Text style={styles.heroBudgetLabel}>预算上限</Text>
+            <Text style={styles.heroBudgetValue}>{formatDemandBudget(demand.budget_min, demand.budget_max)}</Text>
           </View>
-
-          <Text style={styles.budget}>{formatDemandBudget(demand.budget_min, demand.budget_max)}</Text>
-          <Text style={styles.heroDesc}>
-            {getDemandSceneLabel(demand.cargo_scene)} · {formatTripCount(demand.estimated_trip_count)} · {resolveDemandPrimaryAddress(demand)}
-          </Text>
         </View>
 
         {progressFocus ? (
-          <View style={styles.progressCard}>
-            <Text style={styles.progressEyebrow}>{progressFocus.eyebrow}</Text>
-            <Text style={styles.progressTitle}>{progressFocus.title}</Text>
-            <Text style={styles.progressDesc}>{progressFocus.desc}</Text>
-            <View style={styles.progressEtaPill}>
-              <Text style={styles.progressEtaText}>{progressFocus.eta}</Text>
-            </View>
-          </View>
-        ) : null}
-
-        {canEditOrCancel ? (
-          <View style={styles.ownerActions}>
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => navigation.navigate('EditDemand', {demandId: demand.id})}>
-              <Text style={styles.editBtnText}>{demand.status === 'draft' ? '继续完善' : '修改任务'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={handleCancel}
-              disabled={cancelling}>
-              <Text style={styles.cancelBtnText}>{cancelling ? '撤销中...' : '撤销任务'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {canQuoteAsOwner || canOperateCandidate ? (
-          <View style={styles.actionPanel}>
-            <Text style={styles.sectionTitle}>你在这里可以做什么</Text>
-            {canQuoteAsOwner ? (
-              <TouchableOpacity
-                style={[styles.primaryBtn, styles.ownerBtn]}
-                onPress={() =>
-                  navigation.navigate('DemandQuoteCompose', {
-                    demandId: demand.id,
-                    demandTitle: demand.title,
-                    existingQuote: demand.my_quote || null,
-                  })
-                }
-                activeOpacity={0.9}>
-                <Text style={styles.primaryBtnText}>{hasOwnQuote ? '更新报价方案' : '提交报价方案'}</Text>
-              </TouchableOpacity>
-            ) : null}
-            {canOperateCandidate ? (
-              <TouchableOpacity
-                style={[styles.primaryBtn, activeCandidate ? styles.ghostBtn : styles.pilotBtn]}
-                onPress={handleCandidateToggle}
-                activeOpacity={0.9}
-                disabled={candidateSubmitting}>
-                <Text style={[styles.primaryBtnText, activeCandidate && styles.ghostBtnText]}>
-                  {candidateSubmitting ? '处理中...' : activeCandidate ? '取消候选报名' : '报名候选'}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-            <Text style={styles.helperText}>机主报价和飞手候选现在都只围绕新版任务对象运转，不再混入旧订单入口。</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>任务详情</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>服务类型</Text>
-            <Text style={styles.infoValue}>重载吊运</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>作业场景</Text>
-            <Text style={styles.infoValue}>{getDemandSceneLabel(demand.cargo_scene)}</Text>
-          </View>
-          {demand.departure_address?.text || demand.destination_address?.text ? (
-            <>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>起点地址</Text>
-                <Text style={styles.infoValue}>{demand.departure_address?.text || '未填写'}</Text>
+          <View style={styles.focusCard}>
+            <View style={styles.focusHeader}>
+              <Text style={styles.focusEyebrow}>{progressFocus.eyebrow}</Text>
+              <View style={styles.focusEtaPill}>
+                <Text style={styles.focusEtaText}>{progressFocus.eta}</Text>
               </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>终点地址</Text>
-                <Text style={styles.infoValue}>{demand.destination_address?.text || '未填写'}</Text>
+            </View>
+            <Text style={styles.focusTitle}>{progressFocus.title}</Text>
+            <Text style={styles.focusDesc}>{progressFocus.desc}</Text>
+
+            {canEditOrCancel && (
+              <View style={styles.focusActions}>
+                <TouchableOpacity
+                  style={styles.focusEditBtn}
+                  onPress={() => navigation.navigate('EditDemand', {demandId: demand.id})}>
+                  <Text style={styles.focusEditBtnText}>{demand.status === 'draft' ? '去发布' : '修改任务'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.focusCancelBtn}
+                  onPress={handleCancel}
+                  disabled={cancelling}>
+                  <Text style={styles.focusCancelBtnText}>撤销</Text>
+                </TouchableOpacity>
               </View>
-            </>
-          ) : (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>服务地址</Text>
-              <Text style={styles.infoValue}>{demand.service_address?.text || resolveDemandPrimaryAddress(demand)}</Text>
-            </View>
-          )}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>预约时间</Text>
-            <Text style={styles.infoValue}>{formatDemandSchedule(demand.scheduled_start_at, demand.scheduled_end_at)}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>货物重量</Text>
-            <Text style={styles.infoValue}>{demand.cargo_weight_kg || 0} kg</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>货物类型</Text>
-            <Text style={styles.infoValue}>{summarizeFlexibleValue(demand.cargo_type, '未填写')}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>预计架次</Text>
-            <Text style={styles.infoValue}>{formatTripCount(demand.estimated_trip_count)}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>飞手候选</Text>
-            <Text style={styles.infoValue}>{demand.allows_pilot_candidate ? '开放' : '关闭'}</Text>
-          </View>
-          <Text style={styles.description}>{demand.description || '客户暂未补充更多任务说明。'}</Text>
-          {demand.cargo_special_requirements ? (
-            <View style={styles.noteBox}>
-              <Text style={styles.noteLabel}>特殊要求</Text>
-              <Text style={styles.noteText}>{demand.cargo_special_requirements}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>撮合进度</Text>
-          <View style={styles.metricRow}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricValue}>{demand.quote_count || 0}</Text>
-              <Text style={styles.metricLabel}>报价方案</Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricValue}>{demand.candidate_pilot_count || 0}</Text>
-              <Text style={styles.metricLabel}>候选飞手</Text>
-            </View>
-          </View>
-          {canViewAndSelectQuotes ? (
-            <TouchableOpacity style={styles.quoteTrigger} onPress={toggleQuotes}>
-              <Text style={styles.quoteTriggerText}>{quotesVisible ? '收起报价方案' : '查看报价方案'}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {isConvertedToOrder ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>该任务已转为订单</Text>
-          </View>
-        ) : null}
-
-        {canViewAndSelectQuotes && quotesVisible ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>报价方案</Text>
-            {quotesLoading ? (
-              <ActivityIndicator color={theme.primary} />
-            ) : quotes.length === 0 ? (
-              <Text style={styles.emptyText}>还没有机主提交报价。</Text>
-            ) : (
-              <>
-                {quoteComparisonItems.length > 1 ? (
-                  <View style={styles.comparePanel}>
-                    <Text style={styles.compareTitle}>方案对比</Text>
-                    <Text style={styles.compareDesc}>先横向看价格、机型、吊重和响应速度，再决定是否选定。</Text>
-                    {quoteComparisonItems.map((item, index) => (
-                      <View key={`compare-${item.id}`} style={styles.compareItem}>
-                        <View style={styles.compareHeader}>
-                          <Text style={styles.compareOwner}>{item.owner?.nickname || `机主 #${item.owner_user_id}`}</Text>
-                          {index === 0 ? <Text style={styles.compareBadge}>当前最低价</Text> : null}
-                        </View>
-                        <View style={styles.compareRow}>
-                          <Text style={styles.compareLabel}>报价</Text>
-                          <Text style={styles.compareValueStrong}>{formatAmountYuan(item.price_amount)}</Text>
-                        </View>
-                        <View style={styles.compareRow}>
-                          <Text style={styles.compareLabel}>机型</Text>
-                          <Text style={styles.compareValue}>{item.drone?.brand || '-'} {item.drone?.model || ''}</Text>
-                        </View>
-                        <View style={styles.compareRow}>
-                          <Text style={styles.compareLabel}>最大吊重</Text>
-                          <Text style={styles.compareValue}>{item.drone?.max_payload_kg ? `${item.drone.max_payload_kg}kg` : '未填写'}</Text>
-                        </View>
-                        <View style={styles.compareRow}>
-                          <Text style={styles.compareLabel}>响应时间</Text>
-                          <Text style={styles.compareValue}>{item.created_at ? item.created_at.slice(5, 16).replace('T', ' ') : '刚刚提交'}</Text>
-                        </View>
-                        <Text style={styles.comparePlan}>{item.execution_plan || '机主未补充更多执行说明。'}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {quotes.map(item => (
-                  <View key={item.id} style={styles.quoteCard}>
-                    <View style={styles.quoteHeader}>
-                      <Text style={styles.quoteOwner}>{item.owner?.nickname || `机主 #${item.owner_user_id}`}</Text>
-                      <StatusBadge meta={getObjectStatusMeta('quote', item.status)} label="" />
-                    </View>
-                    <Text style={styles.quotePrice}>{formatAmountYuan(item.price_amount)}</Text>
-                    <Text style={styles.quoteDesc}>{item.execution_plan || '机主未补充更多报价说明。'}</Text>
-                    <Text style={styles.quoteMeta}>设备：{item.drone?.brand || '-'} {item.drone?.model || ''}</Text>
-                    <TouchableOpacity
-                      style={[styles.selectBtn, selectingQuoteId === item.id && styles.disabledBtn]}
-                      onPress={() => handleSelectQuote(item)}
-                      disabled={selectingQuoteId === item.id}>
-                      <Text style={styles.selectBtnText}>{selectingQuoteId === item.id ? '处理中...' : '选定此方案'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </>
             )}
           </View>
         ) : null}
+
+        <View style={styles.infoGroup}>
+          <Text style={styles.groupTitle}>任务概况</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>作业场景</Text>
+              <Text style={styles.infoValue}>{getDemandSceneLabel(demand.cargo_scene)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>预计架次</Text>
+              <Text style={styles.infoValue}>{formatTripCount(demand.estimated_trip_count)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>预约时间</Text>
+              <Text style={styles.infoValue}>{formatDemandSchedule(demand.scheduled_start_at, demand.scheduled_end_at)}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.infoGroup}>
+          <Text style={styles.groupTitle}>运输路径</Text>
+          <View style={styles.infoCard}>
+            {demand.departure_address?.text || demand.destination_address?.text ? (
+              <View style={styles.routeContainer}>
+                <View style={styles.routePoint}>
+                  <View style={[styles.routeDot, {backgroundColor: theme.success}]} />
+                  <Text style={styles.routeText}>{demand.departure_address?.text || '未填写起点'}</Text>
+                </View>
+                <View style={styles.routeLine} />
+                <View style={styles.routePoint}>
+                  <View style={[styles.routeDot, {backgroundColor: theme.danger}]} />
+                  <Text style={styles.routeText}>{demand.destination_address?.text || '未填写终点'}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>作业地址</Text>
+                <Text style={styles.infoValue}>{demand.service_address?.text || resolveDemandPrimaryAddress(demand)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.infoGroup}>
+          <Text style={styles.groupTitle}>货物与要求</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>预估重量</Text>
+              <Text style={styles.infoValue}>{demand.cargo_weight_kg || 0} kg</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>货物类型</Text>
+              <Text style={styles.infoValue}>{summarizeFlexibleValue(demand.cargo_type, '未填写')}</Text>
+            </View>
+            <View style={styles.descriptionBox}>
+              <Text style={styles.description}>{demand.description || '暂无详细说明。'}</Text>
+            </View>
+            {demand.cargo_special_requirements ? (
+              <View style={styles.noteBox}>
+                <Text style={styles.noteLabel}>特殊要求</Text>
+                <Text style={styles.noteText}>{demand.cargo_special_requirements}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.infoGroup}>
+          <View style={styles.groupHeader}>
+            <Text style={styles.groupTitle}>报价与响应</Text>
+            <Text style={styles.groupSubtitle}>{demand.quote_count} 个方案</Text>
+          </View>
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{demand.quote_count || 0}</Text>
+              <Text style={styles.statLabel}>已收到报价</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{demand.candidate_pilot_count || 0}</Text>
+              <Text style={styles.statLabel}>候选飞手</Text>
+            </View>
+          </View>
+
+          {canViewAndSelectQuotes && (
+            <TouchableOpacity
+              style={[styles.quotesBtn, quotesVisible && styles.quotesBtnActive]}
+              onPress={toggleQuotes}
+            >
+              <Text style={[styles.quotesBtnText, quotesVisible && styles.quotesBtnTextActive]}>
+                {quotesVisible ? '收起方案' : '展开查看详细方案'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {canViewAndSelectQuotes && quotesVisible && (
+          <View style={styles.quotesSection}>
+            {quotesLoading ? (
+              <ActivityIndicator style={{marginVertical: 20}} color={theme.primary} />
+            ) : quotes.length === 0 ? (
+              <Text style={styles.emptyQuotesText}>暂时还没有机主提交报价</Text>
+            ) : (
+              <View style={styles.quotesList}>
+                {quotes.map(item => (
+                  <View key={item.id} style={styles.quoteCard}>
+                    <View style={styles.quoteTop}>
+                      <Text style={styles.quoteOwner}>{item.owner?.nickname || '机主'}</Text>
+                      <Text style={styles.quotePrice}>{formatAmountYuan(item.price_amount)}</Text>
+                    </View>
+                    <Text style={styles.quoteMeta}>设备：{item.drone?.brand} {item.drone?.model} | 吊重 {item.drone?.max_payload_kg}kg</Text>
+                    <Text style={styles.quotePlan} numberOfLines={3}>{item.execution_plan || '暂无执行方案说明'}</Text>
+                    <TouchableOpacity
+                      style={[styles.selectQuoteBtn, selectingQuoteId === item.id && styles.disabledBtn]}
+                      onPress={() => handleSelectQuote(item)}
+                      disabled={selectingQuoteId === item.id}>
+                      <Text style={styles.selectQuoteBtnText}>{selectingQuoteId === item.id ? '正在处理...' : '选定此方案'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {(canQuoteAsOwner || canOperateCandidate) && (
+          <View style={styles.operatorActions}>
+            <Text style={styles.operatorTitle}>作为承接方，您可以：</Text>
+            <View style={styles.operatorRow}>
+              {canQuoteAsOwner && (
+                <TouchableOpacity
+                  style={[styles.opBtn, styles.opQuoteBtn]}
+                  onPress={() =>
+                    navigation.navigate('DemandQuoteCompose', {
+                      demandId: demand.id,
+                      demandTitle: demand.title,
+                      existingQuote: demand.my_quote || null,
+                    })
+                  }>
+                  <Text style={styles.opBtnText}>{hasOwnQuote ? '更新报价' : '提交报价'}</Text>
+                </TouchableOpacity>
+              )}
+              {canOperateCandidate && (
+                <TouchableOpacity
+                  style={[styles.opBtn, activeCandidate ? styles.opCancelBtn : styles.opPilotBtn]}
+                  onPress={handleCandidateToggle}
+                  disabled={candidateSubmitting}>
+                  <Text style={styles.opBtnText}>{activeCandidate ? '取消候选' : '报名候选'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bg},
-  content: {padding: 16, paddingBottom: 28},
-  loader: {marginTop: 120},
-  emptyBox: {margin: 18, marginTop: 48, padding: 28, backgroundColor: theme.card, borderRadius: 20, alignItems: 'center'},
-  emptyIcon: {fontSize: 36},
-  emptyTitle: {fontSize: 18, fontWeight: '700', color: theme.text, marginTop: 12},
-  emptyDesc: {fontSize: 13, color: theme.textSub, marginTop: 8, textAlign: 'center', lineHeight: 20},
-  hero: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderRadius: 24, padding: 18, marginBottom: 14, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
-  heroHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12},
-  heroTitleWrap: {flex: 1},
-  demandNo: {fontSize: 12, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '700'},
-  title: {fontSize: 24, lineHeight: 30, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800', marginTop: 8},
-  tagRow: {flexDirection: 'row', gap: 8, marginTop: 14},
-  budget: {fontSize: 18, color: theme.isDark ? '#FFE4C4' : '#fff7e6', fontWeight: '800', marginTop: 14},
-  heroDesc: {fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)', marginTop: 8},
-  progressCard: {
-    backgroundColor: theme.card,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: theme.primaryBorder,
-  },
-  progressEyebrow: {fontSize: 12, color: theme.primaryText, fontWeight: '700', marginBottom: 8},
-  progressTitle: {fontSize: 20, lineHeight: 26, color: theme.text, fontWeight: '800'},
-  progressDesc: {fontSize: 13, lineHeight: 20, color: theme.textSub, marginTop: 8},
-  progressEtaPill: {
-    alignSelf: 'flex-start',
-    marginTop: 12,
-    borderRadius: 999,
-    backgroundColor: theme.primaryBg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  progressEtaText: {fontSize: 12, color: theme.primaryText, fontWeight: '700'},
-  card: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 14},
-  sectionTitle: {fontSize: 18, fontWeight: '700', color: theme.text},
-  actionPanel: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 14},
-  primaryBtn: {height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 12},
-  ownerBtn: {backgroundColor: theme.primary},
-  pilotBtn: {backgroundColor: theme.warning},
-  ghostBtn: {backgroundColor: theme.warning + '22', borderWidth: 1, borderColor: theme.warning + '55'},
-  primaryBtnText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '700'},
-  ghostBtnText: {color: theme.warning},
-  helperText: {fontSize: 12, lineHeight: 18, color: theme.textSub, marginTop: 10},
-  infoRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginTop: 12},
-  infoLabel: {fontSize: 13, color: theme.textSub},
-  infoValue: {flex: 1, textAlign: 'right', fontSize: 14, color: theme.text, fontWeight: '600'},
-  description: {fontSize: 13, lineHeight: 21, color: theme.text, marginTop: 14},
-  noteBox: {backgroundColor: theme.bgSecondary, borderRadius: 14, padding: 12, marginTop: 12},
-  noteLabel: {fontSize: 12, color: theme.textSub, marginBottom: 4},
-  noteText: {fontSize: 13, lineHeight: 20, color: theme.text},
-  metricRow: {flexDirection: 'row', gap: 12, marginTop: 14},
-  metricCard: {flex: 1, backgroundColor: theme.bgSecondary, borderRadius: 16, padding: 14, alignItems: 'center'},
-  metricValue: {fontSize: 24, fontWeight: '800', color: theme.primaryText},
-  metricLabel: {fontSize: 12, color: theme.textSub, marginTop: 6},
-  quoteTrigger: {marginTop: 14, alignSelf: 'flex-start'},
-  quoteTriggerText: {fontSize: 14, color: theme.primaryText, fontWeight: '700'},
-  emptyText: {fontSize: 13, color: theme.textSub, marginTop: 14},
-  comparePanel: {
-    marginTop: 12,
-    marginBottom: 4,
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: theme.bgSecondary,
-    gap: 10,
-  },
-  compareTitle: {fontSize: 15, fontWeight: '800', color: theme.text},
-  compareDesc: {fontSize: 12, lineHeight: 18, color: theme.textSub},
-  compareItem: {
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    gap: 6,
-  },
-  compareHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8},
-  compareOwner: {fontSize: 14, fontWeight: '700', color: theme.text},
-  compareBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.success,
-    backgroundColor: theme.success + '18',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  compareRow: {flexDirection: 'row', justifyContent: 'space-between', gap: 12},
-  compareLabel: {fontSize: 12, color: theme.textSub},
-  compareValue: {flex: 1, textAlign: 'right', fontSize: 12, color: theme.text},
-  compareValueStrong: {fontSize: 14, fontWeight: '800', color: theme.danger},
-  comparePlan: {fontSize: 12, lineHeight: 18, color: theme.textSub, marginTop: 2},
-  quoteCard: {borderWidth: 1, borderColor: theme.divider, borderRadius: 16, padding: 14, marginTop: 12},
-  quoteHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8},
-  quoteOwner: {fontSize: 15, fontWeight: '700', color: theme.text},
-  quotePrice: {fontSize: 18, fontWeight: '800', color: theme.danger, marginTop: 10},
-  quoteDesc: {fontSize: 13, color: theme.textSub, lineHeight: 20, marginTop: 8},
-  quoteMeta: {fontSize: 12, color: theme.textSub, marginTop: 8},
-  selectBtn: {
-    marginTop: 12,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: theme.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectBtnText: {fontSize: 14, color: theme.btnPrimaryText, fontWeight: '700'},
-  disabledBtn: {opacity: 0.6},
-  ownerActions: {flexDirection: 'row', gap: 10, marginBottom: 14},
-  editBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: theme.primary, justifyContent: 'center', alignItems: 'center'},
-  editBtnText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '700'},
-  cancelBtn: {flex: 1, height: 44, borderRadius: 12, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.danger, justifyContent: 'center', alignItems: 'center'},
-  cancelBtnText: {color: theme.danger, fontSize: 15, fontWeight: '700'},
-});
+const getStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {flex: 1, backgroundColor: theme.bg},
+    content: {paddingBottom: 40},
+    loader: {marginTop: 120},
+    heroCard: {
+      padding: 20,
+      paddingTop: 24,
+      borderBottomLeftRadius: 32,
+      borderBottomRightRadius: 32,
+    },
+    heroTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    heroBadgeRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    heroNo: {
+      fontSize: 11,
+      color: 'rgba(255,255,255,0.6)',
+      fontWeight: '700',
+    },
+    heroTitle: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: '#FFFFFF',
+      marginTop: 16,
+      lineHeight: 34,
+    },
+    heroBudgetBox: {
+      marginTop: 20,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      borderRadius: 12,
+      padding: 12,
+      alignSelf: 'flex-start',
+    },
+    heroBudgetLabel: {
+      fontSize: 11,
+      color: 'rgba(255,255,255,0.7)',
+      fontWeight: '600',
+    },
+    heroBudgetValue: {
+      fontSize: 18,
+      color: '#FFFFFF',
+      fontWeight: '800',
+      marginTop: 4,
+    },
+    focusCard: {
+      margin: 16,
+      marginTop: -16,
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.primaryBorder,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    focusHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    focusEyebrow: {
+      fontSize: 12,
+      color: theme.primaryText,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
+    focusEtaPill: {
+      backgroundColor: theme.primaryBg,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+    },
+    focusEtaText: {
+      fontSize: 11,
+      color: theme.primaryText,
+      fontWeight: '700',
+    },
+    focusTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.text,
+      lineHeight: 26,
+    },
+    focusDesc: {
+      fontSize: 13,
+      color: theme.textSub,
+      marginTop: 8,
+      lineHeight: 20,
+    },
+    focusActions: {
+      flexDirection: 'row',
+      marginTop: 20,
+      gap: 12,
+    },
+    focusEditBtn: {
+      flex: 2,
+      height: 44,
+      backgroundColor: theme.primary,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    focusEditBtnText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    focusCancelBtn: {
+      flex: 1,
+      height: 44,
+      borderWidth: 1,
+      borderColor: theme.danger,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    focusCancelBtnText: {
+      color: theme.danger,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    infoGroup: {
+      paddingHorizontal: 16,
+      marginTop: 20,
+    },
+    groupHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
+      marginBottom: 12,
+    },
+    groupTitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: theme.text,
+      marginBottom: 12,
+    },
+    groupSubtitle: {
+      fontSize: 13,
+      color: theme.textSub,
+      marginBottom: 12,
+    },
+    infoCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.divider,
+    },
+    infoLabel: {
+      fontSize: 13,
+      color: theme.textSub,
+      fontWeight: '500',
+    },
+    infoValue: {
+      fontSize: 14,
+      color: theme.text,
+      fontWeight: '700',
+      flex: 1,
+      textAlign: 'right',
+      marginLeft: 20,
+    },
+    routeContainer: {
+      paddingVertical: 4,
+    },
+    routePoint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    routeDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    routeText: {
+      fontSize: 14,
+      color: theme.text,
+      fontWeight: '600',
+      flex: 1,
+    },
+    routeLine: {
+      width: 1,
+      height: 16,
+      backgroundColor: theme.divider,
+      marginLeft: 3.5,
+      marginVertical: 4,
+    },
+    descriptionBox: {
+      marginTop: 12,
+    },
+    description: {
+      fontSize: 14,
+      color: theme.textSub,
+      lineHeight: 22,
+    },
+    noteBox: {
+      marginTop: 16,
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 14,
+      padding: 14,
+    },
+    noteLabel: {
+      fontSize: 11,
+      color: theme.textHint,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    noteText: {
+      fontSize: 13,
+      color: theme.text,
+      lineHeight: 20,
+    },
+    statsCard: {
+      flexDirection: 'row',
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 20,
+      padding: 16,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: theme.primaryText,
+    },
+    statLabel: {
+      fontSize: 11,
+      color: theme.textSub,
+      marginTop: 4,
+      fontWeight: '600',
+    },
+    statDivider: {
+      width: 1,
+      height: '60%',
+      backgroundColor: theme.divider,
+      alignSelf: 'center',
+    },
+    quotesBtn: {
+      marginTop: 12,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: theme.bgSecondary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    quotesBtnActive: {
+      backgroundColor: theme.primaryBg,
+      borderColor: theme.primary,
+    },
+    quotesBtnText: {
+      fontSize: 14,
+      color: theme.textSub,
+      fontWeight: '700',
+    },
+    quotesBtnTextActive: {
+      color: theme.primaryText,
+    },
+    quotesSection: {
+      paddingHorizontal: 16,
+      marginTop: 12,
+    },
+    quotesList: {
+      gap: 12,
+    },
+    quoteCard: {
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    quoteTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    quoteOwner: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    quotePrice: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.danger,
+    },
+    quoteMeta: {
+      fontSize: 12,
+      color: theme.textSub,
+      marginTop: 6,
+    },
+    quotePlan: {
+      fontSize: 13,
+      color: theme.text,
+      lineHeight: 20,
+      marginTop: 10,
+    },
+    selectQuoteBtn: {
+      marginTop: 16,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor: theme.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    selectQuoteBtnText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    operatorActions: {
+      marginTop: 32,
+      paddingHorizontal: 16,
+      paddingBottom: 20,
+    },
+    operatorTitle: {
+      fontSize: 14,
+      color: theme.textSub,
+      fontWeight: '700',
+      marginBottom: 12,
+    },
+    operatorRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    opBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    opQuoteBtn: {
+      backgroundColor: theme.primary,
+    },
+    opPilotBtn: {
+      backgroundColor: theme.warning,
+    },
+    opCancelBtn: {
+      backgroundColor: theme.bgSecondary,
+      borderWidth: 1,
+      borderColor: theme.divider,
+    },
+    opBtnText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    disabledBtn: {opacity: 0.5},
+    emptyBox: {padding: 40, alignItems: 'center'},
+    emptyIcon: {fontSize: 48, marginBottom: 16},
+    emptyTitle: {fontSize: 18, fontWeight: '800', color: theme.text},
+    emptyDesc: {fontSize: 14, color: theme.textSub, textAlign: 'center', marginTop: 8},
+    emptyQuotesText: {textAlign: 'center', color: theme.textHint, marginVertical: 20},
+  });

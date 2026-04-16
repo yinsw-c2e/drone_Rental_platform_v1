@@ -14,8 +14,6 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 
 import EmptyState from '../../components/business/EmptyState';
-import ObjectCard from '../../components/business/ObjectCard';
-import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
@@ -116,7 +114,11 @@ export default function PilotTaskListScreen({navigation, route}: any) {
                   try {
                     await dispatchV2Service.accept(task.id);
                     await loadData();
-                    Alert.alert('接单成功', '正式派单已接受，你可以继续查看派单详情或进入订单详情。', [
+                    Alert.alert('接单成功', '正式派单已接受，你现在可以直接进入执行工作台，继续推进本次任务。', [
+                      {
+                        text: '进入执行',
+                        onPress: () => navigation.navigate('PilotOrderExecution', {taskId: task.id}),
+                      },
                       {
                         text: '查看详情',
                         onPress: () => navigation.navigate('DispatchTaskDetail', {id: task.id}),
@@ -150,6 +152,89 @@ export default function PilotTaskListScreen({navigation, route}: any) {
     }
   };
 
+  const renderItem = ({item}: {item: V2DispatchTaskSummary}) => {
+    const canRespond = String(item.status || '').toLowerCase() === 'pending_response';
+    const isAccepted = String(item.status || '').toLowerCase() === 'accepted';
+    const os = String(item.order?.status || '').toLowerCase();
+    const isExecuting = isAccepted && !['completed', 'cancelled'].includes(os);
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[styles.taskCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}, canRespond && styles.cardHighlight]}
+        onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
+
+        <View style={styles.cardHeader}>
+          <View style={styles.headerLeft}>
+            <StatusBadge label="" meta={getObjectStatusMeta('dispatch_task', item.status)} />
+            <Text style={styles.dispatchNo}>{item.dispatch_no}</Text>
+          </View>
+          <Text style={styles.timeText}>{formatDateTime(item.sent_at)} 发出</Text>
+        </View>
+
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.order?.title || '正式派单任务'}</Text>
+
+        <View style={styles.routeContainer}>
+          <View style={styles.routePoint}>
+            <View style={[styles.routeDot, {backgroundColor: theme.success}]} />
+            <Text style={styles.routeText} numberOfLines={1}>{item.order?.service_address || '起点'}</Text>
+          </View>
+          <View style={styles.routeLine} />
+          <View style={styles.routePoint}>
+            <View style={[styles.routeDot, {backgroundColor: theme.danger}]} />
+            <Text style={styles.routeText} numberOfLines={1}>{item.order?.dest_address || '终点'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardMetaGrid}>
+          <View style={styles.metaItem}>
+                      <Text style={styles.metaLabel}>安排方式</Text>
+            <Text style={styles.metaValue}>{item.dispatch_source || '系统'}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>预估报酬</Text>
+            <Text style={[styles.metaValue, {color: theme.danger}]}>{formatMoney(item.order?.total_amount)}</Text>
+          </View>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>重派次数</Text>
+            <Text style={styles.metaValue}>{item.retry_count || 0}</Text>
+          </View>
+        </View>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.providerInfo}>
+            <Text style={styles.providerName}>机主：{item.provider?.nickname || '机主'}</Text>
+          </View>
+          <View style={styles.actionButtons}>
+            {canRespond ? (
+              <>
+                <TouchableOpacity
+                  style={styles.inlineRejectBtn}
+                  onPress={() => {
+                    setSelectedTask(item);
+                    setRejectReason('');
+                  }}>
+                  <Text style={styles.inlineRejectText}>拒绝</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.inlineAcceptBtn} onPress={() => handleAccept(item)}>
+                  <Text style={styles.inlineAcceptText}>确认接单</Text>
+                </TouchableOpacity>
+              </>
+            ) : isExecuting ? (
+              <TouchableOpacity style={styles.inlineExecuteBtn} onPress={() => navigation.navigate('PilotOrderExecution', {taskId: item.id})}>
+                <Text style={styles.inlineExecuteText}>进入执行工作台</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.inlineGhostBtn} onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
+                <Text style={styles.inlineGhostBtnText}>详情</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.banner}>
@@ -158,28 +243,18 @@ export default function PilotTaskListScreen({navigation, route}: any) {
       </View>
 
       {eligibility ? (
-        <ObjectCard style={styles.noticeCard}>
-          <View style={styles.noticeHeader}>
-            <Text style={styles.noticeTitle}>{eligibility.label || '飞手准入状态'}</Text>
+        <View style={styles.eligibilitySection}>
+          <View style={styles.eligibilityHeader}>
+            <Text style={styles.eligibilityTitle}>{eligibility.label || '准入状态'}</Text>
             <StatusBadge
-              label={candidateReady ? '先报名候选需求' : eligibility?.can_accept_dispatch ? '正式派单已开放' : '待补资料'}
+              label={candidateReady ? '限报需求' : eligibility?.can_accept_dispatch ? '准入已开' : '待补资料'}
               tone={candidateReady ? 'orange' : eligibility?.can_accept_dispatch ? 'green' : 'gray'}
             />
           </View>
-          <Text style={styles.noticeDesc}>
-            {eligibility.recommended_next_step || '系统会根据认证进度逐步开放候选需求、正式派单和执行能力。'}
+          <Text style={styles.eligibilityDesc}>
+            {eligibility.recommended_next_step || '完善飞手认证资料以获得完整接单能力。'}
           </Text>
-          {candidateReady ? (
-            <View style={styles.noticeActionRow}>
-              <TouchableOpacity style={styles.noticeGhostBtn} onPress={() => navigation.navigate('DemandList')}>
-                <Text style={styles.noticeGhostBtnText}>查看可报名任务</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.noticeGhostBtn} onPress={() => navigation.navigate('PilotRegister')}>
-                <Text style={styles.noticeGhostBtnText}>继续补资料</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </ObjectCard>
+        </View>
       ) : null}
 
       <FlatList
@@ -190,77 +265,20 @@ export default function PilotTaskListScreen({navigation, route}: any) {
           loadData();
         }} colors={[theme.refreshColor]} />}
         contentContainerStyle={styles.content}
-        renderItem={({item}) => {
-          const canRespond = String(item.status || '').toLowerCase() === 'pending_response';
-          const isAccepted = String(item.status || '').toLowerCase() === 'accepted';
-          return (
-            <ObjectCard style={[styles.card, canRespond && styles.cardHighlight]} onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardHeaderLeft}>
-                  <SourceTag source="dispatch_task" />
-                  <StatusBadge label="" meta={getObjectStatusMeta('dispatch_task', item.status)} />
-                </View>
-                <Text style={styles.code}>{item.dispatch_no}</Text>
-              </View>
-
-              <Text style={styles.title}>{item.order?.title || '正式派单任务'}</Text>
-              <Text style={styles.route} numberOfLines={2}>
-                {item.order?.service_address || '未设置起点'}
-                {item.order?.dest_address ? ` -> ${item.order.dest_address}` : ''}
-              </Text>
-
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>机主：{item.provider?.nickname || `机主 #${item.provider?.user_id || '-'}`}</Text>
-                <Text style={styles.metaText}>派单来源：{item.dispatch_source || '-'}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>订单状态：{getObjectStatusMeta('order', item.order?.status).label}</Text>
-                <Text style={styles.metaText}>发出时间：{formatDateTime(item.sent_at)}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>重派次数：{item.retry_count || 0}</Text>
-                <Text style={styles.metaText}>订单金额：{formatMoney(item.order?.total_amount)}</Text>
-              </View>
-
-              {canRespond ? (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.rejectBtn}
-                    onPress={() => {
-                      setSelectedTask(item);
-                      setRejectReason('');
-                    }}>
-                    <Text style={styles.rejectBtnText}>拒绝</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(item)}>
-                    <Text style={styles.acceptBtnText}>接受派单</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              {isAccepted ? (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity style={styles.executeBtn} onPress={() => navigation.navigate('PilotOrderExecution', {taskId: item.id})}>
-                    <Text style={styles.executeBtnText}>进入执行</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </ObjectCard>
-          );
-        }}
+        renderItem={renderItem}
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator style={styles.loading} color={theme.warning} />
           ) : (
-            <ObjectCard>
+            <View style={styles.emptyCard}>
               <EmptyState
                 icon="🧭"
                 title={entryMeta.empty}
-                description="正式派单会在这里统一收口。若您还未完成资质认证，请先至「可报名任务」参与低风险候选需求。"
-                actionText="查看可报名任务"
-                onAction={() => navigation.navigate('DemandList')}
+                description="正式派单会在这里统一收口。若您还未完成资质认证，请先参与「报名需求」累积履约记录。"
+                actionText="查看可报名需求"
+                onAction={() => navigation.navigate('DemandList', {mode: 'pilot'})}
               />
-            </ObjectCard>
+            </View>
           )
         }
       />
@@ -292,218 +310,274 @@ export default function PilotTaskListScreen({navigation, route}: any) {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
+    backgroundColor: theme.bgSecondary,
   },
   banner: {
-    backgroundColor: theme.warning,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
+    backgroundColor: theme.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   bannerTitle: {
     fontSize: 24,
-    color: theme.btnPrimaryText,
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   bannerHint: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 13,
-    lineHeight: 20,
-    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.8)',
   },
-  noticeCard: {
-    marginHorizontal: 14,
-    marginTop: 10,
-    marginBottom: 2,
-    gap: 10,
+  eligibilitySection: {
+    backgroundColor: theme.card,
+    margin: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.divider,
   },
-  noticeHeader: {
+  eligibilityHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  noticeTitle: {
-    flex: 1,
-    fontSize: 16,
+  eligibilityTitle: {
+    fontSize: 15,
     fontWeight: '800',
     color: theme.text,
   },
-  noticeDesc: {
-    fontSize: 13,
-    lineHeight: 20,
+  eligibilityDesc: {
+    fontSize: 12,
     color: theme.textSub,
-  },
-  noticeActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  noticeGhostBtn: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.primaryBorder,
-    backgroundColor: theme.bgSecondary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  noticeGhostBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.primaryText,
+    lineHeight: 18,
   },
   content: {
-    padding: 14,
+    padding: 16,
     paddingBottom: 140,
   },
-  loading: {
-    paddingVertical: 48,
-  },
-  card: {
-    marginBottom: 12,
+  taskCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
   },
   cardHighlight: {
-    borderWidth: 1,
     borderColor: theme.warning,
+    backgroundColor: theme.warning + '05',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 14,
   },
-  cardHeaderLeft: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  code: {
+  dispatchNo: {
+    fontSize: 11,
+    color: theme.textHint,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  timeText: {
+    fontSize: 11,
+    color: theme.textHint,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: theme.text,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  routeContainer: {
+    marginBottom: 20,
+  },
+  routePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  routeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  routeText: {
+    fontSize: 14,
+    color: theme.textSub,
+    fontWeight: '600',
+    flex: 1,
+  },
+  routeLine: {
+    width: 1,
+    height: 14,
+    backgroundColor: theme.divider,
+    marginLeft: 3.5,
+    marginVertical: 2,
+  },
+  cardMetaGrid: {
+    flexDirection: 'row',
+    backgroundColor: theme.bgSecondary,
+    borderRadius: 16,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  metaItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metaLabel: {
+    fontSize: 10,
+    color: theme.textHint,
+    fontWeight: '700',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  metaValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: theme.text,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.divider,
+    paddingTop: 16,
+  },
+  providerInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  providerName: {
     fontSize: 12,
     color: theme.textSub,
     fontWeight: '600',
   },
-  title: {
-    marginTop: 14,
-    fontSize: 17,
-    lineHeight: 24,
-    color: theme.text,
-    fontWeight: '700',
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  route: {
-    marginTop: 8,
+  inlineRejectBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: theme.danger + '10',
+  },
+  inlineRejectText: {
     fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
-  },
-  metaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metaText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 18,
-    color: theme.textSub,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-  },
-  rejectBtn: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.danger + '44',
-    backgroundColor: theme.danger + '22',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 10,
-  },
-  rejectBtnText: {
-    fontSize: 12,
     color: theme.danger,
     fontWeight: '700',
   },
-  acceptBtn: {
-    borderRadius: 999,
+  inlineAcceptBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: theme.warning,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
   },
-  acceptBtnText: {
-    fontSize: 12,
-    color: theme.btnPrimaryText,
-    fontWeight: '700',
+  inlineAcceptText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
-  executeBtn: {
-    borderRadius: 999,
+  inlineExecuteBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: theme.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
   },
-  executeBtnText: {
-    fontSize: 12,
-    color: theme.btnPrimaryText,
+  inlineExecuteText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  inlineGhostBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  inlineGhostBtnText: {
+    fontSize: 13,
+    color: theme.textSub,
     fontWeight: '700',
+  },
+  loading: {
+    paddingVertical: 48,
+  },
+  emptyCard: {
+    marginTop: 40,
   },
   rejectSheet: {
     position: 'absolute',
     left: 12,
     right: 12,
     bottom: 16,
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: theme.card,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: theme.warning + '44',
+    padding: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowOffset: {width: 0, height: 4},
-    shadowRadius: 12,
-    elevation: 4,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: theme.divider,
   },
   rejectTitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: theme.text,
     fontWeight: '800',
   },
   rejectInput: {
-    marginTop: 12,
-    minHeight: 88,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.warning + '44',
-    backgroundColor: theme.warning + '11',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    marginTop: 16,
+    minHeight: 100,
+    borderRadius: 16,
+    backgroundColor: theme.bgSecondary,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: theme.text,
     textAlignVertical: 'top',
   },
   rejectActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 14,
+    marginTop: 20,
+    gap: 12,
   },
   sheetGhostBtn: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: theme.divider,
-    backgroundColor: theme.card,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: theme.bgSecondary,
   },
   sheetGhostText: {
-    fontSize: 12,
+    fontSize: 14,
     color: theme.textSub,
     fontWeight: '700',
   },
   sheetDangerBtn: {
-    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
     backgroundColor: theme.danger,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
   },
   sheetDangerText: {
-    fontSize: 12,
-    color: theme.btnPrimaryText,
-    fontWeight: '700',
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 });

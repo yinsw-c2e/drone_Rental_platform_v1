@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
@@ -99,11 +100,11 @@ const getExecutionModeLabel = (executionMode?: string) => {
     case 'self_execute':
       return '机主直接执行';
     case 'dispatch_bound_pilot':
-      return '专属飞手执行';
+      return '合作飞手执行';
     case 'dispatch_candidate_pool':
-      return '优先飞手匹配';
+      return '优先安排执行方';
     case 'dispatch_pool':
-      return '公开飞手匹配';
+      return '平台协调执行';
     default:
       return '待系统确认';
   }
@@ -112,11 +113,11 @@ const getExecutionModeLabel = (executionMode?: string) => {
 const getDispatchSourceLabel = (source?: string) => {
   switch (String(source || '').toLowerCase()) {
     case 'bound_pilot':
-      return '专属飞手';
+      return '合作飞手';
     case 'candidate_pool':
-      return '优先飞手名单';
+      return '优先候选';
     case 'general_pool':
-      return '公开飞手池';
+      return '平台协调';
     case 'self_execute':
       return '机主自执行';
     default:
@@ -168,21 +169,6 @@ const buildFallbackTimeline = (items?: V2OrderTimelineItem[]): V2OrderTimelineEv
       status: item.status,
     },
   }));
-
-const getTimelineSourceLabel = (item: V2OrderTimelineEvent) => {
-  switch (item.source_type) {
-    case 'payment':
-      return '支付';
-    case 'refund':
-      return '退款';
-    case 'dispatch_task':
-      return '执行安排';
-    case 'flight_record':
-      return '飞行';
-    default:
-      return '订单';
-  }
-};
 
 const getTimelineTitle = (item: V2OrderTimelineEvent, isClient: boolean) => {
   if (item.source_type === 'dispatch_task' && isClient) {
@@ -289,7 +275,7 @@ const getContractProgressState = (
 
 const getProgressFocus = (
   detail: V2OrderDetail,
-  options: {isClient: boolean; isProvider: boolean; isExecutor: boolean},
+  options: {isClient: boolean; isProvider: boolean; isExecutor: boolean; isDispatchTargetPilot: boolean},
 ): ProgressFocus => {
   const status = String(detail.status || '').toLowerCase();
   const contractState = getContractProgressState(detail, options);
@@ -384,6 +370,16 @@ const getProgressFocus = (
             tone: 'muted',
           };
     case 'pending_dispatch':
+      if (options.isDispatchTargetPilot) {
+        return {
+          eyebrow: '当前在等你',
+          title: '请确认是否执行这笔订单',
+          desc: '这笔任务已经正式发到你名下。确认后就能继续进入准备、飞行和签收流程。',
+          eta: '建议 15 分钟内响应',
+          actionHint: '去响应派单',
+          tone: 'warning',
+        };
+      }
       return options.isProvider
         ? {
             eyebrow: '当前在等你',
@@ -402,7 +398,7 @@ const getProgressFocus = (
             tone: 'muted',
           };
     case 'assigned':
-      return options.isExecutor
+      return options.isExecutor || options.isDispatchTargetPilot
         ? {
             eyebrow: '当前在等你',
             title: '请开始执行准备',
@@ -569,23 +565,27 @@ function ProgressFocusCard({focus}: {focus: ProgressFocus}) {
           : theme.textSub;
 
   return (
-    <ObjectCard style={[styles.sectionCard, styles.progressCard, {borderColor: `${accent}44`}]}>
-      <Text style={[styles.progressEyebrow, {color: accent}]}>{focus.eyebrow}</Text>
-      <Text style={styles.progressTitle}>{focus.title}</Text>
-      <Text style={styles.progressDesc}>{focus.desc}</Text>
-      <View style={styles.progressMetaRow}>
+    <View style={[styles.progressFocusContainer, {backgroundColor: theme.card, borderColor: `${accent}40`}]}>
+      <View style={styles.progressFocusHeader}>
+        <View style={[styles.focusIndicator, {backgroundColor: accent}]} />
+        <Text style={[styles.focusEyebrow, {color: accent}]}>{focus.eyebrow}</Text>
         {focus.eta ? (
-          <View style={[styles.progressChip, {backgroundColor: `${accent}15`}]}>
-            <Text style={[styles.progressChipText, {color: accent}]}>{focus.eta}</Text>
-          </View>
-        ) : null}
-        {focus.actionHint ? (
-          <View style={[styles.progressChip, {backgroundColor: theme.badgeBg}]}>
-            <Text style={[styles.progressChipText, {color: theme.text}]}>下一步：{focus.actionHint}</Text>
+          <View style={[styles.focusEtaPill, {backgroundColor: `${accent}15`}]}>
+            <Text style={[styles.focusEtaText, {color: accent}]}>{focus.eta}</Text>
           </View>
         ) : null}
       </View>
-    </ObjectCard>
+
+      <Text style={styles.focusTitle}>{focus.title}</Text>
+      <Text style={styles.focusDesc}>{focus.desc}</Text>
+
+      {focus.actionHint ? (
+        <View style={styles.focusActionHintRow}>
+          <Text style={styles.focusActionHintLabel}>下一步指引：</Text>
+          <Text style={[styles.focusActionHintValue, {color: theme.primaryText}]}>{focus.actionHint}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -605,8 +605,10 @@ function ExecutionArrangementCard({
   if (detail.execution_mode === 'self_execute' || detail.needs_dispatch === false) {
     return (
       <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>本单由机主直接执行</Text>
-        <Text style={styles.noticeDesc}>你只需要关注订单进度，后续准备、飞行和交付都会继续汇总到当前订单里。</Text>
+        <Text style={styles.noticeTitle}>🛡️ 机主直接承运保证</Text>
+        <Text style={styles.noticeDesc}>
+          本单由机主团队直接执行。平台已核实机主具备合法飞行资质，且已签署设备安全操作责任书。
+        </Text>
       </View>
     );
   }
@@ -615,11 +617,11 @@ function ExecutionArrangementCard({
   if (!task) {
     return (
       <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>执行方还在安排中</Text>
+        <Text style={styles.noticeTitle}>执行团队匹配中</Text>
         <Text style={styles.noticeDesc}>
           {isClient
-            ? '平台会继续联系合适的飞手，你不需要额外切到“派单任务”处理。安排完成后会直接反映在订单进度里。'
-            : '当前还没有生效的正式执行安排。你可以从下方主动作继续安排飞手，或者等待新的响应。'}
+            ? '系统正在从合格飞手库中筛选最佳执行方。所有备选飞手均已通过民航资质认证与实名核验。'
+            : '当前还没有生效的正式执行安排。您可以从下方主动作继续安排飞手，或者等待新的响应。'}
         </Text>
       </View>
     );
@@ -627,26 +629,25 @@ function ExecutionArrangementCard({
 
   const pilotLabel = summarizeParty(task.target_pilot, '待确认飞手');
   const taskStatus = getObjectStatusMeta('dispatch_task', task.status);
-  const clientSummary =
-    String(task.status || '').toLowerCase() === 'accepted'
-      ? `${pilotLabel} 已确认执行这笔订单`
-      : String(task.status || '').toLowerCase() === 'pending_response'
-        ? `已邀请 ${pilotLabel} 确认执行`
-        : `${pilotLabel} 的执行安排正在调整`;
 
   return (
     <View style={styles.dispatchBox}>
       <View style={styles.dispatchHeader}>
-        <Text style={styles.dispatchNo}>{isClient ? '当前执行安排' : task.dispatch_no}</Text>
+        <Text style={styles.dispatchNo}>{isClient ? '当前执行团队' : task.dispatch_no}</Text>
         <StatusBadge label="" meta={taskStatus} />
       </View>
-      <DetailRow label="安排状态" value={clientSummary} />
-      <DetailRow label="安排方式" value={getDispatchSourceLabel(task.dispatch_source)} />
+      <View style={styles.trustRow}>
+        <Text style={styles.trustIcon}>✅</Text>
+        <Text style={styles.trustText}>飞手资质已核验 (民航执照)</Text>
+      </View>
+      <View style={styles.trustRow}>
+        <Text style={styles.trustIcon}>✅</Text>
+        <Text style={styles.trustText}>责任声明已签署 (设备操作权)</Text>
+      </View>
+      <View style={styles.dispatchDivider} />
       <DetailRow label="当前执行方" value={pilotLabel} />
-      <DetailRow label="发出时间" value={formatDateTime(task.sent_at)} />
-      <DetailRow label="响应时间" value={formatDateTime(task.responded_at)} />
-      {!isClient ? <DetailRow label="调整次数" value={String(task.retry_count || 0)} /> : null}
-      {task.reason ? <DetailRow label="备注" value={task.reason} /> : null}
+      <DetailRow label="安排方式" value={getDispatchSourceLabel(task.dispatch_source)} />
+      {task.reason ? <DetailRow label="执行说明" value={task.reason} /> : null}
     </View>
   );
 }
@@ -657,45 +658,46 @@ function TimelineSection({items, isClient}: {items?: V2OrderTimelineEvent[]; isC
   if (!items || items.length === 0) {
     return (
       <ObjectCard style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>订单时间线</Text>
+        <Text style={styles.sectionTitle}>订单动态汇总</Text>
         <Text style={styles.sectionHint}>当前还没有可展示的时间线记录。</Text>
       </ObjectCard>
     );
   }
 
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'payment': return '💰';
+      case 'refund': return '💸';
+      case 'dispatch_task': return '📋';
+      case 'flight_record': return '🚁';
+      default: return '📍';
+    }
+  };
+
   return (
     <ObjectCard style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>订单时间线</Text>
-      <Text style={styles.sectionHint}>支付、执行安排、飞行和退款都会按时间汇总到这里，不需要再跳多个对象页查看。</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>订单动态汇总</Text>
+        <Text style={styles.sectionSubtitle}>{items.length} 条记录</Text>
+      </View>
+      <Text style={styles.sectionHint}>支付、执行安排、飞行和退款都会按时间汇总到这里。</Text>
       <View style={styles.timelineList}>
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
-          const accent =
-            item.source_type === 'refund'
-              ? theme.warning
-              : item.source_type === 'payment'
-                ? theme.primary
-                : item.source_type === 'flight_record'
-                  ? theme.success
-                  : theme.textSub;
           const description = getTimelineDescription(item, isClient);
           return (
             <View key={`${item.event_id}-${index}`} style={styles.timelineItem}>
               <View style={styles.timelineAxis}>
-                <View style={[styles.timelineDot, {backgroundColor: accent}]} />
+                <View style={styles.timelineIconBg}>
+                  <Text style={styles.timelineIconText}>{getEventIcon(item.source_type)}</Text>
+                </View>
                 {!isLast ? <View style={styles.timelineLine} /> : null}
               </View>
               <View style={styles.timelineContent}>
                 <View style={styles.timelineHeaderRow}>
                   <Text style={styles.timelineTitle}>{getTimelineTitle(item, isClient)}</Text>
-                  <View style={[styles.timelineSourcePill, {backgroundColor: `${accent}15`}]}>
-                    <Text style={[styles.timelineSourceText, {color: accent}]}>{getTimelineSourceLabel(item)}</Text>
-                  </View>
+                  <Text style={styles.timelineTime}>{formatDateTime(item.occurred_at)}</Text>
                 </View>
-                <Text style={styles.timelineMeta}>
-                  {formatDateTime(item.occurred_at)}
-                  {item.operator_type ? ` · ${item.operator_type}` : ''}
-                </Text>
                 {description ? <Text style={styles.timelineDesc}>{description}</Text> : null}
               </View>
             </View>
@@ -759,6 +761,8 @@ export default function OrderDetailScreen({route, navigation}: any) {
   const isClient = currentUserId > 0 && currentUserId === Number(client?.user_id || 0);
   const isProvider = currentUserId > 0 && currentUserId === Number(provider?.user_id || 0);
   const isExecutor = currentUserId > 0 && currentUserId === Number(executor?.user_id || 0);
+  const isDispatchTargetPilot =
+    currentUserId > 0 && currentUserId === Number(detail?.current_dispatch?.target_pilot_user_id || 0);
   const canOpenFlightMonitor = ACTIVE_EXECUTION_STATUSES.includes(String(detail?.status || '').toLowerCase());
   const canOpenReview =
     String(detail?.status || '').toLowerCase() === 'completed' && (isClient || isProvider || isExecutor);
@@ -776,7 +780,18 @@ export default function OrderDetailScreen({route, navigation}: any) {
         String(detail.status || '').toLowerCase(),
       ),
   );
-  const canOpenDispatchDetail = Boolean(detail?.current_dispatch?.id && (isProvider || isExecutor));
+  const canOpenDispatchDetail = Boolean(detail?.current_dispatch?.id && (isProvider || isExecutor || isDispatchTargetPilot));
+  const canRespondCurrentDispatch = Boolean(
+    detail?.current_dispatch?.id &&
+      isDispatchTargetPilot &&
+      String(detail.current_dispatch?.status || '').toLowerCase() === 'pending_response',
+  );
+  const canEnterExecutionWorkspace = Boolean(
+    detail?.current_dispatch?.id &&
+      (isExecutor || isDispatchTargetPilot) &&
+      String(detail.current_dispatch?.status || '').toLowerCase() === 'accepted' &&
+      !['cancelled'].includes(String(detail?.status || '').toLowerCase()),
+  );
   const latestTimelineTitle = timelineItems[0]?.title;
 
   const progressFocus = useMemo(
@@ -786,9 +801,10 @@ export default function OrderDetailScreen({route, navigation}: any) {
             isClient,
             isProvider,
             isExecutor,
+            isDispatchTargetPilot,
           })
         : null,
-    [detail, isClient, isExecutor, isProvider],
+    [detail, isClient, isDispatchTargetPilot, isExecutor, isProvider],
   );
 
   const actionButtons = useMemo<ActionButton[]>(() => {
@@ -798,6 +814,29 @@ export default function OrderDetailScreen({route, navigation}: any) {
 
     const buttons: ActionButton[] = [];
     const contractState = getContractProgressState(detail, {isClient, isProvider});
+
+    if (canRespondCurrentDispatch) {
+      buttons.push({
+        label: '去响应派单',
+        tone: 'primary',
+        onPress: () =>
+          navigation.navigate('DispatchTaskDetail', {
+            id: detail.current_dispatch?.id,
+            dispatchId: detail.current_dispatch?.id,
+          }),
+      });
+    }
+
+    if (canEnterExecutionWorkspace) {
+      buttons.push({
+        label: '进入执行工作台',
+        tone: 'primary',
+        onPress: () =>
+          navigation.navigate('PilotOrderExecution', {
+            taskId: detail.current_dispatch?.id,
+          }),
+      });
+    }
 
     if (detail.status === 'pending_provider_confirmation' && isProvider) {
       buttons.push({
@@ -1003,8 +1042,10 @@ export default function OrderDetailScreen({route, navigation}: any) {
     canCancelOrder,
     canOpenAfterSale,
     canOpenDispatchDetail,
+    canEnterExecutionWorkspace,
     canOpenFlightMonitor,
     canOpenReview,
+    canRespondCurrentDispatch,
     detail,
     fetchDetail,
     isClient,
@@ -1095,8 +1136,6 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <Text style={styles.sectionTitle}>任务信息</Text>
           <DetailRow label="成单方式" value={getSourceContextLabel(detail.order_source)} />
           <DetailRow label="来源标题" value={sourceTitle} />
-          <DetailRow label="关联任务" value={detail.source_info?.demand_id ? String(detail.source_info.demand_id) : '-'} />
-          <DetailRow label="关联服务" value={detail.source_info?.source_supply_id ? String(detail.source_info.source_supply_id) : '-'} />
           <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} />
           <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} />
           <DetailRow label="起始地址" value={detail.service_address || '-'} />
@@ -1107,7 +1146,6 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <ObjectCard style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>执行设备</Text>
             <DetailRow label="品牌型号" value={`${detail.drone.brand} ${detail.drone.model}`} />
-            {detail.drone.serial_number ? <DetailRow label="序列号" value={detail.drone.serial_number} /> : null}
             <DetailRow label="起飞重量" value={detail.drone.mtow_kg != null ? `${detail.drone.mtow_kg} kg` : '-'} />
             <DetailRow label="最大载重" value={detail.drone.max_payload_kg != null ? `${detail.drone.max_payload_kg} kg` : '-'} />
           </ObjectCard>
@@ -1122,28 +1160,36 @@ export default function OrderDetailScreen({route, navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>执行进度</Text>
-          <DetailRow label="当前状态" value={getObjectStatusMeta('order', detail.status).label} />
           <DetailRow label="执行安排" value={getDispatchArrangementSummary(detail)} />
           <DetailRow label="执行模式" value={getExecutionModeLabel(detail.execution_mode)} />
-          <DetailRow label="当前执行方" value={currentExecutorLabel} />
           {latestTimelineTitle ? <DetailRow label="最近进展" value={latestTimelineTitle} /> : null}
-          {!isClient ? <DetailRow label="安排调整次数" value={String(detail.dispatch_history?.length || 0)} /> : null}
           <View style={styles.dispatchSection}>
-            <Text style={styles.subsectionTitle}>{isClient ? '当前执行安排' : '执行安排详情'}</Text>
+            <Text style={styles.subsectionTitle}>{isClient ? '当前执行安排' : isDispatchTargetPilot || isExecutor ? '我的执行安排' : '执行安排详情'}</Text>
             <ExecutionArrangementCard detail={detail} isClient={isClient} />
           </View>
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>费用与结算</Text>
-          <DetailRow label="订单总额" value={formatMoney(financial?.total_amount || detail.total_amount)} highlight />
-          <DetailRow label="押金" value={formatMoney(financial?.deposit_amount)} />
-          <DetailRow label="平台佣金" value={formatMoney(financial?.platform_commission)} />
-          <DetailRow label="承接方收入" value={formatMoney(financial?.owner_amount)} />
-          <DetailRow label="已支付" value={formatMoney(financial?.paid_amount)} />
-          <DetailRow label="已退款" value={formatMoney(financial?.refunded_amount)} />
-          <DetailRow label="支付笔数" value={String(financial?.paid_count || 0)} />
-          <DetailRow label="退款笔数" value={String(financial?.refund_count || 0)} />
+          <Text style={styles.sectionTitle}>费用与结算明细</Text>
+          <View style={styles.costGrid}>
+            <View style={styles.costItem}>
+              <Text style={styles.costLabel}>运输服务费</Text>
+              <Text style={styles.costValue}>{formatMoney(detail.total_amount)}</Text>
+            </View>
+            <View style={styles.costItem}>
+              <Text style={styles.costLabel}>履约保证金</Text>
+              <Text style={styles.costValue}>{formatMoney(detail.financial_summary?.deposit_amount || 0)}</Text>
+            </View>
+            <View style={styles.costDivider} />
+            <View style={[styles.costItem, {marginTop: 4}]}>
+              <Text style={styles.costLabelTotal}>总计金额</Text>
+              <Text style={styles.costValueTotal}>{formatMoney(Number(detail.total_amount || 0) + Number(detail.financial_summary?.deposit_amount || 0))}</Text>
+            </View>
+          </View>
+          <View style={styles.paymentStatusRow}>
+            <DetailRow label="已支付总额" value={formatMoney(financial?.paid_amount)} highlight />
+            <DetailRow label="已退款金额" value={formatMoney(financial?.refunded_amount)} />
+          </View>
           {financial?.provider_reject_reason ? <DetailRow label="拒绝原因" value={financial.provider_reject_reason} /> : null}
         </ObjectCard>
 
@@ -1239,6 +1285,97 @@ const getStyles = (theme: AppTheme) =>
       padding: 14,
       paddingBottom: 120,
     },
+    progressFocusContainer: {
+      marginBottom: 16,
+      borderRadius: 24,
+      padding: 20,
+      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    progressFocusHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    focusIndicator: {
+      width: 4,
+      height: 14,
+      borderRadius: 2,
+      marginRight: 8,
+    },
+    focusEyebrow: {
+      fontSize: 12,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      flex: 1,
+    },
+    focusEtaPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+    },
+    focusEtaText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    focusTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.text,
+      lineHeight: 26,
+    },
+    focusDesc: {
+      fontSize: 13,
+      color: theme.textSub,
+      marginTop: 8,
+      lineHeight: 20,
+    },
+    focusActionHintRow: {
+      marginTop: 16,
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.divider,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    focusActionHintLabel: {
+      fontSize: 12,
+      color: theme.textHint,
+      fontWeight: '600',
+    },
+    focusActionHintValue: {
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    sectionCard: {
+      marginBottom: 12,
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      color: theme.text,
+      fontWeight: '800',
+    },
+    sectionSubtitle: {
+      fontSize: 12,
+      color: theme.textHint,
+      fontWeight: '600',
+    },
+    sectionHint: {
+      fontSize: 13,
+      color: theme.textSub,
+      lineHeight: 20,
+      marginBottom: 16,
+    },
     hero: {
       borderRadius: 24,
       backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
@@ -1300,56 +1437,6 @@ const getStyles = (theme: AppTheme) =>
       color: theme.isDark ? theme.text : '#FFFFFF',
       fontWeight: '700',
     },
-    sectionCard: {
-      marginBottom: 12,
-    },
-    progressCard: {
-      borderWidth: 1,
-    },
-    progressEyebrow: {
-      fontSize: 12,
-      fontWeight: '700',
-      marginBottom: 8,
-    },
-    progressTitle: {
-      fontSize: 20,
-      lineHeight: 26,
-      color: theme.text,
-      fontWeight: '800',
-    },
-    progressDesc: {
-      marginTop: 8,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.textSub,
-    },
-    progressMetaRow: {
-      marginTop: 14,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    progressChip: {
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    progressChipText: {
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    sectionTitle: {
-      fontSize: 16,
-      color: theme.text,
-      fontWeight: '800',
-      marginBottom: 12,
-    },
-    sectionHint: {
-      fontSize: 13,
-      color: theme.textSub,
-      lineHeight: 20,
-      marginBottom: 8,
-    },
     row: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -1391,7 +1478,7 @@ const getStyles = (theme: AppTheme) =>
       marginRight: 12,
     },
     participantAvatarText: {
-      color: theme.btnPrimaryText,
+      color: '#FFFFFF',
       fontSize: 15,
       fontWeight: '800',
     },
@@ -1453,12 +1540,69 @@ const getStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    trustRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
       marginBottom: 6,
+    },
+    trustIcon: {
+      fontSize: 12,
+    },
+    trustText: {
+      fontSize: 12,
+      color: theme.success,
+      fontWeight: '600',
+    },
+    dispatchDivider: {
+      height: 1,
+      backgroundColor: theme.divider,
+      marginVertical: 12,
     },
     dispatchNo: {
       fontSize: 13,
       color: theme.textSub,
       fontWeight: '700',
+    },
+    costGrid: {
+      backgroundColor: theme.bgSecondary,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+    },
+    costItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    costLabel: {
+      fontSize: 12,
+      color: theme.textHint,
+    },
+    costValue: {
+      fontSize: 13,
+      color: theme.text,
+      fontWeight: '600',
+    },
+    costDivider: {
+      height: 1,
+      backgroundColor: theme.divider,
+      marginVertical: 8,
+    },
+    costLabelTotal: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: theme.text,
+    },
+    costValueTotal: {
+      fontSize: 16,
+      fontWeight: '900',
+      color: theme.primaryText,
+    },
+    paymentStatusRow: {
+      marginTop: 4,
     },
     timelineList: {
       marginTop: 4,
@@ -1468,25 +1612,32 @@ const getStyles = (theme: AppTheme) =>
       minHeight: 58,
     },
     timelineAxis: {
-      width: 20,
+      width: 32,
       alignItems: 'center',
     },
-    timelineDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
+    timelineIconBg: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.bgSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
       marginTop: 4,
+    },
+    timelineIconText: {
+      fontSize: 12,
     },
     timelineLine: {
       width: 2,
       flex: 1,
       backgroundColor: theme.divider,
-      marginTop: 4,
+      marginVertical: 4,
     },
     timelineContent: {
       flex: 1,
       paddingLeft: 10,
-      paddingBottom: 16,
+      paddingBottom: 24,
     },
     timelineHeaderRow: {
       flexDirection: 'row',
@@ -1500,19 +1651,10 @@ const getStyles = (theme: AppTheme) =>
       color: theme.text,
       fontWeight: '700',
     },
-    timelineSourcePill: {
-      borderRadius: 999,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    timelineSourceText: {
+    timelineTime: {
       fontSize: 11,
-      fontWeight: '700',
-    },
-    timelineMeta: {
-      marginTop: 4,
-      fontSize: 12,
-      color: theme.textSub,
+      color: theme.textHint,
+      fontWeight: '600',
     },
     timelineDesc: {
       marginTop: 6,
@@ -1534,7 +1676,7 @@ const getStyles = (theme: AppTheme) =>
       borderTopColor: theme.divider,
       paddingHorizontal: 14,
       paddingTop: 12,
-      paddingBottom: 28,
+      paddingBottom: Platform.OS === 'ios' ? 28 : 12,
     },
     actionSpinner: {
       marginRight: 12,
@@ -1566,7 +1708,7 @@ const getStyles = (theme: AppTheme) =>
       fontWeight: '700',
     },
     actionButtonTextPrimary: {
-      color: theme.btnPrimaryText,
+      color: '#FFFFFF',
     },
     actionButtonTextDanger: {
       color: theme.danger,

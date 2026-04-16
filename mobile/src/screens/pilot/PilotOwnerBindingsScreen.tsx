@@ -70,7 +70,7 @@ export default function PilotOwnerBindingsScreen() {
 
   const handleApply = useCallback(async () => {
     if (!ownerUserId.trim()) {
-      Alert.alert('请补充信息', '请填写机主用户 ID。');
+      Alert.alert('请补充信息', '请填写机主账号编号。');
       return;
     }
     setSubmitting(true);
@@ -171,13 +171,13 @@ export default function PilotOwnerBindingsScreen() {
             <View style={styles.hero}>
               <Text style={styles.heroEyebrow}>绑定机主</Text>
               <Text style={styles.heroTitle}>长期协作关系从这里发起</Text>
-              <Text style={styles.heroDesc}>绑定关系只是在调度层建立长期合作，不代表跳过正式派单，也不会自动赋予执行权限。</Text>
+              <Text style={styles.heroDesc}>建立长期协作后，后续接单沟通会更顺畅；每次任务仍会单独确认。</Text>
             </View>
 
             <ObjectCard style={styles.formCard}>
               <Text style={styles.formTitle}>申请绑定机主</Text>
-              <Text style={styles.formDesc}>当前开发阶段先通过机主用户 ID 发起申请，后面再补搜索选择体验。</Text>
-              <TextInput style={styles.input} placeholder="机主用户 ID" keyboardType="number-pad" value={ownerUserId} onChangeText={setOwnerUserId} />
+              <Text style={styles.formDesc}>当前可先输入对方账号编号发起申请，确认后即可建立长期合作。</Text>
+              <TextInput style={styles.input} placeholder="机主账号编号" keyboardType="number-pad" value={ownerUserId} onChangeText={setOwnerUserId} />
               <TextInput style={[styles.input, styles.noteInput]} placeholder="合作说明（选填）" value={note} onChangeText={setNote} multiline textAlignVertical="top" />
               <TouchableOpacity style={[styles.primaryBtn, submitting && styles.disabledBtn]} onPress={handleApply} disabled={submitting}>
                 <Text style={styles.primaryBtnText}>{submitting ? '提交中...' : '提交申请'}</Text>

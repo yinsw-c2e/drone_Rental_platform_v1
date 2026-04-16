@@ -79,7 +79,7 @@ const buildReviewTargets = (detail: V2OrderDetail | null, currentUserId: number)
   return Array.from(unique.values());
 };
 
-export default function ReviewScreen({route, navigation}: any) {
+export default function ReviewScreen({route, navigation: _navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const currentUserId = Number(useSelector((state: RootState) => state.auth.user?.id || 0));
@@ -219,7 +219,7 @@ export default function ReviewScreen({route, navigation}: any) {
               <EmptyState
                 icon="⌛"
                 title="订单完成后才能评价"
-                description="后端当前只允许 completed 订单提交评价，避免在履约未结束时提前形成结论。"
+                description="请在订单完结后再提交评价，这样更有利于给出完整、客观的反馈。"
               />
             )
           ) : (

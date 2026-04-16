@@ -10,6 +10,7 @@ import {
   TextInput,
   RefreshControl,
   FlatList,
+  Platform,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -25,6 +26,7 @@ import AddressInputField from '../../components/AddressInputField';
 import {AddressData} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const STATUS_MAP: Record<string, {label: string; colorKey: 'textHint' | 'warning' | 'success' | 'danger' | 'info'}> = {
   draft: {label: '草稿', colorKey: 'textHint'},
@@ -60,12 +62,42 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   const [departureAddr, setDepartureAddr] = useState<AddressData | null>(null);
   const [arrivalAddr, setArrivalAddr] = useState<AddressData | null>(null);
   const [maxAltitudeStr, setMaxAltitudeStr] = useState('120');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+
+  const [startDate, setStartDate] = useState<Date>(new Date(Date.now() + 86400000));
+  const [endDate, setEndDate] = useState<Date>(new Date(Date.now() + 86400000 + 7200000));
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
   const [routeDesc, setRouteDesc] = useState('');
 
   const droneId = route?.params?.droneId || 0;
   const orderId = route?.params?.orderId || 0;
+
+  const onStartDateChange = (_event: any, selected?: Date) => {
+    setShowStartPicker(Platform.OS === 'ios');
+    if (selected) {
+      setStartDate(selected);
+      if (selected >= endDate) {
+        setEndDate(new Date(selected.getTime() + 7200000));
+      }
+    }
+  };
+
+  const onEndDateChange = (_event: any, selected?: Date) => {
+    setShowEndPicker(Platform.OS === 'ios');
+    if (selected) {
+      setEndDate(selected);
+    }
+  };
+
+  const formatDisplayTime = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const mi = String(date.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${d} ${h}:${mi}`;
+  };
 
   useEffect(() => {
     loadPilotInfo();
@@ -105,11 +137,9 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   );
 
   const handleCreate = async () => {
-    if (!planName.trim()) return Alert.alert('提示', '请输入飞行计划名称');
-    if (!departureAddr) return Alert.alert('提示', '请选择起飞地址');
-    if (!arrivalAddr) return Alert.alert('提示', '请选择降落地址');
-    if (!startTime.trim()) return Alert.alert('提示', '请输入计划起飞时间');
-    if (!endTime.trim()) return Alert.alert('提示', '请输入计划结束时间');
+    if (!planName.trim()) return Alert.alert('提示', '请输入报备名称');
+    if (!departureAddr) return Alert.alert('提示', '请选择起运报备地址');
+    if (!arrivalAddr) return Alert.alert('提示', '请选择送达报备地址');
 
     setSubmitting(true);
     try {
@@ -126,31 +156,31 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
         arrival_longitude: arrivalAddr.longitude || 0,
         arrival_address: arrivalAddr.address || arrivalAddr.name || '',
         max_altitude: parseInt(maxAltitudeStr, 10) || 120,
-        planned_start_time: startTime,
-        planned_end_time: endTime,
+        planned_start_time: startDate.toISOString(),
+        planned_end_time: endDate.toISOString(),
         route_description: routeDesc,
       };
       await createApplication(req);
-      Alert.alert('成功', '空域申请已创建');
+      Alert.alert('成功', '空域报备已提交存证');
       setMode('list');
       resetForm();
       loadApplications();
     } catch (err: any) {
-      Alert.alert('创建失败', err.message);
+      Alert.alert('提交失败', err.message);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleSubmitReview = async (id: number) => {
-    Alert.alert('提交审核', '确定要提交此空域申请进行审核吗？提交前会自动执行合规性检查。', [
+    Alert.alert('确认报备', '确定要提交此空域报备进行正式存证与审核吗？提交前将自动进行合规性校验。', [
       {text: '取消', style: 'cancel'},
       {
         text: '确认提交',
         onPress: async () => {
           try {
             await submitForReview(id, pilotId);
-            Alert.alert('成功', '已提交审核');
+            Alert.alert('成功', '已提交存证');
             loadApplications();
           } catch (err: any) {
             Alert.alert('提交失败', err.message);
@@ -161,10 +191,10 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   };
 
   const handleCancel = async (id: number) => {
-    Alert.alert('取消申请', '确定要取消此空域申请吗？', [
+    Alert.alert('取消报备', '确定要撤销此空域报备申请吗？', [
       {text: '保留', style: 'cancel'},
       {
-        text: '确认取消',
+        text: '确认撤销',
         style: 'destructive',
         onPress: async () => {
           try {
@@ -185,8 +215,8 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
     setDepartureAddr(null);
     setArrivalAddr(null);
     setMaxAltitudeStr('120');
-    setStartTime('');
-    setEndTime('');
+    setStartDate(new Date(Date.now() + 86400000));
+    setEndDate(new Date(Date.now() + 86400000 + 7200000));
     setRouteDesc('');
   };
 
@@ -197,7 +227,7 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
         style={styles.card}
         onPress={() => navigation.navigate('ComplianceCheck', {applicationId: item.id, pilotId, droneId: item.drone_id})}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.flight_plan_name || '未命名飞行计划'}</Text>
+          <Text style={styles.cardTitle} numberOfLines={1}>{item.flight_plan_name || '未命名报备'}</Text>
           <View style={[styles.statusBadge, {backgroundColor: theme[statusInfo.colorKey] + '20'}]}>
             <Text style={[styles.statusText, {color: theme[statusInfo.colorKey]}]}>{statusInfo.label}</Text>
           </View>
@@ -207,15 +237,15 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
           <Text style={styles.cardInfo}>用途: {PURPOSE_OPTIONS.find(p => p.value === item.flight_purpose)?.label || item.flight_purpose}</Text>
           <Text style={styles.cardInfo}>起飞: {item.departure_address || '未设置'}</Text>
           <Text style={styles.cardInfo}>降落: {item.arrival_address || '未设置'}</Text>
-          <Text style={styles.cardInfo}>高度: {item.max_altitude}m</Text>
+          <Text style={styles.cardInfo}>限高: {item.max_altitude}m</Text>
           {item.uom_application_no ? (
-            <Text style={styles.cardInfo}>UOM编号: {item.uom_application_no}</Text>
+            <Text style={styles.cardInfo}>UOM存证编号: {item.uom_application_no}</Text>
           ) : null}
         </View>
 
         <View style={styles.cardFooter}>
           <Text style={styles.timeText}>
-            {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
+            创建: {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
           </Text>
           <View style={styles.actionButtons}>
             {item.status === 'draft' && (
@@ -223,12 +253,12 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
                 <TouchableOpacity
                   style={[styles.actionBtn, styles.submitBtn]}
                   onPress={() => handleSubmitReview(item.id)}>
-                  <Text style={styles.submitBtnText}>提交审核</Text>
+                  <Text style={styles.submitBtnText}>提交存证</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, styles.cancelBtn]}
                   onPress={() => handleCancel(item.id)}>
-                  <Text style={styles.cancelBtnText}>取消</Text>
+                  <Text style={styles.cancelBtnText}>撤销</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -248,65 +278,99 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
   if (mode === 'create') {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setMode('list')} style={styles.backBtnHeader}>
+            <Text style={styles.backText}>˂ 取消</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>新建空域报备</Text>
+          <View style={{width: 60}} />
+        </View>
+
         <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>空域报备信息</Text>
+          <View style={styles.formCard}>
+            <Text style={styles.formSectionTitle}>基本信息</Text>
+            <Text style={styles.label}>报备名称 *</Text>
+            <TextInput style={styles.input} placeholder="例如：某项目物资运输空域报备" value={planName} onChangeText={setPlanName} />
 
-          <Text style={styles.label}>计划名称 *</Text>
-          <TextInput style={styles.input} placeholder="例: 南海区塔材短距吊运报备" value={planName} onChangeText={setPlanName} />
-
-          <Text style={styles.label}>飞行用途 *</Text>
-          <View style={styles.optionRow}>
-            {PURPOSE_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.optionChip, purpose === opt.value && styles.optionChipActive]}
-                onPress={() => setPurpose(opt.value)}>
-                <Text style={[styles.optionChipText, purpose === opt.value && styles.optionChipTextActive]}>{opt.label}</Text>
-              </TouchableOpacity>
-            ))}
+            <Text style={styles.label}>作业用途 *</Text>
+            <View style={styles.optionRow}>
+              {PURPOSE_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.optionChip, purpose === opt.value && styles.optionChipActive]}
+                  onPress={() => setPurpose(opt.value)}>
+                  <Text style={[styles.optionChipText, purpose === opt.value && styles.optionChipTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
-          <Text style={styles.sectionTitle}>起飞点</Text>
-          <Text style={styles.label}>地址 *</Text>
-          <AddressInputField
-            value={departureAddr}
-            placeholder="点击选择起飞地址"
-            onSelect={setDepartureAddr}
-            style={styles.addrField}
-          />
+          <View style={styles.formCard}>
+            <Text style={styles.formSectionTitle}>起降点设置</Text>
+            <Text style={styles.label}>起飞点地址 *</Text>
+            <AddressInputField
+              value={departureAddr}
+              placeholder="请选择作业起始坐标"
+              onSelect={setDepartureAddr}
+              style={styles.addrField}
+            />
 
-          <Text style={styles.sectionTitle}>降落点</Text>
-          <Text style={styles.label}>地址 *</Text>
-          <AddressInputField
-            value={arrivalAddr}
-            placeholder="点击选择降落地址"
-            onSelect={setArrivalAddr}
-            style={styles.addrField}
-          />
+            <Text style={styles.label}>降落点地址 *</Text>
+            <AddressInputField
+              value={arrivalAddr}
+              placeholder="请选择作业结束坐标"
+              onSelect={setArrivalAddr}
+              style={styles.addrField}
+            />
+          </View>
 
-          <Text style={styles.sectionTitle}>飞行区域与作业参数</Text>
-          <Text style={styles.label}>最大飞行高度(米)</Text>
-          <TextInput style={styles.input} placeholder="120" keyboardType="number-pad" value={maxAltitudeStr} onChangeText={setMaxAltitudeStr} />
+          <View style={styles.formCard}>
+            <Text style={styles.formSectionTitle}>作业时间与参数</Text>
 
-          <Text style={styles.label}>计划起飞时间 * (YYYY-MM-DD HH:MM)</Text>
-          <TextInput style={styles.input} placeholder="2026-03-05 09:00" value={startTime} onChangeText={setStartTime} />
+            <View style={styles.timePickerRow}>
+              <TouchableOpacity style={styles.timeBox} onPress={() => setShowStartPicker(true)}>
+                <Text style={styles.timeLabel}>计划开始</Text>
+                <Text style={styles.timeValue}>{formatDisplayTime(startDate)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.timeBox} onPress={() => setShowEndPicker(true)}>
+                <Text style={styles.timeLabel}>计划结束</Text>
+                <Text style={styles.timeValue}>{formatDisplayTime(endDate)}</Text>
+              </TouchableOpacity>
+            </View>
 
-          <Text style={styles.label}>计划结束时间 * (YYYY-MM-DD HH:MM)</Text>
-          <TextInput style={styles.input} placeholder="2026-03-05 11:00" value={endTime} onChangeText={setEndTime} />
+            <Text style={styles.label}>最大飞行高度 (米) *</Text>
+            <TextInput style={styles.input} placeholder="120" keyboardType="number-pad" value={maxAltitudeStr} onChangeText={setMaxAltitudeStr} />
 
-          <Text style={styles.label}>飞行区域描述</Text>
-          <TextInput style={[styles.input, styles.textArea]} placeholder="描述计划作业区域、起降点和绕飞关注点" value={routeDesc} onChangeText={setRouteDesc} multiline numberOfLines={3} />
+            <Text style={styles.label}>航线描述 (选填)</Text>
+            <TextInput style={[styles.input, styles.textArea]} placeholder="描述大致飞行路径、绕飞障碍物等信息" value={routeDesc} onChangeText={setRouteDesc} multiline numberOfLines={3} />
+          </View>
+
+          {showStartPicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="datetime"
+              display="default"
+              onChange={onStartDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+          {showEndPicker && (
+            <DateTimePicker
+              value={endDate}
+              mode="datetime"
+              display="default"
+              onChange={onEndDateChange}
+              minimumDate={startDate}
+            />
+          )}
 
           <View style={styles.formButtons}>
-            <TouchableOpacity style={[styles.formBtn, styles.formBtnCancel]} onPress={() => {setMode('list'); resetForm();}}>
-              <Text style={styles.formBtnCancelText}>取消</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={[styles.formBtn, styles.formBtnSubmit]} onPress={handleCreate} disabled={submitting}>
-              <Text style={styles.formBtnSubmitText}>{submitting ? '提交中...' : '创建申请'}</Text>
+              <Text style={styles.formBtnSubmitText}>{submitting ? '提交中...' : '提交空域报备'}</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{height: 40}} />
+          <View style={{height: 60}} />
         </ScrollView>
       </SafeAreaView>
     );
@@ -367,26 +431,29 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
 
   // Form styles
   form: {flex: 1, padding: 16},
-  sectionTitle: {fontSize: 16, fontWeight: '600', color: theme.text, marginTop: 16, marginBottom: 8},
-  label: {fontSize: 13, color: theme.textSub, marginBottom: 4, marginTop: 8},
-  input: {backgroundColor: theme.card, borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.text},
+  formCard: {backgroundColor: theme.card, borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: theme.divider},
+  formSectionTitle: {fontSize: 16, fontWeight: '800', color: theme.text, marginBottom: 12},
+  label: {fontSize: 13, color: theme.textSub, marginBottom: 6, marginTop: 8},
+  input: {backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: theme.text},
   textArea: {minHeight: 80, textAlignVertical: 'top'},
   optionRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4},
-  optionChip: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider},
+  optionChip: {paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider},
   optionChipActive: {backgroundColor: theme.primaryBg, borderColor: theme.primary},
-  optionChipText: {fontSize: 13, color: theme.textSub},
-  optionChipTextActive: {color: theme.primaryText},
+  optionChipText: {fontSize: 13, color: theme.textSub, fontWeight: '600'},
+  optionChipTextActive: {color: theme.primaryText, fontWeight: '700'},
   addrField: {
-    borderWidth: 1, borderColor: theme.divider, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 14, backgroundColor: theme.card,
-    justifyContent: 'center', minHeight: 46,
+    borderWidth: 1, borderColor: theme.divider, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 14, backgroundColor: theme.bgSecondary,
+    justifyContent: 'center', minHeight: 48,
   },
-  coordRow: {flexDirection: 'row', gap: 12},
-  coordInput: {flex: 1},
-  formButtons: {flexDirection: 'row', gap: 12, marginTop: 24},
-  formBtn: {flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center'},
-  formBtnCancel: {backgroundColor: theme.bgSecondary, borderWidth: 1, borderColor: theme.divider},
-  formBtnCancelText: {color: theme.textSub, fontSize: 15, fontWeight: '500'},
+  timePickerRow: {flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 16},
+  timeBox: {flex: 1, backgroundColor: theme.bgSecondary, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: theme.divider},
+  timeLabel: {fontSize: 10, color: theme.textSub, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4},
+  timeValue: {fontSize: 14, color: theme.text, fontWeight: '700'},
+  formButtons: {marginTop: 12, marginBottom: 24},
+  formBtn: {paddingVertical: 14, borderRadius: 16, alignItems: 'center'},
   formBtnSubmit: {backgroundColor: theme.primary},
-  formBtnSubmitText: {color: theme.btnPrimaryText, fontSize: 15, fontWeight: '500'},
+  formBtnSubmitText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '800'},
+  backBtnHeader: {paddingVertical: 4},
+  backText: {fontSize: 15, color: theme.primaryText, fontWeight: '600'},
 });

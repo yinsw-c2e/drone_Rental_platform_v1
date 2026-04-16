@@ -121,66 +121,84 @@ export default function AddDroneScreen({navigation}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <ScrollView style={styles.scroll}>
-        {renderInput('品牌 *', 'brand', '如：DJI、大疆')}
-        {renderInput('型号 *', 'model', '如：Mavic 3 Pro')}
-        {renderInput('序列号', 'serial_number', '无人机序列号')}
-        {renderInput('最大载重(kg)', 'max_load', '如：2.5', {keyboardType: 'numeric'})}
-        {renderInput('续航时间(分钟)', 'max_flight_time', '如：45', {keyboardType: 'numeric'})}
-        {renderInput('日租金(元)', 'daily_price', '如：299', {keyboardType: 'numeric'})}
-        {renderInput('时租金(元)', 'hourly_price', '如：50', {keyboardType: 'numeric'})}
-        {renderInput('押金(元)', 'deposit', '如：500', {keyboardType: 'numeric'})}
-
-        {/* 无人机照片上传 */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>无人机照片（最多5张）</Text>
-          <View style={styles.imageRow}>
-            {images.map((uri, index) => (
-              <View key={index} style={styles.imageWrapper}>
-                <Image source={{uri}} style={styles.thumbnail} />
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  onPress={() => handleRemoveImage(index)}>
-                  <Text style={styles.removeBtnText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-            {images.length < 5 && (
-              <TouchableOpacity
-                style={styles.addImageBtn}
-                onPress={handlePickImage}
-                disabled={uploading}>
-                {uploading ? (
-                  <ActivityIndicator color={theme.primary} />
-                ) : (
-                  <>
-                    <Text style={styles.addImageIcon}>+</Text>
-                    <Text style={styles.addImageText}>添加照片</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>1. 基础规格信息</Text>
+          <View style={styles.card}>
+            {renderInput('品牌 *', 'brand', '如：大疆 (DJI)')}
+            {renderInput('型号 *', 'model', '如：Mavic 3 Pro')}
+            {renderInput('设备识别码 (SN)', 'serial_number', '请输入机身序列号')}
+            <View style={styles.rowInputs}>
+              <View style={{flex: 1}}>{renderInput('最大载重(kg)', 'max_load', '0.0', {keyboardType: 'numeric'})}</View>
+              <View style={{flex: 1}}>{renderInput('续航时间(min)', 'max_flight_time', '0', {keyboardType: 'numeric'})}</View>
+            </View>
           </View>
         </View>
-        
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>描述</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="描述无人机的特点、配置等"
-            value={form.description}
-            onChangeText={(text) => setForm({...form, description: text})}
-            multiline
-            numberOfLines={4}
-          />
+
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>2. 经营价格与描述</Text>
+          <View style={styles.card}>
+            <View style={styles.rowInputs}>
+              <View style={{flex: 1}}>{renderInput('日租金(元)', 'daily_price', '0', {keyboardType: 'numeric'})}</View>
+              <View style={{flex: 1}}>{renderInput('时租金(元)', 'hourly_price', '0', {keyboardType: 'numeric'})}</View>
+            </View>
+            {renderInput('押金金额(元)', 'deposit', '0', {keyboardType: 'numeric'})}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>资产描述</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="描述无人机的配置、电池循环数、成色等..."
+                placeholderTextColor={theme.textHint}
+                value={form.description}
+                onChangeText={(text) => setForm({...form, description: text})}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+          </View>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.submitBtn, (loading || uploading) && styles.submitBtnDisabled]} 
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>3. 资产实拍图</Text>
+          <View style={[styles.card, {paddingBottom: 20}]}>
+            <Text style={styles.tipText}>清晰的照片有助于提升租用率（最多5张）</Text>
+            <View style={styles.imageRow}>
+              {images.map((uri, index) => (
+                <View key={index} style={styles.imageWrapper}>
+                  <Image source={{uri}} style={styles.thumbnail} />
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() => handleRemoveImage(index)}>
+                    <Text style={styles.removeBtnText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {images.length < 5 && (
+                <TouchableOpacity
+                  style={styles.addImageBtn}
+                  onPress={handlePickImage}
+                  disabled={uploading}>
+                  {uploading ? (
+                    <ActivityIndicator color={theme.primary} />
+                  ) : (
+                    <>
+                      <Text style={styles.addImageIcon}>+</Text>
+                      <Text style={styles.addImageText}>上传图片</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.submitBtn, (loading || uploading) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={loading || uploading}>
-          <Text style={styles.submitBtnText}>{loading ? '提交中...' : '添加无人机'}</Text>
+          <Text style={styles.submitBtnText}>{loading ? '正在同步云端...' : '确认添加资产'}</Text>
         </TouchableOpacity>
+        <View style={{height: 40}} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -189,39 +207,46 @@ export default function AddDroneScreen({navigation}: any) {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {flex: 1, backgroundColor: theme.bgSecondary},
   scroll: {padding: 16},
+  formSection: {marginBottom: 20},
+  sectionTitle: {fontSize: 15, fontWeight: '800', color: theme.text, marginBottom: 12, marginLeft: 4},
+  card: {backgroundColor: theme.card, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: theme.divider},
   inputGroup: {marginBottom: 16},
-  label: {fontSize: 14, color: theme.text, marginBottom: 8, fontWeight: '500'},
+  rowInputs: {flexDirection: 'row', gap: 12},
+  label: {fontSize: 13, color: theme.textSub, marginBottom: 8, fontWeight: '700'},
   input: {
-    backgroundColor: theme.card, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 15, borderWidth: 1, borderColor: theme.divider,
+    backgroundColor: theme.bgSecondary, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 15, color: theme.text, borderWidth: 1, borderColor: theme.divider,
   },
-  textArea: {height: 100, textAlignVertical: 'top'},
+  textArea: {height: 96, textAlignVertical: 'top'},
   submitBtn: {
-    backgroundColor: theme.primary, borderRadius: 8, paddingVertical: 14,
-    alignItems: 'center', marginTop: 8, marginBottom: 32,
+    backgroundColor: theme.primary, borderRadius: 16, height: 54,
+    alignItems: 'center', justifyContent: 'center', marginTop: 8,
+    shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
   },
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '600'},
+  submitBtnText: {color: '#FFFFFF', fontSize: 16, fontWeight: '800'},
+  tipText: {fontSize: 12, color: theme.textHint, marginBottom: 16},
   // 照片相关
   imageRow: {flexDirection: 'row', flexWrap: 'wrap'},
   imageWrapper: {
-    width: 88, height: 88, marginRight: 10, marginBottom: 10, position: 'relative',
+    width: 80, height: 80, marginRight: 12, marginBottom: 12, position: 'relative',
   },
   thumbnail: {
-    width: 88, height: 88, borderRadius: 8, backgroundColor: theme.divider,
+    width: 80, height: 80, borderRadius: 12, backgroundColor: theme.divider,
   },
   removeBtn: {
     position: 'absolute', top: -6, right: -6,
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: theme.danger, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#fff',
   },
-  removeBtnText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: 'bold', lineHeight: 20},
+  removeBtnText: {color: '#FFFFFF', fontSize: 14, fontWeight: 'bold', lineHeight: 18},
   addImageBtn: {
-    width: 88, height: 88, borderRadius: 8, borderWidth: 1.5,
+    width: 80, height: 80, borderRadius: 12, borderWidth: 1.5,
     borderColor: theme.divider, borderStyle: 'dashed',
     backgroundColor: theme.bgSecondary, justifyContent: 'center', alignItems: 'center',
-    marginRight: 10, marginBottom: 10,
+    marginRight: 12, marginBottom: 12,
   },
-  addImageIcon: {fontSize: 24, color: theme.textHint},
-  addImageText: {fontSize: 12, color: theme.textSub, marginTop: 2},
+  addImageIcon: {fontSize: 28, color: theme.textHint, fontWeight: '300'},
+  addImageText: {fontSize: 11, color: theme.textSub, marginTop: 2, fontWeight: '600'},
 });

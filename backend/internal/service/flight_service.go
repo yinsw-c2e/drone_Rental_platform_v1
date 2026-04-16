@@ -5,24 +5,30 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/amap"
 	"wurenji-backend/internal/repository"
 )
 
 // FlightService 飞行监控服务
 type FlightService struct {
-	flightRepo *repository.FlightRepo
-	orderRepo  *repository.OrderRepo
-	pilotRepo  *repository.PilotRepo
-	logger     *zap.Logger
+	flightRepo  *repository.FlightRepo
+	orderRepo   *repository.OrderRepo
+	pilotRepo   *repository.PilotRepo
+	amapService *amap.AmapService
+	logger      *zap.Logger
 
 	// 配置
 	config FlightServiceConfig
+
+	simMu       sync.RWMutex
+	simulations map[int64]*developmentFlightSimulation
 }
 
 // FlightServiceConfig 服务配置
@@ -62,10 +68,15 @@ func NewFlightService(
 			GeofenceAlertDistance:   100,
 			TrajectorySimpTolerance: 5,
 		},
+		simulations: make(map[int64]*developmentFlightSimulation),
 	}
 	// 从数据库加载配置
 	s.loadConfigFromDB()
 	return s
+}
+
+func (s *FlightService) SetAmapService(amapService *amap.AmapService) {
+	s.amapService = amapService
 }
 
 func (s *FlightService) loadConfigFromDB() {

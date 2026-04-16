@@ -510,6 +510,24 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 		Status:                 "pending_provider_confirmation",
 	}
 
+	existingOrder, err := orderRepo.FindReusableDirectSupplyOrder(repository.DirectOrderReuseLookup{
+		SourceSupplyID: supply.ID,
+		RenterID:       renterUserID,
+		ServiceType:    serviceType,
+		StartTime:      startAt,
+		EndTime:        endAt,
+		ServiceAddress: serviceAddr,
+		DestAddress:    destAddr,
+		TotalAmount:    totalAmount,
+		CreatedAfter:   time.Now().Add(-24 * time.Hour),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if existingOrder != nil {
+		return existingOrder, nil
+	}
+
 	if err := orderRepo.Create(order); err != nil {
 		return nil, err
 	}

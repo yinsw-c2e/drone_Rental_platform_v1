@@ -343,18 +343,14 @@ ensure_owner_supply() {
 
   local existing_id
   existing_id="$(jq -r --argjson drone_id "$drone_id" '.data.items[] | select(.drone_id == $drone_id and .status == "active" and .accepts_direct_order == true) | .id' <<<"$list" | head -n1)"
-  if [[ -n "$existing_id" ]]; then
-    echo "$existing_id"
-    return
-  fi
 
   local payload response
   payload="$(jq -nc \
     --argjson drone_id "$drone_id" \
-    --arg title "阶段10自动验收重载供给" \
-    --arg description "阶段10 AUTO RUN 直达供给验收样本" \
-    --argjson cargo_scenes '["grid_power_material_transport"]' \
-    --argjson service_area '{"text":"广东省佛山市南海区","city":"佛山","district":"南海区"}' \
+    --arg title "阶段10佛山禅城重载直达供给" \
+    --arg description "阶段10 AUTO RUN 佛山禅城区快速下单验收样本" \
+    --argjson cargo_scenes '["power_grid"]' \
+    --argjson service_area '{"text":"广东省佛山市禅城区祖庙街道","city":"佛山","district":"禅城区"}' \
     --argjson pricing_rule '{"mode":"fixed_trip"}' \
     --argjson available_time_slots '[{"weekday":"all","start":"08:00","end":"18:00"}]' \
     '{
@@ -370,6 +366,14 @@ ensure_owner_supply() {
       accepts_direct_order:true,
       status:"active"
     }')"
+
+  if [[ -n "$existing_id" ]]; then
+    response="$(json_put "$token" "/owner/supplies/$existing_id" "$payload")"
+    assert_ok "$response" "update_owner_supply"
+    echo "$existing_id"
+    return
+  fi
+
   response="$(json_post "$token" "/owner/supplies" "$payload")"
   assert_ok "$response" "create_owner_supply"
   jq -r '.data.id' <<<"$response"
@@ -401,7 +405,7 @@ PY
   local payload response demand_id
   payload="$(jq -nc \
     --arg title "$title" \
-    --arg cargo_scene "grid_power_material_transport" \
+    --arg cargo_scene "power_grid" \
     --arg start "$start_iso" \
     --arg end "$end_iso" \
     --arg expiry "$expiry_iso" \
@@ -410,9 +414,9 @@ PY
       service_type:"heavy_cargo_lift_transport",
       cargo_scene:$cargo_scene,
       description:"阶段10 AUTO RUN 客户需求验收样本",
-      departure_address:{text:"广东省佛山市南海区电力仓储基地", city:"佛山", district:"南海区"},
-      destination_address:{text:"广东省佛山市高明区电网建设工地", city:"佛山", district:"高明区"},
-      service_address:{text:"广东省佛山市南海区电力仓储基地", city:"佛山", district:"南海区"},
+      departure_address:{text:"广东省佛山市禅城区电力仓储基地", city:"佛山", district:"禅城区"},
+      destination_address:{text:"广东省佛山市南海区电网建设工地", city:"佛山", district:"南海区"},
+      service_address:{text:"广东省佛山市禅城区电力仓储基地", city:"佛山", district:"禅城区"},
       scheduled_start_at:$start,
       scheduled_end_at:$end,
       cargo_weight_kg:52,
@@ -499,10 +503,10 @@ PY
     --arg end "$end_iso" \
     '{
       service_type:"heavy_cargo_lift_transport",
-      cargo_scene:"grid_power_material_transport",
-      departure_address:{text:"广东省佛山市南海区电网仓库", city:"佛山", district:"南海区"},
-      destination_address:{text:"广东省佛山市三水区施工吊运点", city:"佛山", district:"三水区"},
-      service_address:{text:"广东省佛山市南海区电网仓库", city:"佛山", district:"南海区"},
+      cargo_scene:"power_grid",
+      departure_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
+      destination_address:{text:"广东省佛山市南海区施工吊运点", city:"佛山", district:"南海区"},
+      service_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
       scheduled_start_at:$start,
       scheduled_end_at:$end,
       cargo_weight_kg:55,

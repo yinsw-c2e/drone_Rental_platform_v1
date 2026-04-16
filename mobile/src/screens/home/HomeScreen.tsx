@@ -476,44 +476,44 @@ export default function HomeScreen({ navigation }: any) {
         };
       case 'pilot':
         return {
-          title: '先接派单，再看执行',
+          title: '正式派单已就绪',
           subtitle:
-            '飞手视图只保留执行相关信息，避免把任务、服务和订单列表堆在一起。',
+            '请优先处理分配给您的正式派单。已接任务的执行环节、飞行监控与记录均在此汇总。',
           primaryAction: {
-            title: '待接派单',
+            title: '查看待接派单',
             onPress: () =>
               navigation.navigate('PilotTaskList', { entry: 'assigned' }),
           },
           secondaryActions: [
             {
-              title: '飞行记录',
-              onPress: () => navigation.navigate('FlightLog'),
+              title: '飞行执行',
+              onPress: () => navigation.navigate('Fulfillment'),
             },
             {
-              title: '可报名需求',
-              onPress: () => navigation.navigate('DemandList'),
+              title: '资质管理',
+              onPress: () => navigation.navigate('PilotProfile'),
             },
           ],
           metrics: [
             {
               key: 'pilot-pending',
-              label: '待响应派单',
+              label: '待响应',
               value:
                 currentDashboard.role_views.pilot
                   .pending_response_dispatch_count,
-              hint: '系统正式派单待确认',
+              hint: '正式派单待确认',
             },
             {
               key: 'pilot-active',
-              label: '今日任务',
+              label: '执行中',
               value: currentDashboard.role_views.pilot.active_dispatch_count,
-              hint: '已接受或执行中的派单',
+              hint: '当前进行中的任务',
             },
             {
               key: 'pilot-flight',
-              label: '最近飞行',
+              label: '累计飞行',
               value: currentDashboard.role_views.pilot.recent_flight_count,
-              hint: '真实履约飞行记录',
+              hint: '真实履约飞行次数',
             },
           ] as MetricCard[],
         };
@@ -681,7 +681,7 @@ export default function HomeScreen({ navigation }: any) {
           {
             key: 'pilot-assigned',
             title: '待接派单',
-            desc: '优先处理系统正式派单',
+            desc: '处理系统正式指派任务',
             icon: '🎯',
             tone: 'orange',
             onPress: () =>
@@ -690,22 +690,29 @@ export default function HomeScreen({ navigation }: any) {
               currentDashboard.role_views.pilot.pending_response_dispatch_count,
           },
           {
+            key: 'pilot-fulfillment',
+            title: '飞行执行',
+            desc: '进入飞行监控与交付看板',
+            icon: '🚁',
+            tone: 'teal',
+            onPress: () => navigation.navigate('Fulfillment'),
+          },
+          {
             key: 'pilot-nearby',
-            title: '可报名任务',
-            desc: '查看系统筛选后的公开任务',
+            title: '报名需求',
+            desc: '报名公开任务进入候选池',
             icon: '🛰️',
             tone: 'blue',
-            onPress: () => navigation.navigate('DemandList'),
+            onPress: () => navigation.navigate('DemandList', {mode: 'pilot'}),
             badge: currentDashboard.role_views.pilot.candidate_demand_count,
           },
           {
-            key: 'pilot-records',
-            title: '飞行记录',
-            desc: '查看真实执行飞行数据',
-            icon: '🛫',
+            key: 'pilot-profile',
+            title: '资质设置',
+            desc: '管理执照、技能与接单开关',
+            icon: '🪪',
             tone: 'purple',
-            onPress: () => navigation.navigate('FlightLog'),
-            badge: currentDashboard.role_views.pilot.recent_flight_count,
+            onPress: () => navigation.navigate('PilotProfile'),
           },
         ];
       default:
@@ -1313,6 +1320,23 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   heroActionTextGhost: {
     color: '#FFFFFF',
+  },
+  heroDualBtn: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  heroDualBtnTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  heroDualBtnDesc: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   sectionWrap: {
     marginTop: 14,

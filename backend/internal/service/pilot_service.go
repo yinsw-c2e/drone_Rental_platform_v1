@@ -1222,6 +1222,24 @@ func calcFlightMetricsFromPositions(positions []model.FlightPosition) (durationS
 		distanceMeters += dist
 	}
 
+	if durationSec > 0 || len(positions) < 2 {
+		return durationSec, distanceMeters, maxAltitude
+	}
+
+	// 开发态模拟飞行的点位跨度会比真实遥测更大，严格阈值可能把所有航段都过滤掉。
+	// 当严格模式一段都没算出来时，退回到更宽松的二次计算，避免监控概览长期显示为 0。
+	for i := 1; i < len(positions); i++ {
+		prev := positions[i-1]
+		cur := positions[i]
+		dt := cur.RecordedAt.Sub(prev.RecordedAt).Seconds()
+		if dt <= 0 || dt > maxSegmentGapSeconds {
+			continue
+		}
+		dist := haversineMeters(prev.Latitude, prev.Longitude, cur.Latitude, cur.Longitude)
+		durationSec += int64(dt)
+		distanceMeters += dist
+	}
+
 	return durationSec, distanceMeters, maxAltitude
 }
 

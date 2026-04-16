@@ -1,5 +1,5 @@
-import React, {useEffect} from 'react';
-import {useNavigate} from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Web 版本的 useFocusEffect polyfill
@@ -39,6 +39,14 @@ function resolveWebPath(screen: string, params?: any): string | null {
     case 'OrderAfterSale': {
       const id = getId(params, 'orderId', 'id');
       return id ? `/order/${id}/after-sale` : null;
+    }
+    case 'Contract': {
+      const id = getId(params, 'orderId', 'id');
+      return id ? `/order/${id}/contract` : null;
+    }
+    case 'ContractDocument': {
+      const id = getId(params, 'orderId', 'id');
+      return id ? `/order/${id}/contract/document` : null;
     }
     case 'DroneDetail': {
       const id = getId(params, 'droneId', 'id');
@@ -140,7 +148,7 @@ export function useNavigation<T = any>() {
     navigate: (screen: string, params?: any) => {
       const path = resolveWebPath(screen, params);
       if (path) {
-        navigate(path, {state: params});
+        navigate(path, { state: params });
         return;
       }
 
@@ -152,7 +160,11 @@ export function useNavigation<T = any>() {
   } as T;
 }
 
-export function NavigationContainer({children}: {children: React.ReactNode}) {
+export function NavigationContainer({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return React.createElement(React.Fragment, null, children);
 }
 
@@ -182,27 +194,45 @@ export const NavigationMetaContext = React.createContext<any>(undefined);
 export const usePreventRemoveContext = React.createContext<any>(undefined);
 
 export function useLocale() {
-  return {direction: 'ltr' as const};
+  return { direction: 'ltr' as const };
 }
 
 export function useLinkProps(_: any) {
-  return {onPress: () => {}, href: undefined};
+  return { onPress: () => {}, href: undefined };
 }
 
 export function useLinkBuilder() {
-  return {buildHref: () => '', buildAction: () => ({})};
+  return { buildHref: () => '', buildAction: () => ({}) };
 }
 
 export function useNavigationBuilder(_: any, config: any) {
-  return {state: {routes: [], index: 0}, navigation: {}, descriptors: {}, NavigationContent: ({children}: any) => children, ...config};
+  return {
+    state: { routes: [], index: 0 },
+    navigation: {},
+    descriptors: {},
+    NavigationContent: ({ children }: any) => children,
+    ...config,
+  };
 }
 
 export function createNavigatorFactory(_: any) {
-  return () => ({Navigator: (_: any) => null, Screen: (_: any) => null, Group: (_: any) => null});
+  return () => ({
+    Navigator: (_: any) => null,
+    Screen: (_: any) => null,
+    Group: (_: any) => null,
+  });
 }
 
-export const CommonActions = {navigate: () => ({}), reset: () => ({}), goBack: () => ({})};
-export const StackActions = {push: () => ({}), pop: () => ({}), replace: () => ({})};
+export const CommonActions = {
+  navigate: () => ({}),
+  reset: () => ({}),
+  goBack: () => ({}),
+};
+export const StackActions = {
+  push: () => ({}),
+  pop: () => ({}),
+  replace: () => ({}),
+};
 export const TabRouter = {};
 export const StackRouter = {};
 
