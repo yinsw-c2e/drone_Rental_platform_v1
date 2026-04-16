@@ -56,8 +56,23 @@ export default function ContractScreen({route, navigation}: any) {
     setSigning(true);
     try {
       const res = await contractService.sign(orderId);
-      setContract(res.data);
-      Alert.alert('签署成功', '合同已签署');
+      const nextContract = res.data;
+      setContract(nextContract);
+      if (nextContract.status === 'fully_signed') {
+        Alert.alert(
+          '签署成功',
+          currentUserId === nextContract.client_user_id
+            ? '双方已完成合同签署，现在可以继续支付。'
+            : '双方已完成合同签署，系统会提醒客户继续支付。',
+        );
+      } else {
+        Alert.alert(
+          '签署成功',
+          currentUserId === nextContract.client_user_id
+            ? '你已完成签署，待服务方签署后系统会提醒你继续下一步。'
+            : '你已完成签署，待客户签署后系统会自动继续推进。',
+        );
+      }
     } catch (e: any) {
       Alert.alert('签署失败', e.message || '请稍后重试');
     } finally {

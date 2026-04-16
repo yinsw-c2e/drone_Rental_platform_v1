@@ -17,6 +17,7 @@ import (
 type PaymentService struct {
 	paymentRepo       *repository.PaymentRepo
 	orderRepo         *repository.OrderRepo
+	contractRepo      *repository.ContractRepo
 	droneRepo         *repository.DroneRepo
 	pilotRepo         *repository.PilotRepo
 	orderArtifactRepo *repository.OrderArtifactRepo
@@ -54,6 +55,10 @@ func (s *PaymentService) SetEventService(eventService *EventService) {
 	s.eventService = eventService
 }
 
+func (s *PaymentService) SetContractRepo(contractRepo *repository.ContractRepo) {
+	s.contractRepo = contractRepo
+}
+
 func (s *PaymentService) CreatePayment(orderID, userID int64, method string) (*model.Payment, *payment.PaymentResult, error) {
 	method, err := normalizePaymentMethod(method)
 	if err != nil {
@@ -72,6 +77,15 @@ func (s *PaymentService) CreatePayment(orderID, userID int64, method string) (*m
 	}
 	if order.Status != "pending_payment" && order.Status != "accepted" {
 		return nil, nil, errors.New("订单状态不允许支付")
+	}
+	if s.contractRepo != nil {
+		contract, contractErr := s.contractRepo.GetByOrderID(orderID)
+		if contractErr != nil && !errors.Is(contractErr, gorm.ErrRecordNotFound) {
+			return nil, nil, contractErr
+		}
+		if contractErr == nil && contract != nil && contract.Status != "fully_signed" {
+			return nil, nil, errors.New("请先完成双方合同签署后再支付")
+		}
 	}
 
 	amount := order.TotalAmount + order.DepositAmount

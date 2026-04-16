@@ -21,9 +21,11 @@ import (
 	v2owner "wurenji-backend/internal/api/v2/owner"
 	v2payment "wurenji-backend/internal/api/v2/payment"
 	v2pilot "wurenji-backend/internal/api/v2/pilot"
+	v2push "wurenji-backend/internal/api/v2/push"
 	v2review "wurenji-backend/internal/api/v2/review"
 	v2settlement "wurenji-backend/internal/api/v2/settlement"
 	v2supply "wurenji-backend/internal/api/v2/supply"
+	pushpkg "wurenji-backend/internal/pkg/push"
 	"wurenji-backend/internal/service"
 )
 
@@ -44,13 +46,14 @@ type Handlers struct {
 	Payment      *v2payment.Handler
 	Settlement   *v2settlement.Handler
 	Notification *v2notification.Handler
+	Push         *v2push.Handler
 	Review       *v2review.Handler
 	AdminLegacy  *v1admin.Handler
 	Analytics    *v1analytics.Handler
 	ClientLegacy *v1client.Handler
 }
 
-func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, adminHandler *v1admin.Handler, analyticsHandler *v1analytics.Handler, clientLegacyHandler *v1client.Handler) *Handlers {
+func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, serverMode string, adminHandler *v1admin.Handler, analyticsHandler *v1analytics.Handler, clientLegacyHandler *v1client.Handler) *Handlers {
 	return &Handlers{
 		Base:         base.NewHandler(),
 		Auth:         v2auth.NewHandler(authService, userService),
@@ -68,6 +71,7 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Payment:      v2payment.NewHandler(orderService, paymentService),
 		Settlement:   v2settlement.NewHandler(orderService, settlementService),
 		Notification: v2notification.NewHandler(messageService),
+		Push:         v2push.NewHandler(pushService, serverMode),
 		Review:       v2review.NewHandler(orderService, reviewService),
 		AdminLegacy:  adminHandler,
 		Analytics:    analyticsHandler,
@@ -213,6 +217,12 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		{
 			notificationGroup.GET("", h.Notification.List)
 			notificationGroup.POST("/:notification_id/read", h.Notification.MarkRead)
+		}
+
+		pushGroup := authenticated.Group("/push")
+		{
+			pushGroup.POST("/device", h.Push.RegisterDevice)
+			pushGroup.POST("/test", h.Push.SendTest)
 		}
 
 		conversationGroup := authenticated.Group("/conversations")

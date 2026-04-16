@@ -692,6 +692,16 @@ export interface V2OrderSummary {
   end_time?: string;
   total_amount: number;
   paid_at?: string | null;
+  payment_ready?: boolean;
+  contract?: {
+    id?: number;
+    status: string;
+    client_user_id?: number;
+    provider_user_id?: number;
+    client_signed_at?: string | null;
+    provider_signed_at?: string | null;
+    payment_ready?: boolean;
+  } | null;
   provider_confirmed_at?: string | null;
   provider_rejected_at?: string | null;
   provider_reject_reason?: string;

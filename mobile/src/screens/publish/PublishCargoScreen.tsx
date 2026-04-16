@@ -298,8 +298,11 @@ export default function PublishCargoScreen({route, navigation}: any) {
     }
   };
 
-  const onStartDateChange = (_event: any, selectedDate?: Date) => {
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (!selectedDate) {
       return;
     }
@@ -309,8 +312,11 @@ export default function PublishCargoScreen({route, navigation}: any) {
     }
   };
 
-  const onEndDateChange = (_event: any, selectedDate?: Date) => {
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
     setShowEndPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (selectedDate) {
       setEndDate(selectedDate);
     }

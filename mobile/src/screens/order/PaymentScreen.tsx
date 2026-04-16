@@ -137,7 +137,8 @@ export default function PaymentScreen({route, navigation}: any) {
     return Number(detail.total_amount || 0) + Number(detail.financial_summary?.deposit_amount || 0);
   }, [detail]);
 
-  const canPay = !!detail && (detail.status === 'pending_payment' || detail.status === 'accepted') && !detail.paid_at;
+  const paymentReady = detail?.payment_ready !== false && (!detail?.contract || detail.contract.payment_ready !== false);
+  const canPay = !!detail && paymentReady && (detail.status === 'pending_payment' || detail.status === 'accepted') && !detail.paid_at;
   const selectedMethod = METHODS.find(method => method.key === selected) || METHODS[0];
   const primaryActionLabel = selected === 'mock'
     ? `确认模拟支付 ${formatMoney(totalPay)}`
@@ -245,7 +246,33 @@ export default function PaymentScreen({route, navigation}: any) {
           <View style={styles.row}><Text style={styles.rowLabel}>已支付</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.paid_amount)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>已退款</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.refunded_amount)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>订单状态</Text><Text style={styles.rowValue}>{getObjectStatusMeta('order', detail.status).label}</Text></View>
+          {detail.contract ? (
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>合同状态</Text>
+              <Text style={styles.rowValue}>
+                {detail.contract.status === 'fully_signed'
+                  ? '双方已签署'
+                  : detail.contract.status === 'client_signed'
+                    ? '客户已签署'
+                    : detail.contract.status === 'provider_signed'
+                      ? '服务方已签署'
+                      : '待签署'}
+              </Text>
+            </View>
+          ) : null}
         </ObjectCard>
+
+        {!paymentReady ? (
+          <ObjectCard style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>当前还不能支付</Text>
+            <Text style={styles.sectionHint}>这笔订单的合同还没有完成双方签署，请先回到合同页完成确认。签署完成后，这里会自动恢复可支付状态。</Text>
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => navigation.navigate('Contract', {orderId: detail.id})}>
+              <Text style={styles.secondaryBtnText}>查看合同</Text>
+            </TouchableOpacity>
+          </ObjectCard>
+        ) : null}
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>支付方式</Text>
@@ -275,7 +302,9 @@ export default function PaymentScreen({route, navigation}: any) {
             {paying ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.primaryBtnText}>{primaryActionLabel}</Text>}
           </TouchableOpacity>
           {!canPay ? (
-            <Text style={styles.sectionHint}>当前订单状态不是待支付，不能重复发起支付。</Text>
+            <Text style={styles.sectionHint}>
+              {paymentReady ? '当前订单状态不是待支付，不能重复发起支付。' : '当前合同尚未完成双方签署，暂时不能发起支付。'}
+            </Text>
           ) : null}
         </ObjectCard>
 

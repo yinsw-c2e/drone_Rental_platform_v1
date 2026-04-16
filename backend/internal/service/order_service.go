@@ -365,13 +365,13 @@ type DirectOrderInput struct {
 }
 
 type DirectOrderResult struct {
-	OrderID             int64  `json:"order_id"`
-	OrderNo             string `json:"order_no"`
-	OrderSource         string `json:"order_source"`
-	Status              string `json:"status"`
-	TotalAmount         int64  `json:"total_amount"`
-	PlatformCommission  int64  `json:"platform_commission"`
-	OwnerAmount         int64  `json:"owner_amount"`
+	OrderID            int64  `json:"order_id"`
+	OrderNo            string `json:"order_no"`
+	OrderSource        string `json:"order_source"`
+	Status             string `json:"status"`
+	TotalAmount        int64  `json:"total_amount"`
+	PlatformCommission int64  `json:"platform_commission"`
+	OwnerAmount        int64  `json:"owner_amount"`
 }
 
 func (s *OrderService) CreateDirectSupplyOrder(renterUserID int64, client *model.Client, supplyID int64, input *DirectOrderInput) (*model.Order, error) {
@@ -643,7 +643,7 @@ func (s *OrderService) providerConfirmOrderWithRepos(
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      orderID,
 		Status:       "pending_payment",
-		Note:         "机主已确认直达订单，待客户支付",
+		Note:         "机主已确认直达订单，请先完成合同签署后再支付",
 		OperatorID:   ownerID,
 		OperatorType: "owner",
 	}); err != nil {

@@ -2,7 +2,11 @@ package service
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
+
+	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/repository"
 )
 
 func TestNormalizePaymentMethod(t *testing.T) {
@@ -82,5 +86,45 @@ func TestBuildCreatePaymentResult(t *testing.T) {
 				t.Fatalf("expected deferred presence=%v, got %v", tt.wantDeferred, hasDeferred)
 			}
 		})
+	}
+}
+
+func TestCreatePaymentRequiresFullySignedContract(t *testing.T) {
+	db := newServiceTestDB(t, &model.Order{}, &model.OrderContract{}, &model.Payment{})
+
+	orderRepo := repository.NewOrderRepo(db)
+	paymentRepo := repository.NewPaymentRepo(db)
+	contractRepo := repository.NewContractRepo(db)
+
+	order := &model.Order{
+		OrderNo:      "ORD202604160001",
+		OrderSource:  "supply_direct",
+		ClientUserID: 301,
+		RenterID:     301,
+		Status:       "pending_payment",
+		TotalAmount:  88000,
+	}
+	if err := orderRepo.Create(order); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if err := contractRepo.Create(&model.OrderContract{
+		OrderID:        order.ID,
+		OrderNo:        order.OrderNo,
+		Status:         "client_signed",
+		ClientUserID:   301,
+		ProviderUserID: 401,
+	}); err != nil {
+		t.Fatalf("create contract: %v", err)
+	}
+
+	service := NewPaymentService(paymentRepo, orderRepo, nil, nil, nil, nil, nil)
+	service.SetContractRepo(contractRepo)
+
+	_, _, err := service.CreatePayment(order.ID, 301, "mock")
+	if err == nil {
+		t.Fatal("expected contract gating error, got nil")
+	}
+	if !strings.Contains(err.Error(), "合同签署") {
+		t.Fatalf("expected contract signing error, got %v", err)
 	}
 }

@@ -236,9 +236,81 @@ WHERE id = 13;
 UPDATE drones
 SET mtow_kg = 150
 WHERE id = 18;
+
+UPDATE drones
+SET availability_status = 'available',
+    certification_status = 'approved',
+    uom_verified = 'verified',
+    insurance_verified = 'verified',
+    airworthiness_verified = 'verified',
+    city = '佛山'
+WHERE id IN (18, 19, 20, 21, 22);
+
+UPDATE owner_supplies
+SET cargo_scenes = JSON_ARRAY('power_grid', 'grid_power_material_transport'),
+    service_area_snapshot = JSON_OBJECT('text', '广东省佛山市南海区重载运输服务区', 'city', '佛山', 'district', '南海区'),
+    updated_at = NOW()
+WHERE id = 8;
+
+INSERT INTO owner_supplies (
+  supply_no, owner_user_id, drone_id, title, description,
+  service_types, cargo_scenes, service_area_snapshot,
+  mtow_kg, max_payload_kg, max_range_km, base_price_amount,
+  pricing_unit, pricing_rule, available_time_slots,
+  accepts_direct_order, status, created_at, updated_at
+)
+SELECT
+  'SPDEMOFS20260416A', 7, 20, '佛山顺德重载应急直达样本', '开发验收用佛山顺德重载直达供给样本',
+  JSON_ARRAY('heavy_cargo_lift_transport'),
+  JSON_ARRAY('power_grid', 'emergency'),
+  JSON_OBJECT('text', '广东省佛山市顺德区陈村镇重载运输服务区', 'city', '佛山', 'district', '顺德区'),
+  200, 80, 35, 188000,
+  'per_trip', JSON_OBJECT('mode', 'fixed_trip'),
+  JSON_ARRAY(JSON_OBJECT('weekday', 'all', 'start', '08:00', 'end', '20:00')),
+  1, 'active', NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM owner_supplies WHERE supply_no = 'SPDEMOFS20260416A');
+
+INSERT INTO owner_supplies (
+  supply_no, owner_user_id, drone_id, title, description,
+  service_types, cargo_scenes, service_area_snapshot,
+  mtow_kg, max_payload_kg, max_range_km, base_price_amount,
+  pricing_unit, pricing_rule, available_time_slots,
+  accepts_direct_order, status, created_at, updated_at
+)
+SELECT
+  'SPDEMOFS20260416B', 16, 18, '佛山南海赵飞手重载直达样本', '开发验收用佛山南海区重载直达供给样本',
+  JSON_ARRAY('heavy_cargo_lift_transport'),
+  JSON_ARRAY('power_grid', 'mountain_agriculture', 'emergency'),
+  JSON_OBJECT('text', '广东省佛山市南海区狮山镇重载运输服务区', 'city', '佛山', 'district', '南海区'),
+  220, 100, 40, 208000,
+  'per_trip', JSON_OBJECT('mode', 'fixed_trip'),
+  JSON_ARRAY(JSON_OBJECT('weekday', 'all', 'start', '08:00', 'end', '20:00')),
+  1, 'active', NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM owner_supplies WHERE supply_no = 'SPDEMOFS20260416B');
+
+INSERT INTO owner_supplies (
+  supply_no, owner_user_id, drone_id, title, description,
+  service_types, cargo_scenes, service_area_snapshot,
+  mtow_kg, max_payload_kg, max_range_km, base_price_amount,
+  pricing_unit, pricing_rule, available_time_slots,
+  accepts_direct_order, status, created_at, updated_at
+)
+SELECT
+  'SPDEMOFS20260416C', 17, 19, '佛山三水陈飞手重载直达样本', '开发验收用佛山三水区重载直达供给样本',
+  JSON_ARRAY('heavy_cargo_lift_transport'),
+  JSON_ARRAY('power_grid', 'emergency'),
+  JSON_OBJECT('text', '广东省佛山市三水区西南街道重载运输服务区', 'city', '佛山', 'district', '三水区'),
+  155, 55, 28, 176000,
+  'per_trip', JSON_OBJECT('mode', 'fixed_trip'),
+  JSON_ARRAY(JSON_OBJECT('weekday', 'all', 'start', '08:00', 'end', '20:00')),
+  1, 'active', NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM owner_supplies WHERE supply_no = 'SPDEMOFS20260416C');
 SQL
 
-  append_result "PREPARE" "demo_data" "passed" "reset active demo orders/dispatches and patched drones 5, 13 and 18 for heavy-lift acceptance"
+  append_result "PREPARE" "demo_data" "passed" "reset active demo orders/dispatches, patched Foshan heavy-lift drones and inserted reusable Foshan quick-order supplies"
 }
 
 force_drone_available() {

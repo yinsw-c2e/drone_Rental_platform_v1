@@ -13,6 +13,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.6.0",
     "@react-native-community/geolocation": "^3.4.0",
     "@react-native/new-app-screen": "0.84.0",
@@ -21,6 +22,8 @@
     "@react-navigation/native-stack": "^7.13.0",
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.13.5",
+    "jcore-react-native": "^1.9.3",
+    "jpush-react-native": "^3.2.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.84.0",

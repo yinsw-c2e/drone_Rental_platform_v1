@@ -20,6 +20,7 @@ export default function MapPickerScreen({navigation, route}: any) {
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
   const initialLat: number | undefined = route.params?.latitude;
   const initialLng: number | undefined = route.params?.longitude;
+  const returnSteps = Math.max(Number(route.params?.returnSteps || 1), 1);
 
   const [currentAddr, setCurrentAddr] = useState<string>('定位中...');
   const [latitude, setLatitude] = useState(initialLat || 0);
@@ -128,7 +129,7 @@ export default function MapPickerScreen({navigation, route}: any) {
       setLatitude(lat);
       setLongitude(lng);
       await fetchAddressAndNearby(lng, lat);
-    } catch (e: any) {
+    } catch {
       if (!isMountedRef.current) { return; }
       setCurrentAddr('获取地址失败');
     } finally {
@@ -228,6 +229,10 @@ export default function MapPickerScreen({navigation, route}: any) {
     }
 
     beginSafeExit(() => {
+      if (returnSteps > 1 && typeof navigation.pop === 'function') {
+        navigation.pop(returnSteps);
+        return;
+      }
       navigation.goBack();
     });
   };
@@ -248,6 +253,10 @@ export default function MapPickerScreen({navigation, route}: any) {
     }
 
     beginSafeExit(() => {
+      if (returnSteps > 1 && typeof navigation.pop === 'function') {
+        navigation.pop(returnSteps);
+        return;
+      }
       navigation.goBack();
     });
   };

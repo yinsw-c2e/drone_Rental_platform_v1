@@ -29,6 +29,22 @@
           android:name="com.amap.api.v2.apikey"
           android:value="${AMAP_ANDROID_KEY}" />
 
+      <meta-data
+          android:name="JPUSH_CHANNEL"
+          android:value="${JPUSH_CHANNEL}" />
+
+      <meta-data
+          android:name="JPUSH_APPKEY"
+          android:value="${JPUSH_APPKEY}" />
+
+      <service
+        android:name=".push.WurenjiJCommonService"
+        android:exported="true">
+        <intent-filter>
+          <action android:name="cn.jiguang.user.service.action" />
+        </intent-filter>
+      </service>
+
       <!-- 微信 SDK 回调 Activity -->
       <activity
         android:name=".wxapi.WXEntryActivity"

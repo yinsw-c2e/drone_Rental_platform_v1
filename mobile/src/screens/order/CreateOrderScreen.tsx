@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {orderService} from '../../services/order';
-import {Drone} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -73,6 +72,9 @@ export default function CreateOrderScreen({route, navigation}: any) {
 
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (selectedDate) {
       setStartDate(selectedDate);
     }
@@ -80,6 +82,9 @@ export default function CreateOrderScreen({route, navigation}: any) {
 
   const onEndDateChange = (event: any, selectedDate?: Date) => {
     setShowEndPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (selectedDate) {
       setEndDate(selectedDate);
     }

@@ -18,7 +18,6 @@ import * as WeChat from 'react-native-wechat-lib';
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
-import {API_BASE_URL} from '../../constants';
 import {THIRD_PARTY_LOGIN} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -32,6 +31,7 @@ const QUICK_LOGIN_ACCOUNTS = {
   ],
   pilot: [
     {label: '飞手样本 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手'},
+    {label: '陈飞手 (13900000017)', phone: '13900000017', password: 'password123', role: '飞手'},
   ],
   composite: [
     {label: '复合身份样本 (13800000002)', phone: '13800000002', password: 'password123', role: '复合身份'},
@@ -54,7 +54,6 @@ export default function LoginScreen({navigation}: any) {
   const [password, setPassword] = useState('');
   const [loginMode, setLoginMode] = useState<'code' | 'password'>('code');
   const [countdown, setCountdown] = useState(0);
-  const [debugError, setDebugError] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [dropdown, setDropdown] = useState<{key: DropdownKey; visible: boolean} | null>(null);
   const [selected, setSelected] = useState<{[k in DropdownKey]?: AccountItem}>({});
@@ -170,7 +169,6 @@ export default function LoginScreen({navigation}: any) {
     const requestId = beginSubmit();
     if (!requestId) return;
     try {
-      setDebugError('');
       let res;
       if (loginMode === 'code') {
         res = await authService.login(phone, undefined, code);
@@ -190,27 +188,21 @@ export default function LoginScreen({navigation}: any) {
     }
   };
 
-  const quickLogin = async (userPhone: string, userPassword: string, role: string) => {
+  const quickLogin = async (userPhone: string, userPassword: string) => {
     const requestId = beginSubmit();
     if (!requestId) return;
-    setDebugError('');
     try {
-      const startTime = Date.now();
       const res = await authService.login(userPhone, userPassword);
       if (!isLatestRequest(requestId)) return;
-      const elapsed = Date.now() - startTime;
       dispatch(setCredentials({
         user: res.data.user,
         token: res.data.token,
         roleSummary: res.data.role_summary || null,
       }));
-      setDebugError(`✅ 登录成功\n角色: ${role}\n耗时: ${elapsed}ms\nAPI: ${API_BASE_URL}`);
     } catch (e: any) {
       if (!isLatestRequest(requestId)) return;
       const errorMsg = e.message || '未知错误';
-      const errorDetails = `❌ 快速登录失败\n\n账号: ${userPhone}\n密码: ${userPassword}\n角色: ${role}\n\nAPI: ${API_BASE_URL}\n\n错误信息:\n${errorMsg}\n\n原始错误:\n${JSON.stringify(e, null, 2)}`;
-      setDebugError(errorDetails);
-      Alert.alert('快速登录失败', `${errorMsg}\n\n详细错误信息请查看下方红色区域`);
+      Alert.alert('快速登录失败', errorMsg);
     } finally {
       finishSubmit(requestId);
     }
@@ -344,7 +336,7 @@ export default function LoginScreen({navigation}: any) {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.devLoginBtn, {backgroundColor: acct ? color : theme.textHint}]}
-                    onPress={() => acct && quickLogin(acct.phone, acct.password, acct.role)}
+                    onPress={() => acct && quickLogin(acct.phone, acct.password)}
                     disabled={!acct || submitting}>
                     <Text style={styles.devLoginBtnText}>{submitting ? '...' : '登录'}</Text>
                   </TouchableOpacity>

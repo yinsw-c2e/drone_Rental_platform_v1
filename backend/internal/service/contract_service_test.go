@@ -11,7 +11,7 @@ import (
 )
 
 func TestGenerateContractForOrderCreatesContractAndIncludesTrustClause(t *testing.T) {
-	db := newServiceTestDB(t, &model.User{}, &model.Order{}, &model.OrderContract{})
+	db := newServiceTestDB(t, &model.User{}, &model.Order{}, &model.OrderContract{}, &model.OrderTimeline{})
 
 	userRepo := repository.NewUserRepo(db)
 	orderRepo := repository.NewOrderRepo(db)
@@ -65,7 +65,7 @@ func TestGenerateContractForOrderCreatesContractAndIncludesTrustClause(t *testin
 }
 
 func TestProviderAutoSignMarksContractFullySignedAfterClientSign(t *testing.T) {
-	db := newServiceTestDB(t, &model.User{}, &model.Order{}, &model.OrderContract{})
+	db := newServiceTestDB(t, &model.User{}, &model.Order{}, &model.OrderContract{}, &model.OrderTimeline{})
 
 	userRepo := repository.NewUserRepo(db)
 	orderRepo := repository.NewOrderRepo(db)

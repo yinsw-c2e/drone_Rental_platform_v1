@@ -1,22 +1,34 @@
-import React, {useEffect, useState} from 'react';
-import {NavigationContainer} from '@react-navigation/native';
-import {ActivityIndicator, StyleSheet, View} from 'react-native';
-import {useDispatch, useSelector} from 'react-redux';
-import {RootState} from '../store/store';
-import {markMeInitialized, setMeSummary} from '../store/slices/authSlice';
-import {sessionService} from '../services/session';
-import {wsService} from '../services/websocket';
-import {useTheme} from '../theme/ThemeContext';
+import React, { useEffect, useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../store/store';
+import { markMeInitialized, setMeSummary } from '../store/slices/authSlice';
+import { pushService } from '../services/pushFacade';
+import { sessionService } from '../services/session';
+import { wsService } from '../services/websocket';
+import { useTheme } from '../theme/ThemeContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 
 export default function AppNavigator() {
-  const {theme} = useTheme();
+  const { theme } = useTheme();
   const dispatch = useDispatch();
-  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
-  const meInitialized = useSelector((state: RootState) => state.auth.meInitialized);
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated,
+  );
+  const meInitialized = useSelector(
+    (state: RootState) => state.auth.meInitialized,
+  );
+  const user = useSelector((state: RootState) => state.auth.user);
   const [bootstrapping, setBootstrapping] = useState(false);
   const navigatorKey = isAuthenticated ? 'main' : 'auth';
+
+  useEffect(() => {
+    pushService.init().catch(error => {
+      console.warn('[AppNavigator] Push init failed', error);
+    });
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -63,6 +75,14 @@ export default function AppNavigator() {
       active = false;
     };
   }, [dispatch, isAuthenticated, meInitialized]);
+
+  useEffect(() => {
+    pushService
+      .syncUser(isAuthenticated ? user?.id ?? null : null)
+      .catch(error => {
+        console.warn('[AppNavigator] Push sync failed', error);
+      });
+  }, [isAuthenticated, user?.id]);
 
   return (
     <NavigationContainer key={navigatorKey}>

@@ -147,9 +147,9 @@ export const AMAP_CONFIG = {
 // ============================================================
 export const PUSH_CONFIG = {
   // 极光推送AppKey
-  appKey: getConfig('JPUSH_APP_KEY') || '',
+  appKey: getConfig('JPUSH_APP_KEY') || getConfig('JPUSH_APPKEY') || '',
   // 是否启用推送
-  enabled: getConfig('PUSH_ENABLED') === 'true',
+  enabled: getConfig('PUSH_ENABLED') !== 'false',
 };
 
 // ============================================================
@@ -170,6 +170,8 @@ export const APP_CONFIG = {
   env: getConfig('APP_ENV') || (__DEV__ ? 'development' : 'production'),
   // 是否调试模式
   debugMode: getConfig('DEBUG_MODE') === 'true' || __DEV__,
+  // 是否显示推送验收/诊断工具，默认关闭，避免影响真实用户路径
+  pushDebugToolsEnabled: getConfig('PUSH_DEBUG_TOOLS_ENABLED') === 'true',
   // 版本检查地址
   versionCheckUrl: getConfig('VERSION_CHECK_URL') || '',
 };

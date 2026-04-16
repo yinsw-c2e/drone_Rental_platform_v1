@@ -13,6 +13,7 @@ export default function AddressSearchScreen({navigation, route}: any) {
   const styles = getStyles(theme);
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
   const city: string = route.params?.city || '';
+  const returnSteps = Math.max(Number(route.params?.returnSteps || 1), 1);
 
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<POIItem[]>([]);
@@ -59,6 +60,10 @@ export default function AddressSearchScreen({navigation, route}: any) {
     };
     if (onSelect) {
       onSelect(addr);
+    }
+    if (returnSteps > 1 && typeof navigation.pop === 'function') {
+      navigation.pop(returnSteps);
+      return;
     }
     navigation.goBack();
   };

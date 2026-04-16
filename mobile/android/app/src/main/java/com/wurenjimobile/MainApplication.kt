@@ -2,6 +2,8 @@ package com.wurenjimobile
 
 import android.app.Application
 import com.amap.api.maps.MapsInitializer
+import cn.jiguang.api.utils.JCollectionAuth
+import cn.jpush.android.api.JPushInterface
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -25,6 +27,11 @@ class MainApplication : Application(), ReactApplication {
     super.onCreate()
     MapsInitializer.updatePrivacyShow(this, true, true)
     MapsInitializer.updatePrivacyAgree(this, true)
+    JCollectionAuth.setAuth(this, true)
+    JPushInterface.setDebugMode(BuildConfig.DEBUG)
+    JPushInterface.init(this)
+    JPushInterface.resumePush(this)
+    JPushInterface.setNotificationCallBackEnable(this, true)
     loadReactNative(this)
   }
 }

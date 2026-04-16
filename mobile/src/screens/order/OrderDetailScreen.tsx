@@ -274,11 +274,25 @@ const getDispatchArrangementSummary = (detail?: V2OrderDetail | null) => {
   }
 };
 
+const getContractProgressState = (
+  detail?: V2OrderDetail | null,
+  options?: {isClient: boolean; isProvider: boolean},
+) => {
+  const contract = detail?.contract;
+  const paymentReady = detail?.payment_ready !== false && (!contract || contract.payment_ready !== false);
+  const clientSigned = Boolean(contract?.client_signed_at);
+  const providerSigned = Boolean(contract?.provider_signed_at);
+  const mySigned = options?.isClient ? clientSigned : options?.isProvider ? providerSigned : false;
+  const counterpartSigned = options?.isClient ? providerSigned : options?.isProvider ? clientSigned : false;
+  return {contract, paymentReady, clientSigned, providerSigned, mySigned, counterpartSigned};
+};
+
 const getProgressFocus = (
   detail: V2OrderDetail,
   options: {isClient: boolean; isProvider: boolean; isExecutor: boolean},
 ): ProgressFocus => {
   const status = String(detail.status || '').toLowerCase();
+  const contractState = getContractProgressState(detail, options);
   const executorName = summarizeParty(
     detail.participants?.executor || detail.executor,
     detail.execution_mode === 'self_execute' ? '机主' : '执行团队',
@@ -290,7 +304,7 @@ const getProgressFocus = (
         ? {
             eyebrow: '当前在等你',
             title: '请确认是否承接这笔订单',
-            desc: '确认承接后，订单会进入待支付阶段；若不合适，可直接拒绝并说明原因。',
+            desc: '确认承接后会先进入合同确认阶段，双方完成签署后客户才能继续支付；若不合适，可直接拒绝并说明原因。',
             eta: '建议 2 小时内处理',
             actionHint: '确认承接',
             tone: 'warning',
@@ -298,25 +312,73 @@ const getProgressFocus = (
         : {
             eyebrow: '当前在等机主',
             title: '机主正在确认是否承接',
-            desc: '机主确认后你就能继续支付，若不承接会在这里直接看到结果。',
+            desc: '机主确认后会先完成合同确认，再进入支付阶段；若不承接会在这里直接看到结果。',
             eta: '通常 2 小时内回复',
             actionHint: '查看合同',
             tone: 'warning',
           };
     case 'pending_payment':
+      if (!contractState.paymentReady && contractState.contract) {
+        if (!options.isClient && !options.isProvider) {
+          return {
+            eyebrow: '合同确认中',
+            title: '订单还在等待双方确认合同',
+            desc: '当前合同尚未完成双方签署，支付和后续执行会在合同确认完成后继续推进。',
+            eta: '签署完成后自动更新',
+            actionHint: '查看合同',
+            tone: 'muted',
+          };
+        }
+        if (!contractState.mySigned) {
+          return options.isClient
+            ? {
+                eyebrow: '当前在等你',
+                title: '请先签署合同',
+                desc: '订单已确认承接，但还不能直接支付。请先完成你的合同签署，系统会继续等待另一方确认。',
+                eta: '签署后实时同步',
+                actionHint: '签署合同',
+                tone: 'warning',
+              }
+            : {
+                eyebrow: '当前在等你',
+                title: '请先签署合同',
+                desc: '客户已经进入下单流程，但需要你先确认合同，后续客户才能继续支付。',
+                eta: '建议尽快完成',
+                actionHint: '签署合同',
+                tone: 'warning',
+              };
+        }
+        return options.isClient
+          ? {
+              eyebrow: '当前在等服务方',
+              title: '等待服务方签署合同',
+              desc: '你已经完成签署，等服务方也确认后，订单才会进入可支付状态。',
+              eta: '签署完成后立即通知你',
+              actionHint: '查看合同',
+              tone: 'muted',
+            }
+          : {
+              eyebrow: '当前在等客户',
+              title: '等待客户签署合同',
+              desc: '你已完成合同确认，等客户签署后，订单才会进入支付阶段。',
+              eta: '签署完成后立即推进',
+              actionHint: '查看合同',
+              tone: 'muted',
+            };
+      }
       return options.isClient
         ? {
             eyebrow: '下一步是支付',
-            title: '支付完成后才会继续安排执行',
-            desc: '这笔订单已经确认成交，完成支付后平台会继续推进执行安排。',
+            title: '合同已完成确认，请尽快支付',
+            desc: '双方合同已确认完成，支付成功后平台会继续推进执行安排。',
             eta: '支付成功后立即推进',
             actionHint: '去支付',
             tone: 'primary',
           }
         : {
             eyebrow: '当前在等客户',
-            title: '等待客户完成支付',
-            desc: '支付成功后，订单会自动进入下一步执行安排。',
+            title: '合同已完成确认，等待客户支付',
+            desc: '双方合同已确认完成，支付成功后订单会自动进入下一步执行安排。',
             eta: '通常会尽快完成',
             actionHint: '查看合同',
             tone: 'muted',
@@ -735,6 +797,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
     }
 
     const buttons: ActionButton[] = [];
+    const contractState = getContractProgressState(detail, {isClient, isProvider});
 
     if (detail.status === 'pending_provider_confirmation' && isProvider) {
       buttons.push({
@@ -750,7 +813,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
                 try {
                   await orderV2Service.providerConfirm(detail.id);
                   await fetchDetail();
-                  Alert.alert('已确认', '订单已进入待支付状态。');
+                  Alert.alert('已确认', '订单已确认，请继续按合同签署状态推进下一步。');
                 } catch (error: any) {
                   Alert.alert('操作失败', error?.response?.data?.message || '请稍后重试');
                 } finally {
@@ -788,7 +851,15 @@ export default function OrderDetailScreen({route, navigation}: any) {
       });
     }
 
-    if (detail.status === 'pending_payment' && isClient) {
+    if (detail.status === 'pending_payment' && detail.contract && !contractState.paymentReady && !contractState.mySigned && (isClient || isProvider)) {
+      buttons.push({
+        label: '签署合同',
+        tone: 'primary',
+        onPress: () => navigation.navigate('Contract', {orderId: detail.id}),
+      });
+    }
+
+    if (detail.status === 'pending_payment' && isClient && contractState.paymentReady) {
       buttons.push({
         label: '去支付',
         tone: 'primary',

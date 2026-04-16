@@ -369,8 +369,11 @@ export default function OfferListScreen({route, navigation}: any) {
     });
   }, [activeScene, fetchSupplies, hasMore, hasQuickOrderSearch, loading, minPayloadKg, page, quickOrderMode, refreshing, region]);
 
-  const onStartDateChange = (_event: any, selectedDate?: Date) => {
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (!selectedDate) {
       return;
     }
@@ -381,8 +384,11 @@ export default function OfferListScreen({route, navigation}: any) {
     }
   };
 
-  const onEndDateChange = (_event: any, selectedDate?: Date) => {
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
     setShowEndPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (selectedDate) {
       setEndDate(selectedDate);
     }

@@ -225,9 +225,11 @@ func main() {
 	clientService.SetEventService(eventService)
 	paymentService.SetDispatchService(dispatchService)
 	paymentService.SetEventService(eventService)
+	paymentService.SetContractRepo(contractRepo)
 	orderService.SetEventService(eventService)
 	dispatchService.SetEventService(eventService)
 	droneService.SetEventService(eventService)
+	contractService.SetEventService(eventService)
 
 	// Init AMap service
 	amapService := amap.NewAmapService(cfg.Amap.APIKey, zapLogger)
@@ -256,7 +258,7 @@ func main() {
 		Insurance:  insurancehandler.NewHandler(insuranceService),
 		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, handlers.Admin, handlers.Analytics, handlers.Client)
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, cfg.Server.Mode, handlers.Admin, handlers.Analytics, handlers.Client)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)

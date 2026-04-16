@@ -15,6 +15,28 @@ type EventService struct {
 	logger         *zap.Logger
 }
 
+var pushEventAllowlist = map[string]struct{}{
+	"direct_order_created":         {},
+	"direct_order_confirmed":       {},
+	"direct_order_rejected":        {},
+	"contract_client_signed":       {},
+	"contract_provider_signed":     {},
+	"contract_fully_signed":        {},
+	"order_paid":                   {},
+	"order_preparing":              {},
+	"order_in_transit":             {},
+	"order_delivered":              {},
+	"dispatch_created":             {},
+	"dispatch_accepted":            {},
+	"dispatch_reassigned":          {},
+	"dispatch_manual_required":     {},
+	"pilot_verification_result":    {},
+	"drone_certification_reviewed": {},
+	"drone_uom_reviewed":           {},
+	"drone_insurance_reviewed":     {},
+	"drone_airworthiness_reviewed": {},
+}
+
 func NewEventService(messageService *MessageService, pushService push.PushService, logger *zap.Logger) *EventService {
 	return &EventService{
 		messageService: messageService,
@@ -119,7 +141,7 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 	providerUserID := orderProviderUserID(order)
 	clientRecipients := orderClientReceivers(order)
 	s.notifyUsers(orderClientReceivers(order), "direct_order_confirmed", "直达订单已确认",
-		fmt.Sprintf("订单“%s”已由机主确认，请尽快完成支付。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+		fmt.Sprintf("订单“%s”已由机主确认，请先查看合同签署状态，再继续下一步。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":      order.ID,
 			"order_no":      order.OrderNo,
@@ -130,7 +152,7 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 	)
 	for _, clientUserID := range clientRecipients {
 		s.notifyConversation(providerUserID, clientUserID, "direct_order_confirmed", "直达订单已确认",
-			fmt.Sprintf("订单“%s”已由机主确认，请尽快完成支付。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+			fmt.Sprintf("订单“%s”已由机主确认，请先查看合同签署状态，再继续下一步。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 			map[string]interface{}{
 				"order_id":      order.ID,
 				"order_no":      order.OrderNo,
@@ -138,6 +160,96 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 				"status":        order.Status,
 				"business_type": "order",
 			},
+		)
+	}
+}
+
+func (s *EventService) NotifyContractClientSigned(order *model.Order) {
+	if order == nil {
+		return
+	}
+	providerUserID := orderProviderUserID(order)
+	if providerUserID <= 0 {
+		return
+	}
+	title := "客户已签署合同"
+	content := fmt.Sprintf("订单“%s”客户已完成签署，请尽快确认合同。", fallbackTitle(order.Title, order.OrderNo, "订单"))
+	payload := map[string]interface{}{
+		"order_id":        order.ID,
+		"order_no":        order.OrderNo,
+		"status":          order.Status,
+		"contract_status": "client_signed",
+		"business_type":   "contract",
+		"order_source":    order.OrderSource,
+	}
+	s.notifyUsers([]int64{providerUserID}, "contract_client_signed", title, content, payload)
+	for _, clientUserID := range orderClientReceivers(order) {
+		s.notifyConversation(clientUserID, providerUserID, "contract_client_signed", title, content, payload)
+	}
+}
+
+func (s *EventService) NotifyContractProviderSigned(order *model.Order) {
+	if order == nil {
+		return
+	}
+	title := "服务方已签署合同"
+	content := fmt.Sprintf("订单“%s”服务方已完成签署，请确认合同后再继续支付。", fallbackTitle(order.Title, order.OrderNo, "订单"))
+	payload := map[string]interface{}{
+		"order_id":        order.ID,
+		"order_no":        order.OrderNo,
+		"status":          order.Status,
+		"contract_status": "provider_signed",
+		"business_type":   "contract",
+		"order_source":    order.OrderSource,
+	}
+	clientRecipients := orderClientReceivers(order)
+	s.notifyUsers(clientRecipients, "contract_provider_signed", title, content, payload)
+	providerUserID := orderProviderUserID(order)
+	for _, clientUserID := range clientRecipients {
+		s.notifyConversation(providerUserID, clientUserID, "contract_provider_signed", title, content, payload)
+	}
+}
+
+func (s *EventService) NotifyContractFullySigned(order *model.Order) {
+	if order == nil {
+		return
+	}
+	orderTitle := fallbackTitle(order.Title, order.OrderNo, "订单")
+	clientRecipients := orderClientReceivers(order)
+	providerUserID := orderProviderUserID(order)
+	clientPayload := map[string]interface{}{
+		"order_id":        order.ID,
+		"order_no":        order.OrderNo,
+		"status":          order.Status,
+		"contract_status": "fully_signed",
+		"business_type":   "contract",
+		"order_source":    order.OrderSource,
+		"next_action":     "pay",
+	}
+	providerPayload := map[string]interface{}{
+		"order_id":        order.ID,
+		"order_no":        order.OrderNo,
+		"status":          order.Status,
+		"contract_status": "fully_signed",
+		"business_type":   "contract",
+		"order_source":    order.OrderSource,
+		"next_action":     "wait_client_payment",
+	}
+
+	s.notifyUsers(clientRecipients, "contract_fully_signed", "合同已全部签署",
+		fmt.Sprintf("订单“%s”已完成双方签署，现在可以支付了。", orderTitle),
+		clientPayload,
+	)
+	if providerUserID > 0 {
+		s.notifyUsers([]int64{providerUserID}, "contract_fully_signed", "合同已全部签署",
+			fmt.Sprintf("订单“%s”已完成双方签署，待客户支付。", orderTitle),
+			providerPayload,
+		)
+	}
+	for _, clientUserID := range clientRecipients {
+		s.notifyConversation(providerUserID, clientUserID, "contract_fully_signed", "合同已全部签署",
+			fmt.Sprintf("订单“%s”已完成双方签署，现在可以支付了。", orderTitle),
+			clientPayload,
 		)
 	}
 }
@@ -477,12 +589,17 @@ func (s *EventService) notifyUsers(userIDs []int64, eventType, title, content st
 				s.logger.Warn("send system notification failed", zap.Int64("user_id", userID), zap.String("event_type", eventType), zap.Error(err))
 			}
 		}
-		if s.pushService != nil {
+		if s.pushService != nil && shouldSendPushEvent(eventType) {
 			if err := s.pushService.PushToUser(userID, title, content, stringifyExtras(payload)); err != nil && s.logger != nil {
 				s.logger.Warn("push notification failed", zap.Int64("user_id", userID), zap.String("event_type", eventType), zap.Error(err))
 			}
 		}
 	}
+}
+
+func shouldSendPushEvent(eventType string) bool {
+	_, ok := pushEventAllowlist[eventType]
+	return ok
 }
 
 func (s *EventService) notifyConversation(senderID, receiverID int64, eventType, title, content string, extras map[string]interface{}) {

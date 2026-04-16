@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {APP_CONFIG} from '../../constants';
 import {dispatchV2Service} from '../../services/dispatchV2';
+import {simulateFlight} from '../../services/flight';
 import {updateExecutionStatus} from '../../services/orderV2';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -43,6 +45,7 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
   const [order, setOrder] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [simulating, setSimulating] = useState(false);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -124,6 +127,31 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
   const nextAction = NEXT_ACTION[order.status];
   const isCompleted = order.status === 'completed';
   const isDelivered = order.status === 'delivered';
+  const showDevSimulation = APP_CONFIG.debugMode;
+  const canSimulateFlight = order.status === 'in_transit' && !isCompleted && !isDelivered;
+
+  const handleSimulateFlight = async () => {
+    if (!order?.id) {
+      return;
+    }
+    if (!canSimulateFlight) {
+      Alert.alert('暂不可用', '请先将任务推进到“运输中”阶段，再启动测试飞行模拟。');
+      return;
+    }
+
+    setSimulating(true);
+    try {
+      const result = await simulateFlight(order.id);
+      Alert.alert(
+        '测试飞行模拟已启动',
+        result?.message || '模拟轨迹已开始上报，请前往飞行监控查看位置变化。',
+      );
+    } catch (e: any) {
+      Alert.alert('启动失败', e?.message || '测试飞行模拟启动失败，请稍后重试');
+    } finally {
+      setSimulating(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -219,6 +247,29 @@ export default function PilotOrderExecutionScreen({route, navigation}: any) {
             <Text style={styles.linkText}>轨迹记录</Text>
             <Text style={styles.linkArrow}>›</Text>
           </TouchableOpacity>
+          {showDevSimulation ? (
+            <View style={styles.devSimulationWrap}>
+              <Text style={styles.devSimulationTitle}>开发验收工具</Text>
+              <Text style={styles.devSimulationDesc}>
+                {canSimulateFlight
+                  ? '当前任务已进入运输中，可启动测试飞行模拟并观察监控轨迹。'
+                  : '测试飞行模拟仅在任务进入“运输中”后可用，用于演示监控与轨迹回放。'}
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.devSimulationBtn,
+                  (!canSimulateFlight || simulating) && styles.devSimulationBtnDisabled,
+                ]}
+                onPress={handleSimulateFlight}
+                disabled={!canSimulateFlight || simulating}>
+                {simulating ? (
+                  <ActivityIndicator color={theme.btnPrimaryText} />
+                ) : (
+                  <Text style={styles.devSimulationBtnText}>启动测试飞行模拟</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
 
         {/* 操作按钮 */}
@@ -307,6 +358,26 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   linkText: {fontSize: 14, color: theme.text},
   linkArrow: {fontSize: 18, color: theme.primaryText},
+  devSimulationWrap: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.divider,
+  },
+  devSimulationTitle: {fontSize: 14, fontWeight: '700', color: theme.text},
+  devSimulationDesc: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
+  devSimulationBtn: {
+    marginTop: 12,
+    backgroundColor: theme.warning,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  devSimulationBtnDisabled: {
+    backgroundColor: theme.divider,
+  },
+  devSimulationBtnText: {fontSize: 14, fontWeight: '700', color: theme.btnPrimaryText},
   stepRow: {flexDirection: 'row', marginBottom: 0},
   stepLeft: {alignItems: 'center', width: 36},
   stepCircle: {

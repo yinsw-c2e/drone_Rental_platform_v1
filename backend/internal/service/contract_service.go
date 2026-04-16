@@ -18,6 +18,7 @@ type ContractService struct {
 	contractRepo *repository.ContractRepo
 	orderRepo    *repository.OrderRepo
 	userRepo     *repository.UserRepo
+	eventService *EventService
 	cfg          *config.Config
 }
 
@@ -33,6 +34,10 @@ func NewContractService(
 		userRepo:     userRepo,
 		cfg:          cfg,
 	}
+}
+
+func (s *ContractService) SetEventService(eventService *EventService) {
+	s.eventService = eventService
 }
 
 // ─── 合同编号生成 ────────────────────────────────────────
@@ -410,8 +415,12 @@ func (s *ContractService) SignContract(contractID, userID int64) (*model.OrderCo
 		return nil, fmt.Errorf("合同签署失败: %w", err)
 	}
 
-	// 重新获取更新后的合同
-	return s.contractRepo.GetByID(contract.ID)
+	updatedContract, err := s.contractRepo.GetByID(contract.ID)
+	if err != nil {
+		return nil, err
+	}
+	s.afterContractSigned(updatedContract, userID)
+	return updatedContract, nil
 }
 
 // SignContractByOrder 通过订单ID签署合同
@@ -445,7 +454,20 @@ func (s *ContractService) ProviderAutoSign(tx *gorm.DB, orderID, providerUserID 
 	} else {
 		updates["status"] = "provider_signed"
 	}
-	return contractRepo.UpdateFields(contract.ID, updates)
+	if err := contractRepo.UpdateFields(contract.ID, updates); err != nil {
+		return err
+	}
+	note := "服务方已签署合同，待客户确认"
+	if updates["status"] == "fully_signed" {
+		note = "双方已完成合同签署，待客户支付"
+	}
+	return repository.NewOrderRepo(tx).AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       "pending_payment",
+		Note:         note,
+		OperatorID:   providerUserID,
+		OperatorType: "owner",
+	})
 }
 
 // GetContractByOrder 获取订单合同
@@ -465,4 +487,51 @@ func maskPhone(phone string) string {
 func formatCentToYuan(cent int64) string {
 	yuan := float64(cent) / 100.0
 	return fmt.Sprintf("%.2f", yuan)
+}
+
+func (s *ContractService) afterContractSigned(contract *model.OrderContract, userID int64) {
+	if contract == nil || s.orderRepo == nil {
+		return
+	}
+
+	order, err := s.orderRepo.GetByID(contract.OrderID)
+	if err != nil || order == nil {
+		return
+	}
+
+	operatorType := "client"
+	if userID == contract.ProviderUserID {
+		operatorType = "owner"
+	}
+
+	note := "合同签署状态已更新"
+	switch contract.Status {
+	case "client_signed":
+		note = "客户已签署合同，待服务方签署"
+	case "provider_signed":
+		note = "服务方已签署合同，待客户签署"
+	case "fully_signed":
+		note = "双方已完成合同签署，待客户支付"
+	}
+
+	_ = s.orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      contract.OrderID,
+		Status:       "pending_payment",
+		Note:         note,
+		OperatorID:   userID,
+		OperatorType: operatorType,
+	})
+
+	if s.eventService == nil {
+		return
+	}
+
+	switch contract.Status {
+	case "client_signed":
+		s.eventService.NotifyContractClientSigned(order)
+	case "provider_signed":
+		s.eventService.NotifyContractProviderSigned(order)
+	case "fully_signed":
+		s.eventService.NotifyContractFullySigned(order)
+	}
 }

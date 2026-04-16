@@ -85,12 +85,15 @@ android {
         applicationId "com.wurenjimobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 11
+        versionName "1.2.0-build11"
 
         // 注入高德 Key 到 AndroidManifest.xml
         manifestPlaceholders = [
-            AMAP_ANDROID_KEY: project.findProperty('AMAP_ANDROID_KEY') ?: ''
+            JPUSH_PKGNAME: applicationId,
+            AMAP_ANDROID_KEY: project.env.get("AMAP_ANDROID_KEY") ?: project.findProperty('AMAP_ANDROID_KEY') ?: '',
+            JPUSH_APPKEY: project.env.get("JPUSH_APP_KEY") ?: project.findProperty('JPUSH_APP_KEY') ?: '',
+            JPUSH_CHANNEL: project.env.get("JPUSH_CHANNEL") ?: project.findProperty('JPUSH_CHANNEL') ?: 'developer-default'
         ]
     }
     signingConfigs {
@@ -120,6 +123,7 @@ dependencies {
     implementation("com.facebook.react:react-android")
 
     implementation 'com.amap.api:3dmap:9.8.3'
+    implementation 'cn.jiguang.sdk:jpush:6.0.1'
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

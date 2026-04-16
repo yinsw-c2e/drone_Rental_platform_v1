@@ -94,8 +94,11 @@ export default function PublishDemandScreen({navigation}: any) {
     return d.toISOString();
   }, []);
 
-  const onStartDateChange = (_event: any, selected?: Date) => {
+  const onStartDateChange = (event: any, selected?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (!selected) return;
     setStartDate(selected);
     setStartConfirmed(true);
@@ -107,8 +110,11 @@ export default function PublishDemandScreen({navigation}: any) {
     }
   };
 
-  const onEndDateChange = (_event: any, selected?: Date) => {
+  const onEndDateChange = (event: any, selected?: Date) => {
     setShowEndPicker(Platform.OS === 'ios');
+    if (Platform.OS === 'android' && event?.type === 'dismissed') {
+      return;
+    }
     if (selected) {
       setEndDate(selected);
       setEndConfirmed(true);

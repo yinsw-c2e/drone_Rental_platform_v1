@@ -86,6 +86,7 @@ export default function AddressPickerScreen({navigation, route}: any) {
   const handleMapPicker = () => {
     navigation.navigate('MapPicker', {
       onSelect: notifyAddressSelected,
+      returnSteps: 2,
     });
   };
 
@@ -93,6 +94,7 @@ export default function AddressPickerScreen({navigation, route}: any) {
     navigation.navigate('AddressSearch', {
       onSelect: notifyAddressSelected,
       city: currentCity,
+      returnSteps: 2,
     });
   };
 

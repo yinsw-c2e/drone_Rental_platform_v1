@@ -410,6 +410,19 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 	}
 
 	data := buildOrderSummary(order)
+	if h.contractService != nil {
+		contract, contractErr := h.contractService.GetContractByOrder(order.ID)
+		if contractErr == nil && contract != nil {
+			data["contract"] = buildOrderContractSummary(contract)
+			data["payment_ready"] = contract.Status == "fully_signed"
+		} else if errors.Is(contractErr, gorm.ErrRecordNotFound) {
+			data["payment_ready"] = true
+		} else if contractErr != nil {
+			return nil, contractErr
+		}
+	} else {
+		data["payment_ready"] = true
+	}
 	data["source_info"] = gin.H{
 		"order_source":     order.OrderSource,
 		"demand_id":        nullableInt64(order.DemandID),
@@ -554,6 +567,7 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"end_time":               order.EndTime,
 		"total_amount":           order.TotalAmount,
 		"paid_at":                order.PaidAt,
+		"payment_ready":          order.PaidAt != nil || order.Status == "accepted" || order.Status == "pending_payment",
 		"provider_confirmed_at":  order.ProviderConfirmedAt,
 		"provider_rejected_at":   order.ProviderRejectedAt,
 		"provider_reject_reason": order.ProviderRejectReason,
@@ -566,6 +580,21 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"drone":                  buildDroneSummary(order.Drone),
 		"created_at":             order.CreatedAt,
 		"updated_at":             order.UpdatedAt,
+	}
+}
+
+func buildOrderContractSummary(c *model.OrderContract) gin.H {
+	if c == nil {
+		return nil
+	}
+	return gin.H{
+		"id":                 c.ID,
+		"status":             c.Status,
+		"client_user_id":     c.ClientUserID,
+		"provider_user_id":   c.ProviderUserID,
+		"client_signed_at":   c.ClientSignedAt,
+		"provider_signed_at": c.ProviderSignedAt,
+		"payment_ready":      c.Status == "fully_signed",
 	}
 }
 
