@@ -27,8 +27,8 @@ import { userService } from '../../services/user';
 import { useTheme } from '../../theme/ThemeContext';
 import type { AppTheme } from '../../theme/index';
 
-const APP_VERSION = '1.2.0-build11';
-const APP_VERSION_CODE = '11';
+const APP_VERSION = '1.2.0-build12';
+const APP_VERSION_CODE = '12';
 
 const formatPermissionStatus = (status: PushPermissionStatus) => {
   switch (status) {
