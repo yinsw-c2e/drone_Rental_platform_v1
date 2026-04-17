@@ -12,10 +12,6 @@ import {
 import {useSelector} from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
-import ObjectCard from '../../components/business/ObjectCard';
-import SourceTag from '../../components/business/SourceTag';
-import StatusBadge from '../../components/business/StatusBadge';
-import {getObjectStatusMeta} from '../../components/business/visuals';
 import {demandV2Service} from '../../services/demandV2';
 import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
@@ -151,7 +147,7 @@ export default function MarketHubScreen({navigation}: any) {
         </View>
         <View style={styles.cardFooter}>
           <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
-          <TouchableOpacity style={[styles.orderBtn, {backgroundColor: theme.primary}]} onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
+          <TouchableOpacity activeOpacity={0.7} style={[styles.orderBtn, {backgroundColor: theme.primary}]} onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
             <Text style={styles.orderBtnText}>去下单</Text>
           </TouchableOpacity>
         </View>

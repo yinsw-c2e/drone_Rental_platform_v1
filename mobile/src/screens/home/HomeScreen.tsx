@@ -23,6 +23,8 @@ import { useSelector } from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
+import SurfaceGroup from '../../components/business/SurfaceGroup';
+import SurfaceItem from '../../components/business/SurfaceItem';
 import StatusBadge from '../../components/business/StatusBadge';
 import {
   getObjectStatusMeta,
@@ -1060,50 +1062,54 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={[styles.sectionTitle, {color: theme.text}]}>今天优先处理</Text>
               <Text style={[styles.sectionHint, {color: theme.textHint}]}>先处理这些再看其他</Text>
             </View>
-            {todoItems.map(item => {
-              const palette = getTonePalette(item.tone || 'blue', theme.isDark);
-              return (
-                <ObjectCard
-                  key={item.key}
-                  style={styles.todoCard}
-                  highlightColor={palette.border}
-                >
-                  <View style={styles.todoHeader}>
-                    <Text style={[styles.todoTitle, {color: theme.text}]}>{item.title}</Text>
-                    {typeof item.badge === 'number' && item.badge > 0 ? (
-                      <View
-                        style={[
-                          styles.todoBadge,
-                          {
-                            backgroundColor: palette.bg,
-                            borderColor: palette.border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.todoBadgeText,
-                            { color: palette.text },
-                          ]}
-                        >
-                          {item.badge}
-                        </Text>
+            {todoItems.length > 0 && (
+              <SurfaceGroup>
+                {todoItems.map((item, index) => {
+                  const palette = getTonePalette(item.tone || 'blue', theme.isDark);
+                  return (
+                    <SurfaceItem
+                      key={item.key}
+                      isLast={index === todoItems.length - 1}
+                    >
+                      <View style={styles.todoHeader}>
+                        <Text style={[styles.todoTitle, {color: theme.text}]}>{item.title}</Text>
+                        {typeof item.badge === 'number' && item.badge > 0 ? (
+                          <View
+                            style={[
+                              styles.todoBadge,
+                              {
+                                backgroundColor: palette.bg,
+                                borderColor: palette.border,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.todoBadgeText,
+                                { color: palette.text },
+                              ]}
+                            >
+                              {item.badge}
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
-                  </View>
-                  <Text style={[styles.todoDesc, {color: theme.textSub}]}>{item.desc}</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.todoActionBtn,
-                      { backgroundColor: palette.text },
-                    ]}
-                    onPress={item.onPress}
-                  >
-                    <Text style={styles.todoActionText}>{item.actionText}</Text>
-                  </TouchableOpacity>
-                </ObjectCard>
-              );
-            })}
+                      <Text style={[styles.todoDesc, {color: theme.textSub}]}>{item.desc}</Text>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={[
+                          styles.todoActionBtn,
+                          { backgroundColor: palette.text },
+                        ]}
+                        onPress={item.onPress}
+                      >
+                        <Text style={styles.todoActionText}>{item.actionText}</Text>
+                      </TouchableOpacity>
+                    </SurfaceItem>
+                  );
+                })}
+              </SurfaceGroup>
+            )}
           </View>
         </View>
 
@@ -1418,22 +1424,17 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 10,
   },
   quickActionCard: {
-    borderRadius: 20,
-    padding: 14,
-    shadowColor: theme.isDark ? 'rgba(0,212,255,0.15)' : '#000',
-    shadowOffset: {width: 0, height: theme.isDark ? 0 : 3},
-    shadowOpacity: theme.isDark ? 0.4 : 0.06,
-    shadowRadius: theme.isDark ? 12 : 10,
-    elevation: theme.isDark ? 0 : 3,
+    borderRadius: 22,
+    padding: 16,
   },
   quickActionIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    borderWidth: 1,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    marginBottom: 8,
   },
   quickActionIcon: {
     fontSize: 20,

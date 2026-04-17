@@ -25,7 +25,7 @@ export default function AppNavigator() {
   const navigatorKey = isAuthenticated ? 'main' : 'auth';
 
   useEffect(() => {
-    pushService.init().catch(error => {
+    pushService.init().catch((error: any) => {
       console.warn('[AppNavigator] Push init failed', error);
     });
   }, []);
@@ -79,7 +79,7 @@ export default function AppNavigator() {
   useEffect(() => {
     pushService
       .syncUser(isAuthenticated ? user?.id ?? null : null)
-      .catch(error => {
+      .catch((error: any) => {
         console.warn('[AppNavigator] Push sync failed', error);
       });
   }, [isAuthenticated, user?.id]);
