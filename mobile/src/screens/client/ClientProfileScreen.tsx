@@ -47,6 +47,8 @@ const CREDIT_STATUS_MAP: Record<string, {label: string; tone: 'green' | 'orange'
 };
 
 const sceneOptions = ['电网建设', '山区运输', '海岛给养', '应急救援', '高原补给'];
+const ACCOUNT_QUALIFICATION_HELP =
+  '客户能力主要看实名认证、账号状态和平台信用。企业升级只在需要企业主体资料时再补。';
 
 type DraftProfile = {
   contact_person: string;
@@ -203,6 +205,10 @@ export default function ClientProfileScreen({navigation}: any) {
     ]);
   }, [loadData]);
 
+  const showAccountHelp = useCallback(() => {
+    Alert.alert('账号与资格', ACCOUNT_QUALIFICATION_HELP);
+  }, []);
+
   const toggleScene = useCallback((scene: string) => {
     setDraft(prev => ({
       ...prev,
@@ -227,7 +233,6 @@ export default function ClientProfileScreen({navigation}: any) {
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <EmptyState
           title="客户档案暂时不可用"
-          description="系统会默认创建个人客户档案。如果当前没拉到，我们可以直接重试初始化。"
           actionText="重试初始化"
           onAction={loadData}
         />
@@ -244,19 +249,13 @@ export default function ClientProfileScreen({navigation}: any) {
           <View style={styles.heroHeader}>
             <View style={styles.heroContent}>
               <Text style={styles.heroTitle}>客户档案</Text>
-              <Text style={styles.heroSubtitle}>
-                {eligibility?.summary || '默认个人客户档案已开通，可直接发布需求与直达下单。'}
-              </Text>
+              <Text style={styles.accountName}>{user?.nickname || '当前账号'}</Text>
+              <Text style={styles.accountPhone}>{draft.contact_phone || user?.phone || '未设置联系电话'}</Text>
             </View>
             <View style={styles.heroBadges}>
               <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
               <StatusBadge label={client.client_type === 'enterprise' ? '企业客户' : '个人客户'} tone="blue" />
             </View>
-          </View>
-
-          <View style={styles.accountMeta}>
-            <Text style={styles.accountName}>{user?.nickname || '当前账号'}</Text>
-            <Text style={styles.accountPhone}>{draft.contact_phone || user?.phone || '未设置联系电话'}</Text>
           </View>
 
           <View style={styles.summaryRow}>
@@ -271,12 +270,13 @@ export default function ClientProfileScreen({navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>账号与资格</Text>
-              <Text style={styles.sectionDesc}>
-                这里确认的是“客户能力”是否就绪。默认阻塞项只看实名认证、账号状态和平台信用，企业升级不是主链路前置条件。
-              </Text>
-            </View>
+            <Text style={styles.sectionTitle}>账号与资格</Text>
+            <TouchableOpacity
+              style={styles.helpIcon}
+              activeOpacity={0.75}
+              onPress={showAccountHelp}>
+              <Text style={styles.helpIconText}>?</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.infoRow}>
@@ -311,11 +311,7 @@ export default function ClientProfileScreen({navigation}: any) {
             <Text style={styles.helperNote}>
               当前待补齐：{primaryBlocker.message}
             </Text>
-          ) : (
-            <Text style={styles.helperNote}>
-              当前个人账号已按主链路收口。企业升级仅在需要企业主体资料、对公身份或后续企业能力时再补。
-            </Text>
-          )}
+          ) : null}
 
           {primaryBlocker?.suggested_action === 'verify_identity' ? (
             <TouchableOpacity style={styles.secondaryButton} onPress={() => navigation.navigate('Verification')}>
@@ -360,7 +356,6 @@ export default function ClientProfileScreen({navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>默认地址</Text>
-          <Text style={styles.sectionDesc}>可作为发布需求、直达下单时的默认起运/送达地址。</Text>
 
           <Text style={styles.inputLabel}>默认起运地址</Text>
           <AddressInputField
@@ -385,7 +380,6 @@ export default function ClientProfileScreen({navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>常用任务场景</Text>
-          <Text style={styles.sectionDesc}>帮助我们在市场、推荐和筛选里更早给你匹配合适的服务方。</Text>
           <View style={styles.chipRow}>
             {sceneOptions.map(scene => {
               const active = draft.preferred_cargo_types.includes(scene);
@@ -427,7 +421,6 @@ export default function ClientProfileScreen({navigation}: any) {
         ) : (
           <ObjectCard style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>企业客户升级</Text>
-            <Text style={styles.sectionDesc}>如果你后续要以公司名义发布需求、管理对公资料和信用主体，可在这里升级企业客户资质。这不是当前个人下单/发需求的默认前置步骤。</Text>
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={() => navigation.navigate('ClientRegister', {mode: 'enterprise'})}>
@@ -470,36 +463,30 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   heroCard: {
     backgroundColor: theme.primary,
+    paddingVertical: 16,
   },
   heroHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: 12,
   },
   heroContent: {
     flex: 1,
   },
   heroTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: theme.btnPrimaryText,
-  },
-  heroSubtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 20,
-    color: 'rgba(255,255,255,0.82)',
   },
   heroBadges: {
     flexDirection: 'column',
     gap: 8,
     alignItems: 'flex-end',
   },
-  accountMeta: {
-    marginTop: 18,
-  },
   accountName: {
-    fontSize: 18,
+    marginTop: 10,
+    fontSize: 17,
     fontWeight: '700',
     color: theme.btnPrimaryText,
   },
@@ -512,13 +499,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 18,
+    marginTop: 14,
   },
   summaryItem: {
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 8,
     alignItems: 'center',
   },
@@ -536,17 +523,30 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 12,
   },
   sectionHeader: {
-    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: theme.text,
   },
-  sectionDesc: {
+  helpIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.bgSecondary,
+    borderWidth: 1,
+    borderColor: theme.divider,
+  },
+  helpIconText: {
     fontSize: 13,
-    lineHeight: 20,
     color: theme.textSub,
+    fontWeight: '800',
   },
   helperNote: {
     fontSize: 13,

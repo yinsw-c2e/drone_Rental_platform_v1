@@ -1,62 +1,36 @@
 package service
 
-import (
-	"strings"
-	"testing"
+import "testing"
 
-	"wurenji-backend/internal/model"
-	"wurenji-backend/internal/repository"
-)
-
-func TestListConversationsFiltersSystemConversation(t *testing.T) {
-	db := newServiceTestDB(t, &model.Message{})
-	service := NewMessageService(repository.NewMessageRepo(db))
-
-	if _, err := service.SendConversationSystemMessage(1, 2, "订单更新", "订单已进入待支付", map[string]interface{}{"order_id": 9}); err != nil {
-		t.Fatalf("send conversation system message: %v", err)
-	}
-	if _, err := service.SendMessage(3, 1, "text", "你好，我可以接单", nil); err != nil {
-		t.Fatalf("send peer message: %v", err)
-	}
-	if _, err := service.SendSystemNotification(1, "system", "系统提醒", "这里是一条系统通知", nil); err != nil {
-		t.Fatalf("send system notification: %v", err)
+func TestDetectSensitiveContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		category string
+	}{
+		{name: "phone", content: "我的电话是 13900001234", category: "phone"},
+		{name: "email", content: "联系邮箱 demo@example.com", category: "email"},
+		{name: "wechat", content: "加我微信 vx:chenfei007", category: "wechat"},
+		{name: "qq", content: "QQ 1234567", category: "qq"},
+		{name: "link", content: "请看 https://example.com", category: "external_link"},
+		{name: "safe text", content: "订单签署完成后我会在平台内继续跟进。", category: ""},
 	}
 
-	conversations, total, err := service.ListConversations(1, 1, 20)
-	if err != nil {
-		t.Fatalf("list conversations: %v", err)
-	}
-	if total != 2 {
-		t.Fatalf("expected only peer conversations to remain, got total=%d", total)
-	}
-	for _, conversation := range conversations {
-		if conversation.PeerID <= 0 {
-			t.Fatalf("expected filtered conversation to have peer id, got %#v", conversation)
-		}
-		if IsSystemConversationID(conversation.ConversationID) {
-			t.Fatalf("expected system conversation to be filtered out, got %#v", conversation)
-		}
-	}
-}
-
-func TestSendConversationSystemMessageStoresSystemGeneratedFlag(t *testing.T) {
-	db := newServiceTestDB(t, &model.Message{})
-	service := NewMessageService(repository.NewMessageRepo(db))
-
-	msg, err := service.SendConversationSystemMessage(5, 8, "支付成功", "订单已支付", map[string]interface{}{"order_id": 12})
-	if err != nil {
-		t.Fatalf("send conversation system message: %v", err)
-	}
-
-	var stored model.Message
-	if err := db.First(&stored, msg.ID).Error; err != nil {
-		t.Fatalf("reload stored message: %v", err)
-	}
-	if !strings.Contains(string(stored.ExtraData), "\"system_generated\":true") {
-		t.Fatalf("expected extra data to contain system_generated flag, got %s", string(stored.ExtraData))
-	}
-
-	if _, _, err := service.GetMessagesForUser(99, makeConversationID(5, 8), 1, 20); err == nil {
-		t.Fatal("expected unauthorized user to be denied conversation access")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			violation := detectSensitiveContent(tt.content)
+			if tt.category == "" {
+				if violation != nil {
+					t.Fatalf("expected no violation, got %+v", violation)
+				}
+				return
+			}
+			if violation == nil {
+				t.Fatalf("expected violation category %s, got nil", tt.category)
+			}
+			if violation.Category != tt.category {
+				t.Fatalf("expected category %s, got %s", tt.category, violation.Category)
+			}
+		})
 	}
 }

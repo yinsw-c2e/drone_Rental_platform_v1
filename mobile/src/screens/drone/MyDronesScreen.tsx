@@ -35,6 +35,9 @@ const CHANGEABLE_STATUSES = [
   {key: 'offline', label: '不可用（下线）'},
 ] as const;
 
+const DRONE_PAGE_HELP =
+  '这里可以查看每台无人机能不能接单、是否正在执行任务，以及运营资质、保险、适航证明等材料是否齐全。资质越完整，越方便上架服务、参与报价和承接订单。';
+
 type StatusKey = (typeof STATUS_GROUPS)[number]['key'];
 
 const statusMap: Record<string, {label: string; tone: 'green' | 'orange' | 'red' | 'gray' | 'blue'}> = {
@@ -103,7 +106,7 @@ export default function MyDronesScreen({navigation}: any) {
   );
 
   const handleChangeStatus = useCallback((drone: Drone) => {
-    Alert.alert('更改状态', `当前：${statusMap[drone.availability_status || 'offline']?.label || drone.availability_status}`, [
+    Alert.alert('更改状态', `当前：${statusMap[drone.availability_status || 'offline']?.label || '状态未知'}`, [
       ...CHANGEABLE_STATUSES.filter(s => s.key !== drone.availability_status).map(s => ({
         text: s.label,
         onPress: async () => {
@@ -117,6 +120,10 @@ export default function MyDronesScreen({navigation}: any) {
       })),
       {text: '取消', style: 'cancel'},
     ]);
+  }, []);
+
+  const showPageHelp = useCallback(() => {
+    Alert.alert('我的无人机', DRONE_PAGE_HELP);
   }, []);
 
   const handleViewActiveOrder = useCallback(async (droneId: number) => {
@@ -205,7 +212,7 @@ export default function MyDronesScreen({navigation}: any) {
         </View>
         <View style={styles.metricRow}>
           <Text style={styles.metricText}>城市：{item.city || '未设置'}</Text>
-          <Text style={styles.metricText}>状态：{item.availability_status || 'offline'}</Text>
+          <Text style={styles.metricText}>状态：{availability.label}</Text>
         </View>
 
         <View style={styles.badgeRow}>
@@ -252,9 +259,18 @@ export default function MyDronesScreen({navigation}: any) {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>我的无人机</Text>
-              <Text style={styles.heroTitle}>设备、状态、资质在一页看清</Text>
-              <Text style={styles.heroDesc}>机主链路里，无人机不是静态资产，而是后续供给、报价、履约和派单的基础能力。基础资质、UOM、保险、适航现在也按并行总览展示，不用再按串行心智理解。</Text>
+              <View style={styles.heroHeader}>
+                <View style={styles.heroTitleWrap}>
+                  <Text style={styles.heroEyebrow}>我的无人机</Text>
+                  <Text style={styles.heroTitle}>管理设备与资质</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.helpIcon}
+                  activeOpacity={0.75}
+                  onPress={showPageHelp}>
+                  <Text style={styles.helpIconText}>?</Text>
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.summaryRow}>
                 <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
@@ -267,11 +283,11 @@ export default function MyDronesScreen({navigation}: any) {
                 </View>
                 <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
                   <Text style={styles.summaryValue}>{summary.active}</Text>
-                  <Text style={styles.summaryLabel}>基础资质通过</Text>
+                  <Text style={styles.summaryLabel}>资质通过</Text>
                 </View>
                 <View style={[styles.summaryItem, {width: summaryLayout.itemWidth}]}>
                   <Text style={styles.summaryValue}>{summary.suppliesReady}</Text>
-                  <Text style={styles.summaryLabel}>可上架准备</Text>
+                  <Text style={styles.summaryLabel}>可上架</Text>
                 </View>
               </View>
             </View>
@@ -299,7 +315,6 @@ export default function MyDronesScreen({navigation}: any) {
               <EmptyState
                 icon="🛩️"
                 title={activeGroup === 'all' ? '还没有添加无人机' : '这个分组下暂无无人机'}
-                description="先添加设备基础信息，即可开始建立服务草稿。合规资质可后续再补充。"
                 actionText="添加无人机"
                 onAction={() => navigation.navigate('AddDrone')}
               />
@@ -315,9 +330,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {flex: 1, backgroundColor: theme.bgSecondary},
   content: {padding: 14, paddingBottom: 28},
   hero: {backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary, borderRadius: 24, padding: 20, marginBottom: 12, borderWidth: theme.isDark ? 1 : 0, borderColor: theme.isDark ? theme.primaryBorder : 'transparent'},
+  heroHeader: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12},
+  heroTitleWrap: {flex: 1},
   heroEyebrow: {fontSize: 12, color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)', fontWeight: '700'},
-  heroTitle: {marginTop: 8, fontSize: 28, lineHeight: 34, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800'},
-  heroDesc: {marginTop: 10, fontSize: 13, lineHeight: 20, color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)'},
+  heroTitle: {marginTop: 8, fontSize: 24, lineHeight: 30, color: theme.isDark ? theme.text : '#FFFFFF', fontWeight: '800'},
+  helpIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.28)',
+  },
+  helpIconText: {fontSize: 15, fontWeight: '800', color: theme.isDark ? theme.primaryText : '#FFFFFF'},
   summaryRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18},
   summaryItem: {
     minWidth: 68,

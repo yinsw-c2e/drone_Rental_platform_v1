@@ -13,14 +13,17 @@ import {useFocusEffect} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
+import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
 import ObjectCard from '../../components/business/ObjectCard';
 import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
+import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import {orderV2Service} from '../../services/orderV2';
 import {RootState} from '../../store/store';
-import {RoleSummary, V2OrderSummary} from '../../types';
+import {RoleSummary, V2OrderAnomaly, V2OrderSummary} from '../../types';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {buildOrderAnomalyLookup} from '../../utils/orderAnomalyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -178,6 +181,7 @@ export default function OrderListScreen({navigation, route}: any) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<OrderListItem[]>([]);
+  const [anomalyLookup, setAnomalyLookup] = useState<Record<number, V2OrderAnomaly>>({});
 
   useEffect(() => {
     const nextRole = getRouteRoleFilter(route?.params?.roleFilter);
@@ -235,8 +239,17 @@ export default function OrderListScreen({navigation, route}: any) {
         (a, b) => new Date(b.order.updated_at || b.order.created_at).getTime() - new Date(a.order.updated_at || a.order.created_at).getTime(),
       );
       setItems(list);
+
+      const anomalyRole = activeRole === 'all' ? undefined : activeRole;
+      const anomalyRes = await orderAnomalyV2Service.list({
+        role: anomalyRole === 'all' ? undefined : anomalyRole,
+        page: 1,
+        page_size: 100,
+      });
+      setAnomalyLookup(buildOrderAnomalyLookup(anomalyRes.data?.items || []));
     } catch (error) {
       console.warn('获取订单列表失败:', error);
+      setAnomalyLookup({});
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -265,6 +278,7 @@ export default function OrderListScreen({navigation, route}: any) {
     const progressHint = getOrderProgressHint(item.order);
     const isPilotOrder = item.roles.includes('pilot');
     const hasDispatchTask = Number(item.order.dispatch_task_id || 0) > 0;
+    const anomaly = anomalyLookup[item.order.id];
     const canPilotExecute =
       isPilotOrder &&
       hasDispatchTask &&
@@ -291,7 +305,7 @@ export default function OrderListScreen({navigation, route}: any) {
       <TouchableOpacity
         activeOpacity={0.8}
         style={[styles.orderCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}, isCancelled && styles.cardCancelled]}
-        onPress={() => navigation.navigate('OrderDetail', {orderId: item.order.id, id: item.order.id})}>
+        onPress={openPrimaryEntry}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <SourceTag source={sourceKind} />
@@ -301,6 +315,8 @@ export default function OrderListScreen({navigation, route}: any) {
         </View>
 
         <Text style={styles.cardTitle} numberOfLines={1}>{item.order.title}</Text>
+
+        {anomaly ? <OrderAnomalyBanner anomaly={anomaly} compact onPress={openPrimaryEntry} /> : null}
 
         <View style={styles.cardRoute}>
           <Text style={styles.routeText} numberOfLines={1}>
@@ -350,13 +366,6 @@ export default function OrderListScreen({navigation, route}: any) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View>
-            <View style={styles.hero}>
-              <Text style={styles.heroTitle}>订单进度</Text>
-              <Text style={styles.heroDesc}>
-                成交后的订单、执行安排和签收进度都会汇总在这里，按身份视角和状态分组查看。
-              </Text>
-            </View>
-
             {(effectiveRoleSummary.has_owner_role || effectiveRoleSummary.has_pilot_role) && (
               <View style={styles.toolEntryRow}>
                 {effectiveRoleSummary.has_owner_role && (
@@ -433,7 +442,6 @@ export default function OrderListScreen({navigation, route}: any) {
               <EmptyState
                 icon="📦"
                 title="当前没有匹配订单"
-                description="这里只显示成交后的订单进度。找服务、发布任务和执行安排入口已经拆开。"
                 actionText={emptyAction.text}
                 onAction={emptyAction.onPress}
               />
@@ -453,26 +461,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   content: {
     padding: 14,
     paddingBottom: 28,
-  },
-  hero: {
-    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: theme.isDark ? 1 : 0,
-    borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
-  },
-  heroTitle: {
-    fontSize: 24,
-    lineHeight: 30,
-    color: theme.isDark ? theme.text : '#FFFFFF',
-    fontWeight: '800',
-  },
-  heroDesc: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   toolEntryRow: {
     flexDirection: 'row',

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"wurenji-backend/internal/model"
@@ -12,15 +13,44 @@ import (
 
 type MessageService struct {
 	messageRepo *repository.MessageRepo
+	creditRepo  *repository.CreditRepository
 }
 
 func NewMessageService(messageRepo *repository.MessageRepo) *MessageService {
 	return &MessageService{messageRepo: messageRepo}
 }
 
+type SensitiveContentViolation struct {
+	Category string
+	Message  string
+}
+
+func (e *SensitiveContentViolation) Error() string {
+	if e == nil {
+		return ""
+	}
+	return e.Message
+}
+
+var (
+	phonePattern  = regexp.MustCompile(`(?:\+?86[-\s]?)?1[3-9]\d{9}`)
+	emailPattern  = regexp.MustCompile(`(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}`)
+	wechatPattern = regexp.MustCompile(`(?i)(微信|vx|vx号|wechat|weixin|v信)[：:\s]*[a-zA-Z][-_a-zA-Z0-9]{5,19}`)
+	qqPattern     = regexp.MustCompile(`(?i)(qq)[：:\s]*[1-9][0-9]{4,}`)
+	linkPattern   = regexp.MustCompile(`(?i)(https?://|www\.)`)
+)
+
+func (s *MessageService) SetCreditRepository(creditRepo *repository.CreditRepository) {
+	s.creditRepo = creditRepo
+}
+
 func (s *MessageService) SendMessage(senderID, receiverID int64, msgType, content string, extraData model.JSON) (*model.Message, error) {
 	if senderID == receiverID {
 		return nil, errors.New("不能发送消息给自己")
+	}
+	if violation := detectSensitiveContent(content); violation != nil {
+		s.recordSensitiveContentRisk(senderID, violation)
+		return nil, violation
 	}
 
 	conversationID := makeConversationID(senderID, receiverID)
@@ -37,6 +67,50 @@ func (s *MessageService) SendMessage(senderID, receiverID int64, msgType, conten
 		return nil, err
 	}
 	return msg, nil
+}
+
+func detectSensitiveContent(content string) *SensitiveContentViolation {
+	normalized := strings.TrimSpace(content)
+	if normalized == "" {
+		return nil
+	}
+	switch {
+	case phonePattern.MatchString(normalized):
+		return &SensitiveContentViolation{Category: "phone", Message: "为避免绕开平台线下交易，聊天中暂不支持发送手机号，请继续使用站内沟通。"}
+	case emailPattern.MatchString(normalized):
+		return &SensitiveContentViolation{Category: "email", Message: "为避免绕开平台线下交易，聊天中暂不支持发送邮箱地址，请继续使用站内沟通。"}
+	case wechatPattern.MatchString(normalized):
+		return &SensitiveContentViolation{Category: "wechat", Message: "为避免绕开平台线下交易，聊天中暂不支持交换微信联系方式，请继续使用站内沟通。"}
+	case qqPattern.MatchString(normalized):
+		return &SensitiveContentViolation{Category: "qq", Message: "为避免绕开平台线下交易，聊天中暂不支持交换 QQ 联系方式，请继续使用站内沟通。"}
+	case linkPattern.MatchString(normalized):
+		return &SensitiveContentViolation{Category: "external_link", Message: "为避免将交易引导到平台外，聊天中暂不支持发送外部联系链接。"}
+	default:
+		return nil
+	}
+}
+
+func (s *MessageService) recordSensitiveContentRisk(userID int64, violation *SensitiveContentViolation) {
+	if s == nil || s.creditRepo == nil || userID <= 0 || violation == nil {
+		return
+	}
+	payload, _ := json.Marshal(map[string]interface{}{
+		"category": violation.Category,
+	})
+	_ = s.creditRepo.CreateRiskControl(&model.RiskControl{
+		UserID:       userID,
+		UserType:     "user",
+		RiskPhase:    "during",
+		RiskType:     "off_platform_contact",
+		RiskLevel:    "medium",
+		RiskScore:    40,
+		TriggerRule:  "chat_sensitive_content_guard",
+		TriggerData:  string(payload),
+		Description:  "站内聊天命中敏感联系方式拦截",
+		Status:       "pending",
+		Action:       "warn",
+		ActionDetail: "记录风险留痕，必要时由运营进一步核查是否存在平台外导流行为",
+	})
 }
 
 func (s *MessageService) GetConversations(userID int64) ([]repository.ConversationSummary, error) {

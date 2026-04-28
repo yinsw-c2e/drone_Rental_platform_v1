@@ -198,6 +198,7 @@ func main() {
 	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, clientRepo, ownerDomainRepo, demandDomainRepo, zapLogger)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, droneRepo, pilotRepo, orderArtifactRepo, paymentProvider, zapLogger)
 	messageService := service.NewMessageService(messageRepo)
+	messageService.SetCreditRepository(creditRepo)
 	eventService := service.NewEventService(messageService, pushService, zapLogger)
 	reviewService := service.NewReviewService(reviewRepo, droneRepo, orderRepo)
 	addressService := service.NewAddressService(addressRepo)
@@ -206,6 +207,7 @@ func main() {
 	dispatchService := service.NewDispatchService(dispatchRepo, pilotRepo, droneRepo, clientRepo, orderRepo, ownerDomainRepo, demandDomainRepo, orderArtifactRepo, zapLogger)
 	flightService := service.NewFlightService(flightRepo, orderRepo, pilotRepo, zapLogger)
 	homeService := service.NewHomeService(userService, clientService, ownerService, pilotService, orderService, demandDomainRepo)
+	orderAnomalyService := service.NewOrderAnomalyService(orderRepo)
 	operationsService := service.NewOperationsService(migrationRepo, orderRepo)
 	airspaceService := service.NewAirspaceService(airspaceRepo, pilotRepo, droneRepo, orderRepo, zapLogger)
 	settlementService := service.NewSettlementService(settlementRepo, orderRepo, zapLogger)
@@ -223,6 +225,7 @@ func main() {
 	pilotService.SetEventService(eventService)
 	clientService.SetMatchingService(matchingService)
 	clientService.SetEventService(eventService)
+	clientService.SetAirspaceService(airspaceService)
 	paymentService.SetDispatchService(dispatchService)
 	paymentService.SetEventService(eventService)
 	paymentService.SetContractRepo(contractRepo)
@@ -259,7 +262,7 @@ func main() {
 		Insurance:  insurancehandler.NewHandler(insuranceService),
 		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, cfg.Server.Mode, handlers.Admin, handlers.Analytics, handlers.Client)
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, cfg.Server.Mode, handlers.Admin, handlers.Analytics, handlers.Client)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)

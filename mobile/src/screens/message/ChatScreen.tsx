@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform} from 'react-native';
+import {Alert, View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform} from 'react-native';
 import {messageService} from '../../services/message';
 import {Message} from '../../types';
 import {useSelector} from 'react-redux';
@@ -55,6 +55,8 @@ export default function ChatScreen({route, navigation}: any) {
       }
     } catch (e) {
       console.error(e);
+      const message = (e as any)?.message || '消息发送失败，请稍后重试。';
+      Alert.alert('发送失败', message);
     }
   };
 
@@ -86,7 +88,7 @@ export default function ChatScreen({route, navigation}: any) {
       <KeyboardAvoidingView style={styles.flexOne} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.noticeBanner}>
           <Text style={styles.noticeTitle}>沟通消息</Text>
-          <Text style={styles.noticeText}>聊天仅用于沟通协作，订单确认、派单接受、退款处理等正式状态，请以系统通知和业务页面为准。</Text>
+          <Text style={styles.noticeText}>聊天仅用于沟通协作。成交前手机号、邮箱、微信等敏感联系方式会被平台规则拦截，正式状态推进仍以系统通知和业务页面为准。</Text>
         </View>
         <FlatList
           data={messages}

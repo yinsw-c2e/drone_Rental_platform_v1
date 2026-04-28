@@ -83,7 +83,7 @@ export function summarizeAddress(address?: AddressData | null): string {
 }
 
 export function getSceneLabel(sceneKey: string): string {
-  return DEMAND_SCENE_OPTIONS.find(option => option.key === sceneKey)?.label || '重载吊运';
+  return DEMAND_SCENE_OPTIONS.find(option => option.key === sceneKey)?.label || sceneKey || '重载吊运';
 }
 
 export function generateSuggestedTitle(params: {

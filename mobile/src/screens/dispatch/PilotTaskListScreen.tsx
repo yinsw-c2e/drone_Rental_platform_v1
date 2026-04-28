@@ -14,11 +14,14 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 
 import EmptyState from '../../components/business/EmptyState';
+import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
+import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import {pilotV2Service} from '../../services/pilotV2';
-import {V2DispatchTaskSummary} from '../../types';
+import {V2DispatchTaskSummary, V2OrderAnomaly} from '../../types';
+import {buildOrderAnomalyLookup} from '../../utils/orderAnomalyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -63,6 +66,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   const [selectedTask, setSelectedTask] = useState<V2DispatchTaskSummary | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [pilotProfile, setPilotProfile] = useState<any>(null);
+  const [anomalyLookup, setAnomalyLookup] = useState<Record<number, V2OrderAnomaly>>({});
   const entryMode = String(route?.params?.entry || 'all');
   const entryMeta = useMemo(() => getPilotEntryMeta(entryMode), [entryMode]);
   const eligibility = pilotProfile?.eligibility;
@@ -77,8 +81,11 @@ export default function PilotTaskListScreen({navigation, route}: any) {
       ]);
       setTasks(dispatchRes.data?.items || []);
       setPilotProfile(profileRes?.data || null);
+      const anomalyRes = await orderAnomalyV2Service.list({role: 'pilot', page: 1, page_size: 100});
+      setAnomalyLookup(buildOrderAnomalyLookup(anomalyRes.data?.items || []));
     } catch (error) {
       console.error('获取飞手正式派单失败:', error);
+      setAnomalyLookup({});
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -157,6 +164,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
     const isAccepted = String(item.status || '').toLowerCase() === 'accepted';
     const os = String(item.order?.status || '').toLowerCase();
     const isExecuting = isAccepted && !['completed', 'cancelled'].includes(os);
+    const anomaly = item.order?.id ? anomalyLookup[item.order.id] : undefined;
 
     return (
       <TouchableOpacity
@@ -173,6 +181,14 @@ export default function PilotTaskListScreen({navigation, route}: any) {
         </View>
 
         <Text style={styles.cardTitle} numberOfLines={2}>{item.order?.title || '正式派单任务'}</Text>
+
+        {anomaly ? (
+          <OrderAnomalyBanner
+            anomaly={anomaly}
+            compact
+            onPress={() => navigation.navigate('DispatchTaskDetail', {id: item.id})}
+          />
+        ) : null}
 
         <View style={styles.routeContainer}>
           <View style={styles.routePoint}>

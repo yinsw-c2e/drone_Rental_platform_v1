@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -18,7 +17,6 @@ import {useDispatch, useSelector} from 'react-redux';
 import * as ImagePicker from 'react-native-image-picker';
 import type {ImagePickerResponse} from 'react-native-image-picker';
 
-import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import {logout, setMeSummary, updateUser} from '../../store/slices/authSlice';
 import {RootState} from '../../store/store';
@@ -31,7 +29,6 @@ import {orderV2Service} from '../../services/orderV2';
 import {ownerService} from '../../services/owner';
 import {pilotV2Service} from '../../services/pilotV2';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
-import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -54,9 +51,16 @@ type ProfileStats = {
 type ShortcutItem = {
   key: string;
   title: string;
-  desc: string;
+  desc?: string;
   icon: string;
   screen: string;
+  rightText?: string;
+};
+
+type ShortcutGroup = {
+  key: string;
+  title: string;
+  items: ShortcutItem[];
 };
 
 type IdentityItem = {
@@ -138,7 +142,6 @@ const capabilityCatalog = [
 export default function ProfileScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {width: viewportWidth} = useWindowDimensions();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const dispatch = useDispatch();
@@ -379,53 +382,135 @@ export default function ProfileScreen({navigation}: any) {
     [effectiveRoleSummary],
   );
 
-  const quickEntries = useMemo<ShortcutItem[]>(() => {
-    const items: ShortcutItem[] = [
-      {key: 'client-profile', title: '客户档案', desc: '联系人、地址、项目统计', icon: '👔', screen: 'ClientProfile'},
-      {key: 'orders', title: '我的订单', desc: '统一查看订单进度与财务', icon: '📋', screen: 'MyOrders'},
-      {key: 'verify', title: '实名认证', desc: '完善账号实名与资料校验', icon: '🔒', screen: 'Verification'},
-      {key: 'settings', title: '设置', desc: '账号与通知偏好设置', icon: '⚙️', screen: 'Settings'},
+  const profileMenuGroups = useMemo<ShortcutGroup[]>(() => {
+    const orderItems: ShortcutItem[] = [
+      {
+        key: 'orders',
+        title: '我的订单',
+        desc: '查看订单进度与费用',
+        icon: '📋',
+        screen: 'MyOrders',
+        rightText: `${stats.orders} 单`,
+      },
     ];
 
     if (effectiveRoleSummary.has_client_role) {
-      items.splice(1, 0, {
+      orderItems.push({
         key: 'demands',
         title: '我的任务',
-        desc: '继续跟进报价和转单',
+        desc: '跟进报价和转单',
         icon: '📝',
         screen: 'MyDemands',
+        rightText: `${stats.demands} 个`,
       });
     }
 
     if (effectiveRoleSummary.has_owner_role) {
-      items.push(
-      {key: 'owner-profile', title: '机主档案', desc: '查看资产、服务与能力就绪情况', icon: '🧭', screen: 'OwnerProfile'},
-      {key: 'drones', title: '我的无人机', desc: '管理设备、资质和状态', icon: '🛩️', screen: 'MyDrones'},
-        {key: 'offers', title: '我的服务', desc: '查看上架、暂停和关闭中的服务', icon: '📦', screen: 'MyOffers'},
-        {key: 'quotes', title: '我的报价', desc: '继续跟进任务报价结果', icon: '💬', screen: 'MyQuotes'},
+      orderItems.push({
+        key: 'quotes',
+        title: '我的报价',
+        desc: '查看报价结果',
+        icon: '💬',
+        screen: 'MyQuotes',
+        rightText: `${stats.quotes} 条`,
+      });
+    }
+
+    const identityItems: ShortcutItem[] = [
+      {
+        key: 'client-profile',
+        title: '客户档案',
+        desc: '联系人、地址和项目资料',
+        icon: '👔',
+        screen: 'ClientProfile',
+        rightText: effectiveRoleSummary.has_client_role ? '已就绪' : '待补齐',
+      },
+      {
+        key: 'verify',
+        title: '实名认证',
+        desc: '账号实名与资料校验',
+        icon: '🔒',
+        screen: 'Verification',
+        rightText: verifyInfo.label,
+      },
+    ];
+
+    if (effectiveRoleSummary.has_owner_role) {
+      identityItems.push({
+        key: 'owner-profile',
+        title: '机主档案',
+        desc: '资产、服务与能力资料',
+        icon: '🧭',
+        screen: 'OwnerProfile',
+        rightText: '已建立',
+      });
+    }
+
+    identityItems.push({
+      key: effectiveRoleSummary.has_pilot_role ? 'pilot' : 'pilot-register',
+      title: effectiveRoleSummary.has_pilot_role ? '飞手中心' : '飞手认证',
+      desc: effectiveRoleSummary.has_pilot_role
+        ? '接单状态、飞行统计'
+        : '申请后才能接正式派单',
+      icon: effectiveRoleSummary.has_pilot_role ? '🎮' : '🪪',
+      screen: effectiveRoleSummary.has_pilot_role ? 'PilotProfile' : 'PilotRegister',
+      rightText: effectiveRoleSummary.has_pilot_role ? '已认证' : '去认证',
+    });
+
+    const assetItems: ShortcutItem[] = [];
+    if (effectiveRoleSummary.has_owner_role) {
+      assetItems.push(
+        {
+          key: 'offers',
+          title: '我的服务',
+          desc: '上架、暂停和关闭中的服务',
+          icon: '📦',
+          screen: 'MyOffers',
+          rightText: `${stats.supplies} 个`,
+        },
+        {
+          key: 'drones',
+          title: '我的无人机',
+          desc: '设备、资质和可用状态',
+          icon: '🛩️',
+          screen: 'MyDrones',
+          rightText: `${stats.drones} 架`,
+        },
       );
     }
 
-    if (effectiveRoleSummary.has_pilot_role) {
-      items.push({
-        key: 'pilot',
-        title: '飞手中心',
-        desc: '接单状态、监控入口、飞行统计',
-        icon: '🎮',
-        screen: 'PilotProfile',
-      });
-    } else {
-      items.push({
-        key: 'pilot-register',
-        title: '飞手认证',
-        desc: '申请飞手后才能接正式派单',
-        icon: '🪪',
-        screen: 'PilotRegister',
-      });
-    }
+    const settingItems: ShortcutItem[] = [
+      {
+        key: 'edit',
+        title: '编辑资料',
+        desc: '昵称、头像和基础资料',
+        icon: '✏️',
+        screen: 'EditProfile',
+      },
+      {
+        key: 'settings',
+        title: '设置',
+        desc: '账号与通知偏好',
+        icon: '⚙️',
+        screen: 'Settings',
+      },
+    ];
 
-    return items;
-  }, [effectiveRoleSummary]);
+    return [
+      {key: 'orders', title: '订单与任务', items: orderItems},
+      {key: 'identity', title: '身份与能力', items: identityItems},
+      {key: 'assets', title: '资产与服务', items: assetItems},
+      {key: 'settings', title: '账户设置', items: settingItems},
+    ].filter(group => group.items.length > 0);
+  }, [
+    effectiveRoleSummary,
+    stats.demands,
+    stats.drones,
+    stats.orders,
+    stats.quotes,
+    stats.supplies,
+    verifyInfo.label,
+  ]);
 
   const roleBadges = useMemo(() => {
     const summary = effectiveRoleSummary;
@@ -437,16 +522,6 @@ export default function ProfileScreen({navigation}: any) {
   }, [effectiveRoleSummary]);
 
   const canApplySelfExecute = effectiveRoleSummary.can_publish_supply && effectiveRoleSummary.can_accept_dispatch;
-  const shortcutCardLayout = useMemo(
-    () =>
-      getResponsiveTwoColumnLayout({
-        viewportWidth,
-        totalHorizontalPadding: 32,
-        gap: 12,
-        minItemWidth: 136,
-      }),
-    [viewportWidth],
-  );
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -491,38 +566,45 @@ export default function ProfileScreen({navigation}: any) {
           </View>
         </View>
 
-        {/* 常用入口 - 提升到首屏 */}
-        <View style={styles.sectionHeaderLoose}>
-          <Text style={styles.sectionTitle}>常用入口</Text>
-        </View>
-        <View style={styles.shortcutGrid}>
-          {quickEntries.map(item => (
-            <TouchableOpacity
-              key={item.key}
-              style={[styles.shortcutCard, {width: shortcutCardLayout.itemWidth}]}
-              activeOpacity={0.88}
-              onPress={() => navigation.navigate(item.screen)}>
-              <Text style={styles.shortcutIcon}>{item.icon}</Text>
-              <Text style={styles.shortcutTitle}>{item.title}</Text>
-              <Text style={styles.shortcutDesc}>{item.desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* 账号与安全 - 简化 */}
-        <ObjectCard style={styles.sectionCard}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>账号与安全</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
-              <Text style={styles.sectionLink}>编辑资料</Text>
-            </TouchableOpacity>
+        {profileMenuGroups.map(group => (
+          <View key={group.key} style={styles.menuGroup}>
+            <Text style={styles.menuGroupTitle}>{group.title}</Text>
+            <View style={styles.menuGroupBody}>
+              {group.items.map((item, index) => (
+                <TouchableOpacity
+                  key={item.key}
+                  activeOpacity={0.82}
+                  style={[
+                    styles.menuRow,
+                    index === group.items.length - 1 ? styles.menuRowLast : null,
+                  ]}
+                  onPress={() => navigation.navigate(item.screen)}>
+                  <View style={styles.menuIconWrap}>
+                    <Text style={styles.menuIcon}>{item.icon}</Text>
+                  </View>
+                  <View style={styles.menuRowCopy}>
+                    <Text style={styles.menuRowTitle}>{item.title}</Text>
+                  </View>
+                  {item.rightText ? (
+                    <Text style={styles.menuRowRight} numberOfLines={1}>
+                      {item.rightText}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.menuChevron}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
+        ))}
+
+        <View style={styles.roleOverview}>
+          <Text style={styles.roleOverviewTitle}>身份概览</Text>
           <View style={styles.roleBadgeWrap}>
             {roleBadges.map(item => (
               <StatusBadge key={item.label} label={item.label} tone={item.tone} />
             ))}
           </View>
-        </ObjectCard>
+        </View>
 
         {/* 身份与能力 - 可折叠 */}
         <TouchableOpacity
@@ -535,44 +617,61 @@ export default function ProfileScreen({navigation}: any) {
 
         {showAdvanced && (
           <>
-            {identityCards.map(card => (
-              <ObjectCard key={card.key} style={styles.identityCard}>
-                <View style={styles.identityHeader}>
-                  <View>
-                    <Text style={styles.identityTitle}>{card.label}</Text>
-                  </View>
-                  <StatusBadge label={card.statusLabel} tone={card.statusTone} />
-                </View>
-                <View style={styles.identityMetrics}>
-                  {card.lines.map(line => (
-                    <Text key={line} style={styles.identityMetricText}>{line}</Text>
-                  ))}
-                </View>
-                <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate(card.screen)}>
-                  <Text style={styles.secondaryActionText}>{card.actionLabel}</Text>
-                </TouchableOpacity>
-              </ObjectCard>
-            ))}
+            <View style={styles.menuGroup}>
+              <Text style={styles.menuGroupTitle}>身份详情</Text>
+              <View style={styles.menuGroupBody}>
+                {identityCards.map((card, index) => (
+                  <TouchableOpacity
+                    key={card.key}
+                    activeOpacity={0.82}
+                    style={[
+                      styles.menuRow,
+                      index === identityCards.length - 1 ? styles.menuRowLast : null,
+                    ]}
+                    onPress={() => navigation.navigate(card.screen)}>
+                    <View style={styles.menuIconWrap}>
+                      <Text style={styles.menuIcon}>
+                        {card.key === 'client' ? '👔' : card.key === 'owner' ? '🧭' : '🎮'}
+                      </Text>
+                    </View>
+                    <View style={styles.menuRowCopy}>
+                      <Text style={styles.menuRowTitle}>{card.label}</Text>
+                    </View>
+                    <StatusBadge label={card.statusLabel} tone={card.statusTone} />
+                    <Text style={styles.menuChevron}>›</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-            <ObjectCard style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>能力状态</Text>
-              {capabilityItems.map(item => (
-                <View key={item.key} style={styles.capabilityRow}>
-                  <View style={styles.capabilityCopy}>
-                    <Text style={styles.capabilityLabel}>{item.label}</Text>
-                    <Text style={styles.capabilityDesc}>{item.desc}</Text>
+            <View style={styles.menuGroup}>
+              <Text style={styles.menuGroupTitle}>能力状态</Text>
+              <View style={styles.menuGroupBody}>
+                {capabilityItems.map((item, index) => (
+                  <View
+                    key={item.key}
+                    style={[
+                      styles.menuRow,
+                      index === capabilityItems.length - 1 ? styles.menuRowLast : null,
+                    ]}>
+                    <View style={styles.menuIconWrap}>
+                      <Text style={styles.menuIcon}>{item.enabled ? '✓' : '·'}</Text>
+                    </View>
+                    <View style={styles.menuRowCopy}>
+                      <Text style={styles.menuRowTitle}>{item.label}</Text>
+                    </View>
+                    <StatusBadge label={item.enabled ? '可用' : '未就绪'} tone={item.enabled ? 'green' : 'gray'} />
                   </View>
-                  <StatusBadge label={item.enabled ? '可用' : '未就绪'} tone={item.enabled ? 'green' : 'gray'} />
-                </View>
-              ))}
+                ))}
+              </View>
               <View style={styles.capabilityNotice}>
                 <Text style={styles.capabilityNoticeText}>
                   {canApplySelfExecute
                     ? '当前账号已经具备机主与飞手双能力，后续订单可走自执行链路。'
-                    : '要实现机主自执行，需要同时具备发布供给和接正式派单两种能力。'}
+                  : '要实现机主自执行，需要同时具备发布供给和接正式派单两种能力。'}
                 </Text>
               </View>
-            </ObjectCard>
+            </View>
           </>
         )}
 
@@ -730,6 +829,83 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 14,
+  },
+  menuGroup: {
+    marginBottom: 12,
+  },
+  menuGroupTitle: {
+    paddingHorizontal: 4,
+    marginBottom: 8,
+    fontSize: 15,
+    color: theme.text,
+    fontWeight: '800',
+  },
+  menuGroupBody: {
+    borderRadius: 22,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.divider,
+    gap: 12,
+  },
+  menuRowLast: {
+    borderBottomWidth: 0,
+  },
+  menuIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.primaryBg,
+  },
+  menuIcon: {
+    fontSize: 18,
+    color: theme.primaryText,
+    fontWeight: '800',
+  },
+  menuRowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  menuRowTitle: {
+    fontSize: 15,
+    color: theme.text,
+    fontWeight: '800',
+  },
+  menuRowRight: {
+    maxWidth: 86,
+    fontSize: 12,
+    color: theme.textSub,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  menuChevron: {
+    fontSize: 22,
+    color: theme.textHint,
+    fontWeight: '500',
+  },
+  roleOverview: {
+    marginBottom: 12,
+    borderRadius: 22,
+    backgroundColor: theme.card,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    padding: 16,
+  },
+  roleOverviewTitle: {
+    fontSize: 15,
+    color: theme.text,
+    fontWeight: '800',
   },
   identityCard: {
     marginBottom: 12,

@@ -16,6 +16,9 @@ export interface ContractDetail {
   client_signed_at: string | null;
   provider_signed_at: string | null;
   contract_html: string;
+  order_status?: string;
+  can_sign?: boolean;
+  sign_block_reason?: string;
   created_at: string;
   updated_at: string;
 }

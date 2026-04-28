@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   SafeAreaView,
@@ -13,14 +12,11 @@ import {
 } from 'react-native';
 
 import EmptyState from '../../components/business/EmptyState';
-import ObjectCard from '../../components/business/ObjectCard';
-import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {demandV2Service} from '../../services/demandV2';
 import {DemandSummary} from '../../types';
 import {
-  formatDemandBudget,
   formatDemandSchedule,
   getDemandSceneLabel,
   resolveDemandPrimaryAddress,
@@ -136,7 +132,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>¥{formatAmountYuan(item.budget_max)}</Text>
+            <Text style={styles.statValue}>{formatAmountYuan(item.budget_max)}</Text>
             <Text style={styles.statLabel}>预算上限</Text>
           </View>
         </View>

@@ -13,7 +13,8 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import AddressInputField from '../../components/AddressInputField';
-import ObjectCard from '../../components/business/ObjectCard';
+import AirspaceRiskNotice from '../../components/business/AirspaceRiskNotice';
+import {AirspaceCheckResult, checkAirspaceAvailability} from '../../services/airspace';
 import {getClientEligibility} from '../../services/client';
 import {demandV2Service, type DemandUpsertPayload} from '../../services/demandV2';
 import {AddressData, QuickOrderDraft} from '../../types';
@@ -26,16 +27,23 @@ import {
   formatDemandDateTime,
   formatSavedAt,
   generateSuggestedTitle,
-  getSceneLabel,
   parseDemandDate,
-  summarizeAddress,
   toAddressSnapshot,
 } from './demandComposerShared';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {isAirspaceHardBlocked} from '../../utils/airspaceRisk';
 
 type DemandStep = 1 | 2;
 type DraftSaveState = 'idle' | 'saving' | 'saved' | 'error';
+const getInitialSceneState = (scene?: string) => {
+  const sceneKey = scene || DEMAND_SCENE_OPTIONS[0].key;
+  const isPreset = DEMAND_SCENE_OPTIONS.some(option => option.key === sceneKey);
+  return {
+    presetScene: isPreset ? sceneKey : DEMAND_SCENE_OPTIONS[0].key,
+    customScene: isPreset ? '' : sceneKey,
+  };
+};
 
 export default function PublishCargoScreen({route, navigation}: any) {
   const {theme} = useTheme();
@@ -50,17 +58,22 @@ export default function PublishCargoScreen({route, navigation}: any) {
     () => parseDemandDate(quickOrderDraft?.scheduled_end_at, buildDefaultDemandEnd(defaultStartDate)),
     [defaultStartDate, quickOrderDraft?.scheduled_end_at],
   );
+  const initialSceneState = useMemo(
+    () => getInitialSceneState(quickOrderDraft?.cargo_scene),
+    [quickOrderDraft?.cargo_scene],
+  );
 
   const [currentStep, setCurrentStep] = useState<DemandStep>(quickOrderDraft ? 2 : 1);
   const [title, setTitle] = useState(() =>
     deriveDraftTitle({
       title: '',
-      sceneKey: quickOrderDraft?.cargo_scene || DEMAND_SCENE_OPTIONS[0].key,
+      sceneKey: quickOrderDraft?.cargo_scene || initialSceneState.presetScene,
       departureAddress: quickOrderDraft?.departure_address || null,
       destinationAddress: quickOrderDraft?.destination_address || null,
     }),
   );
-  const [cargoScene, setCargoScene] = useState(quickOrderDraft?.cargo_scene || DEMAND_SCENE_OPTIONS[0].key);
+  const [cargoScene, setCargoScene] = useState(initialSceneState.presetScene);
+  const [customCargoScene, setCustomCargoScene] = useState(initialSceneState.customScene);
   const [cargoType, setCargoType] = useState(quickOrderDraft?.cargo_type || '');
   const [cargoWeight, setCargoWeight] = useState(
     quickOrderDraft?.cargo_weight_kg ? String(quickOrderDraft.cargo_weight_kg) : '',
@@ -90,24 +103,98 @@ export default function PublishCargoScreen({route, navigation}: any) {
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [pickupAirspace, setPickupAirspace] = useState<AirspaceCheckResult | null>(null);
+  const [deliveryAirspace, setDeliveryAirspace] = useState<AirspaceCheckResult | null>(null);
+  const [checkingPickupAirspace, setCheckingPickupAirspace] = useState(false);
+  const [checkingDeliveryAirspace, setCheckingDeliveryAirspace] = useState(false);
 
   const lastSavedSnapshotRef = useRef('');
   const autoSaveEnabledRef = useRef(false);
 
   const expiresAt = useMemo(() => buildDefaultDemandExpiry(), []);
+  const effectiveCargoScene = customCargoScene.trim() || cargoScene;
   const suggestedTitle = useMemo(
     () =>
       generateSuggestedTitle({
-        sceneKey: cargoScene,
+        sceneKey: effectiveCargoScene,
         departureAddress: pickupAddress,
         destinationAddress: deliveryAddress,
       }),
-    [cargoScene, deliveryAddress, pickupAddress],
+    [deliveryAddress, effectiveCargoScene, pickupAddress],
   );
+  const hasAirspaceHardBlock =
+    isAirspaceHardBlocked(pickupAirspace) || isAirspaceHardBlocked(deliveryAirspace);
+  const blockedAddressLabel = isAirspaceHardBlocked(pickupAirspace)
+    ? '起运地'
+    : isAirspaceHardBlocked(deliveryAirspace)
+      ? '目的地'
+      : '当前地址';
 
   const handleMagicTitle = () => {
     setTitle(suggestedTitle);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!pickupAddress?.latitude || !pickupAddress?.longitude) {
+      setPickupAirspace(null);
+      setCheckingPickupAirspace(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setCheckingPickupAirspace(true);
+    checkAirspaceAvailability(pickupAddress.latitude, pickupAddress.longitude, 120)
+      .then(result => {
+        if (!cancelled) {
+          setPickupAirspace(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPickupAirspace(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingPickupAirspace(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickupAddress?.latitude, pickupAddress?.longitude]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!deliveryAddress?.latitude || !deliveryAddress?.longitude) {
+      setDeliveryAirspace(null);
+      setCheckingDeliveryAirspace(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setCheckingDeliveryAirspace(true);
+    checkAirspaceAvailability(deliveryAddress.latitude, deliveryAddress.longitude, 120)
+      .then(result => {
+        if (!cancelled) {
+          setDeliveryAirspace(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDeliveryAirspace(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingDeliveryAirspace(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deliveryAddress?.latitude, deliveryAddress?.longitude]);
 
   const buildPayload = useCallback(
     (mode: 'draft' | 'publish'): DemandUpsertPayload => {
@@ -117,7 +204,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
       return {
         title: mode === 'publish' ? suggestedTitle : suggestedTitle,
         service_type: 'heavy_cargo_lift_transport',
-        cargo_scene: cargoScene,
+        cargo_scene: effectiveCargoScene,
         description: cargoDescription.trim() || undefined,
         departure_address: toAddressSnapshot(pickupAddress),
         destination_address: toAddressSnapshot(deliveryAddress),
@@ -136,7 +223,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
     [
       budgetMax,
       cargoDescription,
-      cargoScene,
+      effectiveCargoScene,
       cargoType,
       cargoVolume,
       cargoWeight,
@@ -170,6 +257,12 @@ export default function PublishCargoScreen({route, navigation}: any) {
         }
         return false;
       }
+      if (hasAirspaceHardBlock) {
+        if (showAlert) {
+          Alert.alert('当前位置受限', `${blockedAddressLabel}命中禁飞区，当前无法继续，请先更换地址。`);
+        }
+        return false;
+      }
       if (endDate <= startDate) {
         if (showAlert) {
           Alert.alert('提示', '结束时间需要晚于开始时间。');
@@ -178,7 +271,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
       }
       return true;
     },
-    [cargoWeight, deliveryAddress, endDate, pickupAddress, startDate],
+    [blockedAddressLabel, cargoWeight, deliveryAddress, endDate, hasAirspaceHardBlock, pickupAddress, startDate],
   );
 
   const persistDraft = useCallback(
@@ -365,7 +458,6 @@ export default function PublishCargoScreen({route, navigation}: any) {
           <View style={styles.formSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>1. 核心需求信息</Text>
-              <Text style={styles.sectionSubtitle}>必填项，用于发布后匹配合适的机组</Text>
             </View>
 
             <View style={styles.inputCard}>
@@ -397,14 +489,24 @@ export default function PublishCargoScreen({route, navigation}: any) {
                 {DEMAND_SCENE_OPTIONS.map(option => (
                   <TouchableOpacity
                     key={option.key}
-                    style={[styles.sceneBtn, cargoScene === option.key && styles.sceneBtnActive]}
-                    onPress={() => setCargoScene(option.key)}>
-                    <Text style={[styles.sceneBtnText, cargoScene === option.key && styles.sceneBtnTextActive]}>
+                    style={[styles.sceneBtn, !customCargoScene.trim() && cargoScene === option.key && styles.sceneBtnActive]}
+                    onPress={() => {
+                      setCargoScene(option.key);
+                      setCustomCargoScene('');
+                    }}>
+                    <Text style={[styles.sceneBtnText, !customCargoScene.trim() && cargoScene === option.key && styles.sceneBtnTextActive]}>
                       {option.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+              <TextInput
+                style={[styles.input, styles.customSceneInput]}
+                placeholder="其他场景，可直接填写"
+                placeholderTextColor={theme.textHint}
+                value={customCargoScene}
+                onChangeText={setCustomCargoScene}
+              />
 
               <View style={styles.addressSection}>
                 <Text style={styles.label}>起运地</Text>
@@ -414,6 +516,16 @@ export default function PublishCargoScreen({route, navigation}: any) {
                   onSelect={setPickupAddress}
                   style={styles.formAddressInput}
                 />
+                <AirspaceRiskNotice
+                  label="起运地"
+                  result={pickupAirspace}
+                  checking={checkingPickupAirspace}
+                  onOpenDetails={
+                    pickupAddress
+                      ? () => navigation.navigate('NoFlyZone', {latitude: pickupAddress.latitude, longitude: pickupAddress.longitude})
+                      : undefined
+                  }
+                />
                 <View style={styles.addressSpacer} />
                 <Text style={styles.label}>目的地</Text>
                 <AddressInputField
@@ -421,6 +533,16 @@ export default function PublishCargoScreen({route, navigation}: any) {
                   placeholder="点击选择终点"
                   onSelect={setDeliveryAddress}
                   style={styles.formAddressInput}
+                />
+                <AirspaceRiskNotice
+                  label="目的地"
+                  result={deliveryAirspace}
+                  checking={checkingDeliveryAirspace}
+                  onOpenDetails={
+                    deliveryAddress
+                      ? () => navigation.navigate('NoFlyZone', {latitude: deliveryAddress.latitude, longitude: deliveryAddress.longitude})
+                      : undefined
+                  }
                 />
               </View>
 
@@ -456,7 +578,6 @@ export default function PublishCargoScreen({route, navigation}: any) {
           <View style={styles.formSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>2. 更多细节 (选填)</Text>
-              <Text style={styles.sectionSubtitle}>详细的要求能帮您获得更精准的报价方案</Text>
             </View>
 
             <View style={styles.inputCard}>
@@ -535,10 +656,16 @@ export default function PublishCargoScreen({route, navigation}: any) {
         )}
 
         <View style={styles.footerActions}>
+          {hasAirspaceHardBlock ? (
+            <Text style={styles.blockedHint}>
+              当前地址命中禁飞区，需先修改起运地或目的地，才能继续保存并发布任务。
+            </Text>
+          ) : null}
           {currentStep === 1 ? (
-            <TouchableOpacity style={styles.mainActionBtn} onPress={handleContinue}>
+            <TouchableOpacity
+              style={[styles.mainActionBtn, hasAirspaceHardBlock && styles.btnDisabled]}
+              onPress={handleContinue}>
               <Text style={styles.mainActionBtnText}>进入下一步</Text>
-              <Text style={styles.mainActionBtnSub}>下一步可完善预算和详细说明</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.publishRow}>
@@ -546,9 +673,9 @@ export default function PublishCargoScreen({route, navigation}: any) {
                 <Text style={styles.backBtnText}>修改核心信息</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.publishBtn, publishing && styles.btnDisabled]}
+                style={[styles.publishBtn, (publishing || hasAirspaceHardBlock) && styles.btnDisabled]}
                 onPress={handlePublish}
-                disabled={publishing}
+                disabled={publishing || hasAirspaceHardBlock}
               >
                 <Text style={styles.publishBtnText}>{publishing ? '正在发布...' : '立即发布任务'}</Text>
               </TouchableOpacity>
@@ -669,11 +796,6 @@ const getStyles = (theme: AppTheme) =>
       fontWeight: '800',
       color: theme.text,
     },
-    sectionSubtitle: {
-      fontSize: 13,
-      color: theme.textSub,
-      marginTop: 4,
-    },
     inputCard: {
       backgroundColor: theme.card,
       borderRadius: 20,
@@ -687,13 +809,15 @@ const getStyles = (theme: AppTheme) =>
     label: {
       fontSize: 13,
       fontWeight: '700',
-      color: theme.textSub,
+      color: theme.text,
       marginBottom: 8,
       marginTop: 16,
     },
     input: {
       backgroundColor: theme.bgSecondary,
       borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.inputBorder,
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 15,
@@ -762,6 +886,9 @@ const getStyles = (theme: AppTheme) =>
       color: theme.primaryText,
       fontWeight: '700',
     },
+    customSceneInput: {
+      marginTop: 8,
+    },
     addressSection: {
       marginTop: 8,
     },
@@ -807,6 +934,13 @@ const getStyles = (theme: AppTheme) =>
       padding: 16,
       gap: 16,
     },
+    blockedHint: {
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.danger,
+      fontWeight: '700',
+      marginBottom: -4,
+    },
     mainActionBtn: {
       backgroundColor: theme.primary,
       borderRadius: 18,
@@ -823,11 +957,6 @@ const getStyles = (theme: AppTheme) =>
       color: '#FFFFFF',
       fontSize: 17,
       fontWeight: '800',
-    },
-    mainActionBtnSub: {
-      color: 'rgba(255,255,255,0.7)',
-      fontSize: 11,
-      marginTop: 2,
     },
     publishRow: {
       flexDirection: 'row',

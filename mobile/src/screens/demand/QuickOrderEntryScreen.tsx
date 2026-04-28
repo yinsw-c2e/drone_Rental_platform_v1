@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
   Platform,
@@ -13,10 +13,13 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import AddressInputField from '../../components/AddressInputField';
+import AirspaceRiskNotice from '../../components/business/AirspaceRiskNotice';
 import ObjectCard from '../../components/business/ObjectCard';
+import {checkAirspaceAvailability, AirspaceCheckResult} from '../../services/airspace';
 import {AddressData, QuickOrderDraft} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {isAirspaceHardBlocked} from '../../utils/airspaceRisk';
 
 const sceneOptions = [
   {key: 'power_grid', label: '电网建设'},
@@ -48,19 +51,13 @@ function buildDefaultEndDate(startDate: Date): Date {
   return date;
 }
 
-function summarizeAddress(address?: AddressData | null): string {
-  if (!address) {
-    return '待补充';
-  }
-  return address.name || address.address || '待补充';
-}
-
 export default function QuickOrderEntryScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const defaultStartDate = useMemo(() => buildDefaultStartDate(), []);
 
   const [cargoScene, setCargoScene] = useState(sceneOptions[0].key);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [cargoWeight, setCargoWeight] = useState('');
   const [cargoType, setCargoType] = useState('');
   const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
@@ -69,9 +66,79 @@ export default function QuickOrderEntryScreen({navigation}: any) {
   const [endDate, setEndDate] = useState(buildDefaultEndDate(defaultStartDate));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [pickupAirspace, setPickupAirspace] = useState<AirspaceCheckResult | null>(null);
+  const [deliveryAirspace, setDeliveryAirspace] = useState<AirspaceCheckResult | null>(null);
+  const [checkingPickupAirspace, setCheckingPickupAirspace] = useState(false);
+  const [checkingDeliveryAirspace, setCheckingDeliveryAirspace] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!pickupAddress?.latitude || !pickupAddress?.longitude) {
+      setPickupAirspace(null);
+      setCheckingPickupAirspace(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setCheckingPickupAirspace(true);
+    checkAirspaceAvailability(pickupAddress.latitude, pickupAddress.longitude, 120)
+      .then(result => {
+        if (!cancelled) {
+          setPickupAirspace(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPickupAirspace(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingPickupAirspace(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickupAddress?.latitude, pickupAddress?.longitude]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!deliveryAddress?.latitude || !deliveryAddress?.longitude) {
+      setDeliveryAirspace(null);
+      setCheckingDeliveryAirspace(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setCheckingDeliveryAirspace(true);
+    checkAirspaceAvailability(deliveryAddress.latitude, deliveryAddress.longitude, 120)
+      .then(result => {
+        if (!cancelled) {
+          setDeliveryAirspace(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDeliveryAirspace(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingDeliveryAirspace(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deliveryAddress?.latitude, deliveryAddress?.longitude]);
+
+  const hasAirspaceHardBlock =
+    isAirspaceHardBlocked(pickupAirspace) || isAirspaceHardBlocked(deliveryAirspace);
+  const effectiveCargoScene = customCargoScene.trim() || cargoScene;
 
   const buildDraft = (): QuickOrderDraft => ({
-    cargo_scene: cargoScene,
+    cargo_scene: effectiveCargoScene,
     cargo_type: cargoType.trim() || '重载物资',
     cargo_weight_kg: Number(cargoWeight) || undefined,
     departure_address: pickupAddress,
@@ -87,6 +154,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
     }
     if (!cargoWeight || Number(cargoWeight) <= 0) {
       Alert.alert('提示', '请填写货物预估重量，用于筛选有足够吊重的设备。');
+      return;
+    }
+    if (hasAirspaceHardBlock) {
+      Alert.alert('当前位置受限', '起点或终点命中禁飞区，当前无法继续匹配推荐服务，请先调整地址。');
       return;
     }
     if (endDate <= startDate) {
@@ -131,22 +202,34 @@ export default function QuickOrderEntryScreen({navigation}: any) {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ObjectCard style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>快速下单</Text>
-          <Text style={styles.title}>先告诉我这次怎么运</Text>
-          <Text style={styles.subtitle}>
-            这里只收最小成单信息。下一步系统会直接筛出支持直达下单的服务，不让你先发完整任务再慢慢等。
-          </Text>
-        </ObjectCard>
-
         <ObjectCard>
           <Text style={styles.sectionTitle}>第 1 步：填写最小信息</Text>
 
           <Text style={styles.label}>起点地址 *</Text>
           <AddressInputField value={pickupAddress} placeholder="点击选择起点地址" onSelect={setPickupAddress} />
+          <AirspaceRiskNotice
+            label="起点"
+            result={pickupAirspace}
+            checking={checkingPickupAirspace}
+            onOpenDetails={
+              pickupAddress
+                ? () => navigation.navigate('NoFlyZone', {latitude: pickupAddress.latitude, longitude: pickupAddress.longitude})
+                : undefined
+            }
+          />
 
           <Text style={styles.label}>终点地址 *</Text>
           <AddressInputField value={deliveryAddress} placeholder="点击选择终点地址" onSelect={setDeliveryAddress} />
+          <AirspaceRiskNotice
+            label="终点"
+            result={deliveryAirspace}
+            checking={checkingDeliveryAirspace}
+            onOpenDetails={
+              deliveryAddress
+                ? () => navigation.navigate('NoFlyZone', {latitude: deliveryAddress.latitude, longitude: deliveryAddress.longitude})
+                : undefined
+            }
+          />
 
           <Text style={styles.label}>货物重量预估 (kg) *</Text>
           <TextInput
@@ -172,14 +255,24 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             {sceneOptions.map(option => (
               <TouchableOpacity
                 key={option.key}
-                style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
-                onPress={() => setCargoScene(option.key)}>
-                <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>
+                style={[styles.optionBtn, !customCargoScene.trim() && cargoScene === option.key && styles.optionBtnActive]}
+                onPress={() => {
+                  setCargoScene(option.key);
+                  setCustomCargoScene('');
+                }}>
+                <Text style={[styles.optionText, !customCargoScene.trim() && cargoScene === option.key && styles.optionTextActive]}>
                   {option.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
+          <TextInput
+            style={styles.input}
+            placeholder="其他场景，可直接填写"
+            placeholderTextColor={theme.textHint}
+            value={customCargoScene}
+            onChangeText={setCustomCargoScene}
+          />
 
           <Text style={styles.label}>期望开始时间 *</Text>
           <TouchableOpacity style={styles.input} onPress={() => setShowStartPicker(true)}>
@@ -210,22 +303,11 @@ export default function QuickOrderEntryScreen({navigation}: any) {
           ) : null}
         </ObjectCard>
 
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>本次需求摘要</Text>
-          <Text style={styles.summaryText}>
-            {summarizeAddress(pickupAddress)}
-            {' -> '}
-            {summarizeAddress(deliveryAddress)}
-          </Text>
-          <Text style={styles.summaryText}>
-            {cargoWeight || '--'}kg / {cargoType.trim() || '重载物资'}
-          </Text>
-          <Text style={styles.summaryHint}>
-            如果下一步没有筛到合适服务，系统会保留这些信息，让你一键改为发布任务。
-          </Text>
-        </ObjectCard>
+        {hasAirspaceHardBlock ? (
+          <Text style={styles.blockedHint}>当前起点或终点命中禁飞区，请先更换地址后再继续匹配服务。</Text>
+        ) : null}
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleNext}>
+        <TouchableOpacity style={[styles.submitBtn, hasAirspaceHardBlock && styles.disabledBtn]} onPress={handleNext}>
           <Text style={styles.submitBtnText}>第 2 步：查看推荐服务</Text>
         </TouchableOpacity>
 
@@ -241,29 +323,6 @@ const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
     container: {flex: 1, backgroundColor: theme.card},
     content: {padding: 16, paddingBottom: 40, gap: 12},
-    heroCard: {
-      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-      borderWidth: theme.isDark ? 1 : 0,
-      borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
-    },
-    heroEyebrow: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.72)',
-    },
-    title: {
-      marginTop: 8,
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: '800',
-      color: theme.isDark ? theme.text : '#FFFFFF',
-    },
-    subtitle: {
-      marginTop: 10,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
-    },
     sectionTitle: {
       fontSize: 17,
       fontWeight: '800',
@@ -307,18 +366,6 @@ const getStyles = (theme: AppTheme) =>
     },
     optionText: {fontSize: 13, color: theme.textSub},
     optionTextActive: {color: theme.primary, fontWeight: '700'},
-    summaryText: {
-      fontSize: 14,
-      lineHeight: 22,
-      color: theme.text,
-      marginTop: 6,
-    },
-    summaryHint: {
-      fontSize: 12,
-      lineHeight: 18,
-      color: theme.textSub,
-      marginTop: 10,
-    },
     submitBtn: {
       marginTop: 8,
       height: 50,
@@ -327,7 +374,17 @@ const getStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    disabledBtn: {
+      opacity: 0.45,
+    },
     submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '800'},
+    blockedHint: {
+      marginTop: 4,
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.danger,
+      fontWeight: '600',
+    },
     secondaryBtn: {
       height: 48,
       borderRadius: 14,

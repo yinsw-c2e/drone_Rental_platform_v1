@@ -22,6 +22,7 @@ type ClientService struct {
 	matchingService  *MatchingService
 	eventService     *EventService
 	contractService  *ContractService
+	airspaceService  *AirspaceService
 }
 
 func NewClientService(
@@ -147,6 +148,10 @@ func (s *ClientService) SetEventService(eventService *EventService) {
 
 func (s *ClientService) SetContractService(contractService *ContractService) {
 	s.contractService = contractService
+}
+
+func (s *ClientService) SetAirspaceService(airspaceService *AirspaceService) {
+	s.airspaceService = airspaceService
 }
 
 func (s *ClientService) AdminListDemands(page, pageSize int, filters map[string]interface{}) ([]model.Demand, int64, error) {

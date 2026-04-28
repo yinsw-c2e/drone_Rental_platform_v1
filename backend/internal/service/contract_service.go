@@ -130,7 +130,8 @@ td:first-child{width:30%;background:#f8f8f8;font-weight:600}
 <h2>五、违约责任</h2>
 <p>1. 甲方在服务开始前 24 小时内取消订单的，需支付合同金额 20% 作为违约金。</p>
 <p>2. 乙方无故未按时提供服务的，需退还全部费用并支付合同金额 20% 作为违约金。</p>
-<p>3. 争议通过平台客服协调，协调不成的，由平台所在地人民法院管辖。</p>
+<p>3. 双方不得绕开平台私下成交、线下转移支付或交换站外联系方式以规避平台监管、结算与保障措施；如有违反，平台有权依据规则采取警告、扣减信用分、限制接单或下单、临时冻结直至拉黑等处理。</p>
+<p>4. 争议通过平台客服协调，协调不成的，由平台所在地人民法院管辖。</p>
 
 <h2>六、签署</h2>
 <div class="sign-area">
@@ -410,6 +411,15 @@ func (s *ContractService) SignContract(contractID, userID int64) (*model.OrderCo
 
 // SignContractByOrder 通过订单ID签署合同
 func (s *ContractService) SignContractByOrder(orderID, userID int64) (*model.OrderContract, error) {
+	if s.orderRepo != nil {
+		order, err := s.orderRepo.GetByID(orderID)
+		if err != nil {
+			return nil, errors.New("订单不存在")
+		}
+		if err := validateOrderStatusForManualContractSign(order); err != nil {
+			return nil, err
+		}
+	}
 	contract, err := s.contractRepo.GetByOrderID(orderID)
 	if err != nil {
 		return nil, errors.New("该订单暂无合同")
@@ -471,6 +481,29 @@ func (s *ContractService) GetContractByOrder(orderID int64) (*model.OrderContrac
 		return nil, err
 	}
 	return s.refreshContractHTML(s.contractRepo, contract)
+}
+
+func validateOrderStatusForManualContractSign(order *model.Order) error {
+	if order == nil {
+		return errors.New("订单不存在")
+	}
+
+	switch order.Status {
+	case "pending_payment", "accepted":
+		return nil
+	case "pending_provider_confirmation":
+		return errors.New("机主尚未确认承接，暂时不能签署合同")
+	case "cancelled":
+		return errors.New("订单已取消，不能继续签署合同")
+	case "completed":
+		return errors.New("订单已完成，不能继续签署合同")
+	case "refunded":
+		return errors.New("订单已退款，不能继续签署合同")
+	case "provider_rejected":
+		return errors.New("机主已拒绝订单，不能继续签署合同")
+	default:
+		return errors.New("当前订单状态暂不支持签署合同")
+	}
 }
 
 // ─── 工具函数 ─────────────────────────────────────────

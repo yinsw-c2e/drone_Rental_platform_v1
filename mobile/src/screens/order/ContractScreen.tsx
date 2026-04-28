@@ -14,6 +14,7 @@ import {contractService, ContractDetail} from '../../services/contract';
 import {RootState} from '../../store/store';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {formatContractStatusLabel, formatOrderStatusLabel} from '../../utils/orderPresentation';
 
 const formatTime = (value?: string | null) => (value ? new Date(value).toLocaleString('zh-CN') : '待签署');
 const stripHtml = (value?: string | null) =>
@@ -74,7 +75,7 @@ export default function ContractScreen({route, navigation}: any) {
         );
       }
     } catch (e: any) {
-      Alert.alert('签署失败', e.message || '请稍后重试');
+      Alert.alert('签署失败', e?.response?.data?.message || e.message || '请稍后重试');
     } finally {
       setSigning(false);
     }
@@ -100,20 +101,17 @@ export default function ContractScreen({route, navigation}: any) {
   const isProvider = currentUserId === contract.provider_user_id;
 
   const mySignedAt = isClient ? contract.client_signed_at : contract.provider_signed_at;
-  const canSign = !mySignedAt && (isClient || isProvider);
+  const canSign = !mySignedAt && (isClient || isProvider) && contract.can_sign !== false;
   const plainTextContract = stripHtml(contract.contract_html);
   const contractPreview = plainTextContract ? `${plainTextContract.slice(0, 220)}${plainTextContract.length > 220 ? '...' : ''}` : '';
   const hasTrustClause = plainTextContract.includes('设备操作责任') || plainTextContract.includes('执行飞手具备合法资质');
+  const hasPlatformProtectionClause =
+    plainTextContract.includes('绕开平台') ||
+    plainTextContract.includes('线下转移支付') ||
+    plainTextContract.includes('站外联系方式') ||
+    plainTextContract.includes('平台外交易');
 
-  const statusLabel = (() => {
-    switch (contract.status) {
-      case 'pending': return '待签署';
-      case 'client_signed': return '甲方已签署';
-      case 'provider_signed': return '乙方已签署';
-      case 'fully_signed': return '双方已签署';
-      default: return contract.status;
-    }
-  })();
+  const statusLabel = formatContractStatusLabel(contract.status);
 
   const statusColor = contract.status === 'fully_signed' ? theme.success : theme.warning;
 
@@ -148,6 +146,15 @@ export default function ContractScreen({route, navigation}: any) {
         {/* 签署状态 */}
         <View style={styles.signStatusCard}>
           <Text style={styles.cardTitle}>签署状态</Text>
+          {contract.can_sign === false && (
+            <View style={styles.blockNotice}>
+              <Text style={styles.blockNoticeTitle}>当前不能继续签署</Text>
+              <Text style={styles.blockNoticeText}>
+                {contract.sign_block_reason || '当前订单状态暂不支持签署合同'}。
+                {contract.order_status ? ` 订单状态：${formatOrderStatusLabel(contract.order_status)}` : ''}
+              </Text>
+            </View>
+          )}
           <View style={styles.signRow}>
             <Text style={styles.signLabel}>甲方（委托方）</Text>
             <Text style={[styles.signValue, contract.client_signed_at ? {color: theme.success} : {color: theme.textHint}]}>
@@ -182,6 +189,14 @@ export default function ContractScreen({route, navigation}: any) {
               <Text style={styles.trustTitle}>设备操作责任条款</Text>
               <Text style={styles.trustText}>
                 当机主与执行飞手不是同一人时，合同已写入“执行飞手需具备合法资质并确认设备操作责任，服务方对外先承担责任”的保障条款。
+              </Text>
+            </View>
+          ) : null}
+          {hasPlatformProtectionClause ? (
+            <View style={styles.platformRuleCard}>
+              <Text style={styles.platformRuleTitle}>平台交易保护条款</Text>
+              <Text style={styles.platformRuleText}>
+                合同已明确约定：不得绕开平台线下交易、转移支付或交换站外联系方式。若触发违规，平台可按规则进行警告、扣分、限制接单/下单、冻结或拉黑处理。
               </Text>
             </View>
           ) : null}
@@ -254,6 +269,25 @@ const getStyles = (theme: AppTheme) =>
       borderWidth: 1,
       borderColor: theme.cardBorder,
     },
+    blockNotice: {
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: theme.warning + '12',
+      borderWidth: 1,
+      borderColor: theme.warning + '30',
+    },
+    blockNoticeTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.warning,
+      marginBottom: 6,
+    },
+    blockNoticeText: {
+      fontSize: 13,
+      lineHeight: 20,
+      color: theme.textSub,
+    },
     cardTitle: {fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 12},
     signRow: {
       flexDirection: 'row',
@@ -284,6 +318,17 @@ const getStyles = (theme: AppTheme) =>
     },
     trustTitle: {fontSize: 13, fontWeight: '700', color: theme.text},
     trustText: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
+    platformRuleCard: {
+      marginTop: 6,
+      marginBottom: 10,
+      borderRadius: 12,
+      padding: 12,
+      backgroundColor: theme.danger + '10',
+      borderWidth: 1,
+      borderColor: theme.danger + '28',
+    },
+    platformRuleTitle: {fontSize: 13, fontWeight: '700', color: theme.danger},
+    platformRuleText: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
     contractPreview: {fontSize: 13, color: theme.text, lineHeight: 21},
     contractDateInfo: {fontSize: 12, color: theme.textHint, marginTop: 4},
     signBtn: {

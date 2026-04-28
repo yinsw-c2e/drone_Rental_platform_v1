@@ -986,6 +986,32 @@ export interface V2OrderTimelineResponse {
   items: V2OrderTimelineEvent[];
 }
 
+export interface V2OrderAnomaly {
+  order_id: number;
+  order_no: string;
+  title: string;
+  status: string;
+  stage_label?: string;
+  order_source?: string;
+  dispatch_task_id?: number | null;
+  provider_nickname?: string;
+  client_nickname?: string;
+  anomaly_type: string;
+  severity: 'critical' | 'warning' | 'info' | string;
+  message: string;
+  stalled_text?: string;
+  recommended_action?: string;
+  updated_at?: string;
+}
+
+export interface V2OrderAnomalySummary {
+  total: number;
+  critical_count: number;
+  warning_count: number;
+  by_anomaly_type: {key: string; count: number}[];
+  by_order_status: {key: string; count: number}[];
+}
+
 export interface V2OrderFinancialSummary {
   total_amount: number;
   deposit_amount: number;

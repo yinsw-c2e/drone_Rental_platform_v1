@@ -111,6 +111,8 @@ type dispatchPilotOption struct {
 	SortWeight      int
 	Distance        float64
 	BindingPriority bool
+	CreditScore     int
+	ServiceRating   float64
 }
 
 // LoadConfigFromDB 从数据库加载配置
@@ -355,6 +357,7 @@ func (s *DispatchService) MatchTask(taskID int64) ([]model.DispatchCandidate, er
 	if len(candidates) > s.config.MaxCandidatesPerTask {
 		candidates = candidates[:s.config.MaxCandidatesPerTask]
 	}
+	s.logCandidateScoreBreakdown(taskID, candidates)
 
 	// 设置任务ID并保存（先清理该任务未响应的旧候选人，防止重复匹配产生重复记录）
 	for i := range candidates {
@@ -378,6 +381,34 @@ func (s *DispatchService) MatchTask(taskID int64) ([]model.DispatchCandidate, er
 	})
 
 	return candidates, nil
+}
+
+func (s *DispatchService) logCandidateScoreBreakdown(taskID int64, candidates []model.DispatchCandidate) {
+	if s == nil || s.logger == nil || len(candidates) == 0 {
+		return
+	}
+	limit := len(candidates)
+	if limit > 3 {
+		limit = 3
+	}
+	fields := make([]zap.Field, 0, limit+1)
+	fields = append(fields, zap.Int64("task_id", taskID))
+	for i := 0; i < limit; i++ {
+		candidate := candidates[i]
+		fields = append(fields, zap.Any(fmt.Sprintf("candidate_%d", i+1), map[string]interface{}{
+			"pilot_id":            candidate.PilotID,
+			"drone_id":            candidate.DroneID,
+			"total_score":         candidate.TotalScore,
+			"distance_score":      candidate.DistanceScore,
+			"load_score":          candidate.LoadScore,
+			"qualification_score": candidate.QualificationScore,
+			"credit_score":        candidate.CreditScore,
+			"price_score":         candidate.PriceScore,
+			"time_score":          candidate.TimeScore,
+			"rating_score":        candidate.RatingScore,
+		}))
+	}
+	s.logger.Info("正式派单候选评分拆解", fields...)
 }
 
 // scorePair 计算飞手-无人机组合的匹配得分
@@ -1523,6 +1554,7 @@ func (s *DispatchService) collectDispatchPilotOptions(
 		if option.PilotUserID == 0 || excluded[option.PilotUserID] || seen[option.PilotUserID] {
 			return
 		}
+		option.SortWeight = buildDispatchPilotOptionSortWeight(option)
 		seen[option.PilotUserID] = true
 		options = append(options, option)
 	}
@@ -1533,8 +1565,9 @@ func (s *DispatchService) collectDispatchPilotOptions(
 			return nil, err
 		}
 		for _, binding := range bindings {
+			var pilot *model.Pilot
 			if pilotRepo != nil {
-				pilot, err := pilotRepo.GetByUserID(binding.PilotUserID)
+				pilot, err = pilotRepo.GetByUserID(binding.PilotUserID)
 				if err != nil || pilot == nil || pilot.VerificationStatus != "verified" || pilot.AvailabilityStatus != "online" {
 					continue
 				}
@@ -1548,6 +1581,9 @@ func (s *DispatchService) collectDispatchPilotOptions(
 				Source:          "bound_pilot",
 				Reason:          reason,
 				BindingPriority: binding.IsPriority,
+				Distance:        dispatchPilotDistance(order, pilot),
+				CreditScore:     dispatchPilotCreditScore(pilot),
+				ServiceRating:   dispatchPilotServiceRating(pilot),
 			})
 		}
 	}
@@ -1558,16 +1594,20 @@ func (s *DispatchService) collectDispatchPilotOptions(
 			return nil, err
 		}
 		for _, candidate := range candidates {
+			var pilot *model.Pilot
 			if pilotRepo != nil {
-				pilot, err := pilotRepo.GetByUserID(candidate.PilotUserID)
+				pilot, err = pilotRepo.GetByUserID(candidate.PilotUserID)
 				if err != nil || pilot == nil || pilot.VerificationStatus != "verified" || pilot.AvailabilityStatus != "online" {
 					continue
 				}
 			}
 			addOption(dispatchPilotOption{
-				PilotUserID: candidate.PilotUserID,
-				Source:      "candidate_pool",
-				Reason:      "优先触达该需求的候选飞手",
+				PilotUserID:   candidate.PilotUserID,
+				Source:        "candidate_pool",
+				Reason:        "优先触达该需求的候选飞手",
+				Distance:      dispatchPilotDistance(order, pilot),
+				CreditScore:   dispatchPilotCreditScore(pilot),
+				ServiceRating: dispatchPilotServiceRating(pilot),
 			})
 		}
 	}
@@ -1579,40 +1619,35 @@ func (s *DispatchService) collectDispatchPilotOptions(
 		}
 		for _, pilot := range nearbyPilots {
 			addOption(dispatchPilotOption{
-				PilotUserID: pilot.UserID,
-				Source:      "general_pool",
-				Reason:      "扩展到普通飞手池自动派单",
-				Distance:    haversineDistance(order.ServiceLatitude, order.ServiceLongitude, pilot.CurrentLatitude, pilot.CurrentLongitude),
+				PilotUserID:   pilot.UserID,
+				Source:        "general_pool",
+				Reason:        "扩展到普通飞手池自动派单",
+				Distance:      haversineDistance(order.ServiceLatitude, order.ServiceLongitude, pilot.CurrentLatitude, pilot.CurrentLongitude),
+				CreditScore:   pilot.CreditScore,
+				ServiceRating: pilot.ServiceRating,
 			})
 		}
 	}
 
 	sortDispatchPilotOptions(options)
+	s.logDispatchPilotOptionBreakdown(order.ID, options)
 	return options, nil
 }
 
 func sortDispatchPilotOptions(options []dispatchPilotOption) {
-	priorityOf := func(source string) int {
-		switch source {
-		case "bound_pilot":
-			return 0
-		case "candidate_pool":
-			return 1
-		default:
-			return 2
-		}
-	}
 	for i := 0; i < len(options); i++ {
 		for j := i + 1; j < len(options); j++ {
 			left := options[i]
 			right := options[j]
 			swap := false
-			if priorityOf(right.Source) < priorityOf(left.Source) {
+			if right.SortWeight > left.SortWeight {
 				swap = true
-			} else if priorityOf(right.Source) == priorityOf(left.Source) {
-				if right.Source == "bound_pilot" && right.BindingPriority && !left.BindingPriority {
+			} else if right.SortWeight == left.SortWeight {
+				if right.Distance > 0 && left.Distance > 0 && right.Distance < left.Distance {
 					swap = true
-				} else if right.Source == "general_pool" && right.Distance < left.Distance {
+				} else if right.CreditScore > left.CreditScore {
+					swap = true
+				} else if right.PilotUserID < left.PilotUserID {
 					swap = true
 				}
 			}
@@ -1628,6 +1663,132 @@ func mapDispatchSourceToExecutionMode(source string) string {
 		return "bound_pilot"
 	}
 	return "dispatch_pool"
+}
+
+func dispatchPilotCreditScore(pilot *model.Pilot) int {
+	if pilot == nil {
+		return 0
+	}
+	if pilot.CreditScore < 0 {
+		return 0
+	}
+	if pilot.CreditScore > 1000 {
+		return 1000
+	}
+	return pilot.CreditScore
+}
+
+func dispatchPilotServiceRating(pilot *model.Pilot) float64 {
+	if pilot == nil {
+		return 0
+	}
+	if pilot.ServiceRating < 0 {
+		return 0
+	}
+	return pilot.ServiceRating
+}
+
+func dispatchPilotDistance(order *model.Order, pilot *model.Pilot) float64 {
+	if order == nil || pilot == nil {
+		return 0
+	}
+	if pilot.CurrentLatitude == 0 || pilot.CurrentLongitude == 0 {
+		return 0
+	}
+	return haversineDistance(order.ServiceLatitude, order.ServiceLongitude, pilot.CurrentLatitude, pilot.CurrentLongitude)
+}
+
+func dispatchSourcePriorityWeight(source string) int {
+	switch source {
+	case "bound_pilot":
+		return 300000
+	case "candidate_pool":
+		return 200000
+	default:
+		return 100000
+	}
+}
+
+func dispatchBindingPriorityWeight(source string, isPriority bool) int {
+	if source == "bound_pilot" && isPriority {
+		return 20000
+	}
+	return 0
+}
+
+func dispatchCreditPriorityWeight(creditScore int) int {
+	score := creditScore
+	if score < 0 {
+		score = 0
+	}
+	if score > 1000 {
+		score = 1000
+	}
+	return score * 10
+}
+
+func dispatchRatingPriorityWeight(serviceRating float64) int {
+	if serviceRating <= 0 {
+		return 0
+	}
+	if serviceRating > 5 {
+		serviceRating = 5
+	}
+	return int(math.Round(serviceRating * 100))
+}
+
+func dispatchDistancePriorityWeight(distance float64) int {
+	if distance <= 0 {
+		return 0
+	}
+	switch {
+	case distance <= 5:
+		return 800
+	case distance <= 15:
+		return 500
+	case distance <= 30:
+		return 200
+	default:
+		return 0
+	}
+}
+
+func buildDispatchPilotOptionSortWeight(option dispatchPilotOption) int {
+	return dispatchSourcePriorityWeight(option.Source) +
+		dispatchBindingPriorityWeight(option.Source, option.BindingPriority) +
+		dispatchCreditPriorityWeight(option.CreditScore) +
+		dispatchRatingPriorityWeight(option.ServiceRating) +
+		dispatchDistancePriorityWeight(option.Distance)
+}
+
+func (s *DispatchService) logDispatchPilotOptionBreakdown(orderID int64, options []dispatchPilotOption) {
+	if s == nil || s.logger == nil || len(options) == 0 {
+		return
+	}
+	limit := len(options)
+	if limit > 5 {
+		limit = 5
+	}
+	fields := make([]zap.Field, 0, limit+1)
+	fields = append(fields, zap.Int64("order_id", orderID))
+	for i := 0; i < limit; i++ {
+		option := options[i]
+		fields = append(fields, zap.Any(fmt.Sprintf("dispatch_option_%d", i+1), map[string]interface{}{
+			"pilot_user_id":            option.PilotUserID,
+			"source":                   option.Source,
+			"binding_priority":         option.BindingPriority,
+			"credit_score":             option.CreditScore,
+			"service_rating":           option.ServiceRating,
+			"distance_km":              option.Distance,
+			"sort_weight":              option.SortWeight,
+			"source_priority_weight":   dispatchSourcePriorityWeight(option.Source),
+			"binding_priority_weight":  dispatchBindingPriorityWeight(option.Source, option.BindingPriority),
+			"credit_priority_weight":   dispatchCreditPriorityWeight(option.CreditScore),
+			"rating_priority_weight":   dispatchRatingPriorityWeight(option.ServiceRating),
+			"distance_priority_weight": dispatchDistancePriorityWeight(option.Distance),
+		}))
+	}
+	s.logger.Info("正式派单候选排序拆解", fields...)
 }
 
 func buildDispatchTerminalNote(status, note string) string {

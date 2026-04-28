@@ -29,8 +29,36 @@ func (r *OrderRepo) AdminListOrderAnomalies(page, pageSize int, filters map[stri
 	return items, total, nil
 }
 
+func (r *OrderRepo) ListUserOrderAnomalies(userID int64, role string, page, pageSize int, filters map[string]interface{}) ([]model.OrderAnomaly, int64, error) {
+	filteredSQL, args := r.buildUserOrderAnomalyFilteredSQL(userID, role, filters)
+
+	countSQL := fmt.Sprintf("SELECT COUNT(1) AS total FROM (%s) anomaly_rows", filteredSQL)
+	var total int64
+	if err := r.db.Raw(countSQL, args...).Scan(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	listSQL := filteredSQL + " ORDER BY FIELD(severity, 'critical', 'warning', 'info'), updated_at DESC, order_id DESC LIMIT ? OFFSET ?"
+	listArgs := append(append([]interface{}{}, args...), pageSize, (page-1)*pageSize)
+
+	var items []model.OrderAnomaly
+	if err := r.db.Raw(listSQL, listArgs...).Scan(&items).Error; err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
 func (r *OrderRepo) AdminGetOrderAnomalySummary() (*model.OrderAnomalySummary, error) {
 	filteredSQL, args := r.buildOrderAnomalyFilteredSQL(nil)
+	return r.scanOrderAnomalySummary(filteredSQL, args)
+}
+
+func (r *OrderRepo) GetUserOrderAnomalySummary(userID int64, role string, filters map[string]interface{}) (*model.OrderAnomalySummary, error) {
+	filteredSQL, args := r.buildUserOrderAnomalyFilteredSQL(userID, role, filters)
+	return r.scanOrderAnomalySummary(filteredSQL, args)
+}
+
+func (r *OrderRepo) scanOrderAnomalySummary(filteredSQL string, args []interface{}) (*model.OrderAnomalySummary, error) {
 	summary := &model.OrderAnomalySummary{}
 
 	countSQL := fmt.Sprintf("SELECT COUNT(1) AS total FROM (%s) anomaly_rows", filteredSQL)
@@ -81,6 +109,30 @@ func (r *OrderRepo) AdminGetOrderAnomalySummary() (*model.OrderAnomalySummary, e
 	return summary, nil
 }
 
+func (r *OrderRepo) buildUserOrderAnomalyFilteredSQL(userID int64, role string, filters map[string]interface{}) (string, []interface{}) {
+	filteredSQL, filteredArgs := r.buildOrderAnomalyFilteredSQL(filters)
+	if userID <= 0 {
+		return filteredSQL, filteredArgs
+	}
+
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "client":
+		filteredSQL += " AND client_user_id = ?"
+		filteredArgs = append(filteredArgs, userID)
+	case "owner", "provider":
+		filteredSQL += " AND provider_user_id = ?"
+		filteredArgs = append(filteredArgs, userID)
+	case "pilot":
+		filteredSQL += " AND (executor_pilot_user_id = ? OR dispatch_target_pilot_user_id = ?)"
+		filteredArgs = append(filteredArgs, userID, userID)
+	default:
+		filteredSQL += " AND (client_user_id = ? OR provider_user_id = ? OR executor_pilot_user_id = ? OR dispatch_target_pilot_user_id = ?)"
+		filteredArgs = append(filteredArgs, userID, userID, userID, userID)
+	}
+
+	return filteredSQL, filteredArgs
+}
+
 func (r *OrderRepo) buildOrderAnomalyFilteredSQL(filters map[string]interface{}) (string, []interface{}) {
 	baseSQL, args := r.orderAnomalyBaseSQL()
 	filteredSQL := "SELECT * FROM (" + baseSQL + ") anomaly_rows WHERE 1 = 1"
@@ -100,6 +152,10 @@ func (r *OrderRepo) buildOrderAnomalyFilteredSQL(filters map[string]interface{})
 	if status, ok := filters["status"].(string); ok && status != "" {
 		filteredSQL += " AND status = ?"
 		filteredArgs = append(filteredArgs, status)
+	}
+	if orderID, ok := filters["order_id"].(int64); ok && orderID > 0 {
+		filteredSQL += " AND order_id = ?"
+		filteredArgs = append(filteredArgs, orderID)
 	}
 	if keyword, ok := filters["keyword"].(string); ok && strings.TrimSpace(keyword) != "" {
 		like := "%" + strings.TrimSpace(keyword) + "%"
@@ -132,6 +188,8 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.dispatch_task_id,
 			o.provider_user_id,
 			o.client_user_id,
+			COALESCE(o.executor_pilot_user_id, 0) AS executor_pilot_user_id,
+			COALESCE(dt.target_pilot_user_id, 0) AS dispatch_target_pilot_user_id,
 			COALESCE(provider.nickname, '') AS provider_nickname,
 			COALESCE(client.nickname, '') AS client_nickname,
 			'missing_source_supply' AS anomaly_type,
@@ -141,6 +199,7 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.updated_at,
 			o.completed_at
 		FROM orders o
+		LEFT JOIN dispatch_tasks dt ON dt.id = o.dispatch_task_id AND dt.deleted_at IS NULL
 		LEFT JOIN users provider ON provider.id = o.provider_user_id AND provider.deleted_at IS NULL
 		LEFT JOIN users client ON client.id = o.client_user_id AND client.deleted_at IS NULL
 		WHERE o.deleted_at IS NULL
@@ -160,6 +219,8 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.dispatch_task_id,
 			o.provider_user_id,
 			o.client_user_id,
+			COALESCE(o.executor_pilot_user_id, 0) AS executor_pilot_user_id,
+			COALESCE(dt.target_pilot_user_id, 0) AS dispatch_target_pilot_user_id,
 			COALESCE(provider.nickname, '') AS provider_nickname,
 			COALESCE(client.nickname, '') AS client_nickname,
 			'missing_demand_source' AS anomaly_type,
@@ -169,6 +230,7 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.updated_at,
 			o.completed_at
 		FROM orders o
+		LEFT JOIN dispatch_tasks dt ON dt.id = o.dispatch_task_id AND dt.deleted_at IS NULL
 		LEFT JOIN users provider ON provider.id = o.provider_user_id AND provider.deleted_at IS NULL
 		LEFT JOIN users client ON client.id = o.client_user_id AND client.deleted_at IS NULL
 		WHERE o.deleted_at IS NULL
@@ -188,6 +250,8 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.dispatch_task_id,
 			o.provider_user_id,
 			o.client_user_id,
+			COALESCE(o.executor_pilot_user_id, 0) AS executor_pilot_user_id,
+			COALESCE(dt.target_pilot_user_id, 0) AS dispatch_target_pilot_user_id,
 			COALESCE(provider.nickname, '') AS provider_nickname,
 			COALESCE(client.nickname, '') AS client_nickname,
 			'stalled_pending_dispatch' AS anomaly_type,
@@ -197,6 +261,7 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.updated_at,
 			o.completed_at
 		FROM orders o
+		LEFT JOIN dispatch_tasks dt ON dt.id = o.dispatch_task_id AND dt.deleted_at IS NULL
 		LEFT JOIN users provider ON provider.id = o.provider_user_id AND provider.deleted_at IS NULL
 		LEFT JOIN users client ON client.id = o.client_user_id AND client.deleted_at IS NULL
 		WHERE o.deleted_at IS NULL
@@ -217,15 +282,18 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.dispatch_task_id,
 			o.provider_user_id,
 			o.client_user_id,
+			COALESCE(o.executor_pilot_user_id, 0) AS executor_pilot_user_id,
+			COALESCE(dt.target_pilot_user_id, 0) AS dispatch_target_pilot_user_id,
 			COALESCE(provider.nickname, '') AS provider_nickname,
 			COALESCE(client.nickname, '') AS client_nickname,
 			'completed_missing_timestamp' AS anomaly_type,
 			'warning' AS severity,
-			'订单状态已完成，但 completed_at 为空' AS message,
+			'订单已显示完成，但系统未记录完成时间' AS message,
 			o.created_at,
 			o.updated_at,
 			o.completed_at
 		FROM orders o
+		LEFT JOIN dispatch_tasks dt ON dt.id = o.dispatch_task_id AND dt.deleted_at IS NULL
 		LEFT JOIN users provider ON provider.id = o.provider_user_id AND provider.deleted_at IS NULL
 		LEFT JOIN users client ON client.id = o.client_user_id AND client.deleted_at IS NULL
 		WHERE o.deleted_at IS NULL
@@ -245,6 +313,8 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.dispatch_task_id,
 			o.provider_user_id,
 			o.client_user_id,
+			COALESCE(o.executor_pilot_user_id, 0) AS executor_pilot_user_id,
+			COALESCE(dt.target_pilot_user_id, 0) AS dispatch_target_pilot_user_id,
 			COALESCE(provider.nickname, '') AS provider_nickname,
 			COALESCE(client.nickname, '') AS client_nickname,
 			'provider_rejected_missing_reason' AS anomaly_type,
@@ -254,6 +324,7 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.updated_at,
 			o.completed_at
 		FROM orders o
+		LEFT JOIN dispatch_tasks dt ON dt.id = o.dispatch_task_id AND dt.deleted_at IS NULL
 		LEFT JOIN users provider ON provider.id = o.provider_user_id AND provider.deleted_at IS NULL
 		LEFT JOIN users client ON client.id = o.client_user_id AND client.deleted_at IS NULL
 		WHERE o.deleted_at IS NULL
@@ -273,6 +344,8 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.dispatch_task_id,
 			o.provider_user_id,
 			o.client_user_id,
+			COALESCE(o.executor_pilot_user_id, 0) AS executor_pilot_user_id,
+			COALESCE(dt.target_pilot_user_id, 0) AS dispatch_target_pilot_user_id,
 			COALESCE(provider.nickname, '') AS provider_nickname,
 			COALESCE(client.nickname, '') AS client_nickname,
 			'execution_without_dispatch_task' AS anomaly_type,
@@ -282,11 +355,12 @@ func (r *OrderRepo) orderAnomalyBaseSQL() (string, []interface{}) {
 			o.updated_at,
 			o.completed_at
 		FROM orders o
+		LEFT JOIN dispatch_tasks dt ON dt.id = o.dispatch_task_id AND dt.deleted_at IS NULL
 		LEFT JOIN users provider ON provider.id = o.provider_user_id AND provider.deleted_at IS NULL
 		LEFT JOIN users client ON client.id = o.client_user_id AND client.deleted_at IS NULL
 		WHERE o.deleted_at IS NULL
 		  AND o.needs_dispatch = 1
-		  AND o.status IN ('assigned', 'preparing', 'in_progress', 'delivered', 'completed')
+		  AND o.status IN ('assigned', 'confirmed', 'airspace_applying', 'airspace_approved', 'preparing', 'loading', 'in_transit', 'in_progress', 'delivered', 'completed')
 		  AND COALESCE(o.dispatch_task_id, 0) = 0
 	`
 

@@ -28,6 +28,7 @@ import {
 } from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {formatDisputeStatusLabel, formatRefundStatusLabel, formatOrderStatusLabel} from '../../utils/orderPresentation';
 
 const DISPUTE_TYPES = [
   {key: 'general', label: '一般争议'},
@@ -242,7 +243,7 @@ export default function OrderAfterSaleScreen({route}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>订单财务摘要</Text>
-          <View style={styles.row}><Text style={styles.rowLabel}>订单状态</Text><Text style={styles.rowValue}>{detail.status}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>订单状态</Text><Text style={styles.rowValue}>{formatOrderStatusLabel(detail.status)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>订单总额</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.total_amount || detail.total_amount)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>已支付</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.paid_amount)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>已退款</Text><Text style={styles.rowValue}>{formatMoney(detail.financial_summary?.refunded_amount)}</Text></View>
@@ -263,7 +264,7 @@ export default function OrderAfterSaleScreen({route}: any) {
               <View key={item.id} style={styles.recordItem}>
                 <View style={styles.recordHeader}>
                   <Text style={styles.recordCode}>{item.refund_no}</Text>
-                  <StatusBadge label={item.status || '未知'} tone={getRefundTone(item.status)} />
+                  <StatusBadge label={formatRefundStatusLabel(item.status)} tone={getRefundTone(item.status)} />
                 </View>
                 <Text style={styles.recordMeta}>{formatMoney(item.amount)} · {item.reason || '未填写退款原因'}</Text>
                 <Text style={styles.recordMeta}>更新时间：{formatDateTime(item.updated_at || item.created_at)}</Text>
@@ -325,7 +326,7 @@ export default function OrderAfterSaleScreen({route}: any) {
               <View key={item.id} style={styles.recordItem}>
                 <View style={styles.recordHeader}>
                   <Text style={styles.recordCode}>{item.dispute_type || 'general'}</Text>
-                  <StatusBadge label={item.status || '未知'} tone={getDisputeTone(item.status)} />
+                  <StatusBadge label={formatDisputeStatusLabel(item.status)} tone={getDisputeTone(item.status)} />
                 </View>
                 <Text style={styles.recordContent}>{item.summary}</Text>
                 <Text style={styles.recordMeta}>发起时间：{formatDateTime(item.created_at)}</Text>

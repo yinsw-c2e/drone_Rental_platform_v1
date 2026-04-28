@@ -23,18 +23,27 @@ import { useSelector } from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
-import SurfaceGroup from '../../components/business/SurfaceGroup';
-import SurfaceItem from '../../components/business/SurfaceItem';
-import StatusBadge from '../../components/business/StatusBadge';
 import {
   getObjectStatusMeta,
   getTonePalette,
   VisualTone,
 } from '../../components/business/visuals';
+import {demandV2Service} from '../../services/demandV2';
+import {dispatchV2Service} from '../../services/dispatchV2';
 import { homeService } from '../../services/home';
+import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
+import {orderV2Service} from '../../services/orderV2';
 import { RootState } from '../../store/store';
-import { HomeDashboard } from '../../types';
-import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
+import {
+  DemandSummary,
+  HomeDashboard,
+  V2DispatchTaskSummary,
+  V2OrderAnomaly,
+  V2OrderAnomalySummary,
+  V2OrderSummary,
+} from '../../types';
+import {formatDemandBudget, resolveDemandPrimaryAddress} from '../../utils/demandMeta';
+import {formatAmountYuan} from '../../utils/supplyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -66,18 +75,41 @@ type DashboardAction = {
   badge?: number;
 };
 
-type TodoItem = {
+type PriorityQueueFilter =
+  | 'all'
+  | 'quote'
+  | 'confirm'
+  | 'payment'
+  | 'dispatch'
+  | 'progress'
+  | 'anomaly';
+
+type PriorityQueueCategory = Exclude<PriorityQueueFilter, 'all'>;
+
+type PriorityQueueTarget = {
+  screen: 'DemandDetail' | 'OrderDetail' | 'DispatchTaskDetail' | 'PilotOrderExecution';
+  params: Record<string, any>;
+};
+
+type PriorityQueueItem = {
   key: string;
+  role: RoleView | 'all';
+  category: PriorityQueueCategory;
   title: string;
-  desc: string;
-  actionText: string;
-  onPress: () => void;
-  badge?: number;
-  tone?: VisualTone;
+  subtitle: string;
+  meta: string;
+  tagLabel: string;
+  tagTone: VisualTone;
+  urgency: number;
+  sortAt: number;
+  referenceNo?: string;
+  target: PriorityQueueTarget;
 };
 
 const CONTENT_SIDE_MARGIN = 16;
 const HERO_SIDE_PADDING = 18;
+const PRIORITY_PAGE_SIZE = 4;
+const QUICK_GRID_PANEL_HORIZONTAL_PADDING = 12;
 
 const emptyDashboard: HomeDashboard = {
   role_summary: {
@@ -122,6 +154,98 @@ const emptyDashboard: HomeDashboard = {
   },
   in_progress_orders: [],
   market_feed: [],
+};
+
+const emptyAnomalySummary: V2OrderAnomalySummary = {
+  total: 0,
+  critical_count: 0,
+  warning_count: 0,
+  by_anomaly_type: [],
+  by_order_status: [],
+};
+
+const getOrderStatusBucket = (status?: string): PriorityQueueCategory | null => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'pending_provider_confirmation') {
+    return 'confirm';
+  }
+  if (normalized === 'pending_payment') {
+    return 'payment';
+  }
+  if (normalized === 'pending_dispatch') {
+    return 'dispatch';
+  }
+  if (
+    [
+      'assigned',
+      'confirmed',
+      'preparing',
+      'airspace_applying',
+      'airspace_approved',
+      'loading',
+      'in_transit',
+      'delivered',
+    ].includes(normalized)
+  ) {
+    return 'progress';
+  }
+  return null;
+};
+
+const getPriorityItemTimestamp = (value?: string | null): number => {
+  if (!value) {
+    return 0;
+  }
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const getPriorityRoleLabel = (role: RoleView | 'all') => {
+  switch (role) {
+    case 'client':
+      return '客户';
+    case 'owner':
+      return '机主';
+    case 'pilot':
+      return '飞手';
+    default:
+      return '综合';
+  }
+};
+
+const getPriorityFilterLabel = (role: RoleView, filter: PriorityQueueFilter) => {
+  switch (filter) {
+    case 'quote':
+      if (role === 'owner') {
+        return '待报价';
+      }
+      if (role === 'client') {
+        return '待确认方案';
+      }
+      return '方案/报价';
+    case 'confirm':
+      return '待确认';
+    case 'payment':
+      return '待付款';
+    case 'dispatch':
+      return role === 'pilot' ? '待接单' : '待派单';
+    case 'progress':
+      return '进行中';
+    case 'anomaly':
+      return '异常';
+    default:
+      return '全部';
+  }
+};
+
+const getPriorityUrgencyLabel = (urgency: number) => {
+  if (urgency >= 100) {
+    return '需立即处理';
+  }
+  if (urgency >= 85) {
+    return '建议优先';
+  }
+  return '顺手处理';
 };
 
 function ActionPill({
@@ -175,15 +299,7 @@ function QuickActionCard({
   const palette = getTonePalette(action.tone, theme.isDark);
   return (
     <TouchableOpacity
-      style={[
-        styles.quickActionCard,
-        {
-          width,
-          backgroundColor: theme.card,
-          borderWidth: 1,
-          borderColor: theme.cardBorder,
-        },
-      ]}
+      style={[styles.quickActionCard, {width}]}
       onPress={action.onPress}
       activeOpacity={0.88}
     >
@@ -202,8 +318,9 @@ function QuickActionCard({
           </View>
         ) : null}
       </View>
-      <Text style={[styles.quickActionTitle, {color: theme.text}]}>{action.title}</Text>
-      <Text style={[styles.quickActionDesc, {color: theme.textSub}]}>{action.desc}</Text>
+      <Text style={[styles.quickActionTitle, {color: theme.text}]} numberOfLines={2}>
+        {action.title}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -262,7 +379,12 @@ export default function HomeScreen({ navigation }: any) {
   const tabBarHeight = useBottomTabBarHeight();
 
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [anomalySummary, setAnomalySummary] = useState<V2OrderAnomalySummary>(emptyAnomalySummary);
+  const [priorityItems, setPriorityItems] = useState<PriorityQueueItem[]>([]);
+  const [priorityLoading, setPriorityLoading] = useState(false);
+  const [priorityFilter, setPriorityFilter] = useState<PriorityQueueFilter>('all');
+  const [priorityFilterExpanded, setPriorityFilterExpanded] = useState(false);
+  const [priorityPage, setPriorityPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const authStateRef = useRef(isAuthenticated);
 
@@ -327,7 +449,10 @@ export default function HomeScreen({ navigation }: any) {
     authStateRef.current = isAuthenticated;
     if (!isAuthenticated) {
       setDashboard(null);
-      setLoading(false);
+      setAnomalySummary(emptyAnomalySummary);
+      setPriorityItems([]);
+      setPriorityFilter('all');
+      setPriorityPage(0);
       setRefreshing(false);
     }
   }, [isAuthenticated]);
@@ -337,9 +462,15 @@ export default function HomeScreen({ navigation }: any) {
       return;
     }
     try {
-      const res = await homeService.getDashboard();
+      const [res, anomalyRes] = await Promise.all([
+        homeService.getDashboard(),
+        orderAnomalyV2Service.summary({
+          role: activeRole === 'all' ? undefined : activeRole,
+        }),
+      ]);
       if (authStateRef.current) {
         setDashboard(res.data || emptyDashboard);
+        setAnomalySummary(anomalyRes.data || emptyAnomalySummary);
       }
     } catch (error) {
       if (authStateRef.current) {
@@ -347,11 +478,296 @@ export default function HomeScreen({ navigation }: any) {
       }
     } finally {
       if (authStateRef.current) {
-        setLoading(false);
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [activeRole]);
+
+  const anomalyAlertCount = anomalySummary?.total ?? currentDashboard.summary.alert_count;
+  const openAnomalyCenter = useCallback(() => {
+    navigation.navigate('OrderAnomalyList', {
+      roleFilter: activeRole === 'all' ? undefined : activeRole,
+    });
+  }, [activeRole, navigation]);
+
+  const fetchPriorityQueue = useCallback(async () => {
+    if (!authStateRef.current) {
+      return;
+    }
+
+    setPriorityLoading(true);
+    try {
+      const rolesToLoad: RoleView[] =
+        activeRole === 'all'
+          ? [
+              ...(hasClient ? (['client'] as RoleView[]) : []),
+              ...(hasOwner ? (['owner'] as RoleView[]) : []),
+              ...(hasPilot ? (['pilot'] as RoleView[]) : []),
+            ]
+          : [activeRole];
+
+      const nextItems: PriorityQueueItem[] = [];
+
+      const tasks: Promise<void>[] = [];
+
+      if (rolesToLoad.includes('client')) {
+        tasks.push(
+          (async () => {
+            const [demandRes, orderRes] = await Promise.all([
+              demandV2Service.listMyDemands({page: 1, page_size: 40}),
+              orderV2Service.list({role: 'client', page: 1, page_size: 100}),
+            ]);
+
+            (demandRes.data?.items || [])
+              .filter(item => ['published', 'quoting'].includes(String(item.status || '').toLowerCase()) && Number(item.quote_count || 0) > 0)
+              .forEach((item: DemandSummary) => {
+                nextItems.push({
+                  key: `client-demand-${item.id}`,
+                  role: 'client',
+                  category: 'quote',
+                  title: item.title || '待确认方案',
+                  subtitle: `${resolveDemandPrimaryAddress(item)} · ${formatDemandBudget(item.budget_min, item.budget_max)}`,
+                  meta: `已收到 ${item.quote_count || 0} 份报价，点击直接查看并决定是否继续推进`,
+                  tagLabel: '待确认方案',
+                  tagTone: 'green',
+                  urgency: 82 + Math.min(Number(item.quote_count || 0), 9),
+                  sortAt: Number(item.id || 0),
+                  referenceNo: item.demand_no,
+                  target: {screen: 'DemandDetail', params: {id: item.id}},
+                });
+              });
+
+            (orderRes.data?.items || []).forEach((order: V2OrderSummary) => {
+              const bucket = getOrderStatusBucket(order.status);
+              if (!bucket || (bucket !== 'confirm' && bucket !== 'payment' && bucket !== 'progress')) {
+                return;
+              }
+
+              const urgency =
+                bucket === 'confirm'
+                  ? 92
+                  : bucket === 'payment'
+                    ? 88
+                    : String(order.status || '').toLowerCase() === 'delivered'
+                      ? 86
+                      : 70;
+
+              nextItems.push({
+                key: `client-order-${order.id}`,
+                role: 'client',
+                category: bucket,
+                title: order.title || order.order_no,
+                subtitle: `${order.service_address || '起点待确认'}${order.dest_address ? ` → ${order.dest_address}` : ''}`,
+                meta:
+                  bucket === 'confirm'
+                    ? '等待机主确认后才会进入支付阶段'
+                    : bucket === 'payment'
+                      ? `待支付金额 ${formatAmountYuan(order.total_amount)}`
+                      : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
+                tagLabel:
+                  bucket === 'confirm'
+                    ? '待确认'
+                    : bucket === 'payment'
+                      ? '待付款'
+                      : '进行中',
+                tagTone:
+                  bucket === 'confirm'
+                    ? 'orange'
+                    : bucket === 'payment'
+                      ? 'blue'
+                      : 'teal',
+                urgency,
+                sortAt: getPriorityItemTimestamp(order.updated_at || order.created_at),
+                referenceNo: order.order_no,
+                target: {screen: 'OrderDetail', params: {orderId: order.id, id: order.id}},
+              });
+            });
+          })(),
+        );
+      }
+
+      if (rolesToLoad.includes('owner')) {
+        tasks.push(
+          (async () => {
+            const [demandRes, orderRes] = await Promise.all([
+              demandV2Service.listMarketplaceDemands({page: 1, page_size: 40}),
+              orderV2Service.list({role: 'owner', page: 1, page_size: 100}),
+            ]);
+
+            (demandRes.data?.items || []).forEach((item: DemandSummary) => {
+              nextItems.push({
+                key: `owner-demand-${item.id}`,
+                role: 'owner',
+                category: 'quote',
+                title: item.title || '待报价任务',
+                subtitle: `${resolveDemandPrimaryAddress(item)} · ${formatDemandBudget(item.budget_min, item.budget_max)}`,
+                meta: `报价窗口已打开，先响应更容易拿下这单`,
+                tagLabel: '待报价',
+                tagTone: 'blue',
+                urgency: 78 + Math.min(Number(item.quote_count || 0), 5),
+                sortAt: Number(item.id || 0),
+                referenceNo: item.demand_no,
+                target: {screen: 'DemandDetail', params: {id: item.id}},
+              });
+            });
+
+            (orderRes.data?.items || []).forEach((order: V2OrderSummary) => {
+              const bucket = getOrderStatusBucket(order.status);
+              if (!bucket || (bucket !== 'confirm' && bucket !== 'dispatch' && bucket !== 'progress')) {
+                return;
+              }
+
+              nextItems.push({
+                key: `owner-order-${order.id}`,
+                role: 'owner',
+                category: bucket,
+                title: order.title || order.order_no,
+                subtitle: `${order.service_address || '起点待确认'}${order.dest_address ? ` → ${order.dest_address}` : ''}`,
+                meta:
+                  bucket === 'confirm'
+                    ? '客户已下单，机主确认后才能继续推进'
+                    : bucket === 'dispatch'
+                      ? '已承接订单，下一步要安排执行'
+                      : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
+                tagLabel:
+                  bucket === 'confirm'
+                    ? '待确认'
+                    : bucket === 'dispatch'
+                      ? '待派单'
+                      : '进行中',
+                tagTone:
+                  bucket === 'confirm'
+                    ? 'red'
+                    : bucket === 'dispatch'
+                      ? 'orange'
+                      : 'teal',
+                urgency: bucket === 'confirm' ? 95 : bucket === 'dispatch' ? 90 : 68,
+                sortAt: getPriorityItemTimestamp(order.updated_at || order.created_at),
+                referenceNo: order.order_no,
+                target: {screen: 'OrderDetail', params: {orderId: order.id, id: order.id}},
+              });
+            });
+          })(),
+        );
+      }
+
+      if (rolesToLoad.includes('pilot')) {
+        tasks.push(
+          (async () => {
+            const dispatchRes = await dispatchV2Service.list({role: 'pilot', page: 1, page_size: 100});
+
+            (dispatchRes.data?.items || []).forEach((task: V2DispatchTaskSummary) => {
+              const taskStatus = String(task.status || '').toLowerCase();
+              const orderStatus = String(task.order?.status || '').toLowerCase();
+              if (taskStatus === 'pending_response') {
+                nextItems.push({
+                  key: `pilot-dispatch-${task.id}`,
+                  role: 'pilot',
+                  category: 'dispatch',
+                  title: task.order?.title || '待响应派单',
+                  subtitle: `${task.order?.service_address || '起点待确认'}${task.order?.dest_address ? ` → ${task.order.dest_address}` : ''}`,
+                  meta: '正式派单已发到你名下，超时可能会自动回退',
+                  tagLabel: '待接单',
+                  tagTone: 'orange',
+                  urgency: 98,
+                  sortAt: getPriorityItemTimestamp(task.sent_at || task.updated_at || task.created_at),
+                  referenceNo: task.dispatch_no,
+                  target: {screen: 'DispatchTaskDetail', params: {id: task.id, dispatchId: task.id}},
+                });
+                return;
+              }
+
+              if (taskStatus === 'accepted' && !['completed', 'cancelled'].includes(orderStatus)) {
+                nextItems.push({
+                  key: `pilot-active-${task.id}`,
+                  role: 'pilot',
+                  category: 'progress',
+                  title: task.order?.title || '执行中的任务',
+                  subtitle: `${task.order?.service_address || '起点待确认'}${task.order?.dest_address ? ` → ${task.order.dest_address}` : ''}`,
+                  meta: `当前状态：${getObjectStatusMeta('order', task.order?.status).label}`,
+                  tagLabel: '进行中',
+                  tagTone: 'teal',
+                  urgency: orderStatus === 'delivered' ? 84 : 72,
+                  sortAt: getPriorityItemTimestamp(task.updated_at || task.sent_at || task.created_at),
+                  referenceNo: task.dispatch_no,
+                  target: {screen: 'PilotOrderExecution', params: {taskId: task.id}},
+                });
+              }
+            });
+          })(),
+        );
+      }
+
+      tasks.push(
+        (async () => {
+          const anomalyRes = await orderAnomalyV2Service.list({
+            role: activeRole === 'all' ? undefined : activeRole,
+            page: 1,
+            page_size: 40,
+          });
+
+          (anomalyRes.data?.items || []).forEach((item: V2OrderAnomaly) => {
+            const isCritical = String(item.severity || '').toLowerCase() === 'critical';
+            nextItems.push({
+              key: `anomaly-${item.order_id}-${item.anomaly_type}`,
+              role: activeRole === 'all' ? 'all' : activeRole,
+              category: 'anomaly',
+              title: item.title || item.order_no,
+              subtitle: item.message,
+              meta: item.recommended_action || '点击进入详情查看异常上下文',
+              tagLabel: isCritical ? '严重异常' : '异常提醒',
+              tagTone: isCritical ? 'red' : 'orange',
+              urgency: isCritical ? 110 : 96,
+              sortAt: getPriorityItemTimestamp(item.updated_at),
+              referenceNo: item.order_no,
+              target:
+                activeRole === 'pilot' && item.dispatch_task_id
+                  ? {screen: 'DispatchTaskDetail', params: {id: item.dispatch_task_id, dispatchId: item.dispatch_task_id}}
+                  : {screen: 'OrderDetail', params: {orderId: item.order_id, id: item.order_id}},
+            });
+          });
+        })(),
+      );
+
+      await Promise.all(tasks);
+
+      if (!authStateRef.current) {
+        return;
+      }
+
+      nextItems.sort((a, b) => {
+        if (b.urgency !== a.urgency) {
+          return b.urgency - a.urgency;
+        }
+        if (b.sortAt !== a.sortAt) {
+          return b.sortAt - a.sortAt;
+        }
+        return a.key.localeCompare(b.key);
+      });
+
+      setPriorityItems(nextItems);
+    } catch (error) {
+      if (authStateRef.current) {
+        console.warn('加载首页待处理列表失败:', error);
+        setPriorityItems([]);
+      }
+    } finally {
+      if (authStateRef.current) {
+        setPriorityLoading(false);
+      }
+    }
+  }, [activeRole, hasClient, hasOwner, hasPilot]);
+
+  useEffect(() => {
+    setPriorityFilter('all');
+    setPriorityPage(0);
+    setPriorityFilterExpanded(false);
+  }, [activeRole]);
+
+  useEffect(() => {
+    setPriorityPage(0);
+    setPriorityFilterExpanded(false);
+  }, [priorityFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -359,34 +775,40 @@ export default function HomeScreen({ navigation }: any) {
         return undefined;
       }
       fetchDashboard();
+      fetchPriorityQueue();
       return undefined;
-    }, [fetchDashboard, isAuthenticated]),
+    }, [fetchDashboard, fetchPriorityQueue, isAuthenticated]),
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchDashboard();
-  }, [fetchDashboard]);
+    fetchPriorityQueue();
+  }, [fetchDashboard, fetchPriorityQueue]);
 
   const heroTheme = useMemo(() => getHeroTheme(activeRole), [activeRole]);
-  const quickActionLayout = useMemo(
-    () =>
-      getResponsiveTwoColumnLayout({
-        viewportWidth,
-        totalHorizontalPadding: CONTENT_SIDE_MARGIN * 2,
-        gap: 10,
-        minItemWidth: 132,
-      }),
-    [viewportWidth],
-  );
+  const quickActionLayout = useMemo(() => {
+    const gap = 10;
+    const availableWidth = Math.max(
+      viewportWidth - CONTENT_SIDE_MARGIN * 2 - QUICK_GRID_PANEL_HORIZONTAL_PADDING * 2,
+      0,
+    );
+    const columns = availableWidth >= 300 ? 3 : 2;
+    const itemWidth = Math.floor((availableWidth - gap * (columns - 1)) / columns);
+    return {
+      columns,
+      availableWidth,
+      itemWidth,
+    };
+  }, [viewportWidth]);
 
   const heroConfig = useMemo(() => {
     switch (activeRole) {
       case 'client':
         return {
-          title: '这次要快速下单，还是发布任务？',
+          title: '今天先处理这些订单',
           subtitle:
-            '标准化场景先走快速下单，直接看可下单服务；复杂、非标或需要比价的场景再发布任务。',
+            '要下单就走快速下单；需要比价或说明更多细节，就发布任务。',
           primaryAction: {
             title: '快速下单',
             onPress: () => navigation.navigate('QuickOrderEntry'),
@@ -400,38 +822,38 @@ export default function HomeScreen({ navigation }: any) {
           metrics: [
             {
               key: 'client-quoted',
-              label: '待选方案',
+              label: '待确认方案',
               value: currentDashboard.role_views.client.quoted_demand_count,
-              hint: '已有报价进入筛选',
+              hint: '有服务方给出方案',
             },
             {
               key: 'client-confirm',
-              label: '待确认',
+              label: '待确认订单',
               value:
                 currentDashboard.role_views.client
                   .pending_provider_confirmation_order_count,
-              hint: '等待机主确认',
+              hint: '等服务方确认',
             },
             {
               key: 'client-payment',
-              label: '待支付',
+              label: '待付款',
               value:
                 currentDashboard.role_views.client.pending_payment_order_count,
-              hint: '已选定方案待付款',
+              hint: '确认后再付款',
             },
             {
               key: 'client-progress',
-              label: '进行中任务',
+              label: '运输中',
               value: currentDashboard.role_views.client.in_progress_order_count,
-              hint: '已进入执行阶段',
+              hint: '正在推进的订单',
             },
           ] as MetricCard[],
         };
       case 'owner':
         return {
-          title: '先看新需求，再做承接',
+          title: '今天先看这些机会',
           subtitle:
-            '机主首页只聚焦获客、报价和进度管理，不再把客户信息和飞手信息混在一起。',
+            '新任务、待确认订单和待安排执行都放在这里，先处理最着急的。',
           primaryAction: {
             title: '查看新需求',
             onPress: () => navigation.navigate('DemandList'),
@@ -451,36 +873,36 @@ export default function HomeScreen({ navigation }: any) {
               key: 'owner-demand',
               label: '新需求',
               value: currentDashboard.role_views.owner.recommended_demand_count,
-              hint: '平台推荐可报价需求',
+              hint: '可以报价的任务',
             },
             {
               key: 'owner-confirm',
-              label: '待确认',
+              label: '待确认订单',
               value:
                 currentDashboard.role_views.owner
                   .pending_provider_confirmation_order_count,
-              hint: '直达订单待处理',
+              hint: '客户已提交订单',
             },
             {
               key: 'owner-quote',
               label: '待报价',
               value: currentDashboard.role_views.owner.pending_quote_count,
-              hint: '已提交后继续跟进',
+              hint: '需要尽快响应',
             },
             {
               key: 'owner-dispatch',
-              label: '待指派',
+              label: '待安排执行',
               value:
                 currentDashboard.role_views.owner.pending_dispatch_order_count,
-              hint: '成交后待安排执行',
+              hint: '成交后安排飞手',
             },
           ] as MetricCard[],
         };
       case 'pilot':
         return {
-          title: '正式派单已就绪',
+          title: '今天有哪些任务要处理',
           subtitle:
-            '请优先处理分配给您的正式派单。已接任务的执行环节、飞行监控与记录均在此汇总。',
+            '待接单、执行中和飞行记录都在这里，先处理快超时的任务。',
           primaryAction: {
             title: '查看待接派单',
             onPress: () =>
@@ -499,23 +921,23 @@ export default function HomeScreen({ navigation }: any) {
           metrics: [
             {
               key: 'pilot-pending',
-              label: '待响应',
+              label: '待接单',
               value:
                 currentDashboard.role_views.pilot
                   .pending_response_dispatch_count,
-              hint: '正式派单待确认',
+              hint: '等你确认的任务',
             },
             {
               key: 'pilot-active',
               label: '执行中',
               value: currentDashboard.role_views.pilot.active_dispatch_count,
-              hint: '当前进行中的任务',
+              hint: '正在处理的任务',
             },
             {
               key: 'pilot-flight',
-              label: '累计飞行',
+              label: '飞行记录',
               value: currentDashboard.role_views.pilot.recent_flight_count,
-              hint: '真实履约飞行次数',
+              hint: '已完成记录',
             },
           ] as MetricCard[],
         };
@@ -547,7 +969,7 @@ export default function HomeScreen({ navigation }: any) {
             key: 'all-progress',
             label: '进行中订单',
             value: currentDashboard.summary.in_progress_order_count,
-            hint: '当前正在执行的履约任务',
+            hint: '正在推进的订单',
           });
         }
         if (hasPilot) {
@@ -556,34 +978,34 @@ export default function HomeScreen({ navigation }: any) {
             label: '待接派单',
             value:
               currentDashboard.role_views.pilot.pending_response_dispatch_count,
-            hint: '需要飞手尽快响应',
+            hint: '等你确认的任务',
           });
         }
         if (hasOwner) {
           allMetrics.push({
             key: 'all-demand',
-            label: '待报价需求',
+            label: '待报价任务',
             value: currentDashboard.role_views.owner.recommended_demand_count,
-            hint: '适合当前机队承接',
+            hint: '可以报价的任务',
           });
         }
         while (allMetrics.length < 3) {
           allMetrics.push({
             key: `all-filler-${allMetrics.length}`,
-            label: allMetrics.length === 1 ? '今日单量' : '市场需求',
+            label: allMetrics.length === 1 ? '今日新单' : '市场任务',
             value:
               allMetrics.length === 1
                 ? currentDashboard.summary.today_order_count
                 : currentDashboard.market_totals.demand_count,
             hint:
-              allMetrics.length === 1 ? '今天新进入的订单' : '平台公开可见需求',
+              allMetrics.length === 1 ? '今天新来的订单' : '可承接的任务',
           });
         }
 
         return {
-          title: '先处理优先动作，再看全局',
+          title: '今天先处理这些事',
           subtitle:
-            '综合视图只保留今天最重要的三件事：发布任务、看新需求、接派单。',
+            '下单、报价、接单和异常提醒都集中在工作台。',
           primaryAction: {
             title: hasClient
               ? '发布任务'
@@ -603,17 +1025,39 @@ export default function HomeScreen({ navigation }: any) {
     }
   }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
   const quickActions = useMemo<DashboardAction[]>(() => {
+    const platformEntries: DashboardAction[] = [
+      {
+        key: 'platform-service-hub',
+        title: '服务大厅',
+        desc: '浏览服务、公开需求和供需入口',
+        icon: '🧭',
+        tone: 'blue',
+        onPress: () => navigation.navigate('ServiceHub'),
+      },
+      {
+        key: 'platform-progress-center',
+        title: '订单进度',
+        desc: '统一查看全部订单与履约状态',
+        icon: '📋',
+        tone: 'teal',
+        onPress: () => navigation.navigate('ProgressCenter'),
+      },
+    ];
+
     switch (activeRole) {
       case 'client':
         return [
+          ...platformEntries,
           {
             key: 'client-quick-order',
             title: '快速下单',
-            desc: '先看支持直达下单的服务，标准场景更省步骤',
+            desc:
+              currentDashboard.market_totals.supply_count > 0
+                ? `当前有 ${currentDashboard.market_totals.supply_count} 个服务支持直达下单，先补最小信息再筛选`
+                : '先补最小信息，系统会帮你筛选支持直达下单的服务',
             icon: '📦',
             tone: 'blue',
             onPress: () => navigation.navigate('QuickOrderEntry'),
-            badge: currentDashboard.market_totals.supply_count,
           },
           {
             key: 'client-publish',
@@ -625,24 +1069,17 @@ export default function HomeScreen({ navigation }: any) {
           },
           {
             key: 'client-demands',
-            title: '我的任务',
-            desc: '跟进报价与项目进度',
+            title: '询价中的任务',
+            desc: '只看仍在开放报价阶段的任务，和首页数字保持一致',
             icon: '🗂️',
             tone: 'teal',
-            onPress: () => navigation.navigate('MyDemands'),
+            onPress: () => navigation.navigate('MyDemands', {statusFilter: 'quoting'}),
             badge: currentDashboard.role_views.client.open_demand_count,
-          },
-          {
-            key: 'client-orders',
-            title: '我的订单',
-            desc: '查看付款、执行与完成状态',
-            icon: '📋',
-            tone: 'green',
-            onPress: () => navigation.navigate('MyOrders'),
           },
         ];
       case 'owner':
         return [
+          ...platformEntries,
           {
             key: 'owner-demand',
             title: '查看新需求',
@@ -680,6 +1117,7 @@ export default function HomeScreen({ navigation }: any) {
         ];
       case 'pilot':
         return [
+          ...platformEntries,
           {
             key: 'pilot-assigned',
             title: '待接派单',
@@ -718,16 +1156,18 @@ export default function HomeScreen({ navigation }: any) {
           },
         ];
       default:
-        const actions: DashboardAction[] = [];
+        const actions: DashboardAction[] = [...platformEntries];
         if (hasClient) {
           actions.push({
             key: 'all-quick-order',
             title: '快速下单',
-            desc: '标准场景先看可下单服务，直接进入最短路径',
+            desc:
+              currentDashboard.market_totals.supply_count > 0
+                ? `当前有 ${currentDashboard.market_totals.supply_count} 个服务支持直达下单，标准场景优先走这条`
+                : '标准场景先补最小信息，系统会筛选支持直达下单的服务',
             icon: '📦',
             tone: 'blue',
             onPress: () => navigation.navigate('QuickOrderEntry'),
-            badge: currentDashboard.market_totals.supply_count,
           });
           actions.push({
             key: 'all-publish',
@@ -762,196 +1202,67 @@ export default function HomeScreen({ navigation }: any) {
               currentDashboard.role_views.pilot.pending_response_dispatch_count,
           });
         }
-        actions.push({
-          key: 'all-orders',
-          title: '我的订单',
-          desc: '统一查看成交后的订单进度',
-          icon: '📦',
-          tone: 'teal',
-          onPress: () => navigation.navigate('MyOrders'),
-        });
-        return actions.slice(0, 4);
+        return actions.slice(0, 6);
     }
   }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
 
-  const todoItems = useMemo<TodoItem[]>(() => {
-    switch (activeRole) {
-      case 'client':
-        return [
-          {
-            key: 'client-quote',
-            title: '待确认报价与方案',
-            desc: '先看哪些任务已经进入报价阶段，再决定是否继续推进。',
-            badge: currentDashboard.role_views.client.quoted_demand_count,
-            actionText: '查看任务',
-            onPress: () => navigation.navigate('MyDemands', {statusFilter: 'quoting'}),
-            tone: 'green',
-          },
-          {
-            key: 'client-confirm',
-            title: '待机主确认订单',
-            desc: '直达下单后，先由机主确认，再进入支付阶段。',
-            badge:
-              currentDashboard.role_views.client
-                .pending_provider_confirmation_order_count,
-            actionText: '查看订单',
-            onPress: () =>
-              navigation.navigate('MyOrders', {
-                roleFilter: 'client',
-                statusFilter: 'pending',
-                serverStatus: 'pending_provider_confirmation',
-              }),
-            tone: 'orange',
-          },
-          {
-            key: 'client-payment',
-            title: '待付款订单',
-            desc: '已选定方案但尚未付款的订单会在这里汇总。',
-            badge:
-              currentDashboard.role_views.client.pending_payment_order_count,
-            actionText: '去付款',
-            onPress: () =>
-              navigation.navigate('MyOrders', {
-                roleFilter: 'client',
-                statusFilter: 'pending',
-                serverStatus: 'pending_payment',
-              }),
-            tone: 'blue',
-          },
-          {
-            key: 'client-progress',
-            title: '进行中任务',
-            desc: '执行中的订单会持续出现在首页，避免你再去翻列表。',
-            badge: currentDashboard.role_views.client.in_progress_order_count,
-            actionText: '查看订单',
-            onPress: () => navigation.navigate('MyOrders', {roleFilter: 'client', statusFilter: 'in_progress'}),
-            tone: 'teal',
-          },
-        ];
-      case 'owner':
-        return [
-          {
-            key: 'owner-recommend',
-            title: '待报价新需求',
-            desc: '优先处理当前机队可承接的新需求，缩短获客反应时间。',
-            badge: currentDashboard.role_views.owner.recommended_demand_count,
-            actionText: '去报价',
-            onPress: () => navigation.navigate('DemandList', {mode: 'owner'}),
-            tone: 'blue',
-          },
-          {
-            key: 'owner-confirm',
-            title: '待确认直达单',
-            desc: '客户刚提交的直达订单会先停在这里，机主确认后才进入支付。',
-            badge:
-              currentDashboard.role_views.owner
-                .pending_provider_confirmation_order_count,
-            actionText: '去处理',
-            onPress: () =>
-              navigation.navigate('MyOrders', {
-                roleFilter: 'owner',
-                statusFilter: 'pending',
-                serverStatus: 'pending_provider_confirmation',
-              }),
-            tone: 'red',
-          },
-          {
-            key: 'owner-dispatch',
-            title: '待发起派单',
-            desc: '机主已经承接并完成支付的订单，会先停在待派阶段等待你安排执行。',
-            badge:
-              currentDashboard.role_views.owner.pending_dispatch_order_count,
-            actionText: '查看订单',
-            onPress: () =>
-              navigation.navigate('MyOrders', {
-                roleFilter: 'owner',
-                statusFilter: 'pending',
-                serverStatus: 'pending_dispatch',
-              }),
-            tone: 'orange',
-          },
-          {
-            key: 'owner-draft',
-            title: '草稿与待上架服务',
-            desc: '补充资质，将草稿服务转为正式上架以获取更多订单。',
-            badge: currentDashboard.role_views.owner.active_supply_count,
-            actionText: '查看服务',
-            onPress: () => navigation.navigate('MyOffers'),
-            tone: 'teal',
-          },
-        ];
-      case 'pilot':
-        return [
-          {
-            key: 'pilot-pending',
-            title: '待响应派单',
-            desc: '系统正式派单优先于报名任务，超时会自动回退。',
-            badge:
-              currentDashboard.role_views.pilot.pending_response_dispatch_count,
-            actionText: '去接单',
-            onPress: () =>
-              navigation.navigate('PilotTaskList', { entry: 'assigned' }),
-            tone: 'orange',
-          },
-          {
-            key: 'pilot-active',
-            title: '今日执行任务',
-            desc: '已接派单和执行中的任务保持在首页，减少来回切换。',
-            badge: currentDashboard.role_views.pilot.active_dispatch_count,
-            actionText: '查看任务',
-            onPress: () => navigation.navigate('PilotTaskList', {entry: 'accepted'}),
-            tone: 'blue',
-          },
-          {
-            key: 'pilot-candidate',
-            title: '可报名任务',
-            desc: '公开任务报名不等于抢单成功，但能提前进入后续候选池。',
-            badge: currentDashboard.role_views.pilot.candidate_demand_count,
-            actionText: '去查看',
-            onPress: () => navigation.navigate('DemandList', {mode: 'pilot'}),
-            tone: 'purple',
-          },
-        ];
-      default:
-        const items: TodoItem[] = [];
-        if (hasOwner) {
-          items.push({
-            key: 'all-capture',
-            title: '获客优先',
-            desc: '先看今天新需求和待报价机会，决定是否立刻承接。',
-            badge: currentDashboard.role_views.owner.recommended_demand_count,
-            actionText: '查看新需求',
-            onPress: () => navigation.navigate('DemandList'),
-            tone: 'blue',
-          });
-        }
-        if (hasPilot || hasClient) {
-          items.push({
-            key: 'all-exec',
-            title: '执行优先',
-            desc: '待接派单和进行中任务是今天最应该先处理的执行项。',
-            badge:
-              (hasPilot
-                ? currentDashboard.role_views.pilot
-                    .pending_response_dispatch_count
-                : 0) + currentDashboard.summary.in_progress_order_count,
-            actionText: '查看进度',
-            onPress: () => navigation.navigate('MyOrders', {statusFilter: 'in_progress'}),
-            tone: 'orange',
-          });
-        }
-        items.push({
-          key: 'all-alert',
-          title: '异常提醒',
-          desc: '超时过久的订单会在这里提醒，避免阶段性积压。',
-          badge: currentDashboard.summary.alert_count,
-          actionText: '查看订单',
-          onPress: () => navigation.navigate('MyOrders'),
-          tone: 'red',
+  const priorityFilterOptions = useMemo(() => {
+    const counts = priorityItems.reduce<Record<string, number>>((acc, item) => {
+      acc[item.category] = (acc[item.category] || 0) + 1;
+      return acc;
+    }, {});
+
+    const filters: Array<{key: PriorityQueueFilter; label: string; count: number}> = [
+      {key: 'all', label: '全部', count: priorityItems.length},
+    ];
+
+    (['anomaly', 'confirm', 'quote', 'payment', 'dispatch', 'progress'] as PriorityQueueCategory[]).forEach(key => {
+      const count = counts[key] || 0;
+      if (count > 0) {
+        filters.push({
+          key,
+          label: getPriorityFilterLabel(activeRole, key),
+          count,
         });
-        return items;
+      }
+    });
+
+    return filters;
+  }, [activeRole, priorityItems]);
+
+  const currentPriorityFilterOption = useMemo(
+    () =>
+      priorityFilterOptions.find(item => item.key === priorityFilter) ||
+      priorityFilterOptions[0],
+    [priorityFilter, priorityFilterOptions],
+  );
+
+  useEffect(() => {
+    if (priorityFilterOptions.some(item => item.key === priorityFilter)) {
+      return;
     }
-  }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot, navigation]);
+    setPriorityFilter('all');
+  }, [priorityFilter, priorityFilterOptions]);
+
+  const filteredPriorityItems = useMemo(
+    () =>
+      priorityItems.filter(item => priorityFilter === 'all' || item.category === priorityFilter),
+    [priorityFilter, priorityItems],
+  );
+
+  const priorityPageCount = Math.max(1, Math.ceil(filteredPriorityItems.length / PRIORITY_PAGE_SIZE));
+
+  useEffect(() => {
+    if (priorityPage <= priorityPageCount - 1) {
+      return;
+    }
+    setPriorityPage(0);
+  }, [priorityPage, priorityPageCount]);
+
+  const priorityPageItems = useMemo(() => {
+    const start = priorityPage * PRIORITY_PAGE_SIZE;
+    return filteredPriorityItems.slice(start, start + PRIORITY_PAGE_SIZE);
+  }, [filteredPriorityItems, priorityPage]);
 
   return (
     <View style={styles.rootWrap}>
@@ -1027,13 +1338,17 @@ export default function HomeScreen({ navigation }: any) {
                 <Text style={styles.heroSubtitle}>{heroConfig.subtitle}</Text>
               </View>
 
-              {currentDashboard.summary.alert_count > 0 ? (
-                <View style={styles.alertPill}>
-                  <Text style={styles.alertPillValue}>
-                    {currentDashboard.summary.alert_count}
-                  </Text>
+              {anomalyAlertCount > 0 ? (
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel={`异常提醒，当前 ${anomalyAlertCount} 条，点击查看`}
+                  onPress={openAnomalyCenter}
+                  style={styles.alertPill}
+                >
+                  <Text style={styles.alertPillValue}>{anomalyAlertCount}</Text>
                   <Text style={styles.alertPillLabel}>异常提醒</Text>
-                </View>
+                </TouchableOpacity>
               ) : null}
             </View>
 
@@ -1062,131 +1377,278 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={[styles.sectionTitle, {color: theme.text}]}>今天优先处理</Text>
               <Text style={[styles.sectionHint, {color: theme.textHint}]}>先处理这些再看其他</Text>
             </View>
-            {todoItems.length > 0 && (
-              <SurfaceGroup>
-                {todoItems.map((item, index) => {
-                  const palette = getTonePalette(item.tone || 'blue', theme.isDark);
-                  return (
-                    <SurfaceItem
-                      key={item.key}
-                      isLast={index === todoItems.length - 1}
+            <ObjectCard style={styles.priorityBoard}>
+              <View style={styles.priorityHeaderRow}>
+                <Text style={[styles.priorityTitle, {color: theme.text}]}>待处理列表</Text>
+                <Text style={[styles.prioritySummary, {color: theme.textHint}]}>
+                  {filteredPriorityItems.length} 条
+                </Text>
+              </View>
+
+              <View style={styles.priorityFilterRow}>
+                <Text style={[styles.priorityFilterLabel, {color: theme.textHint}]}>筛选范围</Text>
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  style={[
+                    styles.priorityFilterTrigger,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor: priorityFilterExpanded ? theme.primary : theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => setPriorityFilterExpanded(prev => !prev)}
+                >
+                  <View style={styles.priorityFilterTriggerMain}>
+                    <Text style={[styles.priorityFilterTriggerText, {color: theme.text}]}>
+                      {currentPriorityFilterOption?.label || '全部'}
+                    </Text>
+                    <View
+                      style={[
+                        styles.priorityFilterCount,
+                        {backgroundColor: `${theme.primary}18`},
+                      ]}
                     >
-                      <View style={styles.todoHeader}>
-                        <Text style={[styles.todoTitle, {color: theme.text}]}>{item.title}</Text>
-                        {typeof item.badge === 'number' && item.badge > 0 ? (
-                          <View
+                      <Text style={[styles.priorityFilterCountText, {color: theme.primary}]}>
+                        {currentPriorityFilterOption?.count || 0}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.priorityFilterChevron, {color: theme.textHint}]}>
+                    {priorityFilterExpanded ? '▴' : '▾'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {priorityFilterExpanded ? (
+                <View
+                  style={[
+                    styles.priorityDropdown,
+                    {
+                      backgroundColor: theme.card,
+                      borderColor: theme.cardBorder,
+                    },
+                  ]}
+                >
+                  {priorityFilterOptions.map(item => {
+                    const isActive = priorityFilter === item.key;
+                    return (
+                      <TouchableOpacity
+                        key={item.key}
+                        activeOpacity={0.88}
+                        style={[
+                          styles.priorityDropdownItem,
+                          isActive ? styles.priorityDropdownItemActive : null,
+                        ]}
+                        onPress={() => {
+                          setPriorityFilter(item.key);
+                          setPriorityFilterExpanded(false);
+                        }}
+                      >
+                        <View style={styles.priorityDropdownCopy}>
+                          <Text
                             style={[
-                              styles.todoBadge,
-                              {
-                                backgroundColor: palette.bg,
-                                borderColor: palette.border,
-                              },
+                              styles.priorityDropdownTitle,
+                              {color: isActive ? theme.primaryText : theme.text},
                             ]}
                           >
-                            <Text
+                            {item.label}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.priorityDropdownHint,
+                              {color: isActive ? theme.primaryText : theme.textHint},
+                            ]}
+                          >
+                            {item.key === 'all' ? '查看全部待处理事项' : `仅看${item.label}`}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.priorityFilterCount,
+                            {backgroundColor: isActive ? `${theme.primary}20` : theme.inputBg},
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.priorityFilterCountText,
+                              {color: isActive ? theme.primary : theme.textHint},
+                            ]}
+                          >
+                            {item.count}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              {priorityLoading ? (
+                <ActivityIndicator style={styles.loading} color={theme.refreshColor} />
+              ) : priorityPageItems.length > 0 ? (
+                <View style={styles.priorityList}>
+                  {priorityPageItems.map(item => {
+                    const palette = getTonePalette(item.tagTone, theme.isDark);
+                    return (
+                      <TouchableOpacity
+                        key={item.key}
+                        activeOpacity={0.88}
+                        style={[
+                          styles.priorityItem,
+                          {
+                            backgroundColor: theme.card,
+                            borderColor: theme.cardBorder,
+                            borderLeftColor: palette.text,
+                          },
+                        ]}
+                        onPress={() => navigation.navigate(item.target.screen as never, item.target.params as never)}
+                      >
+                        <View style={styles.priorityItemTop}>
+                          <View style={styles.priorityIdentityRow}>
+                            {activeRole === 'all' && item.role !== 'all' ? (
+                              <View
+                                style={[
+                                  styles.priorityRolePill,
+                                  {backgroundColor: theme.inputBg, borderColor: theme.inputBorder},
+                                ]}
+                              >
+                                <Text style={[styles.priorityRolePillText, {color: theme.textSub}]}>
+                                  {getPriorityRoleLabel(item.role)}
+                                </Text>
+                              </View>
+                            ) : null}
+                            {item.referenceNo ? (
+                              <Text
+                                style={[styles.priorityRefNo, {color: theme.textHint}]}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
+                                {item.referenceNo}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <View style={styles.priorityTopTags}>
+                            <View
                               style={[
-                                styles.todoBadgeText,
-                                { color: palette.text },
+                                styles.priorityTag,
+                                {backgroundColor: palette.bg, borderColor: palette.border},
                               ]}
                             >
-                              {item.badge}
+                              <Text style={[styles.priorityTagText, {color: palette.text}]}>
+                                {item.tagLabel}
+                              </Text>
+                            </View>
+                            <Text
+                              style={[
+                                styles.priorityUrgencyText,
+                                {
+                                  color: palette.text,
+                                  backgroundColor: palette.bg,
+                                  borderColor: palette.border,
+                                },
+                              ]}
+                            >
+                              {getPriorityUrgencyLabel(item.urgency)}
                             </Text>
                           </View>
-                        ) : null}
-                      </View>
-                      <Text style={[styles.todoDesc, {color: theme.textSub}]}>{item.desc}</Text>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        style={[
-                          styles.todoActionBtn,
-                          { backgroundColor: palette.text },
-                        ]}
-                        onPress={item.onPress}
-                      >
-                        <Text style={styles.todoActionText}>{item.actionText}</Text>
+                        </View>
+
+                        <Text style={[styles.priorityItemTitle, {color: theme.text}]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
                       </TouchableOpacity>
-                    </SurfaceItem>
-                  );
-                })}
-              </SurfaceGroup>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.contentRail}>
-          <View style={styles.sectionWrap}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.text}]}>
-                {activeRole === 'client' ? '开始新任务' : '常用动作'}
-              </Text>
-              <Text style={[styles.sectionHint, {color: theme.textHint}]}>
-                {activeRole === 'client' ? '先选快速下单或发布任务' : '快速进入常用功能'}
-              </Text>
-            </View>
-            <View style={styles.quickGrid}>
-              {quickActions.map(action => (
-                <QuickActionCard key={action.key} action={action} width={quickActionLayout.itemWidth} />
-              ))}
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.contentRail}>
-          <View style={styles.sectionWrap}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: theme.text}]}>
-                {activeRole === 'pilot' ? '当前执行订单' : '进行中任务'}
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('MyOrders')}>
-                <Text style={[styles.linkText, {color: theme.primary}]}>查看全部</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loading ? (
-              <ActivityIndicator style={styles.loading} color={theme.refreshColor} />
-            ) : currentDashboard.in_progress_orders.length > 0 ? (
-              currentDashboard.in_progress_orders.map(order => (
-                <ObjectCard
-                  key={order.id}
-                  onPress={() =>
-                    navigation.navigate('OrderDetail', { id: order.id })
-                  }
-                >
-                  <View style={styles.orderHeader}>
-                    <Text style={[styles.orderNo, {color: theme.textHint}]}>{order.order_no}</Text>
-                    <StatusBadge
-                      label=""
-                      meta={getObjectStatusMeta('order', order.status)}
-                    />
-                  </View>
-                  <Text style={[styles.orderTitle, {color: theme.text}]} numberOfLines={2}>
-                    {order.title}
-                  </Text>
-                  <View style={styles.orderFooter}>
-                    <Text style={[styles.orderMeta, {color: theme.textSub}]}>
-                      {order.created_at?.slice(0, 10)}
-                    </Text>
-                    <Text style={styles.orderAmount}>
-                      ¥{(order.total_amount / 100).toFixed(2)}
-                    </Text>
-                  </View>
-                </ObjectCard>
-              ))
-            ) : (
-              <ObjectCard>
+                    );
+                  })}
+                </View>
+              ) : (
                 <EmptyState
-                  icon="📭"
-                  title={
-                    activeRole === 'pilot'
-                      ? '当前没有执行中的订单'
-                      : '当前没有进行中的任务'
+                  icon="📋"
+                  title="当前没有待处理事项"
+                  description="筛选后没有命中的结果，先去创建任务或查看全部订单。"
+                  actionText={activeRole === 'client' ? '快速下单' : '查看订单'}
+                  onAction={() =>
+                    activeRole === 'client'
+                      ? navigation.navigate('QuickOrderEntry')
+                      : navigation.navigate('MyOrders')
                   }
-                  description="这里会汇总正在执行中的订单，避免你在首页和列表页之间来回跳。"
-                  actionText="查看订单"
-                  onAction={() => navigation.navigate('MyOrders')}
                 />
-              </ObjectCard>
-            )}
+              )}
+
+              {priorityPageCount > 1 ? (
+                <View style={styles.priorityPagerRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    disabled={priorityPage === 0}
+                    style={[
+                      styles.priorityPagerBtn,
+                      {
+                        backgroundColor: priorityPage === 0 ? theme.inputBg : theme.card,
+                        borderColor: theme.inputBorder,
+                      },
+                    ]}
+                    onPress={() => setPriorityPage(prev => Math.max(0, prev - 1))}
+                  >
+                    <Text
+                      style={[
+                        styles.priorityPagerBtnText,
+                        {color: priorityPage === 0 ? theme.textHint : theme.text},
+                      ]}
+                    >
+                      上一页
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.priorityPagerText, {color: theme.textHint}]}>
+                    第 {priorityPage + 1} / {priorityPageCount} 页
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    disabled={priorityPage >= priorityPageCount - 1}
+                    style={[
+                      styles.priorityPagerBtn,
+                      {
+                        backgroundColor: priorityPage >= priorityPageCount - 1 ? theme.inputBg : theme.card,
+                        borderColor: theme.inputBorder,
+                      },
+                    ]}
+                    onPress={() => setPriorityPage(prev => Math.min(priorityPageCount - 1, prev + 1))}
+                  >
+                    <Text
+                      style={[
+                        styles.priorityPagerBtnText,
+                        {color: priorityPage >= priorityPageCount - 1 ? theme.textHint : theme.text},
+                      ]}
+                    >
+                      下一页
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </ObjectCard>
+          </View>
+        </View>
+
+        <View style={styles.contentRail}>
+          <View style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, {color: theme.text}]}>
+                工作台入口
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.quickGridPanel,
+                {
+                  backgroundColor: theme.isDark ? theme.card : theme.bgSecondary,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+            >
+              <View style={styles.quickGrid}>
+                {quickActions.map(action => (
+                  <QuickActionCard key={action.key} action={action} width={quickActionLayout.itemWidth} />
+                ))}
+              </View>
+            </View>
           </View>
         </View>
 
@@ -1368,73 +1830,236 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.primaryText,
     fontWeight: '700',
   },
-  todoCard: {
-    marginBottom: 10,
+  priorityBoard: {
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  todoHeader: {
+  priorityHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  todoTitle: {
-    flex: 1,
-    fontSize: 15,
-    color: theme.text,
+  priorityTitle: {
+    fontSize: 16,
     fontWeight: '800',
-    paddingRight: 10,
+    letterSpacing: 0.2,
   },
-  todoBadge: {
-    minWidth: 30,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  prioritySummary: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  priorityFilterRow: {
+    marginTop: 12,
+    gap: 8,
+  },
+  priorityFilterLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  priorityFilterTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  priorityFilterTriggerMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  priorityFilterTriggerText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  priorityFilterChevron: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  priorityDropdown: {
+    marginTop: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  priorityDropdownItem: {
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.cardBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  priorityDropdownItemActive: {
+    backgroundColor: theme.primaryBg,
+  },
+  priorityDropdownCopy: {
+    flex: 1,
+  },
+  priorityDropdownTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  priorityDropdownHint: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  priorityFilterChip: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,
-    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 8,
+    gap: 6,
   },
-  todoBadgeText: {
+  priorityFilterText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  priorityFilterCount: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  priorityFilterCountText: {
     fontSize: 11,
     fontWeight: '800',
   },
-  todoDesc: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
+  priorityList: {
+    marginTop: 14,
+    gap: 10,
   },
-  todoActionBtn: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 16,
+  priorityItem: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  todoActionText: {
-    fontSize: 12,
-    color: theme.btnPrimaryText,
+  priorityItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  priorityIdentityRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  priorityRolePill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  priorityRolePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  priorityRefNo: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  priorityTopTags: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priorityTag: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  priorityTagText: {
+    fontSize: 11,
     fontWeight: '800',
+  },
+  priorityItemTitle: {
+    marginTop: 8,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  priorityUrgencyText: {
+    overflow: 'hidden',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  priorityPagerRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  priorityPagerBtn: {
+    minWidth: 78,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  priorityPagerBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  priorityPagerText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
+  quickGridPanel: {
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: QUICK_GRID_PANEL_HORIZONTAL_PADDING,
+    paddingVertical: 14,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: theme.isDark ? 0 : 0.04,
+    shadowRadius: theme.isDark ? 0 : 10,
+    elevation: theme.isDark ? 0 : 2,
+  },
   quickActionCard: {
-    borderRadius: 22,
-    padding: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    minHeight: 88,
   },
   quickActionIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   quickActionIcon: {
     fontSize: 20,
@@ -1456,14 +2081,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontWeight: '800',
   },
   quickActionTitle: {
-    marginTop: 12,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  quickActionDesc: {
     marginTop: 6,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   loading: {
     paddingVertical: 28,

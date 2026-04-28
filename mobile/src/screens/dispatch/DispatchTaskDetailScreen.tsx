@@ -14,12 +14,14 @@ import {useFocusEffect} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 
 import ObjectCard from '../../components/business/ObjectCard';
+import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
 import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
+import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import {RootState} from '../../store/store';
-import {V2DispatchTaskDetail, V2DispatchTaskSummary} from '../../types';
+import {V2DispatchTaskDetail, V2DispatchTaskSummary, V2OrderAnomaly} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -101,6 +103,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectSheet, setShowRejectSheet] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [anomaly, setAnomaly] = useState<V2OrderAnomaly | null>(null);
 
   const loadData = useCallback(async () => {
     if (!dispatchId) {
@@ -111,10 +114,23 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
     setLoading(true);
     try {
       const res = await dispatchV2Service.get(dispatchId);
-      setDetail(res.data || null);
+      const nextDetail = res.data || null;
+      setDetail(nextDetail);
+      const orderId = Number(nextDetail?.order?.id || nextDetail?.dispatch_task?.order?.id || 0);
+      if (orderId > 0) {
+        try {
+          const anomalyRes = await orderAnomalyV2Service.list({order_id: orderId, page_size: 1});
+          setAnomaly(anomalyRes.data?.items?.[0] || null);
+        } catch {
+          setAnomaly(null);
+        }
+      } else {
+        setAnomaly(null);
+      }
     } catch (error) {
       console.error('获取正式派单详情失败:', error);
       setDetail(null);
+      setAnomaly(null);
     } finally {
       setLoading(false);
     }
@@ -315,6 +331,13 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
             正式派单只表达执行指令：派给谁、为何派、是否已响应，以及如果飞手拒绝后系统是否已开始自动重派。
           </Text>
         </View>
+
+        {anomaly ? (
+          <OrderAnomalyBanner
+            anomaly={anomaly}
+            onPress={() => navigation.navigate('OrderAnomalyList', {roleFilter: isPilot ? 'pilot' : isOwner ? 'owner' : 'client'})}
+          />
+        ) : null}
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>派单摘要</Text>

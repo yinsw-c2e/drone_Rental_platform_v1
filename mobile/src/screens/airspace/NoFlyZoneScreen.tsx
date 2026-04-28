@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ const RESTRICTION_MAP: Record<string, {label: string; colorKey: 'danger' | 'warn
   caution: {label: '注意', colorKey: 'info'},
 };
 
-export default function NoFlyZoneScreen({navigation, route}: any) {
+export default function NoFlyZoneScreen({route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const [zones, setZones] = useState<NoFlyZone[]>([]);
@@ -48,12 +48,12 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
   // default coordinates (Chengdu)
   const latitude = route?.params?.latitude || 30.5723;
   const longitude = route?.params?.longitude || 104.0665;
+  const isBlocked = checkResult?.status === 'blocked' || checkResult?.allows_continue === false;
+  const isWarning = !isBlocked && checkResult?.status === 'warning';
+  const checkAccent = isBlocked ? theme.danger : isWarning ? theme.warning : theme.success;
+  const checkBackground = isBlocked ? `${theme.danger}14` : isWarning ? `${theme.warning}14` : `${theme.success}14`;
 
-  useEffect(() => {
-    loadZones();
-  }, [viewMode]);
-
-  const loadZones = async () => {
+  const loadZones = useCallback(async () => {
     try {
       if (viewMode === 'nearby') {
         const data = await findNearbyNoFlyZones(latitude, longitude, 50000);
@@ -68,18 +68,26 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [latitude, longitude, viewMode]);
+
+  useEffect(() => {
+    loadZones();
+  }, [loadZones]);
 
   const handleCheckAvailability = async () => {
     setChecking(true);
     try {
       const result = await checkAirspaceAvailability(latitude, longitude, 120);
       setCheckResult(result);
-      if (result.available) {
-        Alert.alert('空域可用', '当前位置空域可正常飞行');
-      } else {
-        Alert.alert('空域受限', `当前位置存在${result.restrictions.length}个飞行限制`);
+      if (result.status === 'blocked' || result.allows_continue === false) {
+        Alert.alert('空域受限', result.recommended_action || `当前位置存在 ${result.restrictions.length} 个飞行限制，当前不可继续飞行。`);
+        return;
       }
+      if (result.status === 'warning') {
+        Alert.alert('空域提醒', result.recommended_action || `当前位置附近存在 ${result.restrictions.length} 个限飞或注意区域，请留意报备和限制要求。`);
+        return;
+      }
+      Alert.alert('空域可用', '当前位置未发现禁飞限制，可继续执行后续操作。');
     } catch (err: any) {
       Alert.alert('检查失败', err.message);
     } finally {
@@ -185,11 +193,13 @@ export default function NoFlyZoneScreen({navigation, route}: any) {
 
       {/* Availability check result */}
       {checkResult && (
-        <View style={[styles.checkResultBar, {backgroundColor: checkResult.available ? '#f6ffed' : '#fff2f0'}]}>
-          <Text style={[styles.checkResultText, {color: checkResult.available ? '#52c41a' : '#ff4d4f'}]}>
-            {checkResult.available
-              ? '当前位置空域可用，无飞行限制'
-              : `当前位置存在 ${checkResult.restrictions.length} 个飞行限制`}
+        <View style={[styles.checkResultBar, {backgroundColor: checkBackground}]}>
+          <Text style={[styles.checkResultText, {color: checkAccent}]}>
+            {isBlocked
+              ? (checkResult.recommended_action || `当前位置存在 ${checkResult.restrictions.length} 个飞行限制，当前不可继续飞行。`)
+              : isWarning
+                ? (checkResult.recommended_action || `当前位置附近存在 ${checkResult.restrictions.length} 个限飞或注意区域，可继续但需留意限制要求。`)
+                : '当前位置空域可用，未发现禁飞限制'}
           </Text>
         </View>
       )}

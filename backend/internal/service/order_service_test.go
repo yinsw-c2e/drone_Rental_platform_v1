@@ -201,6 +201,109 @@ func TestFilterExecutionStatusUpdates(t *testing.T) {
 	}
 }
 
+func TestConfirmReceiptCompletesFormalDispatchTask(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Drone{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.FormalDispatchTask{},
+		&model.FormalDispatchLog{},
+		&model.Review{},
+	)
+
+	now := time.Now()
+	drone := &model.Drone{
+		OwnerID:            801,
+		Brand:              "DJI",
+		Model:              "FlyCart",
+		SerialNumber:       "SN-CONFIRM-001",
+		AvailabilityStatus: "busy",
+	}
+	if err := db.Create(drone).Error; err != nil {
+		t.Fatalf("create drone: %v", err)
+	}
+
+	order := &model.Order{
+		OrderNo:              "WRJ-CONFIRM-001",
+		DroneID:              drone.ID,
+		ClientUserID:         601,
+		ProviderUserID:       801,
+		ExecutorPilotUserID:  901,
+		Title:                "签收完成自动收尾测试单",
+		ServiceAddress:       "佛山起点",
+		DestAddress:          "佛山终点",
+		StartTime:            now.Add(-2 * time.Hour),
+		EndTime:              now.Add(2 * time.Hour),
+		TotalAmount:          12800,
+		Status:               "delivered",
+		NeedsDispatch:        true,
+		ExecutionMode:        "dispatch_pool",
+		LoadingConfirmedBy:   901,
+		UnloadingConfirmedBy: 901,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	task := &model.FormalDispatchTask{
+		DispatchNo:        "DSP-CONFIRM-001",
+		OrderID:           order.ID,
+		ProviderUserID:    order.ProviderUserID,
+		TargetPilotUserID: order.ExecutorPilotUserID,
+		DispatchSource:    "pool",
+		Status:            "accepted",
+		SentAt:            &now,
+	}
+	if err := db.Create(task).Error; err != nil {
+		t.Fatalf("create dispatch task: %v", err)
+	}
+
+	service := &OrderService{
+		orderRepo: repository.NewOrderRepo(db),
+		droneRepo: repository.NewDroneRepo(db),
+	}
+
+	if err := service.ConfirmReceipt(order.ClientUserID, order.ID); err != nil {
+		t.Fatalf("confirm receipt: %v", err)
+	}
+
+	var updatedOrder model.Order
+	if err := db.First(&updatedOrder, order.ID).Error; err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	if updatedOrder.Status != "completed" {
+		t.Fatalf("expected order completed, got %s", updatedOrder.Status)
+	}
+	if updatedOrder.CompletedAt == nil {
+		t.Fatalf("expected completed_at to be filled")
+	}
+
+	var updatedTask model.FormalDispatchTask
+	if err := db.First(&updatedTask, task.ID).Error; err != nil {
+		t.Fatalf("reload dispatch task: %v", err)
+	}
+	if updatedTask.Status != "completed" {
+		t.Fatalf("expected dispatch task completed, got %s", updatedTask.Status)
+	}
+
+	var logs []model.FormalDispatchLog
+	if err := db.Where("dispatch_task_id = ?", task.ID).Find(&logs).Error; err != nil {
+		t.Fatalf("query dispatch logs: %v", err)
+	}
+	if len(logs) == 0 || !strings.Contains(logs[len(logs)-1].Note, "自动归档完成") {
+		t.Fatalf("expected completion log, got %#v", logs)
+	}
+
+	var updatedDrone model.Drone
+	if err := db.First(&updatedDrone, drone.ID).Error; err != nil {
+		t.Fatalf("reload drone: %v", err)
+	}
+	if updatedDrone.AvailabilityStatus != "available" {
+		t.Fatalf("expected drone availability restored, got %s", updatedDrone.AvailabilityStatus)
+	}
+}
+
 func TestCancelOrderWithRefundCreatesRefundRecord(t *testing.T) {
 	db := newServiceTestDB(
 		t,

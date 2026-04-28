@@ -1939,6 +1939,10 @@ func (s *OrderService) ConfirmReceipt(userID int64, orderID int64) error {
 	}); err != nil {
 		return err
 	}
+	s.syncFormalDispatchCompletion(orderID, userID, now)
+
+	order.Status = "completed"
+	order.CompletedAt = &now
 
 	s.restoreDroneStatusIfNoActiveOrders(order.DroneID, orderID)
 
@@ -1955,4 +1959,41 @@ func (s *OrderService) ConfirmReceipt(userID int64, orderID int64) error {
 	}
 
 	return nil
+}
+
+func (s *OrderService) syncFormalDispatchCompletion(orderID, userID int64, now time.Time) {
+	db := s.orderRepo.DB()
+	if db == nil {
+		return
+	}
+
+	dispatchRepo := repository.NewDispatchRepo(db)
+	task, err := dispatchRepo.GetActiveFormalTaskByOrder(orderID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return
+		}
+		task, err = dispatchRepo.GetFormalTaskByOrderID(orderID)
+		if err != nil {
+			return
+		}
+	}
+	if task == nil || task.ID == 0 || task.Status == "completed" || task.Status == "finished" {
+		return
+	}
+
+	if err := dispatchRepo.UpdateFormalTaskFields(task.ID, map[string]interface{}{
+		"status":       "completed",
+		"responded_at": &now,
+		"updated_at":   now,
+	}); err != nil {
+		return
+	}
+
+	_ = dispatchRepo.CreateFormalLog(&model.FormalDispatchLog{
+		DispatchTaskID: task.ID,
+		ActionType:     "completed",
+		OperatorUserID: userID,
+		Note:           "客户已确认签收，正式派单自动归档完成",
+	})
 }

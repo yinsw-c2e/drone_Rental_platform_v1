@@ -15,7 +15,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import {useSelector} from 'react-redux';
 
 import AddressInputField from '../../components/AddressInputField';
+import AirspaceRiskNotice from '../../components/business/AirspaceRiskNotice';
 import ObjectCard from '../../components/business/ObjectCard';
+import {AirspaceCheckResult, checkAirspaceAvailability} from '../../services/airspace';
 import {ClientEligibility, getClientEligibility} from '../../services/client';
 import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
@@ -27,6 +29,7 @@ import {
 } from '../../utils/supplyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {isAirspaceHardBlocked} from '../../utils/airspaceRisk';
 
 function formatDateTime(date: Date): string {
   const year = date.getFullYear();
@@ -142,10 +145,78 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
   const [submitting, setSubmitting] = useState(false);
   const [eligibility, setEligibility] = useState<ClientEligibility | null>(null);
   const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  const [departureAirspace, setDepartureAirspace] = useState<AirspaceCheckResult | null>(null);
+  const [destinationAirspace, setDestinationAirspace] = useState<AirspaceCheckResult | null>(null);
+  const [checkingDepartureAirspace, setCheckingDepartureAirspace] = useState(false);
+  const [checkingDestinationAirspace, setCheckingDestinationAirspace] = useState(false);
 
   const estimatedAmount = supply.base_price_amount || 0;
   const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
   const orderReady = canCreateOrder && (eligibility?.can_create_direct_order ?? true);
+  const hasAirspaceHardBlock =
+    isAirspaceHardBlocked(departureAirspace) || isAirspaceHardBlocked(destinationAirspace);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!departureAddress?.latitude || !departureAddress?.longitude) {
+      setDepartureAirspace(null);
+      setCheckingDepartureAirspace(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setCheckingDepartureAirspace(true);
+    checkAirspaceAvailability(departureAddress.latitude, departureAddress.longitude, 120)
+      .then(result => {
+        if (!cancelled) {
+          setDepartureAirspace(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDepartureAirspace(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingDepartureAirspace(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [departureAddress?.latitude, departureAddress?.longitude]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!destinationAddress?.latitude || !destinationAddress?.longitude) {
+      setDestinationAirspace(null);
+      setCheckingDestinationAirspace(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+    setCheckingDestinationAirspace(true);
+    checkAirspaceAvailability(destinationAddress.latitude, destinationAddress.longitude, 120)
+      .then(result => {
+        if (!cancelled) {
+          setDestinationAirspace(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDestinationAirspace(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingDestinationAirspace(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [destinationAddress?.latitude, destinationAddress?.longitude]);
 
   useEffect(() => {
     let active = true;
@@ -205,6 +276,10 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
     }
     if (!departureAddress || !destinationAddress) {
       Alert.alert('请补充信息', '请先填写起运地址和送达地址。');
+      return;
+    }
+    if (hasAirspaceHardBlock) {
+      Alert.alert('当前位置受限', '起运地或目的地命中禁飞区，当前无法创建直达订单，请先调整地址。');
       return;
     }
 
@@ -320,6 +395,16 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
                 onSelect={setDepartureAddress}
                 style={styles.inlineAddress}
               />
+              <AirspaceRiskNotice
+                label="起运地"
+                result={departureAirspace}
+                checking={checkingDepartureAirspace}
+                onOpenDetails={
+                  departureAddress
+                    ? () => navigation.navigate('NoFlyZone', {latitude: departureAddress.latitude, longitude: departureAddress.longitude})
+                    : undefined
+                }
+              />
             </View>
             <View style={styles.reviewItem}>
               <Text style={styles.reviewLabel}>目的地</Text>
@@ -328,6 +413,16 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
                 placeholder="请选择目的地"
                 onSelect={setDestinationAddress}
                 style={styles.inlineAddress}
+              />
+              <AirspaceRiskNotice
+                label="目的地"
+                result={destinationAirspace}
+                checking={checkingDestinationAirspace}
+                onOpenDetails={
+                  destinationAddress
+                    ? () => navigation.navigate('NoFlyZone', {latitude: destinationAddress.latitude, longitude: destinationAddress.longitude})
+                    : undefined
+                }
               />
             </View>
           </View>
@@ -408,10 +503,13 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
       </ScrollView>
 
       <View style={styles.footer}>
+        {hasAirspaceHardBlock ? (
+          <Text style={styles.blockedHint}>当前地址命中禁飞区，需先修改起运地或目的地后才能提交订单。</Text>
+        ) : null}
         <TouchableOpacity
-          style={[styles.primaryBtn, (!orderReady || submitting || eligibilityLoading) && styles.disabledBtn]}
+          style={[styles.primaryBtn, (!orderReady || submitting || eligibilityLoading || hasAirspaceHardBlock) && styles.disabledBtn]}
           onPress={handleSubmit}
-          disabled={!orderReady || submitting || eligibilityLoading}>
+          disabled={!orderReady || submitting || eligibilityLoading || hasAirspaceHardBlock}>
           <Text style={styles.primaryBtnText}>
             {submitting ? '正在提交...' : '确认并提交订单'}
           </Text>
@@ -538,6 +636,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.card,
     borderTopWidth: 1,
     borderTopColor: theme.divider,
+  },
+  blockedHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.danger,
+    fontWeight: '700',
+    marginBottom: 10,
   },
   primaryBtn: {
     height: 54,

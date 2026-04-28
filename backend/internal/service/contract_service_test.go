@@ -93,7 +93,7 @@ func TestProviderAutoSignMarksContractFullySignedAfterClientSign(t *testing.T) {
 		TotalAmount:        98000,
 		PlatformCommission: 9800,
 		OwnerAmount:        88200,
-		Status:             "paid",
+		Status:             "pending_payment",
 	}
 	if err := orderRepo.Create(order); err != nil {
 		t.Fatalf("create order: %v", err)

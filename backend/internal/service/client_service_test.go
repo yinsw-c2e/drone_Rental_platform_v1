@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"wurenji-backend/internal/model"
@@ -118,5 +119,19 @@ func TestBuildClientProfileViewUsesIdentityStatusAndExpandedFields(t *testing.T)
 	}
 	if view.Eligibility == nil || !view.Eligibility.CanCreateDirectOrder {
 		t.Fatalf("expected embedded eligibility to be ready, got %#v", view.Eligibility)
+	}
+}
+
+func TestValidateAddressAirspaceRejectsAddressWithoutCoordinates(t *testing.T) {
+	svc := &ClientService{airspaceService: &AirspaceService{}}
+
+	err := svc.validateAddressAirspace("起点地址", addressSnapshotPayload{
+		Text: "佛山市禅城区祖庙街道测试地址",
+	})
+	if err == nil {
+		t.Fatal("expected missing coordinate address to be rejected")
+	}
+	if !strings.Contains(err.Error(), "缺少有效坐标") {
+		t.Fatalf("expected missing coordinate error, got %v", err)
 	}
 }

@@ -308,6 +308,9 @@ func (s *EventService) NotifyOrderStatusChanged(order *model.Order, eventType, t
 	if order.ProviderUserID > 0 {
 		recipients = uniqueUserIDs(append(recipients, order.ProviderUserID)...)
 	}
+	if executorUserID := orderExecutorUserID(order); executorUserID > 0 {
+		recipients = uniqueUserIDs(append(recipients, executorUserID)...)
+	}
 	s.notifyUsers(recipients, eventType, title, content, map[string]interface{}{
 		"order_id":      order.ID,
 		"order_no":      order.OrderNo,

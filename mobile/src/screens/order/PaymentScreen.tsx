@@ -23,6 +23,7 @@ import {
   V2PaymentSummary,
   V2RefundSummary,
 } from '../../types';
+import {formatRefundStatusLabel} from '../../utils/orderPresentation';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -84,6 +85,21 @@ const getRefundStatusTone = (status?: string | null) => {
       return 'red' as const;
     default:
       return 'gray' as const;
+  }
+};
+
+const getPaymentStatusLabel = (status?: string | null) => {
+  switch (String(status || '').toLowerCase()) {
+    case 'paid':
+      return '已支付';
+    case 'pending':
+      return '待处理';
+    case 'refunded':
+      return '已退款';
+    case 'failed':
+      return '失败';
+    default:
+      return '处理中';
   }
 };
 
@@ -317,7 +333,7 @@ export default function PaymentScreen({route, navigation}: any) {
               <View key={item.id} style={styles.recordItem}>
                 <View style={styles.recordHeader}>
                   <Text style={styles.recordCode}>{item.payment_no}</Text>
-                  <StatusBadge label={({'paid':'已支付','pending':'待处理','refunded':'已退款','failed':'失败'} as Record<string,string>)[item.status || ''] || item.status || '未知'} tone={getPaymentStatusTone(item.status)} />
+                  <StatusBadge label={getPaymentStatusLabel(item.status)} tone={getPaymentStatusTone(item.status)} />
                 </View>
                 <Text style={styles.recordMeta}>{item.payment_method || '-'} · {formatMoney(item.amount)}</Text>
                 <Text style={styles.recordMeta}>支付时间：{formatDateTime(item.paid_at || item.created_at)}</Text>
@@ -335,7 +351,7 @@ export default function PaymentScreen({route, navigation}: any) {
               <View key={item.id} style={styles.recordItem}>
                 <View style={styles.recordHeader}>
                   <Text style={styles.recordCode}>{item.refund_no}</Text>
-                  <StatusBadge label={item.status || '未知'} tone={getRefundStatusTone(item.status)} />
+                  <StatusBadge label={formatRefundStatusLabel(item.status)} tone={getRefundStatusTone(item.status)} />
                 </View>
                 <Text style={styles.recordMeta}>{formatMoney(item.amount)} · {item.reason || '未填写退款原因'}</Text>
                 <Text style={styles.recordMeta}>更新时间：{formatDateTime(item.updated_at || item.created_at)}</Text>

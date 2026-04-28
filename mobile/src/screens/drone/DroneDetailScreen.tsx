@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback, useMemo} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
   ActivityIndicator, SafeAreaView, Dimensions,
@@ -7,8 +7,7 @@ import {
 import {useSelector} from 'react-redux';
 import {RootState} from '../../store/store';
 import {droneService} from '../../services/drone';
-import {reviewService} from '../../services/review';
-import {Drone, Review} from '../../types';
+import {Drone} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -30,7 +29,6 @@ export default function DroneDetailScreen({route, navigation}: any) {
 
   const currentUser = useSelector((state: RootState) => state.auth.user);
   const [drone, setDrone] = useState<Drone | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentImage, setCurrentImage] = useState(0);
 
@@ -40,14 +38,8 @@ export default function DroneDetailScreen({route, navigation}: any) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [droneRes, reviewRes] = await Promise.all([
-        droneService.getById(id),
-        reviewService.listByTarget('drone', id, {page: 1, page_size: 10}).catch(() => null),
-      ]);
+      const droneRes = await droneService.getById(id);
       setDrone(droneRes.data);
-      if (reviewRes?.data?.list) {
-        setReviews(reviewRes.data.list);
-      }
     } catch (e) {
       console.error('获取无人机详情失败:', e);
     }
@@ -115,7 +107,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
     );
   }
 
-  const availability = AVAILABILITY_MAP[drone.availability_status] || {label: drone.availability_status, colorKey: 'textHint' as const};
+  const availability = AVAILABILITY_MAP[drone.availability_status] || {label: '状态未知', colorKey: 'textHint' as const};
   const availColor = theme[availability.colorKey];
   const images = drone.images?.length ? drone.images : [];
   const approvedCount = [

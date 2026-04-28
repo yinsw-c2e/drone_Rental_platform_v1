@@ -44,10 +44,22 @@
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
+			<key>192.168.3.182</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
 		</dict>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>需要获取您的位置以推荐附近的无人机服务和完成配送定位</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>开发调试时需要访问本地网络上的 Metro 服务以加载最新代码和调试功能</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+		<string>_ws._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>需要使用相机拍摄货物照片、无人机认证及飞手证件照片</string>
 	<key>NSPhotoLibraryUsageDescription</key>

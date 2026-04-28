@@ -101,6 +101,10 @@ export interface ComplianceCheckItem {
 
 export interface AirspaceCheckResult {
   available: boolean;
+  status?: 'clear' | 'warning' | 'blocked' | string;
+  allows_continue?: boolean;
+  recommended_action?: string;
+  blocked_reason?: string;
   restrictions: {
     id: number;
     name: string;
@@ -138,26 +142,58 @@ export interface RunComplianceCheckRequest {
   trigger_type?: string;
 }
 
+const isAxiosResponseLike = (value: any) =>
+  value && typeof value === 'object' && 'status' in value && 'headers' in value && 'config' in value;
+
+const unwrapAirspaceBody = (res: any) => (isAxiosResponseLike(res) ? res.data : res);
+
+const unwrapAirspacePayload = <T>(res: any): T => {
+  const body = unwrapAirspaceBody(res);
+  if (body && typeof body === 'object' && 'data' in body) {
+    return body.data as T;
+  }
+  return body as T;
+};
+
+const unwrapAirspaceListPayload = <T>(res: any): {data: T[]; total: number} => {
+  const body = unwrapAirspaceBody(res);
+  if (body && typeof body === 'object') {
+    if (Array.isArray(body.data)) {
+      return {
+        data: body.data as T[],
+        total: Number(body.total || 0),
+      };
+    }
+    if (body.data && typeof body.data === 'object' && Array.isArray(body.data.list)) {
+      return {
+        data: body.data.list as T[],
+        total: Number(body.data.total || 0),
+      };
+    }
+  }
+  return {data: [], total: 0};
+};
+
 // ==================== 空域申请 API ====================
 
 export const createApplication = async (data: CreateApplicationRequest): Promise<AirspaceApplication> => {
   const res: any = await api.post('/airspace/application', data);
-  return res.data;
+  return unwrapAirspacePayload<AirspaceApplication>(res);
 };
 
 export const getApplication = async (id: number): Promise<AirspaceApplication> => {
   const res: any = await api.get(`/airspace/application/${id}`);
-  return res.data;
+  return unwrapAirspacePayload<AirspaceApplication>(res);
 };
 
 export const getApplicationByOrder = async (orderId: number): Promise<AirspaceApplication> => {
   const res: any = await api.get(`/airspace/application/order/${orderId}`);
-  return res.data;
+  return unwrapAirspacePayload<AirspaceApplication>(res);
 };
 
 export const listMyApplications = async (pilotId: number, page = 1, pageSize = 20): Promise<{data: AirspaceApplication[]; total: number}> => {
   const res: any = await api.get('/airspace/applications', {params: {pilot_id: pilotId, page, page_size: pageSize}});
-  return {data: res.data, total: res.total};
+  return unwrapAirspaceListPayload<AirspaceApplication>(res);
 };
 
 export const submitForReview = async (id: number, pilotId: number): Promise<void> => {
@@ -176,44 +212,44 @@ export const submitToUOM = async (id: number): Promise<void> => {
 
 export const listNoFlyZones = async (params?: {zone_type?: string; status?: string; page?: number; page_size?: number}): Promise<{data: NoFlyZone[]; total: number}> => {
   const res: any = await api.get('/airspace/no-fly-zones', {params});
-  return {data: res.data, total: res.total};
+  return unwrapAirspaceListPayload<NoFlyZone>(res);
 };
 
 export const getNoFlyZone = async (id: number): Promise<NoFlyZone> => {
   const res: any = await api.get(`/airspace/no-fly-zone/${id}`);
-  return res.data;
+  return unwrapAirspacePayload<NoFlyZone>(res);
 };
 
 export const findNearbyNoFlyZones = async (latitude: number, longitude: number, radius = 50000): Promise<NoFlyZone[]> => {
   const res: any = await api.get('/airspace/no-fly-zones/nearby', {params: {latitude, longitude, radius}});
-  return res.data;
+  return unwrapAirspacePayload<NoFlyZone[]>(res);
 };
 
 export const checkAirspaceAvailability = async (latitude: number, longitude: number, altitude = 120): Promise<AirspaceCheckResult> => {
   const res: any = await api.get('/airspace/check-availability', {params: {latitude, longitude, altitude}});
-  return res.data;
+  return unwrapAirspacePayload<AirspaceCheckResult>(res);
 };
 
 // ==================== 合规检查 API ====================
 
 export const runComplianceCheck = async (data: RunComplianceCheckRequest): Promise<ComplianceCheck> => {
   const res: any = await api.post('/airspace/compliance/check', data);
-  return res.data;
+  return unwrapAirspacePayload<ComplianceCheck>(res);
 };
 
 export const getComplianceCheck = async (id: number): Promise<ComplianceCheck> => {
   const res: any = await api.get(`/airspace/compliance/check/${id}`);
-  return res.data;
+  return unwrapAirspacePayload<ComplianceCheck>(res);
 };
 
 export const listComplianceChecks = async (params?: {pilot_id?: number; drone_id?: number; page?: number; page_size?: number}): Promise<{data: ComplianceCheck[]; total: number}> => {
   const res: any = await api.get('/airspace/compliance/checks', {params});
-  return {data: res.data, total: res.total};
+  return unwrapAirspaceListPayload<ComplianceCheck>(res);
 };
 
 export const getLatestComplianceCheck = async (pilotId: number, droneId: number): Promise<ComplianceCheck> => {
   const res: any = await api.get('/airspace/compliance/latest', {params: {pilot_id: pilotId, drone_id: droneId}});
-  return res.data;
+  return unwrapAirspacePayload<ComplianceCheck>(res);
 };
 
 export default {

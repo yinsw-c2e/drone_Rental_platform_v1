@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   SafeAreaView,
@@ -42,6 +43,9 @@ const NEXT_STATUS_ACTIONS: Partial<
   active: { status: 'paused', label: '暂停供给' },
   paused: { status: 'active', label: '恢复上架' },
 };
+
+const MY_SERVICE_HELP =
+  '这里用于管理你对外提供的无人机运输服务。你可以先保存为草稿，确认设备、价格和资质都没问题后再上架。';
 
 export default function MyOffersScreen({ navigation }: any) {
   const { theme } = useTheme();
@@ -102,6 +106,10 @@ export default function MyOffersScreen({ navigation }: any) {
     },
     [fetchData],
   );
+
+  const showPageHelp = useCallback(() => {
+    Alert.alert('我的服务', MY_SERVICE_HELP);
+  }, []);
 
   const renderItem = ({ item }: { item: SupplySummary }) => {
     const action = NEXT_STATUS_ACTIONS[item.status];
@@ -205,11 +213,19 @@ export default function MyOffersScreen({ navigation }: any) {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>我的服务</Text>
-              <Text style={styles.heroTitle}>服务与市场入口已经拆开</Text>
-              <Text style={styles.heroDesc}>
-                这里展示自己发布的服务方案。可先建服务草稿，等补充资质达标后再正式上架。
-              </Text>
+              <View style={styles.heroHeader}>
+                <View style={styles.heroTitleWrap}>
+                  <Text style={styles.heroEyebrow}>我的服务</Text>
+                  <Text style={styles.heroTitle}>管理已发布服务</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.helpIcon}
+                  activeOpacity={0.75}
+                  onPress={showPageHelp}
+                >
+                  <Text style={styles.helpIconText}>?</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ObjectCard style={styles.filterCard}>
@@ -248,11 +264,10 @@ export default function MyOffersScreen({ navigation }: any) {
                 icon="🛩️"
                 title={
                   activeGroup === 'all'
-                    ? '还没有发布供给'
-                    : '这个分组下暂无供给'
+                    ? '还没有发布服务'
+                    : '这个分组下暂无服务'
                 }
-                description="机主供给会先以草稿存在，确认设备能力、价格规则和资质后再上架。"
-                actionText="发布供给"
+                actionText="发布服务"
                 onAction={() => navigation.navigate('PublishOffer')}
               />
             </ObjectCard>
@@ -281,6 +296,15 @@ const getStyles = (theme: AppTheme) =>
       borderWidth: theme.isDark ? 1 : 0,
       borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
     },
+    heroHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    heroTitleWrap: {
+      flex: 1,
+    },
     heroEyebrow: {
       fontSize: 12,
       color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
@@ -288,16 +312,25 @@ const getStyles = (theme: AppTheme) =>
     },
     heroTitle: {
       marginTop: 8,
-      fontSize: 28,
-      lineHeight: 34,
+      fontSize: 24,
+      lineHeight: 30,
       color: theme.isDark ? theme.text : '#FFFFFF',
       fontWeight: '800',
     },
-    heroDesc: {
-      marginTop: 10,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
+    helpIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.isDark ? theme.primaryBg : 'rgba(255,255,255,0.18)',
+      borderWidth: 1,
+      borderColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.28)',
+    },
+    helpIconText: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: theme.isDark ? theme.primaryText : '#FFFFFF',
     },
     filterCard: {
       marginBottom: 12,

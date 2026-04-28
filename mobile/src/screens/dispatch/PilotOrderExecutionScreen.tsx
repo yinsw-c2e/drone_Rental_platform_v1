@@ -15,11 +15,14 @@ import {
   devFlightSimulationService,
   DevFlightSimulationState,
 } from '../../services/devFlightSimulation';
+import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import { updateExecutionStatus } from '../../services/orderV2';
 import { useTheme } from '../../theme/ThemeContext';
+import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
 import StatusBadge from '../../components/business/StatusBadge';
 import type { AppTheme } from '../../theme/index';
 import { APP_CONFIG } from '../../constants';
+import {V2OrderAnomaly} from '../../types';
 
 // 执行状态定义
 const EXEC_STEPS = [
@@ -144,6 +147,7 @@ export default function PilotOrderExecutionScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [simulationSubmitting, setSimulationSubmitting] = useState(false);
+  const [anomaly, setAnomaly] = useState<V2OrderAnomaly | null>(null);
 
   const loadSimulation = useCallback(async (orderId?: number | null) => {
     if (!APP_CONFIG.debugMode || !orderId) {
@@ -165,10 +169,25 @@ export default function PilotOrderExecutionScreen({ route, navigation }: any) {
       const nextOrder = detail?.order || detail?.dispatch_task?.order || null;
       setOrder(nextOrder);
       await loadSimulation(nextOrder?.id);
+      if (nextOrder?.id) {
+        try {
+          const anomalyRes = await orderAnomalyV2Service.list({
+            role: 'pilot',
+            order_id: Number(nextOrder.id),
+            page_size: 1,
+          });
+          setAnomaly(anomalyRes.data?.items?.[0] || null);
+        } catch {
+          setAnomaly(null);
+        }
+      } else {
+        setAnomaly(null);
+      }
     } catch (e: any) {
       Alert.alert('错误', e.message || '获取订单失败');
       setOrder(null);
       setSimulation(null);
+      setAnomaly(null);
     } finally {
       setLoading(false);
     }
@@ -384,6 +403,13 @@ export default function PilotOrderExecutionScreen({ route, navigation }: any) {
             </View>
           )}
         </View>
+
+        {anomaly ? (
+          <OrderAnomalyBanner
+            anomaly={anomaly}
+            onPress={() => navigation.navigate('OrderAnomalyList', {roleFilter: 'pilot'})}
+          />
+        ) : null}
 
         <View style={styles.liabilityBox}>
           <Text style={styles.liabilityTitle}>📜 数字化执行责任声明</Text>

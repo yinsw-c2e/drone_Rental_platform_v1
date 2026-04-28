@@ -7,6 +7,7 @@ import (
 	v1admin "wurenji-backend/internal/api/v1/admin"
 	v1analytics "wurenji-backend/internal/api/v1/analytics"
 	v1client "wurenji-backend/internal/api/v1/client"
+	v2anomaly "wurenji-backend/internal/api/v2/anomaly"
 	v2auth "wurenji-backend/internal/api/v2/auth"
 	"wurenji-backend/internal/api/v2/base"
 	v2client "wurenji-backend/internal/api/v2/client"
@@ -34,6 +35,7 @@ type Handlers struct {
 	Auth         *v2auth.Handler
 	Me           *v2me.Handler
 	Home         *v2home.Handler
+	Anomaly      *v2anomaly.Handler
 	Client       *v2client.Handler
 	Supply       *v2supply.Handler
 	Demand       *v2demand.Handler
@@ -53,12 +55,13 @@ type Handlers struct {
 	ClientLegacy *v1client.Handler
 }
 
-func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, serverMode string, adminHandler *v1admin.Handler, analyticsHandler *v1analytics.Handler, clientLegacyHandler *v1client.Handler) *Handlers {
+func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, serverMode string, adminHandler *v1admin.Handler, analyticsHandler *v1analytics.Handler, clientLegacyHandler *v1client.Handler) *Handlers {
 	return &Handlers{
 		Base:         base.NewHandler(),
 		Auth:         v2auth.NewHandler(authService, userService),
 		Me:           v2me.NewHandler(userService),
 		Home:         v2home.NewHandler(homeService),
+		Anomaly:      v2anomaly.NewHandler(orderAnomalyService),
 		Client:       v2client.NewHandler(clientService),
 		Supply:       v2supply.NewHandler(clientService),
 		Demand:       v2demand.NewHandler(clientService),
@@ -101,6 +104,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		authenticated.GET("/me", h.Me.Get)
 		authenticated.GET("/me/reviews", h.Review.ListMine)
 		authenticated.GET("/home/dashboard", h.Home.GetDashboard)
+		authenticated.GET("/order-anomalies", h.Anomaly.List)
+		authenticated.GET("/order-anomalies/summary", h.Anomaly.Summary)
 
 		clientGroup := authenticated.Group("/client")
 		{

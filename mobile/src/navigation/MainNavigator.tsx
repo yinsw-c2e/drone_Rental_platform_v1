@@ -8,6 +8,7 @@ import HomeScreen from '../screens/home/HomeScreen';
 import MarketHubScreen from '../screens/market/MarketHubScreen';
 import OrderListScreen from '../screens/order/OrderListScreen';
 import OrderDetailScreen from '../screens/order/OrderDetailScreen';
+import OrderAnomalyListScreen from '../screens/order/OrderAnomalyListScreen';
 import ConversationListScreen from '../screens/message/ConversationListScreen';
 import ChatScreen from '../screens/message/ChatScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -131,17 +132,7 @@ function MainTabs() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ tabBarLabel: '首页' }}
-      />
-      <Tab.Screen
-        name="Market"
-        component={MarketHubScreen}
-        options={{ tabBarLabel: '服务' }}
-      />
-      <Tab.Screen
-        name="Orders"
-        component={OrderListScreen}
-        options={{ tabBarLabel: '进度' }}
+        options={{ tabBarLabel: '工作台' }}
       />
       <Tab.Screen
         name="Messages"
@@ -211,6 +202,11 @@ export default function MainNavigator() {
         options={{ headerShown: false }}
       />
       <RootStack.Screen
+        name="OrderAnomalyList"
+        component={OrderAnomalyListScreen}
+        options={{ title: '异常订单' }}
+      />
+      <RootStack.Screen
         name="Payment"
         component={PaymentScreen}
         options={{ title: '收银台' }}
@@ -239,6 +235,16 @@ export default function MainNavigator() {
         name="QuickOrderEntry"
         component={QuickOrderEntryScreen}
         options={{ title: '填写核心需求' }}
+      />
+      <RootStack.Screen
+        name="ServiceHub"
+        component={MarketHubScreen}
+        options={{ title: '服务大厅' }}
+      />
+      <RootStack.Screen
+        name="ProgressCenter"
+        component={OrderListScreen}
+        options={{ title: '订单进度' }}
       />
       <RootStack.Screen
         name="OfferList"

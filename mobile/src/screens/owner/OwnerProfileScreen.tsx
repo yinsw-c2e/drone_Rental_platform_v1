@@ -8,7 +8,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
@@ -20,7 +19,6 @@ import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {RootState} from '../../store/store';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
-import {getResponsiveTwoColumnLayout} from '../../utils/responsiveGrid';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -29,7 +27,6 @@ const formatAmount = (value?: number | null) => `¥${(((value || 0) as number) /
 export default function OwnerProfileScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {width: viewportWidth} = useWindowDimensions();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
@@ -117,26 +114,6 @@ export default function OwnerProfileScreen({navigation}: any) {
       },
     ],
     [effectiveRoleSummary.can_publish_supply, effectiveRoleSummary.can_self_execute],
-  );
-  const summaryLayout = useMemo(
-    () =>
-      getResponsiveTwoColumnLayout({
-        viewportWidth,
-        totalHorizontalPadding: 68,
-        gap: 10,
-        minItemWidth: 118,
-      }),
-    [viewportWidth],
-  );
-  const quickCardLayout = useMemo(
-    () =>
-      getResponsiveTwoColumnLayout({
-        viewportWidth,
-        totalHorizontalPadding: 68,
-        gap: 12,
-        minItemWidth: 118,
-      }),
-    [viewportWidth],
   );
   const workbenchPreviewItems = useMemo(
     () => [
@@ -232,7 +209,7 @@ export default function OwnerProfileScreen({navigation}: any) {
           </View>
 
           <View style={styles.workbenchSummaryGrid}>
-            <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('Market')}>
+            <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('ServiceHub')}>
               <Text style={[styles.wbSummaryValue, {color: theme.primaryText}]}>{workbench?.summary?.recommended_demand_count || 0}</Text>
               <Text style={styles.wbSummaryLabel}>新机会</Text>
             </TouchableOpacity>

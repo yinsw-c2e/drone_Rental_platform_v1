@@ -145,7 +145,7 @@ export default function MarketHubScreen({navigation}: any) {
             {(item.cargo_scenes || []).map(s => getSupplySceneLabel(s)).join('/')}
           </Text>
         </View>
-        <View style={styles.cardFooter}>
+        <View style={styles.serviceFooter}>
           <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
           <TouchableOpacity activeOpacity={0.7} style={[styles.orderBtn, {backgroundColor: theme.primary}]} onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
             <Text style={styles.orderBtnText}>去下单</Text>
@@ -185,23 +185,16 @@ export default function MarketHubScreen({navigation}: any) {
       <View style={styles.header}>
         {isClientFocused ? (
           <View style={styles.entryCard}>
-            <Text style={styles.entryEyebrow}>客户开始方式</Text>
-            <Text style={styles.entryTitle}>先决定是快速下单，还是发布任务</Text>
-            <Text style={styles.entryDesc}>
-              标准化场景先看可直接下单的服务；复杂、非标或需要比价的场景再发布任务。
-            </Text>
             <View style={styles.entryActionRow}>
               <TouchableOpacity
                 style={[styles.entryActionBtn, styles.entryPrimaryBtn]}
                 onPress={handleQuickOrderPress}>
                 <Text style={styles.entryPrimaryTitle}>快速下单</Text>
-                <Text style={styles.entryPrimaryDesc}>先找可下单服务</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.entryActionBtn, styles.entrySecondaryBtn]}
                 onPress={handlePublishTaskPress}>
                 <Text style={styles.entrySecondaryTitle}>发布任务</Text>
-                <Text style={styles.entrySecondaryDesc}>复杂需求更合适</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -230,30 +223,6 @@ export default function MarketHubScreen({navigation}: any) {
         renderItem={activeTab === 'demand' ? renderDemandItem : renderSupplyItem}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />}
-        ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <View style={styles.hero}>
-              <Text style={styles.heroTitle}>
-                {isClientFocused
-                  ? activeTab === 'demand'
-                    ? '先发任务，后续再慢慢比方案'
-                    : '先看可直接下单的服务'
-                  : activeTab === 'demand'
-                    ? '发现新需求'
-                    : '挑选重载服务'}
-              </Text>
-              <Text style={styles.heroDesc}>
-                {isClientFocused
-                  ? activeTab === 'demand'
-                    ? '适合路线复杂、信息还没补全或想比较多个方案的场景。先发起任务，后面再补细节。'
-                    : '这里优先展示支持直达下单的服务。标准化场景可以直接看服务详情并继续下单。'
-                  : activeTab === 'demand'
-                    ? '机主和飞手可在此寻找作业机会，公开需求报价不等于成交。'
-                    : '客户可在此挑选合规供给，支持从详情页发起直达下单。'}
-              </Text>
-            </View>
-          </View>
-        }
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator style={styles.loading} color={theme.primary} />
@@ -267,13 +236,6 @@ export default function MarketHubScreen({navigation}: any) {
                     : '当前还没有可快速下单的服务'
                   : `暂无公开${activeTab === 'demand' ? '需求' : '服务'}`
               }
-              description={
-                isClientFocused
-                  ? activeTab === 'demand'
-                    ? '可以先去发布任务，等机主来报价。'
-                    : '如果暂时没有匹配服务，可以直接发布任务，让平台反向撮合。'
-                  : '市场内容正在更新中，请稍后再试。'
-              }
             />
           )
         }
@@ -281,18 +243,13 @@ export default function MarketHubScreen({navigation}: any) {
 
       <View style={styles.footer}>
         {isClientFocused ? (
-          <View style={styles.clientFooterRow}>
-            <TouchableOpacity
-              style={[styles.clientFooterBtn, styles.clientFooterGhostBtn]}
-              onPress={handleQuickOrderPress}>
-              <Text style={styles.clientFooterGhostText}>快速下单</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.clientFooterBtn, styles.mainBtn]}
-              onPress={handlePublishTaskPress}>
-              <Text style={styles.mainBtnText}>发布任务</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.mainBtn}
+            onPress={activeTab === 'supply' ? handlePublishTaskPress : handleQuickOrderPress}>
+            <Text style={styles.mainBtnText}>
+              {activeTab === 'supply' ? '没看到合适服务？发布任务' : '想直接成交？去快速下单'}
+            </Text>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.mainBtn} onPress={mainAction.onPress}>
             <Text style={styles.mainBtnText}>{mainAction.label}</Text>
@@ -314,32 +271,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   entryCard: {
     borderRadius: 18,
-    padding: 16,
+    padding: 10,
     marginBottom: 12,
     backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primaryBg,
     borderWidth: 1,
     borderColor: theme.isDark ? 'rgba(0,212,255,0.16)' : theme.primaryBorder,
   },
-  entryEyebrow: {
-    fontSize: 12,
-    color: theme.primary,
-    fontWeight: '700',
-  },
-  entryTitle: {
-    marginTop: 8,
-    fontSize: 20,
-    lineHeight: 26,
-    color: theme.text,
-    fontWeight: '800',
-  },
-  entryDesc: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 20,
-    color: theme.textSub,
-  },
   entryActionRow: {
-    marginTop: 14,
     flexDirection: 'row',
     gap: 10,
   },
@@ -361,23 +299,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '800',
-  },
-  entryPrimaryDesc: {
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 18,
-    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'center',
   },
   entrySecondaryTitle: {
     fontSize: 15,
     color: theme.text,
     fontWeight: '800',
-  },
-  entrySecondaryDesc: {
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 18,
-    color: theme.textSub,
+    textAlign: 'center',
   },
   tabBar: {
     flexDirection: 'row',
@@ -411,25 +339,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 100,
-  },
-  listHeader: {
-    marginBottom: 16,
-  },
-  hero: {
-    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-    borderRadius: 20,
-    padding: 18,
-  },
-  heroTitle: {
-    fontSize: 20,
-    color: theme.isDark ? theme.text : '#FFFFFF',
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  heroDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
   },
   demandCard: {
     marginBottom: 14,
@@ -484,6 +393,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 18,
     color: theme.danger,
     fontWeight: '800',
+    flexShrink: 1,
   },
   title: {
     fontSize: 16,
@@ -519,6 +429,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 14,
   },
+  serviceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 14,
+  },
   timeText: {
     fontSize: 12,
     fontWeight: '500',
@@ -527,6 +444,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 14,
+    marginLeft: 12,
   },
   orderBtnText: {
     color: '#FFF',
@@ -545,26 +463,6 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderTopWidth: 1,
     borderTopColor: theme.divider,
-  },
-  clientFooterRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  clientFooterBtn: {
-    flex: 1,
-  },
-  clientFooterGhostBtn: {
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-  },
-  clientFooterGhostText: {
-    fontSize: 15,
-    color: theme.text,
-    fontWeight: '800',
   },
   mainBtn: {
     backgroundColor: theme.primary,

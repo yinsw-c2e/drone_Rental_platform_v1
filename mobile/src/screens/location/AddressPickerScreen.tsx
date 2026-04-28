@@ -3,6 +3,8 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, FlatList, ActivityIndicator, Alert,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
+import addressHistoryService from '../../services/addressHistory';
 import {locationService} from '../../services/location';
 import {AddressData} from '../../types';
 import {getCurrentPosition} from '../../utils/LocationService';
@@ -15,7 +17,9 @@ export default function AddressPickerScreen({navigation, route}: any) {
   const onSelect: ((addr: AddressData) => void) | undefined = route.params?.onSelect;
 
   const [savedAddresses, setSavedAddresses] = useState<AddressData[]>([]);
+  const [recentAddresses, setRecentAddresses] = useState<AddressData[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
+  const [loadingRecent, setLoadingRecent] = useState(true);
   const [locating, setLocating] = useState(false);
   const [currentCity, setCurrentCity] = useState('');
 
@@ -24,6 +28,27 @@ export default function AddressPickerScreen({navigation, route}: any) {
     // 后台获取当前城市，用于搜索时限定范围
     detectCurrentCity();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoadingRecent(true);
+      addressHistoryService.loadAddressHistory()
+        .then(items => {
+          if (!cancelled) {
+            setRecentAddresses(items);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoadingRecent(false);
+          }
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   const detectCurrentCity = async () => {
     try {
@@ -49,14 +74,18 @@ export default function AddressPickerScreen({navigation, route}: any) {
     }
   };
 
-  const notifyAddressSelected = useCallback((addr: AddressData) => {
+  const notifyAddressSelected = useCallback(async (addr: AddressData) => {
+    const nextHistory = await addressHistoryService.addAddressHistory(addr).catch(() => null);
+    if (nextHistory) {
+      setRecentAddresses(nextHistory);
+    }
     if (onSelect) {
       onSelect(addr);
     }
   }, [onSelect]);
 
   const handleSelectAddress = useCallback((addr: AddressData) => {
-    notifyAddressSelected(addr);
+    notifyAddressSelected(addr).catch(() => null);
     navigation.goBack();
   }, [navigation, notifyAddressSelected]);
 
@@ -116,6 +145,11 @@ export default function AddressPickerScreen({navigation, route}: any) {
     ]);
   };
 
+  const handleClearHistory = useCallback(async () => {
+    await addressHistoryService.clearAddressHistory().catch(() => null);
+    setRecentAddresses([]);
+  }, []);
+
   const renderSavedItem = ({item}: {item: AddressData}) => (
     <TouchableOpacity
       style={styles.addressItem}
@@ -148,6 +182,25 @@ export default function AddressPickerScreen({navigation, route}: any) {
     </TouchableOpacity>
   );
 
+  const renderHistoryItem = ({item}: {item: AddressData}) => (
+    <TouchableOpacity
+      style={styles.addressItem}
+      onPress={() => handleSelectAddress(item)}
+      activeOpacity={0.6}>
+      <View style={styles.addressInfo}>
+        <View style={styles.addressNameRow}>
+          <Text style={styles.addressName} numberOfLines={1}>
+            {item.name || item.address}
+          </Text>
+          <View style={styles.historyBadge}>
+            <Text style={styles.historyBadgeText}>最近</Text>
+          </View>
+        </View>
+        <Text style={styles.addressDetail} numberOfLines={1}>{item.address}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       {/* 操作入口区 */}
@@ -161,19 +214,47 @@ export default function AddressPickerScreen({navigation, route}: any) {
         {/* 当前位置 */}
         <TouchableOpacity style={styles.actionItem} onPress={handleCurrentLocation} activeOpacity={0.7}>
           <View style={[styles.actionIcon, {backgroundColor: theme.primaryBg}]}>
-            <Text style={{fontSize: 18, color: theme.primaryText}}>&#9678;</Text>
+            <Text style={styles.actionIconTextPrimary}>&#9678;</Text>
           </View>
           <Text style={styles.actionText}>使用当前位置</Text>
-          {locating && <ActivityIndicator size="small" color={theme.primary} style={{marginLeft: 8}} />}
+          {locating && <ActivityIndicator size="small" color={theme.primary} style={styles.locatingIndicator} />}
         </TouchableOpacity>
 
         {/* 地图选点 */}
         <TouchableOpacity style={styles.actionItem} onPress={handleMapPicker} activeOpacity={0.7}>
           <View style={[styles.actionIcon, {backgroundColor: theme.warning + '22'}]}>
-            <Text style={{fontSize: 18}}>&#128205;</Text>
+            <Text style={styles.actionIconText}>📍</Text>
           </View>
           <Text style={styles.actionText}>地图选点</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* 最近搜索区 */}
+      <View style={styles.savedSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>最近搜索</Text>
+          {recentAddresses.length > 0 ? (
+            <TouchableOpacity onPress={() => { handleClearHistory().catch(() => null); }}>
+              <Text style={styles.sectionActionText}>清空</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {loadingRecent ? (
+          <ActivityIndicator size="small" color={theme.primary} style={styles.historyLoadingIndicator} />
+        ) : recentAddresses.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>暂无最近搜索</Text>
+            <Text style={styles.emptyHint}>搜索并选择过地址后，这里会自动出现历史记录</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={recentAddresses}
+            keyExtractor={(_, index) => `recent-${index}`}
+            renderItem={renderHistoryItem}
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
       </View>
 
       {/* 常用地址区 */}
@@ -183,7 +264,7 @@ export default function AddressPickerScreen({navigation, route}: any) {
         </View>
 
         {loadingSaved ? (
-          <ActivityIndicator size="small" color={theme.primary} style={{paddingVertical: 30}} />
+          <ActivityIndicator size="small" color={theme.primary} style={styles.savedLoadingIndicator} />
         ) : savedAddresses.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>暂无常用地址</Text>
@@ -222,13 +303,22 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
+  actionIconTextPrimary: {fontSize: 18, color: theme.primaryText},
+  actionIconText: {fontSize: 18},
   actionText: {fontSize: 15, color: theme.text, fontWeight: '500'},
+  locatingIndicator: {marginLeft: 8},
   savedSection: {flex: 1, backgroundColor: theme.card},
   sectionHeader: {
     paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider,
   },
   sectionTitle: {fontSize: 14, color: theme.textSub, fontWeight: '500'},
+  sectionActionText: {fontSize: 13, color: theme.primaryText, fontWeight: '500'},
+  historyLoadingIndicator: {paddingVertical: 24},
+  savedLoadingIndicator: {paddingVertical: 30},
   addressItem: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 14,
@@ -247,6 +337,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.divider, borderRadius: 3,
   },
   labelText: {fontSize: 11, color: theme.textSub},
+  historyBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    backgroundColor: theme.primaryBg,
+    borderRadius: 3,
+  },
+  historyBadgeText: {fontSize: 11, color: theme.primaryText},
   addressDetail: {fontSize: 13, color: theme.textSub, marginTop: 3},
   deleteBtn: {paddingLeft: 12},
   deleteBtnText: {fontSize: 14, color: theme.textHint},

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -657,8 +658,8 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"payment_ready":          order.PaidAt != nil || order.Status == "accepted" || order.Status == "pending_payment",
 		"provider_confirmed_at":  order.ProviderConfirmedAt,
 		"provider_rejected_at":   order.ProviderRejectedAt,
-		"provider_reject_reason": order.ProviderRejectReason,
-		"cancel_reason":          order.CancelReason,
+		"provider_reject_reason": sanitizeOrderReason(order.ProviderRejectReason),
+		"cancel_reason":          sanitizeOrderReason(order.CancelReason),
 		"cancel_by":              order.CancelBy,
 		"client":                 buildUserSummary(order.Renter, fallbackPositive(order.ClientUserID, order.RenterID), "client"),
 		"provider":               buildUserSummary(order.Owner, fallbackPositive(order.ProviderUserID, order.OwnerID), "owner"),
@@ -682,6 +683,20 @@ func buildOrderContractSummary(c *model.OrderContract) gin.H {
 		"client_signed_at":   c.ClientSignedAt,
 		"provider_signed_at": c.ProviderSignedAt,
 		"payment_ready":      c.Status == "fully_signed",
+	}
+}
+
+func sanitizeOrderReason(reason string) string {
+	normalized := strings.ToLower(strings.TrimSpace(reason))
+	switch normalized {
+	case "":
+		return ""
+	case "duplicate direct order cleanup":
+		return "系统已自动取消重复下单的订单"
+	case "phase10 prepare reset", "codex verification cleanup":
+		return "系统已清理测试订单"
+	default:
+		return strings.TrimSpace(reason)
 	}
 }
 
@@ -721,9 +736,16 @@ func buildUserSummary(user *model.User, fallbackID int64, role string) gin.H {
 		result["user_id"] = user.ID
 		result["nickname"] = user.Nickname
 		result["avatar_url"] = user.AvatarURL
-		result["phone"] = user.Phone
+		result["phone"] = maskOrderPartyPhone(user.Phone)
 	}
 	return result
+}
+
+func maskOrderPartyPhone(phone string) string {
+	if len(strings.TrimSpace(phone)) < 7 {
+		return phone
+	}
+	return phone[:3] + "****" + phone[len(phone)-4:]
 }
 
 func buildExecutorSummary(order *model.Order, task *model.FormalDispatchTask) gin.H {
@@ -910,7 +932,7 @@ func buildFinancialSummary(order *model.Order, payments []model.Payment, refunds
 		"paid_count":             paidCount,
 		"refunded_amount":        refundedAmount,
 		"refund_count":           refundCount,
-		"provider_reject_reason": order.ProviderRejectReason,
+		"provider_reject_reason": sanitizeOrderReason(order.ProviderRejectReason),
 	}
 }
 
@@ -1328,14 +1350,14 @@ func (h *Handler) GetContract(c *gin.Context) {
 		return
 	}
 
-	// 权限检查
-	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, ""); err != nil {
-		v2common.HandleServiceError(c, err)
+	if h.contractService == nil {
+		response.V2Error(c, 500, "INTERNAL_ERROR", "合同服务未初始化")
 		return
 	}
 
-	if h.contractService == nil {
-		response.V2Error(c, 500, "INTERNAL_ERROR", "合同服务未初始化")
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
 		return
 	}
 
@@ -1345,7 +1367,7 @@ func (h *Handler) GetContract(c *gin.Context) {
 		return
 	}
 
-	response.V2Success(c, buildContractResponse(contract))
+	response.V2Success(c, buildContractResponse(contract, order))
 }
 
 // SignContract 签署订单合同
@@ -1361,7 +1383,8 @@ func (h *Handler) SignContract(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, ""); err != nil {
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
 		v2common.HandleServiceError(c, err)
 		return
 	}
@@ -1377,7 +1400,7 @@ func (h *Handler) SignContract(c *gin.Context) {
 		return
 	}
 
-	response.V2Success(c, buildContractResponse(contract))
+	response.V2Success(c, buildContractResponse(contract, order))
 }
 
 // GetContractPDFDownloadInfo 获取合同 PDF 下载链接
@@ -1477,10 +1500,11 @@ func (h *Handler) DownloadContractPDF(c *gin.Context) {
 	c.Data(200, "application/pdf", pdfBytes)
 }
 
-func buildContractResponse(c *model.OrderContract) gin.H {
+func buildContractResponse(c *model.OrderContract, order *model.Order) gin.H {
 	if c == nil {
 		return nil
 	}
+	canSign, signBlockReason := contractSignAvailability(order)
 	return gin.H{
 		"id":                  c.ID,
 		"contract_no":         c.ContractNo,
@@ -1496,8 +1520,41 @@ func buildContractResponse(c *model.OrderContract) gin.H {
 		"client_signed_at":    c.ClientSignedAt,
 		"provider_signed_at":  c.ProviderSignedAt,
 		"contract_html":       c.ContractHTML,
+		"order_status":        contractOrderStatus(order),
+		"can_sign":            canSign,
+		"sign_block_reason":   signBlockReason,
 		"created_at":          c.CreatedAt,
 		"updated_at":          c.UpdatedAt,
+	}
+}
+
+func contractOrderStatus(order *model.Order) string {
+	if order == nil {
+		return ""
+	}
+	return order.Status
+}
+
+func contractSignAvailability(order *model.Order) (bool, string) {
+	if order == nil {
+		return false, "订单不存在"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(order.Status)) {
+	case "pending_payment", "accepted":
+		return true, ""
+	case "pending_provider_confirmation":
+		return false, "机主尚未确认承接，暂时不能签署合同"
+	case "cancelled":
+		return false, "订单已取消，不能继续签署合同"
+	case "completed":
+		return false, "订单已完成，不能继续签署合同"
+	case "refunded":
+		return false, "订单已退款，不能继续签署合同"
+	case "provider_rejected":
+		return false, "机主已拒绝订单，不能继续签署合同"
+	default:
+		return false, "当前订单状态暂不支持签署合同"
 	}
 }
 

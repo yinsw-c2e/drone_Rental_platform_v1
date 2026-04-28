@@ -176,8 +176,10 @@ func (s *AirspaceService) FindNearbyNoFlyZones(lat, lng float64, radiusMeters fl
 // CheckAirspaceAvailability 检查指定位置空域可用性
 func (s *AirspaceService) CheckAirspaceAvailability(lat, lng float64, altitude int) (*AirspaceCheckResult, error) {
 	result := &AirspaceCheckResult{
-		Available:    true,
-		Restrictions: []NoFlyZoneInfo{},
+		Available:      true,
+		Status:         "clear",
+		AllowsContinue: true,
+		Restrictions:   []NoFlyZoneInfo{},
 	}
 
 	zones, err := s.airspaceRepo.CheckNoFlyZoneConflict(lat, lng, altitude)
@@ -196,6 +198,13 @@ func (s *AirspaceService) CheckAirspaceAvailability(lat, lng float64, altitude i
 		result.Restrictions = append(result.Restrictions, info)
 		if z.RestrictionLevel == "no_fly" {
 			result.Available = false
+			result.Status = "blocked"
+			result.AllowsContinue = false
+			result.RecommendedAction = "当前位置命中禁飞区域，请更换地址后再继续下单或发布任务。"
+			result.BlockedReason = "命中禁飞区"
+		} else if result.Status != "blocked" {
+			result.Status = "warning"
+			result.RecommendedAction = "当前位置存在限飞或注意区域，建议提前确认报备与飞行限制要求。"
 		}
 	}
 
@@ -203,8 +212,12 @@ func (s *AirspaceService) CheckAirspaceAvailability(lat, lng float64, altitude i
 }
 
 type AirspaceCheckResult struct {
-	Available    bool            `json:"available"`
-	Restrictions []NoFlyZoneInfo `json:"restrictions"`
+	Available         bool            `json:"available"`
+	Status            string          `json:"status"`
+	AllowsContinue    bool            `json:"allows_continue"`
+	Restrictions      []NoFlyZoneInfo `json:"restrictions"`
+	RecommendedAction string          `json:"recommended_action,omitempty"`
+	BlockedReason     string          `json:"blocked_reason,omitempty"`
 }
 
 type NoFlyZoneInfo struct {

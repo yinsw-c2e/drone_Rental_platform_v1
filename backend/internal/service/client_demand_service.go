@@ -79,6 +79,9 @@ func (s *ClientService) CreateDemand(userID int64, input *ClientDemandInput) (*m
 	if err != nil {
 		return nil, err
 	}
+	if err := s.validateDemandAirspace(demand); err != nil {
+		return nil, err
+	}
 
 	if err := s.demandDomainRepo.CreateDemand(demand); err != nil {
 		return nil, err
@@ -101,6 +104,9 @@ func (s *ClientService) UpdateDemand(userID, demandID int64, input *ClientDemand
 	}
 
 	if err := applyDemandInput(demand, input); err != nil {
+		return nil, err
+	}
+	if err := s.validateDemandAirspace(demand); err != nil {
 		return nil, err
 	}
 	if err := s.demandDomainRepo.UpdateDemand(demand); err != nil {
@@ -127,6 +133,9 @@ func (s *ClientService) PublishDemand(userID, demandID int64) (*model.Demand, er
 		return nil, errors.New("仅草稿需求允许发布")
 	}
 	if err := validateDemandForPublish(demand); err != nil {
+		return nil, err
+	}
+	if err := s.validateDemandAirspace(demand); err != nil {
 		return nil, err
 	}
 
@@ -389,6 +398,9 @@ func (s *ClientService) SelectProvider(userID, demandID, quoteID int64) (*Select
 		if quote.PriceAmount <= 0 {
 			return errors.New("报价金额无效")
 		}
+		if err := s.validateDemandAirspace(demand); err != nil {
+			return err
+		}
 
 		now := time.Now()
 		demand.Status = "selected"
@@ -481,6 +493,9 @@ func (s *ClientService) CreateDirectSupplyOrder(userID, supplyID int64, input *D
 
 	client, err := s.ensureDefaultClient(userID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.validateDirectOrderAirspace(input); err != nil {
 		return nil, err
 	}
 
@@ -696,6 +711,69 @@ func normalizeDemandServiceType(value string) string {
 		return defaultDemandServiceType
 	}
 	return normalized
+}
+
+func (s *ClientService) validateDemandAirspace(demand *model.Demand) error {
+	if s.airspaceService == nil || demand == nil {
+		return nil
+	}
+
+	if err := s.validateAddressAirspace("服务地址", parseAddressSnapshot(demand.ServiceAddressSnapshot)); err != nil {
+		return err
+	}
+	if err := s.validateAddressAirspace("起点地址", parseAddressSnapshot(demand.DepartureAddressSnapshot)); err != nil {
+		return err
+	}
+	if err := s.validateAddressAirspace("终点地址", parseAddressSnapshot(demand.DestinationAddressSnapshot)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ClientService) validateDirectOrderAirspace(input *DirectOrderInput) error {
+	if s.airspaceService == nil || input == nil {
+		return nil
+	}
+	if input.ServiceAddress != nil {
+		if err := s.validateAddressAirspace("服务地址", parseAddressSnapshot(buildAddressSnapshot(input.ServiceAddress))); err != nil {
+			return err
+		}
+	}
+	if input.DepartureAddress != nil {
+		if err := s.validateAddressAirspace("起点地址", parseAddressSnapshot(buildAddressSnapshot(input.DepartureAddress))); err != nil {
+			return err
+		}
+	}
+	if input.DestinationAddress != nil {
+		if err := s.validateAddressAirspace("终点地址", parseAddressSnapshot(buildAddressSnapshot(input.DestinationAddress))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *ClientService) validateAddressAirspace(label string, snapshot addressSnapshotPayload) error {
+	if s.airspaceService == nil {
+		return nil
+	}
+	addressText := strings.TrimSpace(snapshot.Text)
+	if snapshot.Latitude == nil || snapshot.Longitude == nil {
+		if addressText == "" {
+			return nil
+		}
+		return errors.New(label + "缺少有效坐标，当前无法核验禁飞区，请通过地图选点或地址搜索重新选择地址后再继续：" + addressText)
+	}
+	result, err := s.airspaceService.CheckAirspaceAvailability(*snapshot.Latitude, *snapshot.Longitude, 120)
+	if err != nil {
+		return err
+	}
+	if result == nil || result.AllowsContinue {
+		return nil
+	}
+	if addressText == "" {
+		addressText = label
+	}
+	return errors.New(label + "命中禁飞区，当前无法创建订单或发布任务，请更换地址后重试：" + addressText)
 }
 
 func normalizeCargoScene(value string) string {

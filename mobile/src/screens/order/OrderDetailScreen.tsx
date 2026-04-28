@@ -14,17 +14,21 @@ import {useFocusEffect} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 
 import ObjectCard from '../../components/business/ObjectCard';
+import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
 import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
+import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import {confirmReceipt, orderV2Service} from '../../services/orderV2';
 import {RootState} from '../../store/store';
 import {
   OrderPartySummary,
+  V2OrderAnomaly,
   V2OrderDetail,
   V2OrderTimelineEvent,
   V2OrderTimelineItem,
 } from '../../types';
+import {formatOrderCancelReason} from '../../utils/orderPresentation';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -496,8 +500,10 @@ const getCancelByLabel = (value?: string) => {
       return '机主';
     case 'pilot':
       return '飞手';
+    case 'system':
+      return '系统';
     default:
-      return value || '-';
+      return value ? '系统' : '-';
   }
 };
 
@@ -714,6 +720,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
   const orderId = Number(route?.params?.orderId || route?.params?.id || 0);
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
+  const [anomaly, setAnomaly] = useState<V2OrderAnomaly | null>(null);
   const [timelineItems, setTimelineItems] = useState<V2OrderTimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -733,6 +740,8 @@ export default function OrderDetailScreen({route, navigation}: any) {
       ]);
       const nextDetail = detailRes.data || null;
       setDetail(nextDetail);
+      const anomalyRes = await orderAnomalyV2Service.list({order_id: orderId, page: 1, page_size: 20});
+      setAnomaly((anomalyRes.data?.items || [])[0] || null);
       setTimelineItems(
         timelineRes?.data?.items?.length
           ? timelineRes.data.items
@@ -741,6 +750,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
     } catch (error) {
       console.error('获取订单详情失败:', error);
       setDetail(null);
+      setAnomaly(null);
       setTimelineItems([]);
     } finally {
       setLoading(false);
@@ -1131,6 +1141,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
         </View>
 
         {progressFocus ? <ProgressFocusCard focus={progressFocus} /> : null}
+        {anomaly ? <OrderAnomalyBanner anomaly={anomaly} onPress={() => navigation.navigate('OrderAnomalyList')} /> : null}
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>任务信息</Text>
@@ -1197,7 +1208,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <ObjectCard style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>取消与退款</Text>
             <DetailRow label="取消发起方" value={getCancelByLabel(detail.cancel_by)} />
-            <DetailRow label="取消原因" value={detail.cancel_reason || '未填写'} />
+            <DetailRow label="取消原因" value={formatOrderCancelReason(detail.cancel_reason)} />
             <DetailRow label="退款状态" value={(detail.refunds?.length || 0) > 0 ? '已生成退款记录' : '未产生退款'} />
             <DetailRow label="预计到账" value={(detail.refunds?.length || 0) > 0 ? '预计 1-3 个工作日原路退回' : '无需退款'} />
           </ObjectCard>

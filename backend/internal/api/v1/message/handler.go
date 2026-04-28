@@ -1,6 +1,7 @@
 package message
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,11 @@ func (h *Handler) Send(c *gin.Context) {
 	}
 	msg, err := h.messageService.SendMessage(userID, req.ReceiverID, req.MessageType, req.Content, req.ExtraData)
 	if err != nil {
+		var sensitiveErr *service.SensitiveContentViolation
+		if errors.As(err, &sensitiveErr) {
+			response.BadRequest(c, sensitiveErr.Error())
+			return
+		}
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}

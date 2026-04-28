@@ -23,6 +23,7 @@ import {RootState} from '../../store/store';
 import {OrderPartySummary, V2OrderDetail, V2ReviewSummary} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {formatOrderStatusLabel} from '../../utils/orderPresentation';
 
 type ReviewTarget = {
   userId: number;
@@ -200,7 +201,7 @@ export default function ReviewScreen({route, navigation: _navigation}: any) {
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>订单摘要</Text>
           <View style={styles.row}><Text style={styles.rowLabel}>订单标题</Text><Text style={styles.rowValue}>{detail.title}</Text></View>
-          <View style={styles.row}><Text style={styles.rowLabel}>当前状态</Text><Text style={styles.rowValue}>{detail.status}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>当前状态</Text><Text style={styles.rowValue}>{formatOrderStatusLabel(detail.status)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>客户</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.client, '客户')}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>承接方</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.provider, '承接方')}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>执行飞手</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.executor, '执行飞手')}</Text></View>
