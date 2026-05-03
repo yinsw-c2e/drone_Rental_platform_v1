@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ const SEVERITY_MAP: Record<string, {label: string; colorKey: 'danger' | 'warning
   info: {label: '提示', colorKey: 'info'},
 };
 
-export default function ComplianceCheckScreen({navigation, route}: any) {
+export default function ComplianceCheckScreen({_navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const {pilotId, droneId, orderId, applicationId, checkId} = route?.params || {};
@@ -47,11 +47,7 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       if (checkId) {
         const data = await getComplianceCheck(checkId);
@@ -69,7 +65,11 @@ export default function ComplianceCheckScreen({navigation, route}: any) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkId, droneId, pilotId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleRunCheck = async () => {
     if (!pilotId || !droneId) {

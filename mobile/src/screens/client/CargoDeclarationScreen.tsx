@@ -50,7 +50,7 @@ const COMPLIANCE_MAP: Record<string, {label: string; colorKey: 'warning' | 'succ
   rejected: {label: '已拒绝', colorKey: 'danger'},
 };
 
-export default function CargoDeclarationScreen({navigation}: any) {
+export default function CargoDeclarationScreen({_navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const [declarations, setDeclarations] = useState<CargoDeclaration[]>([]);

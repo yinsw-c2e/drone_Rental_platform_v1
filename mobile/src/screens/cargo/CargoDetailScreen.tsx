@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   SafeAreaView, ActivityIndicator, Alert,
@@ -18,20 +18,20 @@ export default function CargoDetailScreen({route, navigation}: any) {
   const [loading, setLoading] = useState(true);
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
-  useEffect(() => {
-    fetchCargo();
-  }, [id]);
-
-  const fetchCargo = async () => {
+  const fetchCargo = useCallback(async () => {
     try {
       const res = await demandService.getCargo(id);
       setCargo(res.data);
-    } catch (e) {
+    } catch {
       Alert.alert('错误', '获取货运需求详情失败');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchCargo();
+  }, [fetchCargo]);
 
   const getCargoTypeLabel = (type: string) => {
     const typeMap: Record<string, string> = {

@@ -242,7 +242,7 @@ export default function OrderListScreen({navigation, route}: any) {
 
       const anomalyRole = activeRole === 'all' ? undefined : activeRole;
       const anomalyRes = await orderAnomalyV2Service.list({
-        role: anomalyRole === 'all' ? undefined : anomalyRole,
+        role: anomalyRole,
         page: 1,
         page_size: 100,
       });

@@ -16,7 +16,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22.11.0'
         cache: 'npm'
         cache-dependency-path: mobile/package-lock.json
     
@@ -31,10 +31,13 @@ jobs:
     
     - name: Create .env file with production config
       working-directory: mobile
+      env:
+        MOBILE_API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL || 'https://api.wurenji.com/api' }}
+        MOBILE_WS_BASE_URL: ${{ vars.MOBILE_WS_BASE_URL || 'wss://api.wurenji.com/ws' }}
       run: |
         cat > .env << EOF
-        API_BASE_URL=https://dronerentalplat.cpolar.top/api/v2
-        WS_BASE_URL=wss://dronerentalplat.cpolar.top/ws
+        API_BASE_URL=${MOBILE_API_BASE_URL}
+        WS_BASE_URL=${MOBILE_WS_BASE_URL}
         API_TIMEOUT=15000
         APP_ENV=production
         DEBUG_MODE=false
@@ -55,19 +58,19 @@ jobs:
     - name: Build Android APK with bundled JS
       working-directory: mobile
       env:
-        API_BASE_URL: https://dronerentalplat.cpolar.top/api/v2
-        WS_BASE_URL: wss://dronerentalplat.cpolar.top/ws
+        API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL || 'https://api.wurenji.com/api' }}
+        WS_BASE_URL: ${{ vars.MOBILE_WS_BASE_URL || 'wss://api.wurenji.com/ws' }}
         API_TIMEOUT: 15000
         APP_ENV: production
         DEBUG_MODE: false
       run: |
         npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res
         cd android
-        ./gradlew assembleDebug --no-daemon
+        ./gradlew assembleRelease --no-daemon
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: app-release
-        path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+        path: mobile/android/app/build/outputs/apk/release/app-release.apk
         retention-days: 30

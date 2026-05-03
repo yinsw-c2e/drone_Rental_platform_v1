@@ -79,7 +79,7 @@ const ViolationListScreen: React.FC = () => {
       setShowDetail(false);
       setAppealContent('');
       loadData();
-    } catch (error) {
+    } catch {
       Alert.alert('错误', '提交申诉失败，请重试');
     } finally {
       setSubmitting(false);

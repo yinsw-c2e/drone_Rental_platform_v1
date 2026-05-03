@@ -3,8 +3,6 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   SafeAreaView, ActivityIndicator, Alert,
 } from 'react-native';
-import {useSelector} from 'react-redux';
-import {RootState} from '../../store/store';
 import {droneService} from '../../services/drone';
 import {orderService} from '../../services/order';
 import {Drone, CargoDemand} from '../../types';
@@ -19,7 +17,6 @@ export default function CargoAcceptScreen({route, navigation}: any) {
   const [selectedDrone, setSelectedDrone] = useState<Drone | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const currentUser = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     fetchMyDrones();

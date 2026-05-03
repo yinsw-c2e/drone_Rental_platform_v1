@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   TextInput,
   Image,
   Modal,
-  Platform,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {launchImageLibrary} from 'react-native-image-picker';
@@ -44,7 +43,7 @@ const CERT_TYPES = [
   {label: '其他资质', value: 'other'},
 ];
 
-export default function CertificationUploadScreen({navigation}: any) {
+export default function CertificationUploadScreen({_navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const [certifications, setCertifications] = useState<PilotCertification[]>([]);

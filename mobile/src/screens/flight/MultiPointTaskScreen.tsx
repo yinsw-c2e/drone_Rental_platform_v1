@@ -10,7 +10,6 @@ import {
   RefreshControl,
   Modal,
   TextInput,
-  FlatList,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {
@@ -48,7 +47,7 @@ const ACTION_TYPE_MAP: Record<string, string> = {
   waypoint: '途经点',
 };
 
-export default function MultiPointTaskScreen({route, navigation}: any) {
+export default function MultiPointTaskScreen({route, _navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const orderId = route?.params?.orderId;
@@ -73,7 +72,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
   const [stopAction, setStopAction] = useState('pickup');
   const [stopNotes, setStopNotes] = useState('');
 
-  const loadTask = async () => {
+  const loadTask = useCallback(async () => {
     if (!taskIdParam) return;
     try {
       const data = await getMultiPointTask(taskIdParam);
@@ -84,7 +83,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [taskIdParam]);
 
   useFocusEffect(
     useCallback(() => {
@@ -92,7 +91,7 @@ export default function MultiPointTaskScreen({route, navigation}: any) {
         setLoading(true);
         loadTask();
       }
-    }, [taskIdParam]),
+    }, [loadTask, taskIdParam]),
   );
 
   const onRefresh = () => {

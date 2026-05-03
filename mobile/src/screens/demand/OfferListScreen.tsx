@@ -2,7 +2,6 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Platform,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -11,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import {useSelector} from 'react-redux';
 
 import AddressInputField from '../../components/AddressInputField';
@@ -35,15 +33,6 @@ const SCENE_FILTERS = [
   {key: 'island_supply', label: '海岛补给'},
   {key: 'emergency', label: '应急救援'},
 ];
-
-function formatDateTime(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  const hour = `${date.getHours()}`.padStart(2, '0');
-  const minute = `${date.getMinutes()}`.padStart(2, '0');
-  return `${year}-${month}-${day} ${hour}:${minute}`;
-}
 
 function buildDefaultStartDate(): Date {
   const date = new Date();
@@ -160,11 +149,9 @@ export default function OfferListScreen({route, navigation}: any) {
   const [quickCargoWeight, setQuickCargoWeight] = useState(
     initialQuickOrderDraft?.cargo_weight_kg ? String(initialQuickOrderDraft.cargo_weight_kg) : '',
   );
-  const [quickCargoType, setQuickCargoType] = useState(initialQuickOrderDraft?.cargo_type || '');
-  const [startDate, setStartDate] = useState<Date>(defaultQuickStart);
-  const [endDate, setEndDate] = useState<Date>(defaultQuickEnd);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [quickCargoType] = useState(initialQuickOrderDraft?.cargo_type || '');
+  const startDate = defaultQuickStart;
+  const endDate = defaultQuickEnd;
 
   const fetchSupplies = useCallback(
     async (
@@ -309,12 +296,6 @@ export default function OfferListScreen({route, navigation}: any) {
     startDate,
   ]);
 
-  const handlePublishTask = useCallback(() => {
-    navigation.navigate('PublishCargo', {
-      quickOrderDraft: buildQuickOrderDraft(),
-    });
-  }, [buildQuickOrderDraft, navigation]);
-
   const handleBrowseMode = useCallback(async () => {
     setQuickOrderMode(false);
     setHasQuickOrderSearch(false);
@@ -346,16 +327,6 @@ export default function OfferListScreen({route, navigation}: any) {
     });
   }, [activeScene, fetchSupplies, hasQuickOrderSearch, minPayloadKg, quickOrderMode, region]);
 
-  const onSearch = useCallback(() => {
-    setLoading(true);
-    setPage(1);
-    fetchSupplies(1, true, {
-      region,
-      cargoScene: activeScene,
-      minPayloadKg,
-    });
-  }, [activeScene, fetchSupplies, minPayloadKg, region]);
-
   const onLoadMore = useCallback(() => {
     if (loading || refreshing || !hasMore || (quickOrderMode && !hasQuickOrderSearch)) {
       return;
@@ -368,31 +339,6 @@ export default function OfferListScreen({route, navigation}: any) {
       minPayloadKg,
     });
   }, [activeScene, fetchSupplies, hasMore, hasQuickOrderSearch, loading, minPayloadKg, page, quickOrderMode, refreshing, region]);
-
-  const onStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartPicker(Platform.OS === 'ios');
-    if (Platform.OS === 'android' && event?.type === 'dismissed') {
-      return;
-    }
-    if (!selectedDate) {
-      return;
-    }
-    setStartDate(selectedDate);
-    if (selectedDate >= endDate) {
-      const nextEnd = buildDefaultEndDate(selectedDate);
-      setEndDate(nextEnd);
-    }
-  };
-
-  const onEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowEndPicker(Platform.OS === 'ios');
-    if (Platform.OS === 'android' && event?.type === 'dismissed') {
-      return;
-    }
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    }
-  };
 
   const heroTitle = useMemo(() => {
     if (quickOrderMode) {
@@ -419,19 +365,6 @@ export default function OfferListScreen({route, navigation}: any) {
     }
     return '这里只展示满足平台重载门槛、并支持客户直达下单的服务，不再混任务卡片和订单卡片。';
   }, [hasQuickOrderSearch, lastQuickOrderDraft, quickOrderMode]);
-
-  const quickOrderBlockedMessage = useMemo(() => {
-    if (!departureAddress || !destinationAddress) {
-      return '先补起点和终点，系统才能判断服务范围。';
-    }
-    if (!(Number(quickCargoWeight) > 0)) {
-      return '补上货物重量后，才能筛出吊重能力匹配的服务。';
-    }
-    if (endDate <= startDate) {
-      return '结束时间需要晚于开始时间。';
-    }
-    return '';
-  }, [departureAddress, destinationAddress, endDate, quickCargoWeight, startDate]);
 
   const renderItem = ({item}: {item: SupplySummary}) => {
     const isMySupply = item.owner_user_id === currentUser?.id;

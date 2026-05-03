@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TextInput, TouchableOpacity, Alert, ActivityIndicator,
@@ -12,7 +12,7 @@ import type {AppTheme} from '../../theme/index';
 
 type VerifyStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
 
-export default function VerificationScreen({navigation}: any) {
+export default function VerificationScreen({_navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
@@ -26,11 +26,7 @@ export default function VerificationScreen({navigation}: any) {
   const [realName, setRealName] = useState('');
   const [idNumber, setIdNumber] = useState('');
 
-  useEffect(() => {
-    fetchStatus();
-  }, []);
-
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const res = await userService.getIDVerifyStatus();
       const data = res.data;
@@ -40,14 +36,18 @@ export default function VerificationScreen({navigation}: any) {
         if (data.id_number) setIdNumber(data.id_number);
         if (data.reject_reason) setRejectReason(data.reject_reason);
       }
-    } catch (_e) {
+    } catch {
       // 获取失败使用默认状态
       const currentStatus = user?.id_verified as VerifyStatus;
       if (currentStatus) setStatus(currentStatus);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id_verified]);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
 
   const validateIdNumber = (id: string): boolean => {
     // 简易校验：18位身份证号

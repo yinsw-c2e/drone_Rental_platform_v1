@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
-  FlatList,
 } from 'react-native';
 import {
   bindDrone,

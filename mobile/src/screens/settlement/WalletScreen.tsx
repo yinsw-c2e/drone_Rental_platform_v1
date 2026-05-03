@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   FlatList,
 } from 'react-native';
@@ -48,16 +47,9 @@ export default function WalletScreen({navigation}: any) {
   const [wallet, setWallet] = useState<UserWallet | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [settlements, setSettlements] = useState<OrderSettlement[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, []),
-  );
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [walletData, txData, settleData] = await Promise.all([
         getWallet(),
@@ -70,10 +62,15 @@ export default function WalletScreen({navigation}: any) {
     } catch (err: any) {
       console.log('加载钱包数据失败:', err.message);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   const formatAmount = (amountFen: number) => {
     return (amountFen / 100).toFixed(2);

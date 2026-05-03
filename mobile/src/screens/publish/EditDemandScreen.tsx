@@ -25,10 +25,8 @@ import {
   formatDemandDateTime,
   formatSavedAt,
   generateSuggestedTitle,
-  getSceneLabel,
   parseDemandDate,
   snapshotToAddressData,
-  summarizeAddress,
   toAddressSnapshot,
 } from './demandComposerShared';
 import {useTheme} from '../../theme/ThemeContext';

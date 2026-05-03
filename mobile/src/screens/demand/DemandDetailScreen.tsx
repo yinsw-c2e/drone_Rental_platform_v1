@@ -107,16 +107,11 @@ export default function DemandDetailScreen({route, navigation}: any) {
   const isOwnDemand = demand?.client_user_id === currentUser?.id;
   const canEditOrCancel = isOwnDemand && ['draft', 'published', 'quoting'].includes(demand?.status || '');
   const canViewAndSelectQuotes = isOwnDemand && ['published', 'quoting', 'selected'].includes(demand?.status || '');
-  const isConvertedToOrder = isOwnDemand && demand?.status === 'converted_to_order';
   const canQuoteAsOwner = !isOwnDemand && effectiveRoleSummary.has_owner_role;
   const canOperateCandidate = !isOwnDemand && effectiveRoleSummary.has_pilot_role && !!demand?.allows_pilot_candidate;
   const activeCandidate = demand?.my_candidate?.status === 'active';
   const hasOwnQuote = Boolean(demand?.my_quote);
   const progressFocus = demand ? getDemandProgressFocus(demand, isOwnDemand) : null;
-  const quoteComparisonItems = useMemo(
-    () => [...quotes].sort((left, right) => Number(left.price_amount || 0) - Number(right.price_amount || 0)).slice(0, 3),
-    [quotes],
-  );
 
   const fetchDemand = useCallback(async () => {
     setLoading(true);

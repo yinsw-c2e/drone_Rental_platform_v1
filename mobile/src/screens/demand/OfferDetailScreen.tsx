@@ -30,30 +30,11 @@ import {
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
-function SceneTag({label}: {label: string}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  return (
-    <View style={styles.sceneTag}>
-      <Text style={styles.sceneTagText}>{label}</Text>
-    </View>
-  );
-}
-
 function summarizeDraftAddress(address?: QuickOrderDraft['departure_address']): string {
   if (!address) {
     return '待补充';
   }
   return address.name || address.address || '待补充';
-}
-
-function summarizeDraftTimeRange(draft?: QuickOrderDraft): string {
-  if (!draft?.scheduled_start_at || !draft?.scheduled_end_at) {
-    return '待与机主确认';
-  }
-  return `${draft.scheduled_start_at.slice(0, 16).replace('T', ' ')} - ${draft.scheduled_end_at
-    .slice(0, 16)
-    .replace('T', ' ')}`;
 }
 
 export default function OfferDetailScreen({route, navigation}: any) {
@@ -73,7 +54,6 @@ export default function OfferDetailScreen({route, navigation}: any) {
 
   const [supply, setSupply] = useState<SupplyDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const effectiveRoleSummary = useMemo(
     () => getEffectiveRoleSummary(roleSummary, user),
@@ -100,35 +80,6 @@ export default function OfferDetailScreen({route, navigation}: any) {
   const isMySupply = supply?.owner_user_id === user?.id;
   const canCreateDirectOrder =
     !isMySupply && effectiveRoleSummary.has_client_role && supply?.status === 'active' && supply.accepts_direct_order;
-
-  const handleUpdateStatus = async (status: string) => {
-    if (!supply) {
-      return;
-    }
-    const actionTextMap: Record<string, string> = {
-      active: '恢复上架',
-      paused: '暂停服务',
-      closed: '关闭服务',
-    };
-
-    Alert.alert('确认操作', `确认${actionTextMap[status] || '更新服务状态'}？`, [
-      {text: '取消', style: 'cancel'},
-      {
-        text: '确认',
-        onPress: async () => {
-          setUpdatingStatus(true);
-          try {
-            await supplyService.updateStatus(supply.id, status);
-            await fetchSupply();
-          } catch (error: any) {
-            Alert.alert('操作失败', error.message || '请稍后重试');
-          } finally {
-            setUpdatingStatus(false);
-          }
-        },
-      },
-    ]);
-  };
 
   if (loading) {
     return (
@@ -159,7 +110,6 @@ export default function OfferDetailScreen({route, navigation}: any) {
   const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
   const droneLabel = supply.drone ? `${supply.drone.brand} ${supply.drone.model}` : '未关联设备';
   const serviceAreaText = summarizeServiceArea(supply.service_area_snapshot);
-  const timeSlotText = summarizeFlexibleValue(supply.available_time_slots, '未设置服务时间段');
   const pricingRuleText = summarizeFlexibleValue(supply.pricing_rule, '按基础价格执行');
 
   return (

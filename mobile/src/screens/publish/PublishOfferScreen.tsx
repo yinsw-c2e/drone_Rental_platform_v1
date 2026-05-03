@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 
 import AddressInputField from '../../components/AddressInputField';
-import ObjectCard from '../../components/business/ObjectCard';
 import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {AddressData, Drone, SupplyDetail} from '../../types';

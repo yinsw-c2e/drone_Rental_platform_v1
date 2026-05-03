@@ -38,7 +38,7 @@ const MAINTENANCE_TYPES = [
   {label: '其他', value: 'other'},
 ];
 
-export default function DroneMaintenanceLogScreen({route, navigation}: any) {
+export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const droneId = route.params?.id;
@@ -56,7 +56,7 @@ export default function DroneMaintenanceLogScreen({route, navigation}: any) {
   const [performedAt, setPerformedAt] = useState('');
   const [nextDate, setNextDate] = useState('');
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const res: any = await api.get(`/drone/${droneId}/maintenance`, {
         params: {page: 1, page_size: 50},
@@ -68,14 +68,14 @@ export default function DroneMaintenanceLogScreen({route, navigation}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [droneId]);
 
   useFocusEffect(
     useCallback(() => {
       if (droneId) {
         loadData();
       }
-    }, [droneId]),
+    }, [droneId, loadData]),
   );
 
   const onRefresh = () => {

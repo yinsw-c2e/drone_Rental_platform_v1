@@ -11,7 +11,6 @@ import {
   TextInput,
   Image,
   Modal,
-  Platform,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {API_ROOT_URL} from '../../constants';
@@ -29,8 +28,6 @@ const VERIFY_MAP: Record<string, {label: string; colorKey: 'warning' | 'success'
   approved: {label: '已核验', colorKey: 'success'},
   rejected: {label: '未通过', colorKey: 'danger'},
 };
-
-const isApprovedStatus = (value?: string) => value === 'approved' || value === 'verified';
 
 type CertType = 'uom' | 'insurance' | 'airworthiness';
 

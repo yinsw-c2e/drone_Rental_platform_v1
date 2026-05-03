@@ -11,7 +11,7 @@ export const EMPTY_ROLE_SUMMARY: RoleSummary = {
 
 export const buildFallbackRoleSummary = (): RoleSummary => EMPTY_ROLE_SUMMARY;
 
-export const getEffectiveRoleSummary = (roleSummary?: RoleSummary | null, user?: User | null): RoleSummary =>
+export const getEffectiveRoleSummary = (roleSummary?: RoleSummary | null, _user?: User | null): RoleSummary =>
   roleSummary || buildFallbackRoleSummary();
 
 export const getRoleLabels = (roleSummary?: RoleSummary | null, user?: User | null): string[] => {

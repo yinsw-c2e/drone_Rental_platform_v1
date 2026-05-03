@@ -10,6 +10,14 @@ const getConfig = (key: string): string | undefined => {
   }
 };
 
+const shouldLogConfig = () => getConfig('DEBUG_MODE') === 'true' && getConfig('APP_ENV') !== 'production';
+
+const logConfig = (...args: unknown[]) => {
+  if (shouldLogConfig()) {
+    console.log(...args);
+  }
+};
+
 // ============================================================
 // API 配置
 // ============================================================
@@ -22,39 +30,21 @@ const getApiBaseUrl = (): string => {
   // 优先使用环境变量（最高优先级）
   const apiBaseUrl = getConfig('API_BASE_URL');
   if (apiBaseUrl) {
-    console.log('[Config] Using API_BASE_URL from .env:', apiBaseUrl);
+    logConfig('[Config] Using API_BASE_URL from .env:', apiBaseUrl);
     return apiBaseUrl;
-  }
-
-  // 远程测试配置：cpolar 固定域名（无条件优先）
-  const HARDCODED_CPOLAR_URL = 'https://dronerentalplat.cpolar.top/api';
-  const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar，使用局域网IP
-
-  if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_URL) {
-    console.log('[Config] Using cpolar URL for remote testing:', HARDCODED_CPOLAR_URL);
-    return HARDCODED_CPOLAR_URL;
   }
 
   // 开发环境默认配置
   if (__DEV__) {
-    // 本地真机测试：使用电脑局域网IP（手机和电脑在同一WiFi）
-    const LOCAL_NETWORK_IP = '192.168.3.97';
-    if (LOCAL_NETWORK_IP) {
-      const localUrl = `http://${LOCAL_NETWORK_IP}:8080/api`;
-      console.log('[Config] Using local network IP for real device testing:', localUrl);
-      return localUrl;
-    }
-
     // Android模拟器使用10.0.2.2访问宿主机localhost
     // iOS模拟器和Web直接使用localhost
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
     const devUrl = `http://${devHost}:8080/api`;
-    console.log('[Config] Using DEV default:', devUrl);
+    logConfig('[Config] Using DEV default:', devUrl);
     return devUrl;
   }
 
   // 生产环境默认地址
-  console.log('[Config] Using production default');
   return 'https://api.wurenji.com/api';
 };
 
@@ -77,37 +67,19 @@ const getWsBaseUrl = (): string => {
   // 优先使用环境变量（最高优先级）
   const wsBaseUrl = getConfig('WS_BASE_URL');
   if (wsBaseUrl) {
-    console.log('[Config] Using WS_BASE_URL from .env:', wsBaseUrl);
+    logConfig('[Config] Using WS_BASE_URL from .env:', wsBaseUrl);
     return wsBaseUrl;
-  }
-
-  // 远程测试配置：cpolar 内网穿透（无条件优先）
-  const HARDCODED_CPOLAR_WS_URL = 'wss://dronerentalplat.cpolar.top/ws';
-  const USE_CPOLAR_FOR_TESTING = true; // 设置为false禁用cpolar
-
-  if (USE_CPOLAR_FOR_TESTING && HARDCODED_CPOLAR_WS_URL) {
-    console.log('[Config] Using cpolar WS URL for remote testing:', HARDCODED_CPOLAR_WS_URL);
-    return HARDCODED_CPOLAR_WS_URL;
   }
 
   // 开发环境默认配置
   if (__DEV__) {
-    // 本地真机测试：使用电脑局域网IP
-    const LOCAL_NETWORK_IP = '192.168.3.97';
-    if (LOCAL_NETWORK_IP) {
-      const localWsUrl = `ws://${LOCAL_NETWORK_IP}:8080/ws`;
-      console.log('[Config] Using local network IP for WS:', localWsUrl);
-      return localWsUrl;
-    }
-
     const devHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
     const devWsUrl = `ws://${devHost}:8080/ws`;
-    console.log('[Config] Using WS DEV default:', devWsUrl);
+    logConfig('[Config] Using WS DEV default:', devWsUrl);
     return devWsUrl;
   }
 
   // 生产环境默认地址
-  console.log('[Config] Using WS production default');
   return 'wss://api.wurenji.com/ws';
 };
 
@@ -119,18 +91,18 @@ export const API_V2_BASE_URL = switchApiVersion(API_BASE_URL, 'v2');
 export const WS_BASE_URL = getWsBaseUrl();
 export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 
-// 启动时打印最终配置（方便调试）
-console.log('='.repeat(60));
-console.log('📱 APP Configuration Loaded:');
-console.log('API_BASE_URL:', API_BASE_URL);
-console.log('API_ROOT_URL:', API_ROOT_URL);
-console.log('API_V1_BASE_URL:', API_V1_BASE_URL);
-console.log('API_V2_BASE_URL:', API_V2_BASE_URL);
-console.log('WS_BASE_URL:', WS_BASE_URL);
-console.log('API_TIMEOUT:', API_TIMEOUT);
-console.log('Platform:', Platform.OS);
-console.log('__DEV__:', __DEV__);
-console.log('='.repeat(60));
+// 启动时打印最终配置（仅调试模式）
+logConfig('='.repeat(60));
+logConfig('[Config] APP Configuration Loaded');
+logConfig('API_BASE_URL:', API_BASE_URL);
+logConfig('API_ROOT_URL:', API_ROOT_URL);
+logConfig('API_V1_BASE_URL:', API_V1_BASE_URL);
+logConfig('API_V2_BASE_URL:', API_V2_BASE_URL);
+logConfig('WS_BASE_URL:', WS_BASE_URL);
+logConfig('API_TIMEOUT:', API_TIMEOUT);
+logConfig('Platform:', Platform.OS);
+logConfig('__DEV__:', __DEV__);
+logConfig('='.repeat(60));
 
 // ============================================================
 // 高德地图配置

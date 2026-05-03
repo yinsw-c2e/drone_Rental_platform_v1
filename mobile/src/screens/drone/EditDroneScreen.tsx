@@ -52,7 +52,7 @@ export default function EditDroneScreen({navigation, route}: any) {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, navigation]);
 
   const handleSubmit = async () => {
     if (!form.brand || !form.model) {

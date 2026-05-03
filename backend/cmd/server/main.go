@@ -271,7 +271,11 @@ func main() {
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.CORSMiddlewareWithConfig(
+		cfg.CORS.AllowedOrigins,
+		cfg.CORS.AllowedMethods,
+		cfg.CORS.AllowedHeaders,
+	))
 	r.Use(middleware.LoggerMiddleware(zapLogger))
 	r.Use(middleware.RateLimitMiddleware(180, time.Minute))
 	registerHealthRoutes(r, sqlDB, rds)

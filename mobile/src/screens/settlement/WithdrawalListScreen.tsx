@@ -29,7 +29,6 @@ export default function WithdrawalListScreen() {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const [records, setRecords] = useState<WithdrawalRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -43,7 +42,6 @@ export default function WithdrawalListScreen() {
     } catch (err: any) {
       console.log('加载提现记录失败:', err.message);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
