@@ -1,0 +1,21 @@
+// my-demands page specific styles
+.my-demands-wrap {
+  flex: 1;
+  background-color: #f5f7fa;
+  padding: 14px;
+}
+
+.my-demands-filter-tabs {
+  margin-bottom: 14px;
+}
+
+.dc-status-badge {
+  background-color: rgba(22, 119, 255, 0.12);
+  color: #1677ff;
+}
+
+.my-demands-item {
+  .list-item-title {
+    margin-bottom: 4px;
+  }
+}

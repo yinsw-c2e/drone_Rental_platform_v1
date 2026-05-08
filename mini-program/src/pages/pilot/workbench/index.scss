@@ -1,0 +1,127 @@
+// 执行工作台页面样式
+.pw-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.pw-hero {
+  background: #1677FF;
+}
+
+.pw-hero-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  display: block;
+}
+
+.pw-hero-order-no {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  margin-top: 4px;
+  display: block;
+}
+
+.pw-current-status {
+  background: #F0F7FF;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.pw-current-label {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1677FF;
+}
+
+.pw-current-desc {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6B7280;
+  line-height: 20px;
+}
+
+// 执行步骤
+.pw-step {
+  display: flex;
+  flex-direction: row;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.pw-step-left {
+  width: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pw-step-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background: #E8ECF1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pw-step-icon-wrap-active {
+  background: #1677FF;
+}
+
+.pw-step-icon {
+  font-size: 18px;
+}
+
+.pw-step-line {
+  flex: 1;
+  width: 2px;
+  background: #E8ECF1;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.pw-step-line-active {
+  background: #1677FF;
+}
+
+.pw-step-content {
+  flex: 1;
+  padding-bottom: 12px;
+}
+
+.pw-step-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1D26;
+}
+
+.pw-step-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #6B7280;
+  line-height: 20px;
+}
+
+.pw-step-btn {
+  margin-top: 10px;
+  align-self: flex-start;
+  border-radius: 999px;
+  background: #1677FF;
+  padding: 8px 16px;
+}
+
+.pw-step-btn-next {
+  background: #52C41A;
+}
+
+.pw-step-btn-disabled {
+  opacity: 0.6;
+}
+
+.pw-step-btn-text {
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+}

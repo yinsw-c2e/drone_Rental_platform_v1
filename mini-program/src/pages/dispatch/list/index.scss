@@ -1,0 +1,24 @@
+// dispatch/list page specific styles
+$primary: #1677FF;
+
+.list-item-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.dispatch-list-hero {
+  background-color: $primary;
+}
+
+.dispatch-status-badge {
+  background-color: rgba(22, 119, 255, 0.12);
+  color: $primary;
+}
+
+.dispatch-list-item {
+  .list-item-no {
+    flex-shrink: 0;
+  }
+}

@@ -1,0 +1,152 @@
+// 飞行监控页面样式
+.monitor-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.monitor-hero {
+  background: #1677FF;
+}
+
+.monitor-hero-tags {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.monitor-hero-route {
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  margin-top: 8px;
+  display: block;
+}
+
+.monitor-hero-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monitor-live-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.24);
+  padding: 8px 14px;
+  background: rgba(255,255,255,0.06);
+}
+
+.monitor-live-active {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.4);
+}
+
+.monitor-live-text {
+  font-size: 12px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 700;
+}
+
+.monitor-live-text-active {
+  color: #FFFFFF;
+}
+
+// 坐标行
+.monitor-coord-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.monitor-coord-item {
+  flex: 1;
+  border-radius: 16px;
+  background: #F5F7FA;
+  padding: 12px;
+}
+
+.monitor-coord-label {
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.monitor-coord-value {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #1A1D26;
+  font-weight: 800;
+}
+
+// 指标网格
+.monitor-metric-grid {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.monitor-metric-item {
+  width: calc(50% - 5px);
+  border-radius: 16px;
+  background: #F5F7FA;
+  padding: 12px;
+}
+
+.monitor-metric-label {
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.monitor-metric-value {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #1A1D26;
+  font-weight: 800;
+}
+
+.monitor-latest-time {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+// 告警项
+.monitor-alert-item {
+  border-radius: 16px;
+  border: 1px solid;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.monitor-alert-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.monitor-alert-level {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.monitor-alert-time {
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+.monitor-alert-title {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #1A1D26;
+  font-weight: 800;
+}
+
+.monitor-alert-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #6B7280;
+}

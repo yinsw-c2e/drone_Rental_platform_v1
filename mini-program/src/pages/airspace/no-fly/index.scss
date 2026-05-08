@@ -1,0 +1,160 @@
+.nf-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.nf-scroll {
+  flex: 1;
+}
+
+.nf-content {
+  padding: 16px;
+}
+
+.nf-check {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #E5E7EB;
+  margin-bottom: 14px;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nf-check-red {
+  background: #FEF2F2;
+  border-color: #FECACA;
+}
+
+.nf-check-orange {
+  background: #FFF7ED;
+  border-color: #FED7AA;
+}
+
+.nf-check-green {
+  background: #F0FDF4;
+  border-color: #BBF7D0;
+}
+
+.nf-check-blue {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+}
+
+.nf-check-title {
+  display: block;
+  color: #1A1D26;
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.nf-check-desc {
+  color: #6B7280;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.nf-check-btn {
+  align-self: flex-start;
+  background: #1677FF;
+  padding: 7px 10px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.nf-check-btn-text {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nf-count {
+  display: block;
+  color: #6B7280;
+  font-size: 13px;
+  margin: 2px 0 10px;
+}
+
+.nf-card {
+  background: #FFFFFF;
+  border: 1px solid #E8ECF1;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.nf-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.nf-card-title {
+  flex: 1;
+  color: #1A1D26;
+  font-size: 15px;
+  font-weight: 800;
+  margin-right: 10px;
+}
+
+.nf-card-line {
+  display: block;
+  color: #6B7280;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.nf-card-desc {
+  display: block;
+  color: #4B5563;
+  font-size: 13px;
+  line-height: 20px;
+  margin-top: 8px;
+}
+
+.nf-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.nf-badge-red {
+  background: #FEE2E2;
+}
+
+.nf-badge-orange {
+  background: #FFEDD5;
+}
+
+.nf-badge-blue {
+  background: #DBEAFE;
+}
+
+.nf-badge-gray {
+  background: #F3F4F6;
+}
+
+.nf-badge-text {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nf-badge-text-red {
+  color: #DC2626;
+}
+
+.nf-badge-text-orange {
+  color: #D97706;
+}
+
+.nf-badge-text-blue {
+  color: #1677FF;
+}
+
+.nf-badge-text-gray {
+  color: #6B7280;
+}

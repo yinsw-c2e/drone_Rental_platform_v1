@@ -1,0 +1,155 @@
+// 合规检查页面样式
+.compliance-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.compliance-content {
+  padding: 16px;
+}
+
+.compliance-run-btn {
+  background: #1677FF;
+  padding: 14px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.compliance-run-disabled {
+  opacity: 0.6;
+}
+
+.compliance-run-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.compliance-overall {
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.compliance-overall-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.compliance-overall-emoji {
+  color: #FFFFFF;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.compliance-overall-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.compliance-overall-desc {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 8px;
+}
+
+.compliance-stats-row {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+}
+
+.compliance-stat {
+  align-items: center;
+}
+
+.compliance-stat-num {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.compliance-stat-label {
+  font-size: 11px;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+.compliance-summary {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.compliance-summary-item {
+  flex: 1;
+  min-width: 45%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  align-items: center;
+}
+
+.compliance-summary-label {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.compliance-summary-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.compliance-item-card {
+  margin-bottom: 10px;
+  padding: 12px;
+}
+
+.compliance-item-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.compliance-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A1D26;
+}
+
+.compliance-item-msg {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 4px;
+}
+
+.compliance-item-value {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.compliance-item-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.compliance-item-badge-text {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+}

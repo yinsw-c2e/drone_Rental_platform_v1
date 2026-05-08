@@ -1,0 +1,39 @@
+// my-quotes page specific styles
+.my-quotes-wrap {
+  flex: 1;
+  background-color: #f5f7fa;
+  padding: 14px;
+}
+
+.my-quotes-hero {
+  background-color: #fa8c16;
+}
+
+.mq-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.mq-status-badge {
+  background-color: rgba(250, 140, 22, 0.12);
+  color: #fa8c16;
+}
+
+.mq-demand-no {
+  font-size: 12px;
+  color: #999;
+  margin-top: 6px;
+}
+
+.mq-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1677ff;
+}
+
+.my-quotes-item {
+  .list-item-title {
+    margin-bottom: 4px;
+  }
+}

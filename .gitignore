@@ -27,11 +27,20 @@ build/
 AGENTS.md
 GEMINI.md
 .agents/skills/uiux-delegate/SKILL.md
+.deepseek/
 
 .claude/
 examples/
 prompts/
 /scripts/
+
+# Mini Program local/build artifacts
+mini-program/.swc/
+mini-program/dist/
+mini-program/node_modules/
+mini-program/project.private.config.json
+mini-program/fix*.js
+mini-program/scrub.js
 
 # OS
 .DS_Store

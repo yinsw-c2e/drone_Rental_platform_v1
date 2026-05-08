@@ -1,0 +1,58 @@
+// my-offers page specific styles
+$primary: #1677FF;
+
+.my-offers-wrap {
+  flex: 1;
+  background-color: #f5f7fa;
+  padding: 14px;
+}
+
+.my-offers-hero {
+  background-color: #52c41a;
+}
+
+.mo-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.mo-status-badge {
+  background-color: rgba(82, 196, 26, 0.12);
+  color: #52c41a;
+}
+
+.my-offers-item {
+  .list-item-title {
+    margin-bottom: 4px;
+  }
+}
+
+.mo-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.mo-btn-ghost {
+  padding: 8px 14px;
+  border-radius: 50px;
+  border: 1px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+  background-color: #f9fafb;
+}
+
+.mo-btn-primary {
+  padding: 8px 14px;
+  border-radius: 50px;
+  background-color: $primary;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}

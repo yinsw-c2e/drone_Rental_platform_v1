@@ -1,4 +1,5 @@
 import {AddressData} from '../../types';
+import {getSupplySceneLabel} from '../../utils/supplyMeta';
 
 export const DEMAND_SCENE_OPTIONS = [
   {key: 'power_grid', label: '电网建设'},
@@ -83,7 +84,7 @@ export function summarizeAddress(address?: AddressData | null): string {
 }
 
 export function getSceneLabel(sceneKey: string): string {
-  return DEMAND_SCENE_OPTIONS.find(option => option.key === sceneKey)?.label || sceneKey || '重载吊运';
+  return DEMAND_SCENE_OPTIONS.find(option => option.key === sceneKey)?.label || getSupplySceneLabel(sceneKey) || '重载吊运';
 }
 
 export function generateSuggestedTitle(params: {

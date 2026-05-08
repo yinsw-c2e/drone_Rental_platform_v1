@@ -1,0 +1,24 @@
+.page-wrap { min-height: 100vh; background-color: #F9FAFB; padding: 16px; }
+.empty { padding: 40px; align-items: center; }
+.empty-text { font-size: 14px; color: #9CA3AF; }
+
+.p-card { background-color: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.p-header { display: flex; flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.p-title { font-size: 16px; font-weight: 500; color: #1A1D26; }
+.p-company { font-size: 14px; color: #4B5563; margin-bottom: 16px; }
+
+.p-grid { display: flex; flex-direction: row; background-color: #F9FAFB; border-radius: 6px; padding: 12px; margin-bottom: 16px; }
+.p-grid-item { flex: 1; align-items: flex-start; }
+.p-grid-label { font-size: 12px; color: #6B7280; margin-bottom: 4px; }
+.p-grid-value { font-size: 14px; font-weight: 500; color: #1A1D26; }
+
+.p-footer { display: flex; flex-direction: column; border-top: 1px solid #F3F4F6; padding-top: 12px; }
+.p-time { font-size: 12px; color: #6B7280; margin-bottom: 4px; }
+.p-no { font-size: 12px; color: #9CA3AF; }
+
+.badge { padding: 2px 8px; border-radius: 4px; }
+.badge-green { background-color: #D1FAE5; } .text-green { color: #059669; }
+.badge-orange { background-color: #FEF3C7; } .text-orange { color: #D97706; }
+.badge-blue { background-color: #DBEAFE; } .text-blue { color: #2563EB; }
+.badge-red { background-color: #FEE2E2; } .text-red { color: #DC2626; }
+.badge-gray { background-color: #F3F4F6; } .text-gray { color: #6B7280; }

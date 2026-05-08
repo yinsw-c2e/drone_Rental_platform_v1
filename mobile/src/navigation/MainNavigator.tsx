@@ -63,6 +63,9 @@ import DroneMaintenanceLogScreen from '../screens/drone/DroneMaintenanceLogScree
 import ClientRegisterScreen from '../screens/client/ClientRegisterScreen';
 import ClientProfileScreen from '../screens/client/ClientProfileScreen';
 import CargoDeclarationScreen from '../screens/client/CargoDeclarationScreen';
+import CargoAcceptScreen from '../screens/cargo/CargoAcceptScreen';
+import CargoDetailScreen from '../screens/cargo/CargoDetailScreen';
+import CargoListScreen from '../screens/cargo/CargoListScreen';
 import CreateDispatchTaskScreen from '../screens/dispatch/CreateDispatchTaskScreen';
 import DispatchTaskListScreen from '../screens/dispatch/DispatchTaskListScreen';
 import DispatchTaskDetailScreen from '../screens/dispatch/DispatchTaskDetailScreen';
@@ -77,6 +80,7 @@ import NoFlyZoneScreen from '../screens/airspace/NoFlyZoneScreen';
 import WalletScreen from '../screens/settlement/WalletScreen';
 import WithdrawalScreen from '../screens/settlement/WithdrawalScreen';
 import WithdrawalListScreen from '../screens/settlement/WithdrawalListScreen';
+import FulfillmentHubScreen from '../screens/fulfillment/FulfillmentHubScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -330,6 +334,26 @@ export default function MainNavigator() {
         name="CargoDeclaration"
         component={CargoDeclarationScreen}
         options={{ title: '货物申报' }}
+      />
+      <RootStack.Screen
+        name="CargoList"
+        component={CargoListScreen}
+        options={{ title: '物流货单' }}
+      />
+      <RootStack.Screen
+        name="CargoDetail"
+        component={CargoDetailScreen}
+        options={{ title: '货单详情' }}
+      />
+      <RootStack.Screen
+        name="CargoAccept"
+        component={CargoAcceptScreen}
+        options={{ title: '承接货单' }}
+      />
+      <RootStack.Screen
+        name="Fulfillment"
+        component={FulfillmentHubScreen}
+        options={{ title: '履约中心' }}
       />
       <RootStack.Screen
         name="CreateDispatchTask"

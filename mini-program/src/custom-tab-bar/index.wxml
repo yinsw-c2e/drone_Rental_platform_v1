@@ -1,0 +1,36 @@
+<view class="custom-tabbar">
+  <view class="custom-tabbar-inner">
+    <view
+      wx:for="{{list}}"
+      wx:key="key"
+      class="tabbar-item {{selected == index ? 'tabbar-item-active' : ''}}"
+      data-index="{{index}}"
+      data-path="{{item.pagePath}}"
+      bindtap="switchTab"
+    >
+      <view class="tabbar-icon-shell">
+        <view wx:if="{{item.key == 'home'}}" class="tabbar-icon home-icon">
+          <view class="home-panel">
+            <view class="home-panel-line home-panel-line-v"></view>
+            <view class="home-panel-line home-panel-line-h"></view>
+          </view>
+        </view>
+
+        <view wx:elif="{{item.key == 'messages'}}" class="tabbar-icon message-icon">
+          <view class="message-bubble">
+            <view class="message-line message-line-long"></view>
+            <view class="message-line"></view>
+            <view class="message-tail"></view>
+          </view>
+        </view>
+
+        <view wx:else class="tabbar-icon profile-icon">
+          <view class="profile-head"></view>
+          <view class="profile-body"></view>
+        </view>
+      </view>
+
+      <text class="tabbar-label">{{item.text}}</text>
+    </view>
+  </view>
+</view>

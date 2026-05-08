@@ -100,6 +100,15 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 	api.POST("/payment/alipay/notify", h.Payment.AlipayNotify)
 	api.POST("/payment/mock/callback", h.Payment.MockCallback)
 
+	// Public airspace reads
+	airspacePublicGroup := api.Group("/airspace")
+	{
+		airspacePublicGroup.GET("/no-fly-zones", h.Airspace.ListNoFlyZones)                  // 禁飞区列表
+		airspacePublicGroup.GET("/no-fly-zone/:id", h.Airspace.GetNoFlyZone)                 // 禁飞区详情
+		airspacePublicGroup.GET("/no-fly-zones/nearby", h.Airspace.FindNearbyNoFlyZones)     // 附近禁飞区
+		airspacePublicGroup.GET("/check-availability", h.Airspace.CheckAirspaceAvailability) // 空域可用性检查
+	}
+
 	// Authenticated routes
 	authenticated := api.Group("")
 	authenticated.Use(middleware.AuthMiddleware())
@@ -454,12 +463,6 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 			airspaceGroup.POST("/application/:id/submit", h.Airspace.SubmitForReview)           // 提交审核
 			airspaceGroup.POST("/application/:id/cancel", h.Airspace.CancelApplication)         // 取消申请
 			airspaceGroup.POST("/application/:id/uom", h.Airspace.SubmitToUOM)                  // 提交UOM平台
-
-			// 禁飞区
-			airspaceGroup.GET("/no-fly-zones", h.Airspace.ListNoFlyZones)                  // 禁飞区列表
-			airspaceGroup.GET("/no-fly-zone/:id", h.Airspace.GetNoFlyZone)                 // 禁飞区详情
-			airspaceGroup.GET("/no-fly-zones/nearby", h.Airspace.FindNearbyNoFlyZones)     // 附近禁飞区
-			airspaceGroup.GET("/check-availability", h.Airspace.CheckAirspaceAvailability) // 空域可用性检查
 
 			// 合规检查
 			airspaceGroup.POST("/compliance/check", h.Airspace.RunComplianceCheck)       // 执行合规检查

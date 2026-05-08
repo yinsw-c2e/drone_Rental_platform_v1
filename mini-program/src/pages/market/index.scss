@@ -1,0 +1,157 @@
+.market-page {
+  min-height: 100vh;
+  background: #F5F7FA;
+  padding-bottom: 100px;
+}
+
+.market-tab-bar {
+  display: flex;
+  flex-direction: row;
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+
+.market-tab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.market-tab-active {
+  background: #1677FF;
+}
+
+.market-tab-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #666;
+}
+
+.market-tab-text-active {
+  color: #FFFFFF;
+}
+
+.market-demand-card {
+  margin-bottom: 14px;
+}
+
+.market-supply-card {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 14px;
+}
+
+.market-supply-img {
+  width: 100px;
+  background: rgba(0,0,0,0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px 0 0 16px;
+}
+
+.market-supply-emoji {
+  font-size: 32px;
+}
+
+.market-supply-info {
+  flex: 1;
+}
+
+.market-meta-badge {
+  background: #F5F7FA;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #6B7280;
+  font-weight: 600;
+}
+
+.market-meta-badges {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.market-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #F5222D;
+}
+
+.market-order-btn {
+  background: #1677FF;
+  padding: 8px 16px;
+  border-radius: 14px;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.market-budget {
+  font-size: 18px;
+  font-weight: 800;
+  color: #F5222D;
+}
+
+.market-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px;
+  background: rgba(255,255,255,0.9);
+  border-top: 1px solid #EEEFF2;
+}
+
+.market-main-btn {
+  background: #1677FF;
+  border-radius: 999px;
+  padding: 14px;
+  text-align: center;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.market-entry-card {
+  border-radius: 18px;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: rgba(22,119,255,0.06);
+  border: 1px solid rgba(22,119,255,0.16);
+}
+
+.market-entry-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.market-entry-primary {
+  flex: 1;
+  background: #1677FF;
+  border-radius: 16px;
+  padding: 14px;
+  text-align: center;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.market-entry-secondary {
+  flex: 1;
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #E8ECF1;
+  padding: 14px;
+  text-align: center;
+  color: #1A1D26;
+  font-size: 15px;
+  font-weight: 800;
+}

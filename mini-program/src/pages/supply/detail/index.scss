@@ -1,0 +1,194 @@
+// 供给详情 — 1:1 复刻 RN OfferDetailScreen
+$primary: #1677FF;
+
+.supply-hero {
+  background: #FFF;
+  border-radius: 24px;
+  padding: 20px;
+  border: 1px solid #E8ECF1;
+}
+.supply-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.supply-hero-tags {
+  display: flex;
+  gap: 6px;
+}
+.supply-hero-no {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: 700;
+}
+.supply-hero-title {
+  margin-top: 12px;
+  font-size: 22px;
+  line-height: 28px;
+  color: #1A1D26;
+  font-weight: 800;
+}
+.supply-hero-price-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.supply-hero-price {
+  font-size: 20px;
+  color: #F5222D;
+  font-weight: 800;
+}
+.supply-hero-direct-tag {
+  background: rgba(82,196,26,0.08);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  color: #52C41A;
+  font-weight: 800;
+}
+
+// Owner row
+.supply-owner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.supply-owner-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #E6F4FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.supply-owner-avatar-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: $primary;
+}
+.supply-owner-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1D26;
+}
+.supply-owner-sub {
+  font-size: 12px;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+// Grid
+.supply-grid {
+  display: flex;
+  background: #F0F2F5;
+  border-radius: 16px;
+  padding: 14px;
+}
+.supply-grid-item {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.supply-grid-label {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.supply-grid-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1D26;
+}
+
+// Footer
+.supply-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  background: #FFF;
+  border-top: 1px solid #E8ECF1;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+.supply-footer-btn {
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+.supply-footer-btn-secondary {
+  flex: 1;
+  border: 1px solid #E8ECF1;
+  color: #1A1D26;
+}
+.supply-footer-btn-primary {
+  flex: 2;
+  background: $primary;
+  color: #FFF;
+}
+.supply-footer-btn-disabled {
+  opacity: 0.5;
+}
+
+// Step header
+.supply-step-header {
+  padding: 12px 24px;
+  background: #FFF;
+  border-bottom: 1px solid #E8ECF1;
+}
+.supply-step-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.supply-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #E8ECF1;
+}
+.supply-step-dot-active {
+  background: $primary;
+  width: 10px;
+  height: 10px;
+}
+.supply-step-dot-done {
+  background: $primary;
+}
+.supply-step-line {
+  width: 50px;
+  height: 2px;
+  background: #E8ECF1;
+  margin: 0 4px;
+}
+.supply-step-line-done {
+  background: $primary;
+}
+.supply-step-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.supply-step-label {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: 600;
+}
+.supply-step-label-active {
+  color: $primary;
+  font-weight: 700;
+}
+.supply-step-label-done {
+  color: #6B7280;
+}

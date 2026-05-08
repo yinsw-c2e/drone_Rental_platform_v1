@@ -1,0 +1,30 @@
+.page-wrap { min-height: 100vh; background-color: #F9FAFB; display: flex; flex-direction: column; }
+.hero { background-color: #1677FF; padding: 24px 16px; margin-bottom: 0; }
+.hero-title { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.hero-desc { font-size: 14px; color: rgba(255,255,255,0.8); }
+
+.filter-scroll { background-color: #fff; border-bottom: 1px solid #E5E7EB; margin-bottom: 12px; }
+.filter-row { display: flex; flex-direction: row; padding: 12px 16px; }
+.filter-chip { padding: 6px 16px; border-radius: 16px; background-color: #F3F4F6; margin-right: 12px; white-space: nowrap; }
+.filter-chip.active { background-color: #EFF6FF; border: 1px solid #1677FF; padding: 5px 15px; }
+.filter-text { font-size: 13px; color: #4B5563; }
+.filter-text.active-text { color: #1677FF; font-weight: 500; }
+
+.list-content { flex: 1; padding: 0 16px; }
+.empty-state { padding: 40px; align-items: center; justify-content: center; }
+.empty-state-text { font-size: 14px; color: #9CA3AF; }
+.loading-state { padding: 20px; align-items: center; }
+.loading-text { font-size: 13px; color: #9CA3AF; }
+
+.supply-card { background-color: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.sc-header { display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.sc-title { flex: 1; font-size: 16px; font-weight: 500; color: #1A1D26; }
+.sc-badge { background-color: #D1FAE5; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+.sc-badge-text { font-size: 11px; color: #059669; }
+.sc-meta-row { margin-bottom: 12px; }
+.sc-meta-text { font-size: 13px; color: #6B7280; }
+
+.sc-footer { display: flex; flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #F3F4F6; padding-top: 12px; }
+.sc-price { font-size: 16px; font-weight: 600; color: #EF4444; }
+.btn-order { background-color: #1677FF; padding: 6px 16px; border-radius: 16px; }
+.btn-order-text { color: #fff; font-size: 13px; font-weight: 500; }

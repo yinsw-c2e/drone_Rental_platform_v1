@@ -1,0 +1,81 @@
+// 评价页面样式
+.review-wrap {
+  flex: 1;
+  background: #F5F7FA;
+  padding: 16px;
+}
+
+.review-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.review-stars-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.review-star {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #E8ECF1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.review-star-active {
+  background: #FA8C16;
+}
+
+.review-star-text {
+  font-size: 20px;
+  color: #9CA3AF;
+}
+
+.review-star-text-active {
+  color: #FFFFFF;
+}
+
+.review-rating-hint {
+  font-size: 14px;
+  font-weight: 700;
+  color: #FA8C16;
+  margin-left: 8px;
+}
+
+.review-textarea {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  background: #F9FAFB;
+  min-height: 100px;
+  margin-bottom: 16px;
+}
+
+.review-submit-btn {
+  background: #1677FF;
+  border-radius: 14px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.review-submit-disabled {
+  opacity: 0.6;
+}
+
+.review-submit-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+}

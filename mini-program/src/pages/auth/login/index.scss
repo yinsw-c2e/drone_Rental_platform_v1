@@ -1,0 +1,346 @@
+// 登录页 — 1:1 复刻 RN LoginScreen 样式
+$primary: #1677FF;
+
+.login-root {
+  min-height: 100vh;
+  background: #F5F7FA;
+  position: relative;
+}
+
+.login-bg-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.login-glow-orb {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border-radius: 130px;
+  pointer-events: none;
+}
+
+.login-scroll {
+  min-height: 100vh;
+}
+
+.login-scroll-content {
+  padding: 48px 28px 40px;
+}
+
+.login-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: $primary;
+  text-align: center;
+  display: block;
+}
+
+.login-subtitle {
+  font-size: 15px;
+  color: #9CA3AF;
+  text-align: center;
+  margin-top: 8px;
+  margin-bottom: 36px;
+  display: block;
+}
+
+// ── 表单卡片 ──
+.login-form-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid #E8ECF1;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.login-input {
+  height: 50px;
+  line-height: 50px;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 16px;
+  margin-bottom: 14px;
+  background: #F9FAFB;
+  color: #1A1D26;
+}
+
+.login-input::placeholder {
+  color: #9CA3AF;
+}
+
+.login-code-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.login-code-input {
+  flex: 1;
+  margin-right: 12px;
+  margin-bottom: 0;
+}
+
+.login-code-btn {
+  height: 50px;
+  padding: 0 16px;
+  background: $primary;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.login-code-btn-disabled {
+  background: #9CA3AF;
+}
+
+.login-code-btn-text {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.login-submit-btn {
+  height: 52px;
+  background: $primary;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  box-shadow: 0 4px 8px rgba(22,119,255,0.25);
+}
+
+.login-submit-btn-disabled {
+  opacity: 0.6;
+}
+
+.login-submit-btn-text {
+  color: #FFFFFF;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
+
+// ── 链接行 ──
+.login-links-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 0 4px;
+}
+
+.login-link {
+  color: $primary;
+  font-size: 14px;
+}
+
+// ── 第三方登录 ──
+.login-third-party {
+  margin-top: 32px;
+}
+
+.login-divider-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.login-divider-line {
+  flex: 1;
+  height: 1px;
+  background: #EEEFF2;
+}
+
+.login-divider-text {
+  color: #9CA3AF;
+  font-size: 13px;
+  margin: 0 14px;
+}
+
+.login-third-party-btns {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
+.login-tp-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 28px;
+}
+
+.login-tp-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background: #F0F2F5;
+  border: 1px solid #E8ECF1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.login-tp-icon {
+  font-size: 24px;
+}
+
+.login-tp-label {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+// ── 开发模式快速登录 ──
+.login-dev-section {
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid #EEEFF2;
+}
+
+.login-dev-title {
+  font-size: 13px;
+  color: #9CA3AF;
+  text-align: center;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.login-dev-group {
+  margin-bottom: 14px;
+}
+
+.login-dev-group-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.login-dev-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.login-dev-account-btn {
+  width: 100%;
+  height: 42px;
+  line-height: 40px;
+  margin: 0;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.login-dev-account-btn::after {
+  border: 0;
+}
+
+.login-dev-account-btn-hover {
+  opacity: 0.72;
+}
+
+.login-dev-empty {
+  display: block;
+  color: #9CA3AF;
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+// ── 快速登录弹窗 ──
+.login-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 999;
+}
+
+.login-modal-box {
+  background: #FFFFFF;
+  border-radius: 16px;
+  width: 100%;
+  max-height: 340px;
+  overflow: hidden;
+}
+
+.login-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1D26;
+  text-align: center;
+  padding: 14px;
+  border-bottom: 1px solid #EEEFF2;
+}
+
+.login-modal-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #EEEFF2;
+}
+
+.login-modal-item-active {
+  background: #E6F4FF;
+}
+
+.login-modal-item-text {
+  flex: 1;
+  font-size: 14px;
+  color: #1A1D26;
+}
+
+.login-modal-item-text-active {
+  color: $primary;
+  font-weight: 600;
+}
+
+.login-modal-item-check {
+  font-size: 16px;
+  color: $primary;
+}
+
+// ── 主题切换 ──
+.login-theme-toggle {
+  position: absolute;
+  right: 20px;
+  z-index: 10;
+}
+
+.login-toggle-pill {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-toggle-icon {
+  font-size: 20px;
+}

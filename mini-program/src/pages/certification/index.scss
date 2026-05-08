@@ -1,0 +1,171 @@
+// 证书管理页面样式
+.cert-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.cert-scroll {
+  flex: 1;
+}
+
+.cert-add-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background: #1677FF;
+  padding: 18px 24px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+}
+
+.cert-add-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.cert-add-icon {
+  font-size: 20px;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+
+.cert-add-text {
+  font-size: 18px;
+  color: #FFFFFF;
+  font-weight: 900;
+}
+
+.cert-card-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.cert-card-type {
+  font-size: 18px;
+  font-weight: 900;
+  color: #1A1D26;
+}
+
+// 表单样式
+.cert-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1D26;
+  margin-bottom: 8px;
+  margin-top: 14px;
+  display: block;
+}
+
+.cert-input {
+  border: 1.5px solid #E8ECF1;
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 16px;
+  background: #F9FAFB;
+}
+
+.cert-type-scroll {
+  margin-bottom: 8px;
+}
+
+.cert-type-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  padding-bottom: 4px;
+}
+
+.cert-type-btn {
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: #F5F7FA;
+  border: 1.5px solid #E8ECF1;
+  white-space: nowrap;
+}
+
+.cert-type-active {
+  border-color: #1677FF;
+  background: rgba(22, 119, 255, 0.1);
+}
+
+.cert-type-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #6B7280;
+}
+
+.cert-type-text-active {
+  color: #1677FF;
+}
+
+.cert-date-row {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.cert-tip {
+  background: rgba(22, 119, 255, 0.08);
+  padding: 16px;
+  border-radius: 14px;
+  border-left: 4px solid #1677FF;
+  margin-top: 12px;
+}
+
+.cert-tip-text {
+  font-size: 14px;
+  color: #6B7280;
+  line-height: 22px;
+}
+
+.cert-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.cert-btn-primary {
+  flex: 2;
+  height: 48px;
+  border-radius: 14px;
+  background: #1677FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cert-btn-disabled {
+  opacity: 0.6;
+}
+
+.cert-btn-primary-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cert-btn-ghost {
+  flex: 1;
+  height: 48px;
+  border-radius: 14px;
+  background: #F5F7FA;
+  border: 1px solid #E8ECF1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cert-btn-ghost-text {
+  font-size: 16px;
+  color: #6B7280;
+}

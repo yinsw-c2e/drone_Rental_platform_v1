@@ -1,0 +1,205 @@
+// 全局重置
+page {
+  width: 100%;
+  height: 100%;
+  background: #F5F7FA;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+view, text, scroll-view, input, textarea {
+  box-sizing: border-box;
+}
+
+// 确保所有容器默认铺满宽度
+.profile-page, .publish-wrap, .settings-wrap, .msg-page, .page-wrap {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// 全局共享设计变量
+$primary: #1677FF;
+$success: #52C41A;
+$warning: #FA8C16;
+$danger: #F5222D;
+$teal: #13C2C2;
+$purple: #722ED1;
+$text: #1A1D26;
+$textSub: #6B7280;
+$textHint: #9CA3AF;
+$bg: #F5F7FA;
+$card: #FFFFFF;
+$cardBorder: #E8ECF1;
+$inputBg: #F9FAFB;
+$inputBorder: #E5E7EB;
+$divider: #EEEFF2;
+$radiusSm: 12px;
+$radiusMd: 16px;
+$radiusLg: 20px;
+$radiusXl: 24px;
+
+// 通用卡片
+.card {
+  background: $card;
+  border-radius: $radiusMd;
+  padding: 14px;
+  border: 1px solid $cardBorder;
+  margin-bottom: 10px;
+}
+
+// 详情行
+.detail-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid $divider;
+}
+.detail-row-label {
+  font-size: 13px;
+  color: $textHint;
+  width: 88px;
+}
+.detail-row-value {
+  flex: 1;
+  text-align: right;
+  font-size: 14px;
+  color: $text;
+  font-weight: 600;
+  margin-left: 12px;
+}
+
+// Hero 区域（页面顶部蓝色/绿色块）
+.page-hero {
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+.page-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-hero-no {
+  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+}
+.page-hero-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin-top: 10px;
+  display: block;
+}
+.page-hero-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  margin-top: 6px;
+  display: block;
+}
+
+// 状态标签
+.status-badge {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+// 筛选标签
+.filter-tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.filter-tab {
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #E8EDF2;
+  color: #666;
+}
+.filter-tab-active {
+  background: $primary;
+  color: #FFFFFF;
+}
+
+// 操作按钮（底部固定）
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: $card;
+  border-top: 1px solid $divider;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+// 列表项
+.list-item {
+  background: $card;
+  border-radius: $radiusMd;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.list-item-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.list-item-no {
+  font-size: 11px;
+  color: $textHint;
+}
+.list-item-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: $text;
+}
+.list-item-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.list-item-meta-text {
+  font-size: 12px;
+  color: $textSub;
+}
+
+// 区块标题
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: $text;
+  margin-bottom: 10px;
+  display: block;
+}
+
+// 空状态
+.empty-state {
+  padding: 40px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.empty-state-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+.empty-state-text {
+  font-size: 14px;
+  color: $textHint;
+}

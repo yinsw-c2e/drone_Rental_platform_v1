@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   getMyPolicies,
@@ -23,7 +24,7 @@ interface Props {
   navigation: any;
 }
 
-const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
+const InsurancePolicyListScreen: React.FC<Props> = ({ navigation: _navigation }) => {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const [loading, setLoading] = useState(true);
@@ -51,6 +52,22 @@ const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
     loadData();
   };
 
+  const showPolicyDetail = (item: InsurancePolicy) => {
+    Alert.alert(
+      '保单详情',
+      [
+        `保单号：${item.policy_no || '-'}`,
+        `保险公司：${item.insurer_name || '-'}`,
+        `保险金额：${formatAmount(item.coverage_amount)}`,
+        `有效期至：${new Date(item.effective_to).toLocaleDateString()}`,
+      ].join('\n'),
+    );
+  };
+
+  const showInsuranceNotice = (title: string) => {
+    Alert.alert(title, '保险购买与报案需要接入保险服务后开放，当前可先查看已有保单。');
+  };
+
   const renderPolicyItem = ({ item }: { item: InsurancePolicy }) => {
     const statusColor = getPolicyStatusColor(item.status);
     const isActive = item.status === 'active';
@@ -58,7 +75,7 @@ const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => navigation.navigate('InsurancePolicyDetail', { policyId: item.id })}
+        onPress={() => showPolicyDetail(item)}
       >
         <View style={styles.cardHeader}>
           <View style={styles.typeContainer}>
@@ -101,7 +118,7 @@ const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
           {isActive && (
             <TouchableOpacity
               style={styles.claimBtn}
-              onPress={() => navigation.navigate('ReportClaim', { policyId: item.id })}
+              onPress={() => showInsuranceNotice('保险报案')}
             >
               <Text style={styles.claimBtnText}>报案</Text>
             </TouchableOpacity>
@@ -130,7 +147,7 @@ const InsurancePolicyListScreen: React.FC<Props> = ({ navigation }) => {
         ListHeaderComponent={
           <TouchableOpacity
             style={styles.purchaseBtn}
-            onPress={() => navigation.navigate('PurchaseInsurance')}
+            onPress={() => showInsuranceNotice('购买保险')}
           >
             <Text style={styles.purchaseBtnText}>+ 购买保险</Text>
           </TouchableOpacity>

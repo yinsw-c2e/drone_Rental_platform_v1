@@ -1,0 +1,99 @@
+// 飞行记录页面样式
+.records-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.records-stats-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1A1D26;
+  margin-bottom: 16px;
+}
+
+.records-stats-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.records-stat-item {
+  width: 50%;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.records-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1677FF;
+}
+
+.records-stat-label {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.records-tip-card {
+  background: #F0F7FF;
+  border: 1px solid #D6E8FF;
+}
+
+.records-tip-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1677FF;
+  margin-bottom: 8px;
+}
+
+.records-tip-text {
+  font-size: 13px;
+  line-height: 20px;
+  color: #6B7280;
+}
+
+.records-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.records-tags {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.records-order-no {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.records-metric-row {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.records-metric-item {
+  flex: 1;
+  background: #F5F7FA;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.records-metric-label {
+  font-size: 12px;
+  color: #6B7280;
+  margin-bottom: 6px;
+}
+
+.records-metric-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1D26;
+}

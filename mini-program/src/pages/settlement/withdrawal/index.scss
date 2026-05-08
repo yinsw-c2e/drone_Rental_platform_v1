@@ -1,0 +1,24 @@
+.page-wrap { min-height: 100vh; background-color: #F9FAFB; display: flex; flex-direction: column; }
+.form-content { flex: 1; padding: 16px; }
+.section-title { font-size: 15px; font-weight: 500; color: #1A1D26; margin-bottom: 12px; margin-top: 16px; }
+.section-title:first-child { margin-top: 0; }
+.amount-row { background-color: #fff; border-radius: 8px; padding: 24px 16px; display: flex; flex-direction: row; align-items: baseline; }
+.amount-prefix { font-size: 24px; font-weight: 600; color: #1A1D26; margin-right: 8px; }
+.amount-input { flex: 1; font-size: 36px; font-weight: 700; height: 50px; color: #1A1D26; }
+.hint { font-size: 12px; color: #9CA3AF; margin-top: 8px; margin-bottom: 24px; padding-left: 4px; }
+
+.method-row { display: flex; flex-direction: row; margin-bottom: 24px; }
+.method-chip { padding: 8px 16px; border-radius: 20px; background-color: #F3F4F6; margin-right: 12px; }
+.method-chip.active { background-color: #EFF6FF; border: 1px solid #1677FF; padding: 7px 15px; }
+.method-text { font-size: 14px; color: #4B5563; }
+.method-text.active-text { color: #1677FF; font-weight: 500; }
+
+.form-group { background-color: #fff; border-radius: 8px; padding: 0 16px; margin-bottom: 32px; }
+.form-item { display: flex; flex-direction: row; align-items: center; padding: 16px 0; border-bottom: 1px solid #F3F4F6; }
+.border-none { border-bottom: none; }
+.form-label { width: 90px; font-size: 15px; color: #1A1D26; }
+.form-input { flex: 1; font-size: 15px; color: #1A1D26; }
+
+.btn-primary { background-color: #1677FF; border-radius: 8px; padding: 14px; align-items: center; justify-content: center; }
+.btn-text { color: #fff; font-size: 16px; font-weight: 500; }
+.disabled { opacity: 0.6; }

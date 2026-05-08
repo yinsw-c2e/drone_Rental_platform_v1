@@ -1,0 +1,83 @@
+// 售后处理页面样式
+.after-sale-wrap {
+  flex: 1;
+  background: #F5F7FA;
+  padding: 14px;
+}
+
+.after-sale-status-row {
+  display: flex;
+  align-items: center;
+}
+
+.after-sale-dispute-item {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid #EEEFF2;
+}
+
+.after-sale-dispute-summary {
+  flex: 1;
+  font-size: 13px;
+  color: #1A1D26;
+  margin-right: 12px;
+}
+
+.after-sale-dispute-form {
+  margin-top: 12px;
+}
+
+.after-sale-input {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  background: #F9FAFB;
+  min-height: 80px;
+  margin-bottom: 10px;
+}
+
+.after-sale-dispute-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+// 操作按钮
+.after-sale-action-btn {
+  margin-top: 12px;
+  border-radius: 14px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.after-sale-action-primary {
+  background: #1677FF;
+}
+
+.after-sale-action-danger {
+  background: #F5222D;
+}
+
+.after-sale-action-ghost {
+  background: #E8EDF2;
+  min-width: 72px;
+}
+
+.after-sale-action-text {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.after-sale-action-ghost-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+}

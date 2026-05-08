@@ -1,0 +1,27 @@
+.page-wrap { min-height: 100vh; background-color: #F9FAFB; display: flex; flex-direction: column; }
+.hero { background-color: #1677FF; padding: 24px 16px; margin-bottom: 12px; }
+.hero-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.hero-desc { font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.5; }
+
+.form-card { background-color: #fff; border-radius: 8px; padding: 16px; margin: 0 16px 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.section-title { font-size: 15px; font-weight: 500; color: #1A1D26; margin-bottom: 12px; }
+
+.empty-box { padding: 20px; background-color: #F3F4F6; border-radius: 8px; align-items: center; }
+.empty-text { font-size: 13px; color: #6B7280; text-align: center; }
+
+.drone-list-h { width: 100%; }
+.drone-row-h { display: flex; flex-direction: row; }
+.drone-item-h { width: 140px; padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; margin-right: 12px; background-color: #fff; }
+.drone-item-h.active { border-color: #1677FF; background-color: #EFF6FF; }
+.drone-name-h { font-size: 15px; font-weight: 500; color: #1A1D26; margin-bottom: 4px; }
+.drone-name-h.active-text { color: #1677FF; }
+.drone-desc-h { font-size: 12px; color: #6B7280; }
+
+.input-row { display: flex; flex-direction: row; align-items: center; border-bottom: 1px solid #F3F4F6; padding-bottom: 8px; }
+.input-prefix { font-size: 24px; font-weight: 600; color: #1A1D26; margin-right: 8px; }
+.price-input { flex: 1; font-size: 32px; font-weight: 700; height: 44px; }
+.textarea-input { font-size: 15px; color: #1A1D26; }
+
+.btn-primary { background-color: #1677FF; border-radius: 8px; padding: 14px; align-items: center; justify-content: center; }
+.btn-text { color: #fff; font-size: 16px; font-weight: 500; }
+.disabled { opacity: 0.6; }

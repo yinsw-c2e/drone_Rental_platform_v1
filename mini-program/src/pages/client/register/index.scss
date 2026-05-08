@@ -1,0 +1,64 @@
+// 企业客户升级页面样式
+.cr-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.cr-hero {
+  background: #1677FF;
+}
+
+.cr-hero-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 20px;
+  color: rgba(255,255,255,0.82);
+  display: block;
+}
+
+.cr-bullet {
+  font-size: 14px;
+  line-height: 22px;
+  color: #1A1D26;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.cr-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1D26;
+  margin-bottom: 8px;
+  margin-top: 12px;
+  display: block;
+}
+
+.cr-input {
+  border: 1px solid #E8ECF1;
+  border-radius: 12px;
+  height: 44px;
+  line-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  background: #F9FAFB;
+}
+
+.cr-submit-btn {
+  margin-top: 16px;
+  height: 50px;
+  border-radius: 14px;
+  background: #1677FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cr-submit-disabled {
+  opacity: 0.6;
+}
+
+.cr-submit-text {
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+}

@@ -1,0 +1,224 @@
+// @ts-nocheck
+import Taro, { useDidShow } from '@tarojs/taro';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, Switch, Text, View } from '@tarojs/components';
+import { useDispatch, useSelector } from 'react-redux';
+
+import { logout } from '../../store/slices/authSlice';
+import { RootState } from '../../store/store';
+import './index.scss';
+
+const PUSH_STORAGE_KEY = 'profile_push_enabled';
+
+const getVerifyText = (status?: string) => {
+  if (status === 'approved') return '已认证';
+  if (status === 'pending') return '审核中';
+  return '未认证';
+};
+
+export default function SettingsPage() {
+  const dispatch = useDispatch();
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [subscriptionsMainSwitch, setSubscriptionsMainSwitch] = useState<boolean | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  const isDevMode = process.env.NODE_ENV !== 'production';
+
+  const loadSettings = useCallback(async () => {
+    setLoadingSettings(true);
+    try {
+      const localPreference = Taro.getStorageSync(PUSH_STORAGE_KEY);
+      if (typeof localPreference === 'boolean') {
+        setPushEnabled(localPreference);
+      }
+
+      const res: any = await Taro.getSetting({ withSubscriptions: true } as any).catch(() => null);
+      setSubscriptionsMainSwitch(
+        typeof res?.subscriptionsSetting?.mainSwitch === 'boolean'
+          ? res.subscriptionsSetting.mainSwitch
+          : null,
+      );
+    } finally {
+      setLoadingSettings(false);
+    }
+  }, []);
+
+  useDidShow(() => {
+    loadSettings();
+  });
+
+  const handleOpenSystemSettings = async () => {
+    try {
+      await Taro.openSetting();
+      loadSettings();
+    } catch {
+      Taro.showToast({ title: '无法打开设置', icon: 'none' });
+    }
+  };
+
+  const handleTogglePush = async (nextValue: boolean) => {
+    setPushEnabled(nextValue);
+    Taro.setStorageSync(PUSH_STORAGE_KEY, nextValue);
+
+    if (nextValue && subscriptionsMainSwitch === false) {
+      Taro.showModal({
+        title: '通知入口待开启',
+        content: '应用内开关已打开，但微信通知入口还未开启。请在系统设置里检查通知和订阅消息权限。',
+        confirmText: '去设置',
+        success: (res) => {
+          if (res.confirm) {
+            handleOpenSystemSettings();
+          }
+        },
+      });
+      return;
+    }
+
+    if (!nextValue) {
+      Taro.showToast({ title: '已关闭当前设备提醒', icon: 'none' });
+    }
+  };
+
+  const handleLogout = () => {
+    Taro.showModal({
+      title: '退出登录',
+      content: '确定要退出当前账号吗？',
+      success: (res) => {
+        if (!res.confirm) {
+          return;
+        }
+        dispatch(logout());
+        Taro.reLaunch({ url: '/pages/auth/login/index' });
+      },
+    });
+  };
+
+  const notificationStatusText = useMemo(() => {
+    if (loadingSettings) {
+      return '读取中...';
+    }
+    if (subscriptionsMainSwitch === true) {
+      return '微信侧已开启';
+    }
+    if (subscriptionsMainSwitch === false) {
+      return '微信侧待开启';
+    }
+    return '待确认';
+  }, [loadingSettings, subscriptionsMainSwitch]);
+
+  return (
+    <View className='settings-page'>
+      <ScrollView scrollY className='settings-scroll'>
+        <View className='settings-content'>
+          <View className='settings-section-header'>
+            <Text className='settings-section-title'>账户信息</Text>
+          </View>
+          <View className='settings-section'>
+            <View className='settings-row'>
+              <Text className='settings-row-label'>手机号</Text>
+              <Text className='settings-row-value'>{user?.phone || '未绑定'}</Text>
+            </View>
+
+            <View
+              className='settings-row settings-row-clickable'
+              onClick={() => Taro.navigateTo({ url: '/pages/edit-profile/index' })}
+            >
+              <Text className='settings-row-label'>昵称</Text>
+              <View className='settings-row-right'>
+                <Text className='settings-row-value'>{user?.nickname || '未设置'}</Text>
+                <Text className='settings-row-arrow'>›</Text>
+              </View>
+            </View>
+
+            <View
+              className='settings-row settings-row-clickable settings-row-last'
+              onClick={() => Taro.navigateTo({ url: '/pages/verification/index' })}
+            >
+              <Text className='settings-row-label'>实名认证</Text>
+              <View className='settings-row-right'>
+                <Text
+                  className={`settings-row-value ${
+                    user?.id_verified === 'approved'
+                      ? 'settings-row-value-success'
+                      : 'settings-row-value-warning'
+                  }`}
+                >
+                  {getVerifyText(user?.id_verified)}
+                </Text>
+                <Text className='settings-row-arrow'>›</Text>
+              </View>
+            </View>
+          </View>
+
+          <View className='settings-section-header'>
+            <Text className='settings-section-title'>通知设置</Text>
+          </View>
+          <View className='settings-section'>
+            <View className='settings-row'>
+              <View className='settings-row-main'>
+                <Text className='settings-row-label'>接收平台通知</Text>
+                <Text className='settings-row-hint'>控制当前设备是否接收平台消息提醒</Text>
+              </View>
+              <Switch
+                checked={pushEnabled}
+                color='#2563EB'
+                onChange={(e) => handleTogglePush(!!e.detail.value)}
+              />
+            </View>
+
+            <View className='settings-row'>
+              <View className='settings-row-main'>
+                <Text className='settings-row-label settings-row-label-muted'>微信通知入口</Text>
+                <Text className='settings-row-hint settings-row-hint-muted'>
+                  {notificationStatusText}
+                </Text>
+              </View>
+              <Text className='settings-mini-status'>{notificationStatusText}</Text>
+            </View>
+
+            <View
+              className='settings-row settings-row-clickable settings-row-last'
+              onClick={handleOpenSystemSettings}
+            >
+              <View className='settings-row-main'>
+                <Text className='settings-row-label'>打开授权设置</Text>
+                <Text className='settings-row-hint'>检查通知、订阅消息与微信授权状态</Text>
+              </View>
+              <Text className='settings-row-arrow'>›</Text>
+            </View>
+          </View>
+
+          {isDevMode ? (
+            <>
+              <View className='settings-section-header'>
+                <Text className='settings-section-title'>开发诊断</Text>
+              </View>
+              <View className='settings-section settings-dev-section'>
+                <View className='settings-row'>
+                  <Text className='settings-row-label'>当前环境</Text>
+                  <Text className='settings-row-value'>开发模式</Text>
+                </View>
+                <View className='settings-row'>
+                  <Text className='settings-row-label'>登录状态</Text>
+                  <Text className='settings-row-value'>{user?.id ? '已登录' : '未登录'}</Text>
+                </View>
+                <View className='settings-row settings-row-last'>
+                  <Text className='settings-row-label'>本机提醒偏好</Text>
+                  <Text className='settings-row-value'>{pushEnabled ? '已开启' : '已关闭'}</Text>
+                </View>
+              </View>
+            </>
+          ) : null}
+        </View>
+      </ScrollView>
+
+      <View className='settings-footer'>
+        <View className='settings-logout-btn' onClick={handleLogout}>
+          <Text className='settings-logout-text'>退出登录</Text>
+        </View>
+      </View>
+    </View>
+  );
+}

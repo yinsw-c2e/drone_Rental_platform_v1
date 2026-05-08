@@ -1,0 +1,102 @@
+// 绑定飞手页面样式
+.bp-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.bp-hero {
+  background: #1677FF;
+}
+
+.bp-hero-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 20px;
+  color: rgba(255,255,255,0.85);
+  display: block;
+}
+
+.bp-desc {
+  font-size: 13px;
+  line-height: 20px;
+  color: #6B7280;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.bp-input {
+  border: 1px solid #E8ECF1;
+  border-radius: 12px;
+  height: 44px;
+  line-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  background: #F9FAFB;
+  margin-bottom: 12px;
+}
+
+.bp-input-textarea {
+  height: 88px;
+  line-height: 22px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.bp-invite-btn {
+  background: #1677FF;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bp-btn-disabled {
+  opacity: 0.6;
+}
+
+.bp-invite-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bp-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.bp-action-primary {
+  flex: 1;
+  border-radius: 12px;
+  background: #1677FF;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bp-action-primary-text {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bp-action-ghost {
+  flex: 1;
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
+  background: #F5F7FA;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bp-action-ghost-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1677FF;
+}

@@ -1,0 +1,278 @@
+// 空域报备页面样式
+.airspace-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.airspace-form,
+.airspace-list {
+  padding: 16px;
+}
+
+.airspace-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #EEEFF2;
+}
+
+.airspace-header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A1D26;
+}
+
+.airspace-create-btn {
+  background: #1677FF;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.airspace-create-text {
+  color: #FFFFFF;
+  font-size: 14px;
+}
+
+.airspace-back {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.airspace-back-text {
+  font-size: 15px;
+  color: #1677FF;
+  font-weight: 600;
+}
+
+.airspace-label {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 6px;
+  margin-top: 8px;
+  display: block;
+}
+
+.airspace-input {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  height: 44px;
+  line-height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.airspace-textarea {
+  height: 80px;
+  line-height: 22px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.airspace-option-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.airspace-option-btn {
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: #F5F7FA;
+  border: 1px solid #E5E7EB;
+}
+
+.airspace-option-active {
+  background: #F0F7FF;
+  border-color: #1677FF;
+}
+
+.airspace-option-text {
+  font-size: 13px;
+  color: #6B7280;
+  font-weight: 600;
+}
+
+.airspace-option-text-active {
+  color: #1677FF;
+  font-weight: 700;
+}
+
+.airspace-submit-btn {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #1677FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.airspace-submit-disabled {
+  opacity: 0.6;
+}
+
+.airspace-submit-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.airspace-card-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.airspace-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1D26;
+  flex: 1;
+}
+
+.airspace-card-info {
+  font-size: 13px;
+  color: #6B7280;
+  margin-bottom: 4px;
+}
+
+.airspace-address-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #EEEFF2;
+}
+
+.airspace-address-row-last {
+  border-bottom: 0;
+}
+
+.airspace-address-label {
+  width: 82px;
+  font-size: 14px;
+  color: #6B7280;
+  flex-shrink: 0;
+}
+
+.airspace-address-value {
+  flex: 1;
+  text-align: right;
+  font-size: 14px;
+  color: #1A1D26;
+  line-height: 20px;
+}
+
+.airspace-placeholder {
+  color: #9CA3AF;
+}
+
+.airspace-card {
+  margin-bottom: 12px;
+}
+
+.airspace-status {
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.airspace-status-gray {
+  background: #F3F4F6;
+}
+
+.airspace-status-orange {
+  background: #FFF7ED;
+}
+
+.airspace-status-green {
+  background: #F0FDF4;
+}
+
+.airspace-status-red {
+  background: #FEF2F2;
+}
+
+.airspace-status-blue {
+  background: #EFF6FF;
+}
+
+.airspace-status-text {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.airspace-status-text-gray {
+  color: #6B7280;
+}
+
+.airspace-status-text-orange {
+  color: #D97706;
+}
+
+.airspace-status-text-green {
+  color: #16A34A;
+}
+
+.airspace-status-text-red {
+  color: #DC2626;
+}
+
+.airspace-status-text-blue {
+  color: #1677FF;
+}
+
+.airspace-card-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 8px;
+  border-top: 1px solid #EEEFF2;
+}
+
+.airspace-time {
+  color: #9CA3AF;
+  font-size: 12px;
+}
+
+.airspace-action-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.airspace-action-btn {
+  padding: 5px 10px;
+  border-radius: 8px;
+}
+
+.airspace-action-primary {
+  background: #1677FF;
+}
+
+.airspace-action-primary-text {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.airspace-action-ghost {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+}
+
+.airspace-action-ghost-text {
+  color: #6B7280;
+  font-size: 12px;
+  font-weight: 700;
+}

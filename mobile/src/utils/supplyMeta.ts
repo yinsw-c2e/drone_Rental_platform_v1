@@ -1,9 +1,15 @@
 export const SUPPLY_SCENE_LABELS: Record<string, string> = {
   power_grid: '电网建设',
+  grid_power_material_transport: '电网物资运输',
+  power_grid_material: '电网物资',
+  power_grid_material_transport: '电网物资运输',
   mountain_agriculture: '山区农副产品',
   plateau_supply: '高原给养',
   island_supply: '海岛补给',
   emergency: '应急救援',
+  emergency_relief: '应急救援',
+  mountain_agri: '山区吊运',
+  other_heavy_lift: '其他重载',
 };
 
 export const SUPPLY_PRICING_UNIT_LABELS: Record<string, string> = {
@@ -21,14 +27,15 @@ export const getSupplySceneLabel = (scene?: string | null): string => {
   if (!key) {
     return '未标注场景';
   }
-  return SUPPLY_SCENE_LABELS[key] || key;
+  return SUPPLY_SCENE_LABELS[key] || (/^[a-z0-9_:-]+$/i.test(key) ? '其它场景' : key);
 };
 
 export const formatAmountYuan = (amount?: number | null): string =>
   `¥${((amount || 0) / 100).toFixed(2)}`;
 
 export const formatSupplyPricing = (amount?: number | null, unit?: string | null): string => {
-  const unitLabel = SUPPLY_PRICING_UNIT_LABELS[String(unit || '')] || unit || '元';
+  const unitKey = String(unit || '');
+  const unitLabel = SUPPLY_PRICING_UNIT_LABELS[unitKey] || (/^[a-z0-9_:-]+$/i.test(unitKey) ? '元' : unitKey || '元');
   return `${formatAmountYuan(amount)} ${unitLabel}`;
 };
 
