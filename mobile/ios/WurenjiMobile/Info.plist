@@ -96,7 +96,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>wxd24054bf2384f478</string>
+				<string>$(WECHAT_APP_ID)</string>
 			</array>
 		</dict>
 	</array>

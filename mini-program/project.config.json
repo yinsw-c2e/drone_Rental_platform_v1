@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/",
   "projectname": "wurenji-mini",
   "description": "无人机重载吊运平台",
-  "appid": "wx35ee27882ca7c110",
+  "appid": "touristappid",
   "setting": {
     "urlCheck": false,
     "es6": true,
