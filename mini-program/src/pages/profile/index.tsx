@@ -4,7 +4,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { useDispatch, useSelector } from 'react-redux';
 
-import StatusBadge from '../../components/business/StatusBadge';
 import { demandV2Service } from '../../services/demandV2';
 import { dispatchV2Service } from '../../services/dispatchV2';
 import { droneService } from '../../services/drone';
@@ -17,6 +16,23 @@ import { logout, setMeSummary, updateUser } from '../../store/slices/authSlice';
 import { RootState } from '../../store/store';
 import { getEffectiveRoleSummary } from '../../utils/roleSummary';
 import { syncCustomTabBar } from '../../utils/tabBar';
+import profileBgImage from '../../assets/mine/images/mine_profile_drone_bg_750x330.png';
+import defaultAvatarImage from '../../assets/mine/images/default_avatar_circle.png';
+import cellOrderIcon from '../../assets/mine/icons/cell_order.png';
+import cellTaskIcon from '../../assets/mine/icons/cell_task.png';
+import cellArchiveIcon from '../../assets/mine/icons/cell_archive.png';
+import cellLockIcon from '../../assets/mine/icons/cell_lock.png';
+import cellFlyerIcon from '../../assets/mine/icons/cell_flyer.png';
+import cellEditIcon from '../../assets/mine/icons/cell_edit.png';
+import cellSettingIcon from '../../assets/mine/icons/cell_setting.png';
+import identityUserIcon from '../../assets/mine/icons/identity_user.png';
+import identityOwnerIcon from '../../assets/mine/icons/identity_owner.png';
+import identityDroneIcon from '../../assets/mine/icons/identity_drone.png';
+import logoutIcon from '../../assets/mine/icons/logout.png';
+import chevronRightIcon from '../../assets/mine/icons/chevron_right.png';
+import chevronDownIcon from '../../assets/mine/icons/chevron_down.png';
+import chipCheckIcon from '../../assets/mine/icons/chip_check.png';
+import chipStarIcon from '../../assets/mine/icons/chip_star.png';
 import './index.scss';
 
 const VERIFY_META = {
@@ -34,6 +50,75 @@ const getVerifyMeta = (status?: string) =>
 
 const getRoleTone = (enabled: boolean, pendingTone: 'orange' | 'gray' = 'gray') =>
   (enabled ? 'green' : pendingTone) as 'green' | 'orange' | 'gray';
+
+const getMenuIcon = (key: string) => {
+  switch (key) {
+    case 'my-orders':
+      return cellOrderIcon;
+    case 'my-demands':
+    case 'my-quotes':
+      return cellTaskIcon;
+    case 'client-profile':
+      return cellArchiveIcon;
+    case 'verify':
+      return cellLockIcon;
+    case 'owner-profile':
+      return identityOwnerIcon;
+    case 'pilot-profile':
+    case 'pilot-register':
+      return cellFlyerIcon;
+    case 'my-offers':
+      return cellTaskIcon;
+    case 'my-drones':
+      return identityDroneIcon;
+    case 'edit-profile':
+      return cellEditIcon;
+    case 'settings':
+      return cellSettingIcon;
+    default:
+      return cellArchiveIcon;
+  }
+};
+
+const getMenuTone = (key: string) => {
+  switch (key) {
+    case 'my-orders':
+      return 'blue';
+    case 'my-demands':
+    case 'my-quotes':
+      return 'teal';
+    case 'verify':
+    case 'owner-profile':
+      return 'green';
+    case 'pilot-profile':
+    case 'pilot-register':
+    case 'my-drones':
+      return 'blue';
+    case 'my-offers':
+      return 'teal';
+    case 'edit-profile':
+      return 'purple';
+    case 'settings':
+      return 'gray';
+    default:
+      return 'blue';
+  }
+};
+
+const getStatusTextTone = (text?: string) => {
+  if (!text) return 'gray';
+  if (text.includes('去') || text.includes('待') || text.includes('补齐')) return 'blue';
+  if (text.includes('未')) return 'gray';
+  if (text.includes('审核')) return 'orange';
+  if (text.includes('实名') || text.includes('就绪') || text.includes('认证') || text.includes('建立')) return 'green';
+  return 'gray';
+};
+
+const getRoleBadgeIcon = (label: string) => {
+  if (label.includes('客户')) return identityUserIcon;
+  if (label.includes('机主')) return identityOwnerIcon;
+  return identityDroneIcon;
+};
 
 export default function ProfilePage() {
   const dispatch = useDispatch();
@@ -401,15 +486,11 @@ export default function ProfilePage() {
       >
         <View className='profile-content'>
           <View className='hero-card'>
+            <Image className='hero-bg-image' src={profileBgImage} mode='aspectFill' />
+            <Text className='hero-profile-arrow' onClick={() => handleNavigate('/pages/edit-profile/index')}>›</Text>
             <View className='hero-top'>
               <View className='avatar-wrap' onClick={handleAvatarPress}>
-                {user?.avatar_url ? (
-                  <Image src={user.avatar_url} className='avatar-image' mode='aspectFill' />
-                ) : (
-                  <View className='avatar-fallback'>
-                    <Text className='avatar-text'>{user?.nickname?.charAt(0) || 'U'}</Text>
-                  </View>
-                )}
+                <Image src={user?.avatar_url || defaultAvatarImage} className='avatar-image' mode='aspectFill' />
                 <View className='avatar-edit-badge'>
                   <Text className='avatar-edit-text'>{uploading ? '上传中' : '编辑'}</Text>
                 </View>
@@ -421,12 +502,19 @@ export default function ProfilePage() {
                 </Text>
                 <Text className='hero-phone'>{user?.phone || '未绑定手机号'}</Text>
                 <View className='hero-badge-row'>
-                  <StatusBadge label={verifyInfo.label} tone={verifyInfo.tone} />
-                  <StatusBadge label={`信用分 ${user?.credit_score || 100}`} tone='blue' />
+                  <View className={`hero-chip hero-chip-${verifyInfo.tone}`}>
+                    <Image className='hero-chip-icon' src={chipCheckIcon} mode='aspectFit' />
+                    <Text className='hero-chip-text'>{verifyInfo.label}</Text>
+                  </View>
+                  <View className='hero-chip hero-chip-blue'>
+                    <Image className='hero-chip-icon' src={chipStarIcon} mode='aspectFit' />
+                    <Text className='hero-chip-text'>{`信用分 ${user?.credit_score ?? 100}`}</Text>
+                  </View>
                 </View>
               </View>
             </View>
 
+            <View className='hero-divider' />
             <View className='hero-stats-row'>
               {accountHighlights.map((item) => (
                 <View
@@ -451,14 +539,19 @@ export default function ProfilePage() {
                     className={`menu-row ${index === group.items.length - 1 ? 'menu-row-last' : ''}`}
                     onClick={() => handleNavigate(item.screen)}
                   >
-                    <View className='menu-icon-wrap'>
-                      <Text className='menu-icon'>{item.icon}</Text>
+                    <View className={`menu-icon-wrap menu-icon-wrap-${getMenuTone(item.key)}`}>
+                      <Image className='menu-icon-img' src={getMenuIcon(item.key)} mode='aspectFit' />
                     </View>
                     <View className='menu-main'>
                       <Text className='menu-title'>{item.title}</Text>
+                      {item.desc ? <Text className='menu-desc'>{item.desc}</Text> : null}
                     </View>
-                    {item.rightText ? <Text className='menu-right-text'>{item.rightText}</Text> : null}
-                    <Text className='menu-chevron'>›</Text>
+                    {item.rightText ? (
+                      <Text className={`menu-right-text menu-right-text-${getStatusTextTone(item.rightText)}`}>
+                        {item.rightText}
+                      </Text>
+                    ) : null}
+                    <Image className='menu-chevron-img' src={chevronRightIcon} mode='aspectFit' />
                   </View>
                 ))}
               </View>
@@ -469,60 +562,66 @@ export default function ProfilePage() {
             <Text className='section-title'>身份概览</Text>
             <View className='role-badge-wrap'>
               {roleBadges.map((item) => (
-                <StatusBadge key={item.label} label={item.label} tone={item.tone} />
+                <View key={item.label} className={`role-overview-chip role-overview-chip-${item.tone}`}>
+                  <Image className='role-overview-icon' src={getRoleBadgeIcon(item.label)} mode='aspectFit' />
+                  <Text className='role-overview-text'>{item.label}</Text>
+                </View>
               ))}
             </View>
           </View>
 
           <View className='fold-toggle' onClick={() => setShowAdvanced((prev) => !prev)}>
             <Text className='fold-toggle-text'>身份与能力详情</Text>
-            <Text className='fold-toggle-arrow'>{showAdvanced ? '收起 ▲' : '展开 ▼'}</Text>
+            <View className='fold-toggle-right'>
+              <Text className='fold-toggle-state'>{showAdvanced ? '收起' : '展开'}</Text>
+              <Image className={`fold-toggle-icon ${showAdvanced ? 'fold-toggle-icon-open' : ''}`} src={chevronDownIcon} mode='aspectFit' />
+            </View>
           </View>
 
           {showAdvanced ? (
             <>
-              <View className='group-block'>
-                <Text className='group-title'>身份详情</Text>
-                <View className='group-body'>
+              <View className='advanced-section'>
+                <Text className='advanced-title'>身份详情</Text>
+                <View className='advanced-card'>
                   {identityCards.map((card, index) => (
                     <View
                       key={card.key}
-                      className={`menu-row ${index === identityCards.length - 1 ? 'menu-row-last' : ''}`}
+                      className={`advanced-row ${index === identityCards.length - 1 ? 'advanced-row-last' : ''}`}
                       onClick={() => handleNavigate(card.screen)}
                     >
-                      <View className='menu-icon-wrap'>
-                        <Text className='menu-icon'>
-                          {card.key === 'client' ? '👔' : card.key === 'owner' ? '🧭' : '🎮'}
-                        </Text>
+                      <View className={`advanced-icon-wrap advanced-icon-wrap-${card.key === 'owner' ? 'blue' : card.key === 'pilot' ? 'teal' : 'green'}`}>
+                        <Image
+                          className='advanced-icon-img'
+                          src={card.key === 'client' ? identityUserIcon : card.key === 'owner' ? identityOwnerIcon : identityDroneIcon}
+                          mode='aspectFit'
+                        />
                       </View>
-                      <View className='menu-main'>
-                        <Text className='menu-title'>{card.label}</Text>
+                      <Text className='advanced-row-title'>{card.label}</Text>
+                      <View className={`advanced-status advanced-status-${card.statusTone}`}>
+                        <Text className='advanced-status-text'>{card.statusLabel}</Text>
                       </View>
-                      <View className='menu-badge-wrap'>
-                        <StatusBadge label={card.statusLabel} tone={card.statusTone} />
-                      </View>
-                      <Text className='menu-chevron'>›</Text>
+                      <Image className='advanced-chevron-img' src={chevronRightIcon} mode='aspectFit' />
                     </View>
                   ))}
                 </View>
               </View>
 
-              <View className='group-block'>
-                <Text className='group-title'>能力状态</Text>
-                <View className='group-body'>
+              <View className='advanced-section advanced-section-compact'>
+                <Text className='advanced-title'>能力状态</Text>
+                <View className='advanced-card'>
                   {capabilityItems.map((item, index) => (
                     <View
                       key={item.key}
-                      className={`menu-row ${index === capabilityItems.length - 1 ? 'menu-row-last' : ''}`}
+                      className={`advanced-row ${index === capabilityItems.length - 1 ? 'advanced-row-last' : ''}`}
                     >
-                      <View className='menu-icon-wrap capability-icon-wrap'>
-                        <Text className='menu-icon'>{item.enabled ? '✓' : '·'}</Text>
+                      <View className={`advanced-icon-wrap capability-icon-wrap ${item.enabled ? 'capability-icon-wrap-ready' : ''}`}>
+                        <Text className={`capability-dot ${item.enabled ? 'capability-dot-ready' : ''}`}>
+                          {item.enabled ? '✓' : '•'}
+                        </Text>
                       </View>
-                      <View className='menu-main'>
-                        <Text className='menu-title'>{item.label}</Text>
-                      </View>
-                      <View className='menu-badge-wrap'>
-                        <StatusBadge label={item.enabled ? '可用' : '未就绪'} tone={item.enabled ? 'green' : 'gray'} />
+                      <Text className='advanced-row-title'>{item.label}</Text>
+                      <View className={`advanced-status ${item.enabled ? 'advanced-status-green' : 'advanced-status-gray'}`}>
+                        <Text className='advanced-status-text'>{item.enabled ? '已就绪' : '未就绪'}</Text>
                       </View>
                     </View>
                   ))}
@@ -538,6 +637,7 @@ export default function ProfilePage() {
 
           <View className='logout-wrap'>
             <View className='logout-btn' onClick={handleLogout}>
+              <Image className='logout-icon' src={logoutIcon} mode='aspectFit' />
               <Text className='logout-text'>退出登录</Text>
             </View>
           </View>

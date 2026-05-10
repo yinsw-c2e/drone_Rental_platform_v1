@@ -1,11 +1,11 @@
-import { apiV2 } from './api';
+import { apiV2 } from "./api";
 import {
   OwnerPilotBindingSummary,
   V2PilotProfile,
   V2FlightRecordSummary,
   V2ListData,
   V2PageMeta,
-} from '../types';
+} from "../types";
 
 export type PilotFlightRecordListParams = {
   page?: number;
@@ -19,6 +19,9 @@ export type PilotProfilePayload = {
   caac_license_expire_date?: string;
   caac_license_image?: string;
   service_radius?: number;
+  service_base_address?: string;
+  service_base_latitude?: number;
+  service_base_longitude?: number;
   special_skills?: string[];
   current_city?: string;
 };
@@ -33,34 +36,48 @@ const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 
 export const pilotV2Service = {
-  getProfile: () =>
-    apiV2.get<V2PilotProfile>('/pilot/profile'),
+  getProfile: () => apiV2.get<V2PilotProfile>("/pilot/profile"),
 
   upsertProfile: (payload: PilotProfilePayload) =>
-    apiV2.put<V2PilotProfile>('/pilot/profile', payload),
+    apiV2.put<V2PilotProfile>("/pilot/profile", payload),
 
   updateAvailability: (availability_status: string) =>
-    apiV2.patch<V2PilotProfile>('/pilot/availability', { availability_status }),
+    apiV2.patch<V2PilotProfile>("/pilot/availability", { availability_status }),
 
   listOwnerBindings: (params?: PilotBindingListParams) =>
-    apiV2.get<V2ListData<OwnerPilotBindingSummary> & { meta: V2PageMeta }>('/pilot/owner-bindings', params),
+    apiV2.get<V2ListData<OwnerPilotBindingSummary> & { meta: V2PageMeta }>(
+      "/pilot/owner-bindings",
+      params,
+    ),
 
   applyOwnerBinding: (payload: { owner_user_id: number; note?: string }) =>
-    apiV2.post<OwnerPilotBindingSummary>('/pilot/owner-bindings', payload),
+    apiV2.post<OwnerPilotBindingSummary>("/pilot/owner-bindings", payload),
 
   confirmOwnerBinding: (bindingId: number) =>
-    apiV2.post<OwnerPilotBindingSummary>(`/pilot/owner-bindings/${bindingId}/confirm`),
+    apiV2.post<OwnerPilotBindingSummary>(
+      `/pilot/owner-bindings/${bindingId}/confirm`,
+    ),
 
   rejectOwnerBinding: (bindingId: number) =>
-    apiV2.post<OwnerPilotBindingSummary>(`/pilot/owner-bindings/${bindingId}/reject`),
+    apiV2.post<OwnerPilotBindingSummary>(
+      `/pilot/owner-bindings/${bindingId}/reject`,
+    ),
 
   updateOwnerBindingStatus: (bindingId: number, status: string) =>
-    apiV2.patch<OwnerPilotBindingSummary>(`/pilot/owner-bindings/${bindingId}/status`, { status }),
+    apiV2.patch<OwnerPilotBindingSummary>(
+      `/pilot/owner-bindings/${bindingId}/status`,
+      { status },
+    ),
 
   listFlightRecords: (params?: PilotFlightRecordListParams) =>
-    apiV2.get<V2ListData<V2FlightRecordSummary> & { meta: V2PageMeta }>('/pilot/flight-records', params),
+    apiV2.get<V2ListData<V2FlightRecordSummary> & { meta: V2PageMeta }>(
+      "/pilot/flight-records",
+      params,
+    ),
 
-  listAllFlightRecords: async (params?: Omit<PilotFlightRecordListParams, 'page'>) => {
+  listAllFlightRecords: async (
+    params?: Omit<PilotFlightRecordListParams, "page">,
+  ) => {
     const pageSize = params?.page_size || DEFAULT_PAGE_SIZE;
     let page = 1;
     let total = 0;
@@ -76,7 +93,11 @@ export const pilotV2Service = {
       total = Number(response.meta?.total || 0);
       items.push(...batch);
 
-      if (!batch.length || batch.length < pageSize || (total > 0 && items.length >= total)) {
+      if (
+        !batch.length ||
+        batch.length < pageSize ||
+        (total > 0 && items.length >= total)
+      ) {
         break;
       }
       page += 1;

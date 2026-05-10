@@ -29,6 +29,9 @@ export type DemandUpsertPayload = {
   scheduled_end_at?: string;
   cargo_weight_kg?: number;
   cargo_volume_m3?: number;
+  cargo_length_cm?: number;
+  cargo_width_cm?: number;
+  cargo_height_cm?: number;
   cargo_type?: string;
   cargo_special_requirements?: string;
   estimated_trip_count?: number;

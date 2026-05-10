@@ -1,30 +1,40 @@
 // @ts-nocheck
-import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useState } from 'react';
-import { Input, ScrollView, Switch, Text, View } from '@tarojs/components';
+import Taro, { useDidShow } from "@tarojs/taro";
+import React, { useCallback, useRef, useState } from "react";
+import { Input, ScrollView, Switch, Text, View } from "@tarojs/components";
 
-import StatusBadge from '../../../components/business/StatusBadge';
-import { dispatchV2Service } from '../../../services/dispatchV2';
-import { pilotV2Service } from '../../../services/pilotV2';
-import { aggregateFlightRecords, formatHoursFromSeconds } from '../../../utils/flightRecords';
-import './index.scss';
+import StatusBadge from "../../../components/business/StatusBadge";
+import { dispatchV2Service } from "../../../services/dispatchV2";
+import { locationService } from "../../../services/location";
+import { pilotV2Service } from "../../../services/pilotV2";
+import {
+  aggregateFlightRecords,
+  formatHoursFromSeconds,
+} from "../../../utils/flightRecords";
+import "./index.scss";
 
 const STATUS_MAP = {
-  verified: { label: '已认证', tone: 'green' },
-  approved: { label: '已认证', tone: 'green' },
-  pending: { label: '审核中', tone: 'orange' },
-  rejected: { label: '未通过', tone: 'red' },
-  unverified: { label: '未认证', tone: 'gray' },
+  verified: { label: "已认证", tone: "green" },
+  approved: { label: "已认证", tone: "green" },
+  pending: { label: "审核中", tone: "orange" },
+  rejected: { label: "未通过", tone: "red" },
+  unverified: { label: "未认证", tone: "gray" },
 };
 
 const availabilityMap = {
-  online: { label: '接单中', tone: 'green' },
-  available: { label: '接单中', tone: 'green' },
-  busy: { label: '忙碌中', tone: 'orange' },
-  offline: { label: '离线', tone: 'gray' },
+  online: { label: "接单中", tone: "green" },
+  available: { label: "接单中", tone: "green" },
+  busy: { label: "忙碌中", tone: "orange" },
+  offline: { label: "离线", tone: "gray" },
 };
 
-const skillOptions = ['电网吊运', '山区运输', '应急救援', '海岛补给', '高原补给'];
+const skillOptions = [
+  "电网吊运",
+  "山区运输",
+  "应急救援",
+  "海岛补给",
+  "高原补给",
+];
 
 const parseSkills = (skills: any): string[] => {
   if (Array.isArray(skills)) {
@@ -33,14 +43,42 @@ const parseSkills = (skills: any): string[] => {
   return [];
 };
 
+const buildDraftFromProfile = (profile: any) => ({
+  current_city: profile.current_city || "",
+  service_radius: String(
+    profile.service_radius_km ||
+      Math.round(profile.service_radius || 50) ||
+      50,
+  ),
+  service_base_address: profile.service_base_address || "",
+  service_base_latitude: Number(profile.service_base_latitude || 0),
+  service_base_longitude: Number(profile.service_base_longitude || 0),
+  special_skills: parseSkills(profile.special_skills),
+});
+
+const pickLocationCity = (...values: any[]) =>
+  values
+    .map((value) => String(value || "").trim())
+    .find(Boolean) || "";
+
+const formatServiceBaseSubtitle = (lat: number, lng: number) => {
+  if (!lat || !lng) {
+    return "派单匹配会从该地点开始计算覆盖距离";
+  }
+  return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+};
+
 export default function PilotProfilePage() {
   const [pilot, setPilot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState({
-    current_city: '',
-    service_radius: '50',
+    current_city: "",
+    service_radius: "50",
+    service_base_address: "",
+    service_base_latitude: 0,
+    service_base_longitude: 0,
     special_skills: [] as string[],
   });
   const [flightStats, setFlightStats] = useState({
@@ -50,33 +88,33 @@ export default function PilotProfilePage() {
     maxAltitudeM: 0,
   });
   const [dispatchStats, setDispatchStats] = useState({ pending: 0, active: 0 });
+  const draftDirtyRef = useRef(false);
+  const skipNextShowReloadRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
       const [profileRes, flightRecords, dispatchRes] = await Promise.all([
         pilotV2Service.getProfile().catch(() => null),
         pilotV2Service.listAllFlightRecords({ page_size: 100 }).catch(() => []),
-        dispatchV2Service.list({ role: 'pilot', page: 1, page_size: 100 }).catch(() => null),
+        dispatchV2Service
+          .list({ role: "pilot", page: 1, page_size: 100 })
+          .catch(() => null),
       ]);
 
       setPilot(profileRes || null);
-      if (profileRes) {
-        setDraft({
-          current_city: profileRes.current_city || '',
-          service_radius: String(
-            profileRes.service_radius_km || Math.round(profileRes.service_radius || 50) || 50,
-          ),
-          special_skills: parseSkills(profileRes.special_skills),
-        });
+      if (profileRes && !draftDirtyRef.current) {
+        setDraft(buildDraftFromProfile(profileRes));
       }
 
       setFlightStats(aggregateFlightRecords(flightRecords || []));
 
       const dispatchItems = dispatchRes?.items || [];
       setDispatchStats({
-        pending: dispatchItems.filter((item: any) => item.status === 'pending_response').length,
+        pending: dispatchItems.filter(
+          (item: any) => item.status === "pending_response",
+        ).length,
         active: dispatchItems.filter((item: any) =>
-          ['accepted', 'executing', 'in_progress'].includes(item.status),
+          ["accepted", "executing", "in_progress"].includes(item.status),
         ).length,
       });
     } finally {
@@ -86,15 +124,21 @@ export default function PilotProfilePage() {
   }, []);
 
   useDidShow(() => {
+    if (skipNextShowReloadRef.current) {
+      skipNextShowReloadRef.current = false;
+      return;
+    }
     loadData();
   });
 
   const onRefresh = () => {
     setRefreshing(true);
+    draftDirtyRef.current = false;
     loadData();
   };
 
   const toggleSkill = (skill: string) => {
+    draftDirtyRef.current = true;
     setDraft((prev) => ({
       ...prev,
       special_skills: prev.special_skills.includes(skill)
@@ -107,11 +151,57 @@ export default function PilotProfilePage() {
     if (!pilot) {
       return;
     }
+    if (
+      enabled &&
+      (!draft.service_base_latitude || !draft.service_base_longitude)
+    ) {
+      Taro.showToast({ title: "请先设置服务基准地点", icon: "none" });
+      return;
+    }
     try {
-      const nextProfile = await pilotV2Service.updateAvailability(enabled ? 'online' : 'offline');
+      const nextProfile = await pilotV2Service.updateAvailability(
+        enabled ? "online" : "offline",
+      );
       setPilot(nextProfile);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '更新失败', icon: 'none' });
+      Taro.showToast({ title: error?.message || "更新失败", icon: "none" });
+    }
+  };
+
+  const chooseServiceBase = async () => {
+    try {
+      skipNextShowReloadRef.current = true;
+      const res = await Taro.chooseLocation({});
+      if (!res?.latitude || !res?.longitude) {
+        return;
+      }
+      const address = (res.address || res.name || "").trim();
+      let city = "";
+      try {
+        const geo: any = await locationService.reverseGeoCode(
+          res.longitude,
+          res.latitude,
+        );
+        const geoData = geo?.data || geo;
+        city = pickLocationCity(
+          geoData?.city,
+          geoData?.district,
+          geoData?.province,
+        );
+      } catch {}
+      draftDirtyRef.current = true;
+      setDraft((prev) => ({
+        ...prev,
+        current_city: city,
+        service_base_address:
+          address || `${res.latitude.toFixed(6)}, ${res.longitude.toFixed(6)}`,
+        service_base_latitude: res.latitude,
+        service_base_longitude: res.longitude,
+      }));
+    } catch (error: any) {
+      if (!String(error?.errMsg || "").includes("cancel")) {
+        Taro.showToast({ title: "无法选择地点，请重试", icon: "none" });
+      }
     }
   };
 
@@ -119,17 +209,40 @@ export default function PilotProfilePage() {
     if (!pilot) {
       return;
     }
+    if (!draft.service_base_latitude || !draft.service_base_longitude) {
+      Taro.showToast({ title: "请选择服务基准地点", icon: "none" });
+      return;
+    }
     setSaving(true);
     try {
-      const nextProfile = await pilotV2Service.upsertProfile({
+      const payload = {
         current_city: draft.current_city.trim(),
         service_radius: Number(draft.service_radius) || 50,
+        service_base_address: draft.service_base_address.trim(),
+        service_base_latitude: draft.service_base_latitude,
+        service_base_longitude: draft.service_base_longitude,
         special_skills: draft.special_skills,
-      });
-      setPilot(nextProfile);
-      Taro.showToast({ title: '飞手设置已更新', icon: 'success' });
+      };
+      const nextProfile = await pilotV2Service.upsertProfile(payload);
+      const savedProfile = {
+        ...nextProfile,
+        current_city: payload.current_city,
+        service_radius: payload.service_radius,
+        service_radius_km: payload.service_radius,
+        service_base_address: payload.service_base_address,
+        service_base_latitude: payload.service_base_latitude,
+        service_base_longitude: payload.service_base_longitude,
+        special_skills: payload.special_skills,
+      };
+      draftDirtyRef.current = false;
+      setPilot(savedProfile);
+      setDraft(buildDraftFromProfile(savedProfile));
+      Taro.showToast({ title: "飞手设置已更新", icon: "success" });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '保存失败，请稍后重试', icon: 'none' });
+      Taro.showToast({
+        title: error?.message || "保存失败，请稍后重试",
+        icon: "none",
+      });
     } finally {
       setSaving(false);
     }
@@ -137,10 +250,15 @@ export default function PilotProfilePage() {
 
   const handleEnterFlightMonitoring = async () => {
     try {
-      const res = await dispatchV2Service.list({ role: 'pilot', page: 1, page_size: 20 });
+      const res = await dispatchV2Service.list({
+        role: "pilot",
+        page: 1,
+        page_size: 20,
+      });
       const activeTask = (res.items || []).find(
         (item: any) =>
-          item.order?.id && !['rejected', 'finished', 'cancelled'].includes(item.status),
+          item.order?.id &&
+          !["rejected", "finished", "cancelled"].includes(item.status),
       );
       if (activeTask?.order?.id) {
         Taro.navigateTo({
@@ -149,43 +267,51 @@ export default function PilotProfilePage() {
         return;
       }
       Taro.showModal({
-        title: '当前没有可监控任务',
-        content: '先从正式派单里接受一条执行任务，再进入飞行监控。',
-        confirmText: '去派单任务',
+        title: "当前没有可监控任务",
+        content: "先从正式派单里接受一条执行任务，再进入飞行监控。",
+        confirmText: "去派单任务",
         success: (modalRes) => {
           if (modalRes.confirm) {
-            Taro.navigateTo({ url: '/pages/dispatch/list/index' });
+            Taro.navigateTo({ url: "/pages/dispatch/list/index" });
           }
         },
       });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '获取失败，请稍后重试', icon: 'none' });
+      Taro.showToast({
+        title: error?.message || "获取失败，请稍后重试",
+        icon: "none",
+      });
     }
   };
 
   const verificationStatus =
-    STATUS_MAP[pilot?.verification_status || 'unverified'] || STATUS_MAP.unverified;
+    STATUS_MAP[pilot?.verification_status || "unverified"] ||
+    STATUS_MAP.unverified;
   const availabilityStatus =
-    availabilityMap[pilot?.availability_status || 'offline'] || availabilityMap.offline;
+    availabilityMap[pilot?.availability_status || "offline"] ||
+    availabilityMap.offline;
   const eligibility = pilot?.eligibility;
   const readinessTone =
-    eligibility?.tier === 'dispatch_ready'
-      ? 'green'
-      : eligibility?.tier === 'candidate_ready' || eligibility?.tier === 'verified_offline'
-      ? 'orange'
-      : eligibility?.tier === 'needs_resubmission'
-      ? 'red'
-      : 'gray';
+    eligibility?.tier === "dispatch_ready"
+      ? "green"
+      : eligibility?.tier === "candidate_ready" ||
+          eligibility?.tier === "verified_offline"
+        ? "orange"
+        : eligibility?.tier === "needs_resubmission"
+          ? "red"
+          : "gray";
   const canUpdateAvailability =
     eligibility?.can_update_availability ??
-    ['verified', 'approved'].includes(pilot?.verification_status || '');
-  const isOnline = ['online', 'available'].includes(pilot?.availability_status || 'offline');
+    ["verified", "approved"].includes(pilot?.verification_status || "");
+  const isOnline = ["online", "available"].includes(
+    pilot?.availability_status || "offline",
+  );
 
   if (loading) {
     return (
-      <View className='pilot-wrap'>
-        <View className='pilot-loading'>
-          <Text className='pilot-loading-text'>飞手档案加载中...</Text>
+      <View className="pilot-wrap">
+        <View className="pilot-loading">
+          <Text className="pilot-loading-text">飞手档案加载中...</Text>
         </View>
       </View>
     );
@@ -193,17 +319,19 @@ export default function PilotProfilePage() {
 
   if (!pilot) {
     return (
-      <View className='pilot-wrap'>
-        <View className='pilot-empty'>
-          <Text className='pilot-empty-title'>还没有飞手档案</Text>
-          <Text className='pilot-empty-desc'>
+      <View className="pilot-wrap">
+        <View className="pilot-empty">
+          <Text className="pilot-empty-title">还没有飞手档案</Text>
+          <Text className="pilot-empty-desc">
             先完成飞手认证，后面这里才会出现接单状态、服务范围和飞行统计。
           </Text>
           <View
-            className='pilot-empty-btn'
-            onClick={() => Taro.navigateTo({ url: '/pages/pilot/register/index' })}
+            className="pilot-empty-btn"
+            onClick={() =>
+              Taro.navigateTo({ url: "/pages/pilot/register/index" })
+            }
           >
-            <Text className='pilot-empty-btn-text'>去做飞手认证</Text>
+            <Text className="pilot-empty-btn-text">去做飞手认证</Text>
           </View>
         </View>
       </View>
@@ -211,69 +339,84 @@ export default function PilotProfilePage() {
   }
 
   return (
-    <View className='pilot-wrap'>
+    <View className="pilot-wrap">
       <ScrollView
         scrollY
-        className='pilot-scroll'
+        className="pilot-scroll"
         refresherEnabled
         refresherTriggered={refreshing}
         onRefresherRefresh={onRefresh}
       >
-        <View className='pilot-content'>
-          <View className='pilot-hero'>
-            <View className='pilot-hero-top'>
+        <View className="pilot-content">
+          <View className="pilot-hero">
+            <View className="pilot-hero-top">
               <View>
-                <Text className='pilot-hero-title'>飞手工作台</Text>
-                <Text className='pilot-hero-sub'>执照、接单与飞行统计</Text>
+                <Text className="pilot-hero-title">飞手工作台</Text>
+                <Text className="pilot-hero-sub">执照、接单与飞行统计</Text>
               </View>
-              <StatusBadge label={availabilityStatus.label} tone={availabilityStatus.tone} />
+              <StatusBadge
+                label={availabilityStatus.label}
+                tone={availabilityStatus.tone}
+              />
             </View>
 
-            <View className='pilot-stats-grid'>
-              <View className='pilot-stat-card'>
-                <Text className='pilot-stat-value'>{dispatchStats.pending}</Text>
-                <Text className='pilot-stat-label'>待办派单</Text>
+            <View className="pilot-stats-grid">
+              <View className="pilot-stat-card">
+                <Text className="pilot-stat-value">
+                  {dispatchStats.pending}
+                </Text>
+                <Text className="pilot-stat-label">待办派单</Text>
               </View>
-              <View className='pilot-stat-card'>
-                <Text className='pilot-stat-value'>{dispatchStats.active}</Text>
-                <Text className='pilot-stat-label'>进行中</Text>
+              <View className="pilot-stat-card">
+                <Text className="pilot-stat-value">{dispatchStats.active}</Text>
+                <Text className="pilot-stat-label">进行中</Text>
               </View>
-              <View className='pilot-stat-card'>
-                <Text className='pilot-stat-value'>{flightStats.totalFlights}</Text>
-                <Text className='pilot-stat-label'>总飞行</Text>
+              <View className="pilot-stat-card">
+                <Text className="pilot-stat-value">
+                  {flightStats.totalFlights}
+                </Text>
+                <Text className="pilot-stat-label">总飞行</Text>
               </View>
-              <View className='pilot-stat-card'>
-                <Text className='pilot-stat-value'>
+              <View className="pilot-stat-card">
+                <Text className="pilot-stat-value">
                   {formatHoursFromSeconds(flightStats.totalDurationSeconds)}
                 </Text>
-                <Text className='pilot-stat-label'>飞行时数</Text>
+                <Text className="pilot-stat-label">飞行时数</Text>
               </View>
             </View>
           </View>
 
-          <View className='pilot-section'>
-            <Text className='pilot-section-title'>市场准入状态</Text>
-            <View className='pilot-readiness-card'>
-              <View className='pilot-readiness-header'>
-                <View className='pilot-readiness-main'>
-                  <Text className='pilot-readiness-title'>
+          <View className="pilot-section">
+            <Text className="pilot-section-title">市场准入状态</Text>
+            <View className="pilot-readiness-card">
+              <View className="pilot-readiness-header">
+                <View className="pilot-readiness-main">
+                  <Text className="pilot-readiness-title">
                     {eligibility?.label || verificationStatus.label}
                   </Text>
-                  <Text className='pilot-readiness-desc'>
-                    {eligibility?.recommended_next_step || '完善资料以获得更多权限'}
+                  <Text className="pilot-readiness-desc">
+                    {eligibility?.recommended_next_step ||
+                      "完善资料以获得更多权限"}
                   </Text>
                 </View>
                 <StatusBadge
-                  label={eligibility?.tier === 'dispatch_ready' ? '已就绪' : '待达标'}
+                  label={
+                    eligibility?.tier === "dispatch_ready" ? "已就绪" : "待达标"
+                  }
                   tone={readinessTone}
                 />
               </View>
 
               {eligibility?.blockers?.length ? (
-                <View className='pilot-blocker-box'>
-                  <Text className='pilot-blocker-title'>需要处理以下事项：</Text>
+                <View className="pilot-blocker-box">
+                  <Text className="pilot-blocker-title">
+                    需要处理以下事项：
+                  </Text>
                   {eligibility.blockers.map((blocker: any) => (
-                    <Text key={blocker.code || blocker.message} className='pilot-blocker-item'>
+                    <Text
+                      key={blocker.code || blocker.message}
+                      className="pilot-blocker-item"
+                    >
                       • {blocker.message}
                     </Text>
                   ))}
@@ -282,91 +425,117 @@ export default function PilotProfilePage() {
             </View>
           </View>
 
-          <View className='pilot-section'>
-            <View className='pilot-section-header'>
-              <Text className='pilot-section-title'>接单状态</Text>
-              <StatusBadge label={verificationStatus.label} tone={verificationStatus.tone} />
+          <View className="pilot-section">
+            <View className="pilot-section-header">
+              <Text className="pilot-section-title">接单状态</Text>
+              <StatusBadge
+                label={verificationStatus.label}
+                tone={verificationStatus.tone}
+              />
             </View>
 
-            <View className='pilot-availability-row'>
-              <View className='pilot-availability-main'>
-                <Text className='pilot-availability-label'>当前是否接单</Text>
-                <Text className='pilot-availability-desc'>
+            <View className="pilot-availability-row">
+              <View className="pilot-availability-main">
+                <Text className="pilot-availability-label">当前是否接单</Text>
+                <Text className="pilot-availability-desc">
                   已认证后可切换在线状态，平台会据此安排正式派单。
                 </Text>
               </View>
               <Switch
                 checked={isOnline}
-                color='#2563EB'
+                color="#2563EB"
                 disabled={!canUpdateAvailability}
                 onChange={(e) => toggleAvailability(!!e.detail.value)}
               />
             </View>
           </View>
 
-          <View className='pilot-section'>
-            <Text className='pilot-section-title'>快捷入口</Text>
-            <View className='pilot-quick-grid'>
+          <View className="pilot-section">
+            <Text className="pilot-section-title">快捷入口</Text>
+            <View className="pilot-quick-grid">
               <View
-                className='pilot-quick-card'
-                onClick={() => Taro.navigateTo({ url: '/pages/dispatch/list/index' })}
+                className="pilot-quick-card"
+                onClick={() =>
+                  Taro.navigateTo({ url: "/pages/dispatch/list/index" })
+                }
               >
-                <Text className='pilot-quick-icon'>📮</Text>
-                <Text className='pilot-quick-title'>派单任务</Text>
+                <Text className="pilot-quick-icon">📮</Text>
+                <Text className="pilot-quick-title">派单任务</Text>
               </View>
               <View
-                className='pilot-quick-card'
-                onClick={() => Taro.navigateTo({ url: '/pages/flight/records/index' })}
+                className="pilot-quick-card"
+                onClick={() =>
+                  Taro.navigateTo({ url: "/pages/flight/records/index" })
+                }
               >
-                <Text className='pilot-quick-icon'>📈</Text>
-                <Text className='pilot-quick-title'>飞行记录</Text>
-              </View>
-              <View className='pilot-quick-card' onClick={handleEnterFlightMonitoring}>
-                <Text className='pilot-quick-icon'>🛰️</Text>
-                <Text className='pilot-quick-title'>飞行监控</Text>
+                <Text className="pilot-quick-icon">📈</Text>
+                <Text className="pilot-quick-title">飞行记录</Text>
               </View>
               <View
-                className='pilot-quick-card'
-                onClick={() => Taro.navigateTo({ url: '/pages/pilot/bind-drone/index' })}
+                className="pilot-quick-card"
+                onClick={handleEnterFlightMonitoring}
               >
-                <Text className='pilot-quick-icon'>🤝</Text>
-                <Text className='pilot-quick-title'>绑定无人机</Text>
+                <Text className="pilot-quick-icon">🛰️</Text>
+                <Text className="pilot-quick-title">飞行监控</Text>
+              </View>
+              <View
+                className="pilot-quick-card"
+                onClick={() =>
+                  Taro.navigateTo({ url: "/pages/pilot/bind-drone/index" })
+                }
+              >
+                <Text className="pilot-quick-icon">🤝</Text>
+                <Text className="pilot-quick-title">绑定无人机</Text>
               </View>
             </View>
           </View>
 
-          <View className='pilot-section'>
-            <Text className='pilot-section-title'>服务设置</Text>
+          <View className="pilot-section">
+            <Text className="pilot-section-title">服务设置</Text>
 
-            <Text className='pilot-label'>当前服务城市</Text>
-            <Input
-              className='pilot-input'
-              placeholder='例如：佛山'
-              value={draft.current_city}
-              onInput={(e) => setDraft((prev) => ({ ...prev, current_city: e.detail.value }))}
-            />
+            <Text className="pilot-label">服务基准地点</Text>
+            <View className="pilot-location-card" onClick={chooseServiceBase}>
+              <View className="pilot-location-main">
+                <Text className="pilot-location-title">
+                  {draft.service_base_address || "请选择服务半径的中心地点"}
+                </Text>
+                <Text className="pilot-location-sub">
+                  {formatServiceBaseSubtitle(
+                    draft.service_base_latitude,
+                    draft.service_base_longitude,
+                  )}
+                </Text>
+              </View>
+              <Text className="pilot-location-arrow">选择</Text>
+            </View>
 
-            <Text className='pilot-label'>服务半径（公里）</Text>
+            <Text className="pilot-label">服务半径（公里）</Text>
             <Input
-              className='pilot-input'
-              type='number'
-              placeholder='默认 50'
+              className="pilot-input"
+              type="number"
+              placeholder="默认 50"
               value={draft.service_radius}
-              onInput={(e) => setDraft((prev) => ({ ...prev, service_radius: e.detail.value }))}
+              onInput={(e) => {
+                draftDirtyRef.current = true;
+                setDraft((prev) => ({
+                  ...prev,
+                  service_radius: e.detail.value,
+                }));
+              }}
             />
 
-            <Text className='pilot-label'>技能标签</Text>
-            <View className='pilot-skill-row'>
+            <Text className="pilot-label">技能标签</Text>
+            <View className="pilot-skill-row">
               {skillOptions.map((skill) => {
                 const active = draft.special_skills.includes(skill);
                 return (
                   <View
                     key={skill}
-                    className={`pilot-skill-chip ${active ? 'pilot-skill-chip-active' : ''}`}
+                    className={`pilot-skill-chip ${active ? "pilot-skill-chip-active" : ""}`}
                     onClick={() => toggleSkill(skill)}
                   >
                     <Text
-                      className={`pilot-skill-text ${active ? 'pilot-skill-text-active' : ''}`}
+                      className={`pilot-skill-text ${active ? "pilot-skill-text-active" : ""}`}
                     >
                       {skill}
                     </Text>
@@ -377,10 +546,12 @@ export default function PilotProfilePage() {
           </View>
 
           <View
-            className={`pilot-save-btn ${saving ? 'pilot-save-disabled' : ''}`}
+            className={`pilot-save-btn ${saving ? "pilot-save-disabled" : ""}`}
             onClick={handleSave}
           >
-            <Text className='pilot-save-text'>{saving ? '保存中...' : '保存接单设置'}</Text>
+            <Text className="pilot-save-text">
+              {saving ? "保存中..." : "保存接单设置"}
+            </Text>
           </View>
         </View>
       </ScrollView>

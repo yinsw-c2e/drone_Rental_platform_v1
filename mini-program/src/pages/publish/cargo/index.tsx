@@ -18,9 +18,12 @@ export default function PublishCargoPage() {
 
   const [title, setTitle] = useState('');
   const [cargoScene, setCargoScene] = useState(SCENE_OPTIONS[0].key);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [cargoWeight, setCargoWeight] = useState('');
   const [cargoType, setCargoType] = useState('');
-  const [cargoVolume, setCargoVolume] = useState('');
+  const [cargoLength, setCargoLength] = useState('');
+  const [cargoWidth, setCargoWidth] = useState('');
+  const [cargoHeight, setCargoHeight] = useState('');
   const [tripCount, setTripCount] = useState('1');
   const [budgetMax, setBudgetMax] = useState('');
   const [specialReq, setSpecialReq] = useState('');
@@ -32,12 +35,16 @@ export default function PublishCargoPage() {
 
     setSubmitting(true);
     try {
+      const effectiveCargoScene = customCargoScene.trim() || cargoScene;
       await createCargoDeclaration({
-        cargo_category: cargoScene,
+        cargo_category: effectiveCargoScene,
         cargo_name: title.trim(),
         cargo_description: description.trim() || undefined,
         quantity: Math.max(Number(tripCount) || 1, 1),
         total_weight: Number(cargoWeight),
+        length: cargoLength ? Number(cargoLength) : undefined,
+        width: cargoWidth ? Number(cargoWidth) : undefined,
+        height: cargoHeight ? Number(cargoHeight) : undefined,
         declared_value: budgetMax ? Math.round(Number(budgetMax) * 100) : 0,
       });
       Taro.showToast({ title: '申报成功', icon: 'success' });
@@ -71,15 +78,27 @@ export default function PublishCargoPage() {
             <Text className="publish-label">作业场景</Text>
             <View className="publish-option-row">
               {SCENE_OPTIONS.map(opt => (
-                <View key={opt.key} className={`publish-option-btn ${cargoScene === opt.key ? 'publish-option-active' : ''}`}
-                  onClick={() => setCargoScene(opt.key)}>
-                  <Text className={`publish-option-text ${cargoScene === opt.key ? 'publish-option-text-active' : ''}`}>{opt.label}</Text>
+                <View key={opt.key} className={`publish-option-btn ${!customCargoScene.trim() && cargoScene === opt.key ? 'publish-option-active' : ''}`}
+                  onClick={() => {
+                    setCargoScene(opt.key);
+                    setCustomCargoScene('');
+                  }}>
+                  <Text className={`publish-option-text ${!customCargoScene.trim() && cargoScene === opt.key ? 'publish-option-text-active' : ''}`}>{opt.label}</Text>
                 </View>
               ))}
             </View>
+            <Input
+              className="publish-input publish-custom-scene-input"
+              placeholder="其他场景，可直接填写"
+              value={customCargoScene}
+              onInput={e => setCustomCargoScene(e.detail.value)}
+            />
 
             <Text className="publish-label">货物重量 (kg) *</Text>
-            <Input className="publish-input" type="digit" placeholder="例如：120" value={cargoWeight} onInput={e => setCargoWeight(e.detail.value)} />
+            <View className="publish-input-unit-wrap">
+              <Input className="publish-input" type="digit" placeholder="例如：120" value={cargoWeight} onInput={e => setCargoWeight(e.detail.value)} />
+              <Text className="publish-input-unit">kg</Text>
+            </View>
 
             <View className="publish-actions">
               <View className="publish-btn-primary" onClick={() => setStep(2)}>
@@ -91,15 +110,14 @@ export default function PublishCargoPage() {
           <View className="card">
             <Text className="section-title">2. 更多细节 (选填)</Text>
 
-            <View className="publish-budget-row">
-              <View style={{ flex: 1 }}>
-                <Text className="publish-label">货物类型</Text>
-                <Input className="publish-input" placeholder="如：塔材" value={cargoType} onInput={e => setCargoType(e.detail.value)} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text className="publish-label">体积 (m³)</Text>
-                <Input className="publish-input" type="digit" placeholder="可选" value={cargoVolume} onInput={e => setCargoVolume(e.detail.value)} />
-              </View>
+            <Text className="publish-label">货物类型</Text>
+            <Input className="publish-input" placeholder="如：塔材" value={cargoType} onInput={e => setCargoType(e.detail.value)} />
+
+            <Text className="publish-label">货物尺寸（cm，可选）</Text>
+            <View className="publish-dimension-row">
+              <Input className="publish-input publish-dimension-input" type="digit" placeholder="长" value={cargoLength} onInput={e => setCargoLength(e.detail.value)} />
+              <Input className="publish-input publish-dimension-input" type="digit" placeholder="宽" value={cargoWidth} onInput={e => setCargoWidth(e.detail.value)} />
+              <Input className="publish-input publish-dimension-input" type="digit" placeholder="高" value={cargoHeight} onInput={e => setCargoHeight(e.detail.value)} />
             </View>
 
             <View className="publish-budget-row">

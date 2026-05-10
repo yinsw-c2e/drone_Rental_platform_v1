@@ -5,14 +5,12 @@ import { orderV2Service, updateExecutionStatus } from '../../../services/orderV2
 import './index.scss';
 
 const EXECUTION_STEPS = [
-  { status: 'preparing', label: '准备起飞', desc: '装货完毕、设备自检、天气与空域确认', icon: '🔧' },
-  { status: 'airspace_applying', label: '空域申请', desc: '确认临时空域报备已就绪', icon: '📡' },
-  { status: 'loading', label: '装载检查', desc: '载荷固定、重心稳定、周边清场', icon: '📦' },
-  { status: 'in_transit', label: '飞行执行中', desc: '监控飞行轨迹、保持应答联络', icon: '🚁' },
-  { status: 'delivered', label: '确认投送', desc: '确认卸载、拍照留痕、标记完成', icon: '✅' },
+  { status: 'preparing', label: '现场准备', desc: '完成装货、自检、天气与空域复核', icon: '🔧' },
+  { status: 'in_transit', label: '飞行执行', desc: '起飞后持续监控航线、载荷与通讯状态', icon: '🚁' },
+  { status: 'delivered', label: '完成投送', desc: '确认卸载完成，等待客户签收', icon: '✅' },
 ];
 
-const EXECUTION_ORDER = ['preparing', 'airspace_applying', 'loading', 'in_transit', 'delivered'];
+const EXECUTION_ORDER = EXECUTION_STEPS.map(step => step.status);
 
 export default function PilotWorkbenchPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
@@ -35,7 +33,10 @@ export default function PilotWorkbenchPage() {
     }
   });
 
-  const currentStepIndex = EXECUTION_ORDER.indexOf(currentStatus);
+  const currentStepIndex = currentStatus === 'completed'
+    ? EXECUTION_ORDER.length - 1
+    : EXECUTION_ORDER.indexOf(currentStatus);
+  const currentStep = EXECUTION_STEPS.find(s => s.status === currentStatus);
 
   const handleExecute = async (status: string) => {
     if (!orderId) { Taro.showToast({ title: '缺少订单信息', icon: 'none' }); return; }
@@ -68,10 +69,10 @@ export default function PilotWorkbenchPage() {
         <Text className="section-title">当前执行状态</Text>
         <View className="pw-current-status">
           <Text className="pw-current-label">
-            {currentStatus ? EXECUTION_STEPS.find(s => s.status === currentStatus)?.label || currentStatus : '未开始执行'}
+            {currentStatus === 'completed' ? '订单已完成' : currentStep?.label || '未开始执行'}
           </Text>
           <Text className="pw-current-desc">
-            {currentStatus ? EXECUTION_STEPS.find(s => s.status === currentStatus)?.desc || '' : '等待飞手确认派单后开始执行'}
+            {currentStatus === 'completed' ? '客户已确认签收，本次运输已闭环。' : currentStep?.desc || '客户已完成支付，等待执行人开始现场准备。'}
           </Text>
         </View>
       </View>
@@ -83,6 +84,7 @@ export default function PilotWorkbenchPage() {
           const isActive = EXECUTION_ORDER.indexOf(step.status) <= currentStepIndex;
           const isNext = EXECUTION_ORDER.indexOf(step.status) === currentStepIndex + 1;
           const isCurrent = currentStatus === step.status;
+          const isDone = currentStatus === 'completed';
           return (
             <View key={step.status} className={`pw-step ${isActive ? 'pw-step-active' : ''}`}>
               <View className="pw-step-left">
@@ -96,12 +98,12 @@ export default function PilotWorkbenchPage() {
               <View className="pw-step-content">
                 <Text className="pw-step-label">{step.label}</Text>
                 <Text className="pw-step-desc">{step.desc}</Text>
-                {isNext || (!currentStatus && idx === 0) ? (
+                {!isDone && (isNext || currentStatus === 'assigned' && idx === 0) ? (
                   <View className={`pw-step-btn ${submitting ? 'pw-step-btn-disabled' : ''}`}
                     onClick={() => handleExecute(step.status)}>
                     <Text className="pw-step-btn-text">{submitting && isCurrent ? '处理中...' : '执行此步骤'}</Text>
                   </View>
-                ) : isCurrent && currentStatus !== 'delivered' ? (
+                ) : !isDone && isCurrent && currentStatus !== 'delivered' ? (
                   <View className={`pw-step-btn pw-step-btn-next ${submitting ? 'pw-step-btn-disabled' : ''}`}
                     onClick={() => handleExecute(EXECUTION_ORDER[Math.min(idx + 1, EXECUTION_ORDER.length - 1)])}>
                     <Text className="pw-step-btn-text">标记下一步</Text>

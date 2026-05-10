@@ -34,19 +34,36 @@ export default function SupplyDetailPage() {
 
   const isMySupply = (supply as any).owner_user_id === user?.id;
   const canOrder = !isMySupply && roleSummary?.has_client_role && supply.status === 'active' && supply.accepts_direct_order;
+  const ownerUserId = Number((supply as any).owner_user_id || supply.owner?.id || 0);
+  const canContactOwner = ownerUserId > 0 && ownerUserId !== user?.id;
   const ownerLabel = supply.owner?.nickname || `机主 #${(supply as any).owner_user_id}`;
   const droneLabel = supply.drone ? `${supply.drone.brand} ${supply.drone.model}` : '未关联设备';
   const statusMeta = getObjectStatusMeta('supply', supply.status);
+  const sceneLabel = (supply.cargo_scenes || []).map((s: string) => getSupplySceneLabel(s)).join(' / ') || '重载吊运';
+
+  const handleContactOwner = () => {
+    if (!ownerUserId) {
+      Taro.showToast({ title: '该服务暂未提供可联系的机主账号', icon: 'none' });
+      return;
+    }
+    if (ownerUserId === user?.id) {
+      Taro.showToast({ title: '这是您自己的服务', icon: 'none' });
+      return;
+    }
+    Taro.navigateTo({
+      url: `/pages/chat/index?peerId=${ownerUserId}&peerName=${encodeURIComponent(ownerLabel)}&peerAvatar=${encodeURIComponent(supply.owner?.avatar_url || '')}`,
+    });
+  };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
-      <ScrollView scrollY >
-        {/* Hero */}
+    <View className="supply-detail-page">
+      <ScrollView className="supply-detail-scroll" scrollY>
+        <View className="supply-detail-content">
         <View className="supply-hero">
           <View className="supply-hero-top">
             <View className="supply-hero-tags">
-              <Text style={{ fontSize: '11px', fontWeight: '700', background: '#E6F4FF', color: '#1677FF', padding: '4px 8px', borderRadius: '6px' }}>服务供给</Text>
-              <Text style={{ fontSize: '11px', fontWeight: '700', background: '#F6FFED', color: '#52C41A', padding: '4px 8px', borderRadius: '6px' }}>{statusMeta.label}</Text>
+              <Text className="supply-tag supply-tag-source">服务供给</Text>
+              <Text className="supply-tag supply-tag-status">{statusMeta.label}</Text>
             </View>
             <Text className="supply-hero-no">{supply.supply_no}</Text>
           </View>
@@ -57,60 +74,62 @@ export default function SupplyDetailPage() {
           </View>
         </View>
 
-        {/* Owner & Drone */}
-        <View className="card" style={{ marginTop: '12px' }}>
+        <View className="card supply-section-card">
           <Text className="section-title">机组与能力</Text>
           <View className="supply-owner-row">
             <View className="supply-owner-avatar"><Text className="supply-owner-avatar-text">{ownerLabel.charAt(0)}</Text></View>
-            <View>
+            <View className="supply-owner-info">
               <Text className="supply-owner-name">{ownerLabel}</Text>
               <Text className="supply-owner-sub">{droneLabel}</Text>
             </View>
           </View>
           <View className="supply-grid">
-            <View className="supply-grid-item">
-              <Text className="supply-grid-label">起飞重量</Text>
-              <Text className="supply-grid-value">{supply.mtow_kg || 0}kg</Text>
+            <View className="supply-metric-row">
+              <View className="supply-grid-item">
+                <Text className="supply-grid-label">起飞重量</Text>
+                <Text className="supply-grid-value">{supply.mtow_kg || 0}kg</Text>
+              </View>
+              <View className="supply-grid-item">
+                <Text className="supply-grid-label">最大吊重</Text>
+                <Text className="supply-grid-value">{supply.max_payload_kg || 0}kg</Text>
+              </View>
             </View>
-            <View className="supply-grid-item">
-              <Text className="supply-grid-label">最大吊重</Text>
-              <Text className="supply-grid-value">{supply.max_payload_kg || 0}kg</Text>
-            </View>
-            <View className="supply-grid-item">
+            <View className="supply-scene-row">
               <Text className="supply-grid-label">作业场景</Text>
-              <Text className="supply-grid-value">{(supply.cargo_scenes || []).map((s: string) => getSupplySceneLabel(s)).join('/') || '重载吊运'}</Text>
+              <Text className="supply-scene-value">{sceneLabel}</Text>
             </View>
           </View>
         </View>
 
-        {/* Service area */}
         <View className="card">
           <Text className="section-title">服务范围</Text>
           <Row l="覆盖地区" v={(supply as any).service_area_snapshot?.region || '-'} />
           <Row l="计价规则" v={`${formatMoney(supply.base_price_amount)}${PRICING_UNITS[supply.pricing_unit] || ''}`} />
         </View>
 
-        {/* Description */}
         <View className="card">
           <Text className="section-title">服务说明</Text>
-          <Text style={{ fontSize: '14px', lineHeight: '22px', color: '#6B7280' }}>{supply.description || '机主未提供详细文字说明。'}</Text>
+          <Text className="supply-desc">{supply.description || '机主未提供详细文字说明。'}</Text>
+        </View>
         </View>
       </ScrollView>
 
-      {/* Footer */}
-      <View className="supply-footer" style={{ paddingBottom: '24px' }}>
+      <View className="supply-footer">
         {isMySupply ? (
           <View className="supply-footer-btn supply-footer-btn-primary" style={{ flex: 1 }} onClick={() => Taro.navigateTo({ url: '/pages/profile/my-offers/index' })}>
-            <Text style={{ color: '#FFF', fontSize: '15px', fontWeight: '800' }}>管理我的服务</Text>
+            <Text className="supply-footer-btn-primary-text">管理我的服务</Text>
           </View>
         ) : (
           <>
-            <View className="supply-footer-btn supply-footer-btn-secondary">
-              <Text style={{ color: '#1A1D26', fontSize: '15px', fontWeight: '700' }}>联系机主</Text>
+            <View
+              className={`supply-footer-btn supply-footer-btn-secondary ${!canContactOwner ? 'supply-footer-btn-disabled' : ''}`}
+              onClick={handleContactOwner}
+            >
+              <Text className="supply-footer-btn-secondary-text">联系机主</Text>
             </View>
             <View className={`supply-footer-btn supply-footer-btn-primary ${!canOrder ? 'supply-footer-btn-disabled' : ''}`}
-              onClick={() => canOrder && Taro.navigateTo({ url: `/pages/supply/detail/index?supplyId=${supplyId}` })}>
-              <Text style={{ color: '#FFF', fontSize: '15px', fontWeight: '800' }}>立即下单</Text>
+              onClick={() => canOrder && Taro.navigateTo({ url: `/pages/publish/quick-order/index?supplyId=${supplyId}` })}>
+              <Text className="supply-footer-btn-primary-text">立即下单</Text>
             </View>
           </>
         )}

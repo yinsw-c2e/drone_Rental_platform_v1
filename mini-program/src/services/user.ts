@@ -1,6 +1,6 @@
 import Taro from '@tarojs/taro';
 
-import { API_V1_BASE_URL } from '../constants';
+import { API_V1_BASE_URL, API_V2_BASE_URL } from '../constants';
 import { store } from '../store/store';
 import { User } from '../types';
 import { apiV1 } from './api';
@@ -25,17 +25,18 @@ export const uploadFileToEndpoint = async (
   endpoint: string,
   filePath: string,
   name = 'file',
+  version: 'v1' | 'v2' = 'v1',
 ) => {
   const token = getAccessToken();
   const response = await Taro.uploadFile({
-    url: `${API_V1_BASE_URL}${endpoint}`,
+    url: `${version === 'v2' ? API_V2_BASE_URL : API_V1_BASE_URL}${endpoint}`,
     filePath,
     name,
     header: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
   const body = parseUploadResponse(response.data);
-  if (body?.code !== 'OK' && body?.code !== 0) {
+  if (response.statusCode < 200 || response.statusCode >= 300 || (body?.code !== 'OK' && body?.code !== 0)) {
     throw new Error(body?.message || '上传失败');
   }
 

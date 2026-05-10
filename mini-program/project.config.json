@@ -21,7 +21,7 @@
     "uglifyFileName": false,
     "checkInvalidKey": true,
     "checkSiteMap": false,
-    "uploadWithSourceMap": true,
+    "uploadWithSourceMap": false,
     "compileHotReLoad": false,
     "babelSetting": {
       "ignore": [],

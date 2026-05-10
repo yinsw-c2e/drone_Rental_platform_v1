@@ -1,6 +1,6 @@
 import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, ScrollView } from '@tarojs/components';
+import { View, Text, ScrollView, Image } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 import { homeService } from '../../services/home';
@@ -15,6 +15,17 @@ import { HomeDashboard, DemandSummary, V2DispatchTaskSummary, V2OrderAnomaly, V2
 import { formatDemandBudget, resolveDemandPrimaryAddress, formatAmountYuan, getObjectStatusMeta } from '../../utils';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { getTonePalette, VisualTone } from '../../components/business/visuals';
+import heroBgImage from '../../assets/workbench/images/workbench_hero_drone_bg_750x310.png';
+import quickOrderIcon from '../../assets/workbench/icons/paper_plane_blue.png';
+import plusCircleIcon from '../../assets/workbench/icons/plus_circle_white.png';
+import warningIcon from '../../assets/workbench/icons/warning_shield.png';
+import chevronRightIcon from '../../assets/workbench/icons/chevron_right.png';
+import dropdownDownIcon from '../../assets/workbench/icons/dropdown_down.png';
+import entryBrowseService from '../../assets/workbench/icons/entrance_browse_service.png';
+import entryMyDemand from '../../assets/workbench/icons/entrance_my_demand.png';
+import entryQuickOrder from '../../assets/workbench/icons/entrance_quick_order.png';
+import entryPublishTask from '../../assets/workbench/icons/entrance_publish_task.png';
+import entryInquiryTask from '../../assets/workbench/icons/entrance_inquiry_task.png';
 import './index.scss';
 
 // ── Types ──
@@ -24,7 +35,7 @@ type PriorityQueueCategory = Exclude<PriorityQueueFilter, 'all'>;
 
 interface HeroTheme { gradient: string; accent: string; softText: string; eyebrow: string; }
 interface MetricCard { key: string; label: string; value: number; hint: string; }
-interface DashboardAction { key: string; title: string; desc: string; icon: string; tone: VisualTone; onPress: () => void; badge?: number; }
+interface DashboardAction { key: string; title: string; desc: string; icon: string; tone: VisualTone; onPress: () => void; badge?: number | string | null; }
 interface PriorityQueueItem {
   key: string; role: RoleView | 'all'; category: PriorityQueueCategory;
   title: string; subtitle: string; meta: string; tagLabel: string; tagTone: VisualTone;
@@ -33,8 +44,6 @@ interface PriorityQueueItem {
 }
 
 const PRIORITY_PAGE_SIZE = 4;
-const CONTENT_SIDE_MARGIN = 16;
-const HERO_SIDE_PADDING = 18;
 
 const emptyDashboard: HomeDashboard = {
   role_summary: { has_client_role: false, has_owner_role: false, has_pilot_role: false, can_publish_supply: false, can_accept_dispatch: false, can_self_execute: false },
@@ -76,12 +85,61 @@ const getPriorityFilterLabel = (role: RoleView, filter: PriorityQueueFilter) => 
 
 const getPriorityUrgencyLabel = (urgency: number) => urgency >= 100 ? '需立即处理' : urgency >= 85 ? '建议优先' : '顺手处理';
 
+const getVisibleBadgeValue = (badge?: number | string | null): number | null => {
+  const value = Number(badge || 0);
+  return Number.isFinite(value) && value > 0 ? value : null;
+};
+
+const getActionAsset = (action: DashboardAction): string => {
+  switch (action.key) {
+    case 'service-hub':
+      return entryBrowseService;
+    case 'progress':
+      return entryMyDemand;
+    case 'quick-order':
+      return entryQuickOrder;
+    case 'publish':
+      return entryPublishTask;
+    case 'my-demands':
+      return entryInquiryTask;
+    case 'profile':
+    case 'drones':
+      return entryMyDemand;
+    case 'offer':
+    case 'supplies':
+    case 'fulfill':
+      return entryQuickOrder;
+    case 'assigned':
+    case 'nearby':
+      return entryQuickOrder;
+    case 'demand':
+    default:
+      return entryBrowseService;
+  }
+};
+
+const getHeroActionAsset = (title: string): string => {
+  if (title.includes('发布') || title.includes('上架')) return plusCircleIcon;
+  return quickOrderIcon;
+};
+
+const getPriorityTimeLabel = (item: PriorityQueueItem): string => {
+  if (item.sortAt > 946684800000) {
+    const minutes = Math.max(1, Math.floor((Date.now() - item.sortAt) / 60000));
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    return `${Math.floor(hours / 24)} 天前`;
+  }
+  return item.meta || '刚刚';
+};
+
 const getHeroTheme = (role: RoleView): HeroTheme => {
   switch (role) {
-    case 'client': return { gradient: 'linear-gradient(135deg, #0f8f61, #17a36b)', accent: '#0f8f61', softText: 'rgba(239,255,247,0.88)', eyebrow: '客户概览' };
-    case 'owner': return { gradient: 'linear-gradient(135deg, #0f5cab, #1d4ed8)', accent: '#0f5cab', softText: 'rgba(230,244,255,0.88)', eyebrow: '机主概览' };
-    case 'pilot': return { gradient: 'linear-gradient(135deg, #b45309, #d97706)', accent: '#b45309', softText: 'rgba(255,247,237,0.9)', eyebrow: '飞手概览' };
-    default: return { gradient: 'linear-gradient(135deg, #0f4c81, #0f766e)', accent: '#0f5cab', softText: 'rgba(236,253,245,0.9)', eyebrow: '今日概览' };
+    case 'client': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '客户概览' };
+    case 'owner': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '机主概览' };
+    case 'pilot': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '飞手概览' };
+    default: return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '今日概览' };
   }
 };
 
@@ -112,6 +170,8 @@ export default function HomeScreen() {
   const [priorityPage, setPriorityPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const authStateRef = useRef(isAuthenticated);
+  const dashboardRequestSeqRef = useRef(0);
+  const priorityRequestSeqRef = useRef(0);
 
   const currentDashboard = dashboard || emptyDashboard;
   const effectiveRoleSummary = useMemo(() => dashboard?.role_summary || authRoleSummary || emptyDashboard.role_summary, [authRoleSummary, dashboard?.role_summary]);
@@ -147,30 +207,34 @@ export default function HomeScreen() {
 
   useEffect(() => { authStateRef.current = isAuthenticated; }, [isAuthenticated]);
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchDashboard = useCallback(async (roleOverride?: RoleView) => {
     if (!authStateRef.current) return;
+    const requestSeq = ++dashboardRequestSeqRef.current;
+    const role = roleOverride || activeRole;
     try {
       const [res, anomalyRes] = await Promise.all([
         homeService.getDashboard(),
-        orderAnomalyV2Service.summary({ role: activeRole === 'all' ? undefined : activeRole } as any),
+        orderAnomalyV2Service.summary({ role: role === 'all' ? undefined : role } as any),
       ]);
-      if (authStateRef.current) {
+      if (authStateRef.current && requestSeq === dashboardRequestSeqRef.current) {
         setDashboard((res as any) || emptyDashboard);
         setAnomalySummary((anomalyRes as any) || { total: 0, critical_count: 0, warning_count: 0, by_anomaly_type: [], by_order_status: [] });
       }
     } catch (e) { console.warn('加载首页数据失败:', e); }
-    finally { if (authStateRef.current) setRefreshing(false); }
+    finally { if (authStateRef.current && requestSeq === dashboardRequestSeqRef.current) setRefreshing(false); }
   }, [activeRole]);
 
   const anomalyAlertCount = anomalySummary?.total ?? currentDashboard.summary.alert_count;
 
-  const fetchPriorityQueue = useCallback(async () => {
+  const fetchPriorityQueue = useCallback(async (roleOverride?: RoleView) => {
     if (!authStateRef.current) return;
+    const requestSeq = ++priorityRequestSeqRef.current;
+    const role = roleOverride || activeRole;
     setPriorityLoading(true);
     try {
-      const rolesToLoad: RoleView[] = activeRole === 'all'
+      const rolesToLoad: RoleView[] = role === 'all'
         ? [...(hasClient ? ['client' as RoleView] : []), ...(hasOwner ? ['owner' as RoleView] : []), ...(hasPilot ? ['pilot' as RoleView] : [])]
-        : [activeRole];
+        : [role];
       const nextItems: PriorityQueueItem[] = [];
 
       await Promise.all(rolesToLoad.map(async (role) => {
@@ -249,11 +313,11 @@ export default function HomeScreen() {
 
       // Anomalies
       try {
-        const anomalyRes = await orderAnomalyV2Service.list({ role: activeRole === 'all' ? undefined : activeRole, page: 1, page_size: 40 } as any);
+        const anomalyRes = await orderAnomalyV2Service.list({ role: role === 'all' ? undefined : role, page: 1, page_size: 40 } as any);
         ((anomalyRes as any).items || []).forEach((item: V2OrderAnomaly) => {
           const isCritical = String(item.severity || '').toLowerCase() === 'critical';
           nextItems.push({
-            key: `anomaly-${item.order_id}-${item.anomaly_type}`, role: activeRole === 'all' ? 'all' : activeRole,
+            key: `anomaly-${item.order_id}-${item.anomaly_type}`, role: role === 'all' ? 'all' : role,
             category: 'anomaly', title: item.title || item.order_no, subtitle: item.message,
             meta: item.recommended_action || '点击查看异常', tagLabel: isCritical ? '严重异常' : '异常提醒',
             tagTone: isCritical ? 'red' : 'orange', urgency: isCritical ? 110 : 96,
@@ -264,10 +328,24 @@ export default function HomeScreen() {
       } catch {}
 
       nextItems.sort((a, b) => b.urgency !== a.urgency ? b.urgency - a.urgency : b.sortAt !== a.sortAt ? b.sortAt - a.sortAt : a.key.localeCompare(b.key));
-      if (authStateRef.current) setPriorityItems(nextItems);
+      if (authStateRef.current && requestSeq === priorityRequestSeqRef.current) setPriorityItems(nextItems);
     } catch (e) { console.warn('加载待处理列表失败:', e); }
-    finally { if (authStateRef.current) setPriorityLoading(false); }
+    finally { if (authStateRef.current && requestSeq === priorityRequestSeqRef.current) setPriorityLoading(false); }
   }, [activeRole, hasClient, hasOwner, hasPilot]);
+
+  const switchRole = useCallback((nextRole: RoleView) => {
+    if (nextRole === activeRole) return;
+    setActiveRole(nextRole);
+    setPriorityFilter('all');
+    setPriorityPage(0);
+    setPriorityFilterExpanded(false);
+    setPriorityItems([]);
+    setAnomalySummary({ total: 0, critical_count: 0, warning_count: 0, by_anomaly_type: [], by_order_status: [] });
+    if (authStateRef.current) {
+      fetchDashboard(nextRole);
+      fetchPriorityQueue(nextRole);
+    }
+  }, [activeRole, fetchDashboard, fetchPriorityQueue]);
 
   useEffect(() => { setPriorityFilter('all'); setPriorityPage(0); setPriorityFilterExpanded(false); }, [activeRole]);
   useEffect(() => { setPriorityPage(0); setPriorityFilterExpanded(false); }, [priorityFilter]);
@@ -287,14 +365,21 @@ export default function HomeScreen() {
   // ── Hero config ──
   const heroTheme = useMemo(() => getHeroTheme(activeRole), [activeRole]);
   const heroConfig = useMemo(() => {
-    const d = currentDashboard;
     switch (activeRole) {
       case 'client': return { title: '今天先处理这些订单', subtitle: '要下单就走快速下单；需要比价或说明更多细节，就发布任务。', primaryAction: { title: '快速下单', onPress: () => Taro.navigateTo({ url: '/pages/publish/quick-order/index' }) }, secondaryActions: [{ title: '发布任务', onPress: () => Taro.navigateTo({ url: '/pages/publish/demand/index' }) }] };
       case 'owner': return { title: '今天先看这些机会', subtitle: '新任务、待确认订单和待安排执行都放在这里。', primaryAction: { title: '查看新需求', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }) }, secondaryActions: [{ title: '上架服务', onPress: () => Taro.navigateTo({ url: '/pages/publish/supply/index' }) }, { title: '机队资质', onPress: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }) }] };
       case 'pilot': return { title: '今天有哪些任务要处理', subtitle: '待接单、执行中和飞行记录都在这里。', primaryAction: { title: '查看待接派单', onPress: () => Taro.navigateTo({ url: '/pages/dispatch/list/index' }) }, secondaryActions: [{ title: '飞行执行', onPress: () => Taro.navigateTo({ url: '/pages/pilot/workbench/index' }) }, { title: '资质管理', onPress: () => Taro.navigateTo({ url: '/pages/profile/pilot/index' }) }] };
-      default: return { title: '今天先处理这些事', subtitle: '下单、报价、接单和异常提醒都集中在工作台。', primaryAction: { title: hasClient ? '发布任务' : hasOwner ? '查看新需求' : '待接派单', onPress: () => Taro.navigateTo({ url: hasClient ? '/pages/publish/demand/index' : hasOwner ? '/pages/market/index' : '/pages/dispatch/list/index' }) }, secondaryActions: [] };
+      default: return {
+        title: '今天先处理这些事',
+        subtitle: '下单、报价、接单和异常提醒都集中在工作台。',
+        primaryAction: {
+          title: hasClient ? '快速下单' : hasOwner ? '查看新需求' : '待接派单',
+          onPress: () => Taro.navigateTo({ url: hasClient ? '/pages/publish/quick-order/index' : hasOwner ? '/pages/market/index' : '/pages/dispatch/list/index' }),
+        },
+        secondaryActions: hasClient ? [{ title: '发布任务', onPress: () => Taro.navigateTo({ url: '/pages/publish/demand/index' }) }] : [],
+      };
     }
-  }, [activeRole, currentDashboard, hasClient, hasOwner, hasPilot]);
+  }, [activeRole, hasClient, hasOwner, hasPilot]);
 
   // ── Quick actions ──
   const quickActions = useMemo<DashboardAction[]>(() => {
@@ -305,20 +390,20 @@ export default function HomeScreen() {
     switch (activeRole) {
       case 'client': return [...base,
         { key: 'quick-order', title: '快速下单', desc: '直达下单', icon: '📦', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/publish/quick-order/index' }) },
-        { key: 'publish', title: '发布任务', desc: '发起需求', icon: '📝', tone: 'green', onPress: () => Taro.navigateTo({ url: '/pages/publish/demand/index' }) },
-        { key: 'my-demands', title: '询价中的任务', desc: '开放报价中的需求', icon: '🗂️', tone: 'teal', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.client.open_demand_count },
+        { key: 'publish', title: '发布任务', desc: '发起需求', icon: '📝', tone: 'orange', onPress: () => Taro.navigateTo({ url: '/pages/publish/demand/index' }) },
+        { key: 'my-demands', title: '询价中的任务', desc: '开放报价中的需求', icon: '📁', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.client.open_demand_count },
       ];
       case 'owner': return [...base,
         { key: 'demand', title: '查看新需求', desc: '可承接任务', icon: '📈', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.owner.recommended_demand_count },
         { key: 'offer', title: '上架服务', desc: '上架机型', icon: '🚁', tone: 'teal', onPress: () => Taro.navigateTo({ url: '/pages/publish/supply/index' }) },
         { key: 'supplies', title: '我的服务', desc: '服务状态', icon: '📦', tone: 'green', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-offers/index' }), badge: currentDashboard.role_views.owner.active_supply_count },
-        { key: 'drones', title: '机队资质', desc: '设备认证', icon: '🛩️', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }) },
+        { key: 'drones', title: '机队资质', desc: '设备认证', icon: '📄', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }) },
       ];
       case 'pilot': return [...base,
         { key: 'assigned', title: '待接派单', desc: '正式指派任务', icon: '🎯', tone: 'orange', onPress: () => Taro.navigateTo({ url: '/pages/dispatch/list/index' }), badge: currentDashboard.role_views.pilot.pending_response_dispatch_count },
         { key: 'fulfill', title: '飞行执行', desc: '监控看板', icon: '🚁', tone: 'teal', onPress: () => Taro.navigateTo({ url: '/pages/pilot/workbench/index' }) },
-        { key: 'nearby', title: '报名需求', desc: '候选池', icon: '🛰️', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.pilot.candidate_demand_count },
-        { key: 'profile', title: '资质设置', desc: '执照技能', icon: '🪪', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/pilot/index' }) },
+        { key: 'nearby', title: '报名需求', desc: '候选池', icon: '📡', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.pilot.candidate_demand_count },
+        { key: 'profile', title: '资质设置', desc: '执照技能', icon: '📑', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/pilot/index' }) },
       ];
       default: {
         const a: DashboardAction[] = [...base];
@@ -345,9 +430,17 @@ export default function HomeScreen() {
   const filteredPriorityItems = useMemo(() => priorityItems.filter(i => priorityFilter === 'all' || i.category === priorityFilter), [priorityFilter, priorityItems]);
   const priorityPageCount = Math.max(1, Math.ceil(filteredPriorityItems.length / PRIORITY_PAGE_SIZE));
   const priorityPageItems = useMemo(() => filteredPriorityItems.slice(priorityPage * PRIORITY_PAGE_SIZE, (priorityPage + 1) * PRIORITY_PAGE_SIZE), [filteredPriorityItems, priorityPage]);
-
-  const viewportWidth = 375; // Mini program default
-  const quickActionItemWidth = Math.floor((viewportWidth - CONTENT_SIDE_MARGIN * 2 - 12 * 2 - 10 * 2) / 3);
+  const pendingOrderCount = Math.max(
+    priorityItems.length,
+    Number(currentDashboard.role_views.client.pending_provider_confirmation_order_count || 0)
+      + Number(currentDashboard.role_views.client.pending_payment_order_count || 0)
+      + Number(currentDashboard.role_views.owner.pending_provider_confirmation_order_count || 0)
+      + Number(currentDashboard.role_views.owner.pending_dispatch_order_count || 0)
+      + Number(currentDashboard.role_views.pilot.pending_response_dispatch_count || 0),
+  );
+  const inProgressTaskCount = Number(currentDashboard.summary.in_progress_order_count || 0)
+    || Number(currentDashboard.role_views.client.in_progress_order_count || 0)
+    || Number(currentDashboard.role_views.pilot.active_dispatch_count || 0);
 
   return (
     <View className="root-wrap">
@@ -355,10 +448,10 @@ export default function HomeScreen() {
         >
 
         {/* ── Role Tabs ── */}
-        <View className="content-rail">
+        <View className="content-rail role-tabs-rail">
           <View className="tabs-wrap">
             {roleTabs.map(tab => (
-              <View key={tab.key} className={`role-tab ${activeRole === tab.key ? 'role-tab-active' : ''}`} onClick={() => setActiveRole(tab.key)}>
+              <View key={tab.key} className={`role-tab ${activeRole === tab.key ? 'role-tab-active' : ''}`} onClick={() => switchRole(tab.key)}>
                 <Text className={`role-tab-text ${activeRole === tab.key ? 'role-tab-text-active' : ''}`}>{tab.label}</Text>
               </View>
             ))}
@@ -368,25 +461,35 @@ export default function HomeScreen() {
         {/* ── Hero Section ── */}
         <View className="content-rail">
           <View className="hero" style={{ background: heroTheme.gradient }}>
-            <View className="hero-top-row">
-              <View className="hero-copy-wrap">
-                <Text className="hero-eyebrow" style={{ color: heroTheme.softText }}>{heroTheme.eyebrow}</Text>
-                <Text className="hero-title">{heroConfig.title}</Text>
-                <Text className="hero-subtitle">{heroConfig.subtitle}</Text>
+            <Image className="hero-bg-image" src={heroBgImage} mode="aspectFill" />
+            {anomalyAlertCount > 0 && (
+              <View className="alert-pill" onClick={() => Taro.navigateTo({ url: '/pages/after-sale/index' })}>
+                <Text className="alert-pill-text">{anomalyAlertCount} 个异常提醒</Text>
               </View>
-              {anomalyAlertCount > 0 && (
-                <View className="alert-pill" onClick={() => Taro.navigateTo({ url: '/pages/after-sale/index' })}>
-                  <Text className="alert-pill-value">{anomalyAlertCount}</Text>
-                  <Text className="alert-pill-label">异常提醒</Text>
-                </View>
-              )}
+            )}
+            <View className="hero-copy-wrap">
+              <Text className="hero-eyebrow">{heroTheme.eyebrow}</Text>
+              <Text className="hero-title">{heroConfig.title}</Text>
+              <Text className="hero-subtitle">
+                {activeRole === 'all' || activeRole === 'client'
+                  ? `您有 ${pendingOrderCount} 个订单待处理，${inProgressTaskCount} 个任务进行中`
+                  : heroConfig.subtitle}
+              </Text>
+              <View className="hero-alert-row" onClick={() => anomalyAlertCount > 0 && Taro.navigateTo({ url: '/pages/after-sale/index' })}>
+                <Image className="hero-warning-icon" src={warningIcon} mode="aspectFit" />
+                <Text className="hero-alert-text">
+                  {anomalyAlertCount > 0 ? `${anomalyAlertCount} 个任务出现异常，请及时处理` : '暂无异常提醒，当前任务运行稳定'}
+                </Text>
+              </View>
             </View>
             <View className="hero-action-row">
               <View className="hero-action-btn hero-action-btn-primary" onClick={heroConfig.primaryAction.onPress}>
+                <Image className="hero-action-icon" src={getHeroActionAsset(heroConfig.primaryAction.title)} mode="aspectFit" />
                 <Text className="hero-action-text" style={{ color: heroTheme.accent }}>{heroConfig.primaryAction.title}</Text>
               </View>
               {heroConfig.secondaryActions.slice(0, 1).map(a => (
                 <View key={a.title} className="hero-action-btn hero-action-btn-ghost" onClick={a.onPress}>
+                  <Image className="hero-action-icon hero-action-icon-ghost" src={getHeroActionAsset(a.title)} mode="aspectFit" />
                   <Text className="hero-action-text hero-action-text-ghost">{a.title}</Text>
                 </View>
               ))}
@@ -414,7 +517,7 @@ export default function HomeScreen() {
                     <Text className="priority-filter-trigger-text">{currentFilterOption?.label || '全部'}</Text>
                     <View className="priority-filter-count"><Text className="priority-filter-count-text">{currentFilterOption?.count || 0}</Text></View>
                   </View>
-                  <Text className="priority-filter-chevron">{priorityFilterExpanded ? '▴' : '▾'}</Text>
+                  <Image className={`priority-filter-chevron-img ${priorityFilterExpanded ? 'priority-filter-chevron-img-open' : ''}`} src={dropdownDownIcon} mode="aspectFit" />
                 </View>
               </View>
 
@@ -477,6 +580,13 @@ export default function HomeScreen() {
                           </View>
                         </View>
                         <Text className="priority-item-title">{item.title}</Text>
+                        <View className="priority-item-bottom">
+                          <Text className="priority-item-subtitle">{item.subtitle}</Text>
+                          <View className="priority-item-meta-wrap">
+                            <Text className="priority-item-meta">{getPriorityTimeLabel(item)}</Text>
+                            <Image className="priority-item-chevron-img" src={chevronRightIcon} mode="aspectFit" />
+                          </View>
+                        </View>
                       </View>
                     );
                   })}
@@ -503,28 +613,31 @@ export default function HomeScreen() {
         {/* ── Quick Actions Grid ── */}
         <View className="content-rail">
           <View className="section-wrap">
-            <View className="section-header">
-              <Text className="section-title">工作台入口</Text>
-            </View>
             <View className="quick-grid-panel">
-              <View className="quick-grid">
-                {quickActions.map(action => {
-                  const palette = getTonePalette(action.tone, false);
-                  return (
-                    <View key={action.key} className="quick-action-card" onClick={action.onPress}>
-                      <View className="quick-action-icon-wrap" style={{ background: palette.bg, border: `1px solid ${palette.border}` }}>
-                        <Text className="quick-action-icon">{action.icon}</Text>
-                        {action.badge && action.badge > 0 && (
+              <View className="quick-grid-title-row">
+                <Text className="quick-grid-title">工作台入口</Text>
+              </View>
+            <View className="quick-grid">
+              {quickActions.map(action => {
+                const palette = getTonePalette(action.tone, false);
+                const badgeValue = getVisibleBadgeValue(action.badge);
+                return (
+                  <View key={action.key} className="quick-action-card" onClick={action.onPress}>
+                    <View className="quick-action-card-inner">
+                      <View className="quick-action-icon-wrap">
+                        <Image className="quick-action-icon-img" src={getActionAsset(action)} mode="aspectFit" />
+                        {badgeValue !== null && (
                           <View className="quick-action-badge" style={{ background: palette.text }}>
-                            <Text className="quick-action-badge-text">{action.badge}</Text>
+                            <Text className="quick-action-badge-text">{badgeValue}</Text>
                           </View>
                         )}
                       </View>
                       <Text className="quick-action-title">{action.title}</Text>
                     </View>
-                  );
-                })}
-              </View>
+                  </View>
+                );
+              })}
+            </View>
             </View>
           </View>
         </View>

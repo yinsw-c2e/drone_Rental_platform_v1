@@ -87,18 +87,30 @@ export default function MyDronesPage() {
                   </View>
                   <StatusBadge label={availability.label} tone={availability.tone} />
                 </View>
-                <View className='list-item-meta'>
-                  <Text className='list-item-meta-text'>起飞重量：{mtow}kg</Text>
-                  <Text className='list-item-meta-text'>最大吊重：{payload}kg</Text>
+                <View className='md-spec-grid'>
+                  <View className='md-spec-item'>
+                    <Text className='md-spec-label'>起飞重量</Text>
+                    <Text className='md-spec-value'>{mtow}kg</Text>
+                  </View>
+                  <View className='md-spec-item'>
+                    <Text className='md-spec-label'>最大吊重</Text>
+                    <Text className='md-spec-value'>{payload}kg</Text>
+                  </View>
                 </View>
-                <View className='list-item-meta'>
-                  <Text className='list-item-meta-text'>城市：{d.city || '未设置'}</Text>
-                  <Text className='list-item-meta-text'>状态：{availability.label}</Text>
+                <View className='md-meta-row'>
+                  <Text className='md-meta-label'>城市</Text>
+                  <Text className='md-meta-value'>{d.city || '未设置'}</Text>
+                  <Text className='md-meta-label md-meta-label-right'>状态</Text>
+                  <Text className='md-meta-value md-meta-value-right'>{availability.label}</Text>
                 </View>
-                <View className='list-item-meta'>
-                  <Text className='list-item-meta-text'>序列号：{d.serial_number || '-'}</Text>
-                  <Text className='list-item-meta-text'>
-                    认证：{CERTIFICATION_STATUS_LABELS[String(d.certification_status || '').toLowerCase()] || VERIFY_STATUS[String(d.certification_status || '').toLowerCase()] || formatUnknownEnumLabel(d.certification_status, '状态未知')}
+                <View className='md-meta-row md-meta-row-single'>
+                  <Text className='md-meta-label'>序列号</Text>
+                  <Text className='md-meta-value'>{d.serial_number || '-'}</Text>
+                </View>
+                <View className='md-meta-row md-meta-row-single'>
+                  <Text className='md-meta-label'>认证</Text>
+                  <Text className='md-meta-value'>
+                    {CERTIFICATION_STATUS_LABELS[String(d.certification_status || '').toLowerCase()] || VERIFY_STATUS[String(d.certification_status || '').toLowerCase()] || formatUnknownEnumLabel(d.certification_status, '状态未知')}
                   </Text>
                 </View>
                 <View className='md-footer' />

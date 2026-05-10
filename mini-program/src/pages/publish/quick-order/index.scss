@@ -21,6 +21,7 @@
 .scene-chip.active { background-color: #EFF6FF; border: 1px solid #1677FF; padding: 5px 13px; }
 .scene-text { font-size: 13px; color: #4B5563; }
 .scene-text.active-text { color: #1677FF; font-weight: 500; }
+.custom-scene-input { margin-bottom: 12px; }
 
 .form-item { display: flex; flex-direction: row; align-items: center; padding: 14px 0; border-bottom: 1px solid #F3F4F6; }
 .border-none { border-bottom: none; }
@@ -40,6 +41,23 @@
 }
 .form-value { flex: 1; min-width: 0; font-size: 15px; color: #1A1D26; text-align: right; line-height: 22px; }
 .placeholder { color: #9CA3AF; }
+.input-unit-wrap { flex: 1; display: flex; flex-direction: row; align-items: center; min-width: 0; position: relative; }
+.input-unit-wrap .form-input { padding-right: 42px; }
+.input-unit { position: absolute; right: 12px; font-size: 13px; color: #6B7280; font-weight: 700; }
+.dimension-row { display: flex; flex-direction: row; gap: 10px; margin-bottom: 14px; }
+.dimension-input {
+  flex: 1;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  background: #F9FAFB;
+  font-size: 15px;
+  line-height: 44px;
+  color: #1A1D26;
+  box-sizing: border-box;
+}
 
 .airspace-line {
   display: flex;

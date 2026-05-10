@@ -4,6 +4,7 @@ import { View, Text, Input, Textarea, ScrollView } from '@tarojs/components';
 import { getClientEligibility } from '../../../services/client';
 import { demandV2Service } from '../../../services/demandV2';
 import { AddressData } from '../../../types';
+import DateTimeField from '../../../components/DateTimeField';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -62,8 +63,12 @@ export default function PublishDemandPage() {
 
   const [title, setTitle] = useState('');
   const [cargoScene, setCargoScene] = useState(SCENE_OPTIONS[0].key);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [serviceAddress, setServiceAddress] = useState<AddressData | null>(null);
   const [cargoWeight, setCargoWeight] = useState('');
+  const [cargoLength, setCargoLength] = useState('');
+  const [cargoWidth, setCargoWidth] = useState('');
+  const [cargoHeight, setCargoHeight] = useState('');
 
   const [tripCount, setTripCount] = useState('1');
   const [budgetMin, setBudgetMin] = useState('');
@@ -91,20 +96,33 @@ export default function PublishDemandPage() {
     }
   };
 
-  const getPayload = () => ({
-    title: title.trim(),
-    service_type: 'heavy_cargo_lift_transport' as const,
-    cargo_scene: cargoScene,
-    description: description.trim() || undefined,
-    service_address: toAddressSnapshot(serviceAddress),
-    cargo_weight_kg: Number(cargoWeight),
-    estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
-    budget_min: budgetMin ? Math.round(Number(budgetMin) * 100) : undefined,
-    budget_max: budgetMax ? Math.round(Number(budgetMax) * 100) : undefined,
-    allows_pilot_candidate: true,
-    scheduled_start_at: parseDateInput(startTime)?.toISOString(),
-    scheduled_end_at: parseDateInput(endTime)?.toISOString(),
-  });
+  const getPayload = () => {
+    const lengthCM = Number(cargoLength);
+    const widthCM = Number(cargoWidth);
+    const heightCM = Number(cargoHeight);
+    const effectiveCargoScene = customCargoScene.trim() || cargoScene;
+    const payload: any = {
+      title: title.trim(),
+      service_type: 'heavy_cargo_lift_transport' as const,
+      cargo_scene: effectiveCargoScene,
+      description: description.trim() || undefined,
+      service_address: toAddressSnapshot(serviceAddress),
+      cargo_weight_kg: Number(cargoWeight),
+      estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
+      budget_min: budgetMin ? Math.round(Number(budgetMin) * 100) : undefined,
+      budget_max: budgetMax ? Math.round(Number(budgetMax) * 100) : undefined,
+      allows_pilot_candidate: true,
+      scheduled_start_at: parseDateInput(startTime)?.toISOString(),
+      scheduled_end_at: parseDateInput(endTime)?.toISOString(),
+    };
+    if (lengthCM > 0) payload.cargo_length_cm = lengthCM;
+    if (widthCM > 0) payload.cargo_width_cm = widthCM;
+    if (heightCM > 0) payload.cargo_height_cm = heightCM;
+    if (lengthCM > 0 && widthCM > 0 && heightCM > 0) {
+      payload.cargo_volume_m3 = lengthCM * widthCM * heightCM / 1000000;
+    }
+    return payload;
+  };
 
   const validateBaseInfo = () => {
     if (!title.trim()) {
@@ -233,13 +251,22 @@ export default function PublishDemandPage() {
               {SCENE_OPTIONS.map(opt => (
                 <View
                   key={opt.key}
-                  className={`publish-option-btn ${cargoScene === opt.key ? 'publish-option-active' : ''}`}
-                  onClick={() => setCargoScene(opt.key)}
+                  className={`publish-option-btn ${!customCargoScene.trim() && cargoScene === opt.key ? 'publish-option-active' : ''}`}
+                  onClick={() => {
+                    setCargoScene(opt.key);
+                    setCustomCargoScene('');
+                  }}
                 >
-                  <Text className={`publish-option-text ${cargoScene === opt.key ? 'publish-option-text-active' : ''}`}>{opt.label}</Text>
+                  <Text className={`publish-option-text ${!customCargoScene.trim() && cargoScene === opt.key ? 'publish-option-text-active' : ''}`}>{opt.label}</Text>
                 </View>
               ))}
             </View>
+            <Input
+              className="publish-input publish-custom-scene-input"
+              placeholder="其他场景，可直接填写"
+              value={customCargoScene}
+              onInput={e => setCustomCargoScene(e.detail.value)}
+            />
 
             <Text className="publish-label">服务地址 *</Text>
             <View className="publish-address-field" onClick={chooseServiceAddress}>
@@ -250,7 +277,17 @@ export default function PublishDemandPage() {
             </View>
 
             <Text className="publish-label">货物重量 (kg) *</Text>
-            <Input className="publish-input" type="digit" placeholder="例如：80" value={cargoWeight} onInput={e => setCargoWeight(e.detail.value)} />
+            <View className="publish-input-unit-wrap">
+              <Input className="publish-input" type="digit" placeholder="例如：80" value={cargoWeight} onInput={e => setCargoWeight(e.detail.value)} />
+              <Text className="publish-input-unit">kg</Text>
+            </View>
+
+            <Text className="publish-label">货物尺寸（cm，可选）</Text>
+            <View className="publish-dimension-row">
+              <Input className="publish-input publish-dimension-input" type="digit" placeholder="长" value={cargoLength} onInput={e => setCargoLength(e.detail.value)} />
+              <Input className="publish-input publish-dimension-input" type="digit" placeholder="宽" value={cargoWidth} onInput={e => setCargoWidth(e.detail.value)} />
+              <Input className="publish-input publish-dimension-input" type="digit" placeholder="高" value={cargoHeight} onInput={e => setCargoHeight(e.detail.value)} />
+            </View>
 
             <View className="publish-tip-card">
               <Text className="publish-tip-title">草稿提示</Text>
@@ -273,12 +310,8 @@ export default function PublishDemandPage() {
             <Text className="publish-label">预计架次</Text>
             <Input className="publish-input" type="digit" placeholder="默认 1 架次" value={tripCount} onInput={e => setTripCount(e.detail.value)} />
 
-            <Text className="publish-label">预约开始时间 *</Text>
-            <Text className="publish-time-hint">请按“年-月-日 时:分”填写，例如：{formatDateTime(defaultStart)}</Text>
-            <Input className="publish-input" placeholder="请选择期望开始时间" value={startTime} onInput={e => setStartTime(e.detail.value)} />
-
-            <Text className="publish-label">预约结束时间 *</Text>
-            <Input className="publish-input" placeholder="请选择期望结束时间" value={endTime} onInput={e => setEndTime(e.detail.value)} />
+            <DateTimeField label="预约开始时间" value={startTime} onChange={setStartTime} required />
+            <DateTimeField label="预约结束时间" value={endTime} onChange={setEndTime} required />
 
             <Text className="publish-label">预算范围 (元)</Text>
             <View className="publish-budget-row">

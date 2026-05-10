@@ -10,6 +10,7 @@ import {
 import { pilotV2Service } from '../../services/pilotV2';
 import { AddressData } from '../../types';
 import { formatUnknownEnumLabel } from '../../utils';
+import DateTimeField from '../../components/DateTimeField';
 import './index.scss';
 
 const PURPOSE_OPTIONS = [
@@ -276,10 +277,8 @@ export default function AirspacePage() {
 
           <View className='card'>
             <Text className='section-title'>作业时间与参数</Text>
-            <Text className='airspace-label'>计划开始 *</Text>
-            <Input className='airspace-input' placeholder='YYYY-MM-DD HH:mm' value={startTime} onInput={(e) => setStartTime(e.detail.value)} />
-            <Text className='airspace-label'>计划结束 *</Text>
-            <Input className='airspace-input' placeholder='YYYY-MM-DD HH:mm' value={endTime} onInput={(e) => setEndTime(e.detail.value)} />
+            <DateTimeField label='计划开始' value={startTime} onChange={setStartTime} required />
+            <DateTimeField label='计划结束' value={endTime} onChange={setEndTime} required />
             <Text className='airspace-label'>最大飞行高度 (米) *</Text>
             <Input className='airspace-input' type='number' placeholder='120' value={maxAltitude} onInput={(e) => setMaxAltitude(e.detail.value)} />
             <Text className='airspace-label'>航线描述 (选填)</Text>

@@ -1,6 +1,7 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, Input, ScrollView } from '@tarojs/components';
+import DateTimeField from '../../components/DateTimeField';
 import { formatUnknownEnumLabel } from '../../utils';
 import './index.scss';
 
@@ -46,8 +47,8 @@ export default function CertificationPage() {
   const handleSubmit = async () => {
     if (!certNo.trim()) { Taro.showToast({ title: '请输入证书编号', icon: 'none' }); return; }
     if (!certName.trim()) { Taro.showToast({ title: '请输入证书名称', icon: 'none' }); return; }
-    if (!issueDate || !/^\d{4}-\d{2}-\d{2}$/.test(issueDate)) { Taro.showToast({ title: '请输入正确的发证日期 (格式: YYYY-MM-DD)', icon: 'none' }); return; }
-    if (!expireDate || !/^\d{4}-\d{2}-\d{2}$/.test(expireDate)) { Taro.showToast({ title: '请输入正确的有效期 (格式: YYYY-MM-DD)', icon: 'none' }); return; }
+    if (certType !== 'health_check' && certType !== 'criminal_check' && (!issueDate || !/^\d{4}-\d{2}-\d{2}$/.test(issueDate))) { Taro.showToast({ title: '请选择发证日期', icon: 'none' }); return; }
+    if (certType !== 'criminal_check' && (!expireDate || !/^\d{4}-\d{2}-\d{2}$/.test(expireDate))) { Taro.showToast({ title: '请选择有效期', icon: 'none' }); return; }
 
     setSubmitting(true);
     try {
@@ -97,8 +98,7 @@ export default function CertificationPage() {
               </View>
             ) : certType === 'health_check' ? (
               <View>
-                <Text className="cert-label">有效期至 *</Text>
-                <Input className="cert-input" placeholder="YYYY-MM-DD" value={expireDate} onInput={e => setExpireDate(e.detail.value)} />
+                <DateTimeField label="有效期至" value={expireDate} onChange={setExpireDate} mode="date" required />
               </View>
             ) : (
               <View>
@@ -110,12 +110,10 @@ export default function CertificationPage() {
                 <Input className="cert-input" placeholder="请输入签发机构" value={issuer} onInput={e => setIssuer(e.detail.value)} />
                 <View className="cert-date-row">
                   <View style={{ flex: 1 }}>
-                    <Text className="cert-label">发证日期 *</Text>
-                    <Input className="cert-input" placeholder="YYYY-MM-DD" value={issueDate} onInput={e => setIssueDate(e.detail.value)} />
+                    <DateTimeField label="发证日期" value={issueDate} onChange={setIssueDate} mode="date" required />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text className="cert-label">有效期至 *</Text>
-                    <Input className="cert-input" placeholder="YYYY-MM-DD" value={expireDate} onInput={e => setExpireDate(e.detail.value)} />
+                    <DateTimeField label="有效期至" value={expireDate} onChange={setExpireDate} mode="date" required />
                   </View>
                 </View>
               </View>

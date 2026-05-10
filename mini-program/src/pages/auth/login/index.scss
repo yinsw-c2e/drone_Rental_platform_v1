@@ -180,6 +180,10 @@ $primary: #1677FF;
   margin: 0 28px;
 }
 
+.login-tp-btn-disabled {
+  opacity: 0.58;
+}
+
 .login-tp-icon-wrap {
   width: 52px;
   height: 52px;
@@ -192,8 +196,16 @@ $primary: #1677FF;
   margin-bottom: 6px;
 }
 
-.login-tp-icon {
-  font-size: 24px;
+.login-wechat-icon-wrap {
+  background: #19C160;
+  border-color: #19C160;
+  box-shadow: 0 8px 18px rgba(25, 193, 96, 0.22);
+}
+
+.login-wechat-icon {
+  width: 30px;
+  height: 30px;
+  display: block;
 }
 
 .login-tp-label {

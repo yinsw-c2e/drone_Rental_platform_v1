@@ -1,9 +1,10 @@
 import Taro from '@tarojs/taro';
 import React, { useRef, useState } from 'react';
-import { View, Text, Input, Button } from '@tarojs/components';
+import { View, Text, Input, Button, Image } from '@tarojs/components';
 import { useDispatch } from 'react-redux';
 import { authService } from '../../../services/auth';
 import { setCredentials } from '../../../store/slices/authSlice';
+import wechatIcon from '../../../assets/icons/wechat.svg';
 import './index.scss';
 
 const QUICK_ACCOUNTS = [
@@ -76,6 +77,28 @@ export default function LoginPage() {
     }
   };
 
+  const handleWeChatLogin = async () => {
+    if (submitting) return;
+    beginSubmit();
+    Taro.showLoading({ title: '正在登录...' });
+    try {
+      const loginRes = await Taro.login();
+      if (!loginRes.code) {
+        throw new Error('未获得微信登录凭证');
+      }
+      const res = await authService.wechatMiniLogin(loginRes.code);
+      dispatch(setCredentials({ user: (res as any).user, token: (res as any).token, roleSummary: (res as any).role_summary || null }));
+      Taro.hideLoading();
+      Taro.showToast({ title: '登录成功', icon: 'success' });
+      Taro.switchTab({ url: '/pages/home/index' });
+    } catch (e: any) {
+      Taro.hideLoading();
+      Taro.showToast({ title: e.message || '微信登录失败', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const quickLogin = async (p: string, pw: string) => {
     if (submitting) return;
     beginSubmit();
@@ -126,6 +149,25 @@ export default function LoginPage() {
               {loginMode === 'code' ? '使用密码登录' : '使用验证码登录'}
             </Text>
             <Text className="login-link" {...bindPress(() => Taro.navigateTo({ url: '/pages/auth/register/index' }))}>注册新账号</Text>
+          </View>
+
+          <View className="login-third-party">
+            <View className="login-divider-row">
+              <View className="login-divider-line" />
+              <Text className="login-divider-text">其他登录方式</Text>
+              <View className="login-divider-line" />
+            </View>
+            <View className="login-third-party-btns">
+              <View
+                className={`login-tp-btn ${submitting ? 'login-tp-btn-disabled' : ''}`}
+                {...bindPress(handleWeChatLogin)}
+              >
+                <View className="login-tp-icon-wrap login-wechat-icon-wrap">
+                  <Image src={wechatIcon} className="login-wechat-icon" mode="aspectFit" />
+                </View>
+                <Text className="login-tp-label">微信登录</Text>
+              </View>
+            </View>
           </View>
 
           <View className="login-dev-section" style={{ marginTop: '40px', paddingBottom: '100px' }}>

@@ -1,5 +1,5 @@
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Input, ScrollView, Text, View } from '@tarojs/components';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -25,7 +25,9 @@ export default function VerificationPage() {
     setLoading(true);
     try {
       const data = await userService.getIDVerifyStatus();
-      setStatus((data?.id_verified as VerifyStatus) || 'unverified');
+      const nextStatus = (data?.id_verified as VerifyStatus) || 'unverified';
+      setStatus(nextStatus);
+      dispatch(updateUser({ id_verified: nextStatus }));
       setRealName(data?.real_name || '');
       setIdNumber(data?.id_number || '');
       setRejectReason(data?.reject_reason || '');
@@ -34,11 +36,19 @@ export default function VerificationPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id_verified]);
+  }, [dispatch, user?.id_verified]);
 
   useDidShow(() => {
     fetchStatus();
   });
+
+  useEffect(() => {
+    if (status !== 'pending') {
+      return undefined;
+    }
+    const timer = setInterval(fetchStatus, 5000);
+    return () => clearInterval(timer);
+  }, [fetchStatus, status]);
 
   const handleSubmit = async () => {
     if (!realName.trim()) {
@@ -90,7 +100,7 @@ export default function VerificationPage() {
             <Text className='verification-result-emoji'>✅</Text>
           </View>
           <Text className='verification-result-title'>实名认证已通过</Text>
-          <Text className='verification-result-desc'>您的身份信息已经过平台人工验证</Text>
+          <Text className='verification-result-desc'>您的身份信息已通过实名核验</Text>
 
           <View className='verification-info-card'>
             <View className='verification-detail-row'>
@@ -122,7 +132,7 @@ export default function VerificationPage() {
           </View>
           <Text className='verification-result-title'>认证审核中</Text>
           <Text className='verification-result-desc'>
-            您的实名认证信息正在审核中，预计 1-3 个工作日内完成，请耐心等待。
+            您的实名认证信息已提交，当前为模拟核验，预计 1 分钟内自动完成。
           </Text>
 
           <View className='verification-info-card'>
@@ -192,7 +202,7 @@ export default function VerificationPage() {
             <Text className='verification-section-title'>认证说明</Text>
             <Text className='verification-tip-text'>1. 实名认证后可提升信用等级，获得更多平台权限。</Text>
             <Text className='verification-tip-text'>2. 您的信息将被严格保密，仅用于身份验证。</Text>
-            <Text className='verification-tip-text'>3. 审核通常在 1-3 个工作日内完成。</Text>
+            <Text className='verification-tip-text'>3. 认证结果以实名核验返回为准，完成后权限将自动更新。</Text>
           </View>
         </View>
       </ScrollView>

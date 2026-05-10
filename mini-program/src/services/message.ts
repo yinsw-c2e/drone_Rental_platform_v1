@@ -18,7 +18,10 @@ export const messageService = {
     apiV1.post<Message>('/message', { receiver_id: receiverId, content, message_type: messageType || 'text' }),
 
   markRead: (conversationId: string) =>
-    apiV1.put(`/message/${conversationId}/read`),
+    apiV2.post(`/conversations/${encodeURIComponent(conversationId)}/read`),
+
+  deleteConversation: (conversationId: string) =>
+    apiV2.delete(`/conversations/${encodeURIComponent(conversationId)}`),
 
   markReadByPeer: (peerId: number) =>
     apiV1.put(`/message/peer/${peerId}/read`),

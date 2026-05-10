@@ -1,7 +1,25 @@
 const tabList = [
-  { key: 'home', pagePath: '/pages/home/index', text: '工作台' },
-  { key: 'messages', pagePath: '/pages/messages/index', text: '消息' },
-  { key: 'profile', pagePath: '/pages/profile/index', text: '我的' },
+  {
+    key: 'home',
+    pagePath: '/pages/home/index',
+    text: '工作台',
+    iconPath: '/custom-tab-bar/assets/ic_tab_workbench_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/ic_tab_workbench_active.png',
+  },
+  {
+    key: 'messages',
+    pagePath: '/pages/messages/index',
+    text: '消息',
+    iconPath: '/custom-tab-bar/assets/ic_tab_message_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/ic_tab_message_active.png',
+  },
+  {
+    key: 'profile',
+    pagePath: '/pages/profile/index',
+    text: '我的',
+    iconPath: '/custom-tab-bar/assets/ic_tab_mine_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/ic_tab_mine_active.png',
+  },
 ];
 
 function normalizeRoute(route) {

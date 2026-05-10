@@ -24,6 +24,105 @@ $primary: #1677FF;
 
 .md-header-text {
   flex: 1;
+  min-width: 0;
+}
+
+.my-drones-item {
+  border-radius: 16px;
+}
+
+.my-drones-item .list-item-header {
+  align-items: center;
+  gap: 10px;
+}
+
+.my-drones-item .list-item-title {
+  display: block;
+  max-width: 100%;
+  line-height: 21px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-spec-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.md-spec-item {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  background: #F8FAFC;
+  padding: 10px 12px;
+}
+
+.md-spec-label {
+  display: block;
+  font-size: 11px;
+  line-height: 15px;
+  color: #8A94A6;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.md-spec-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 20px;
+  color: #1A1D26;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-meta-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.md-meta-row-single {
+  padding-top: 10px;
+  border-top: 1px solid #F1F3F6;
+}
+
+.md-meta-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: #8A94A6;
+  font-weight: 700;
+}
+
+.md-meta-label-right {
+  margin-left: 8px;
+}
+
+.md-meta-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: #4B5563;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-meta-value-right {
+  flex: 0 1 auto;
+  max-width: 96px;
+  text-align: right;
 }
 
 .md-footer {

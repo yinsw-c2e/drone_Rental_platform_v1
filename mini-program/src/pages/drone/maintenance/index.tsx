@@ -1,6 +1,7 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Input } from '@tarojs/components';
+import DateTimeField from '../../../components/DateTimeField';
 import api from '../../../services/api';
 import './index.scss';
 
@@ -63,7 +64,9 @@ export default function DroneMaintenancePage() {
       {showAdd ? (
         <ScrollView scrollY className="form-content">
           <View className="form-group">
-            <View className="form-item"><Text className="form-label">日期</Text><Input className="form-input" placeholder="YYYY-MM-DD" value={maintenanceDate} onInput={e => setMaintenanceDate(e.detail.value)} /></View>
+            <View className="form-item form-date-item">
+              <DateTimeField label="日期" value={maintenanceDate} onChange={setMaintenanceDate} mode="date" required />
+            </View>
             <View className="form-item"><Text className="form-label">类型</Text><Input className="form-input" placeholder="routine/repair/inspection" value={maintenanceType} onInput={e => setMaintenanceType(e.detail.value)} /></View>
             <View className="form-item"><Text className="form-label">费用(元)</Text><Input className="form-input" type="digit" placeholder="0.00" value={cost} onInput={e => setCost(e.detail.value)} /></View>
             <View className="form-item border-none" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>

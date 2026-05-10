@@ -1,6 +1,7 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Input, Image } from '@tarojs/components';
+import DateTimeField from '../../../components/DateTimeField';
 import api from '../../../services/api';
 import { API_V1_BASE_URL } from '../../../constants';
 import './index.scss';
@@ -116,7 +117,9 @@ export default function DroneCertificationPage() {
             <View className="form-item"><Text className="form-label">保单号</Text><Input className="form-input" placeholder="输入保单号" value={insPolicyNo} onInput={e => setInsPolicyNo(e.detail.value)} /></View>
             <View className="form-item"><Text className="form-label">保险公司</Text><Input className="form-input" placeholder="输入保险公司名称" value={insCompany} onInput={e => setInsCompany(e.detail.value)} /></View>
             <View className="form-item"><Text className="form-label">保额(元)</Text><Input className="form-input" type="digit" placeholder="输入保险额度" value={insCoverage} onInput={e => setInsCoverage(e.detail.value)} /></View>
-            <View className="form-item"><Text className="form-label">过期日期</Text><Input className="form-input" placeholder="YYYY-MM-DD" value={insExpiry} onInput={e => setInsExpiry(e.detail.value)} /></View>
+            <View className="form-item form-date-item">
+              <DateTimeField label="过期日期" value={insExpiry} onChange={setInsExpiry} mode="date" />
+            </View>
             <View className="form-item border-none">
               <Text className="form-label">保单凭证</Text>
               {insDoc ? <Image src={insDoc} className="doc-image" onClick={() => uploadDoc(setInsDoc)} /> : <View className="btn-upload" onClick={() => uploadDoc(setInsDoc)}><Text>上传凭证</Text></View>}
@@ -128,7 +131,9 @@ export default function DroneCertificationPage() {
         {activeTab === 'airworthiness' && (
           <View className="form-group">
             <View className="form-item"><Text className="form-label">证书编号</Text><Input className="form-input" placeholder="输入适航证编号" value={airCertNo} onInput={e => setAirCertNo(e.detail.value)} /></View>
-            <View className="form-item"><Text className="form-label">过期日期</Text><Input className="form-input" placeholder="YYYY-MM-DD" value={airExpiry} onInput={e => setAirExpiry(e.detail.value)} /></View>
+            <View className="form-item form-date-item">
+              <DateTimeField label="过期日期" value={airExpiry} onChange={setAirExpiry} mode="date" />
+            </View>
             <View className="form-item border-none">
               <Text className="form-label">证明文件</Text>
               {airDoc ? <Image src={airDoc} className="doc-image" onClick={() => uploadDoc(setAirDoc)} /> : <View className="btn-upload" onClick={() => uploadDoc(setAirDoc)}><Text>上传文件</Text></View>}

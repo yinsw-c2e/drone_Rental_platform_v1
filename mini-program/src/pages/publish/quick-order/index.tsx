@@ -6,9 +6,11 @@ import {
   AirspaceCheckResult,
   airspaceService,
 } from '../../../services/airspace';
-import { demandV2Service } from '../../../services/demandV2';
-import { AddressData } from '../../../types';
+import { getClientEligibility } from '../../../services/client';
+import { supplyService } from '../../../services/supply';
+import { AddressData, DirectOrderInput, SupplySummary } from '../../../types';
 import { isAirspaceHardBlocked } from '../../../utils/airspaceRisk';
+import DateTimeField from '../../../components/DateTimeField';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -36,6 +38,12 @@ const parseDateInput = (value: string) => {
 const formatAddress = (addr?: AddressData | null) =>
   addr?.address || addr?.name || '';
 
+const toAddressSnapshot = (addr: AddressData) => ({
+  text: formatAddress(addr),
+  latitude: addr.latitude,
+  longitude: addr.longitude,
+});
+
 const getAirspaceLabel = (result?: AirspaceCheckResult | null, hasAddress = false, error = '') => {
   if (error) {
     return error;
@@ -60,7 +68,11 @@ export default function QuickOrderPage() {
   const targetSupplyId = Number(params.supplyId || 0);
 
   const [cargoScene, setCargoScene] = useState(SCENE_OPTIONS[0].key);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [cargoWeight, setCargoWeight] = useState('');
+  const [cargoLength, setCargoLength] = useState('');
+  const [cargoWidth, setCargoWidth] = useState('');
+  const [cargoHeight, setCargoHeight] = useState('');
   const [cargoType, setCargoType] = useState('重载物资');
   const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
@@ -144,6 +156,7 @@ export default function QuickOrderPage() {
     isAirspaceHardBlocked(pickupAirspace) || isAirspaceHardBlocked(deliveryAirspace);
   const hasAirspaceCheckError =
     Boolean(pickupAddress && pickupAirspaceError) || Boolean(deliveryAddress && deliveryAirspaceError);
+  const effectiveCargoScene = customCargoScene.trim() || cargoScene;
 
   const handleChooseLocation = async (type: 'pickup' | 'delivery') => {
     try {
@@ -162,8 +175,35 @@ export default function QuickOrderPage() {
         }
       }
     } catch {
-      // 用户取消选点时不打扰。
+      // 用户取消选点或地图不可用时不注入测试地址。
     }
+  };
+
+  const resolveDirectSupplyId = async (weightKG: number) => {
+    if (targetSupplyId > 0) {
+      return targetSupplyId;
+    }
+
+    const res = await supplyService.list({
+      page: 1,
+      page_size: 10,
+      accepts_direct_order: true,
+      service_type: 'heavy_cargo_lift_transport',
+      cargo_scene: effectiveCargoScene,
+      min_payload_kg: weightKG,
+    });
+    const items = ((res as any).items || []) as SupplySummary[];
+    const matched = items.find((item) => {
+      const scenes = item.cargo_scenes || [];
+      return item.accepts_direct_order &&
+        Number(item.max_payload_kg || 0) >= weightKG &&
+        (scenes.length === 0 || scenes.includes(effectiveCargoScene));
+    });
+
+    if (!matched) {
+      throw new Error('暂无匹配的直达服务，请改为发布任务');
+    }
+    return matched.id;
   };
 
   const openNoFlyDetails = (addr?: AddressData | null) => {
@@ -196,34 +236,60 @@ export default function QuickOrderPage() {
     if (!startDate || !endDate || endDate <= startDate) {
       return Taro.showToast({ title: '请填写正确作业时间', icon: 'none' });
     }
+    try {
+      const eligibility = await getClientEligibility();
+      if (!eligibility.can_create_direct_order) {
+        const blocker = eligibility.blockers?.[0];
+        if (blocker?.suggested_action === 'verify_identity') {
+          const res = await Taro.showModal({
+            title: '请先完成实名认证',
+            content: blocker.message || '完成实名认证后即可直达下单。',
+            confirmText: '去认证',
+            cancelText: '稍后再说',
+          });
+          if (res.confirm) {
+            Taro.navigateTo({ url: '/pages/verification/index' });
+          }
+        } else {
+          Taro.showToast({ title: blocker?.message || '当前暂不可下单', icon: 'none' });
+        }
+        return;
+      }
+    } catch (error: any) {
+      return Taro.showToast({ title: error?.message || '资格检查失败', icon: 'none' });
+    }
 
     setSubmitting(true);
     try {
-      const payload = {
-        title: `${formatAddress(pickupAddress)} 到 ${formatAddress(deliveryAddress)}吊运`,
+      const weightKG = Number(cargoWeight);
+      const lengthCM = Number(cargoLength);
+      const widthCM = Number(cargoWidth);
+      const heightCM = Number(cargoHeight);
+      const supplyId = await resolveDirectSupplyId(weightKG);
+      const payload: DirectOrderInput = {
         service_type: 'heavy_cargo_lift_transport',
-        cargo_scene: cargoScene,
+        cargo_scene: effectiveCargoScene,
         cargo_type: cargoType.trim() || '重载物资',
-        cargo_weight_kg: Number(cargoWeight),
-        departure_address: {
-          text: formatAddress(pickupAddress),
-          latitude: pickupAddress.latitude,
-          longitude: pickupAddress.longitude,
-        },
-        destination_address: {
-          text: formatAddress(deliveryAddress),
-          latitude: deliveryAddress.latitude,
-          longitude: deliveryAddress.longitude,
-        },
+        cargo_weight_kg: weightKG,
+        departure_address: toAddressSnapshot(pickupAddress),
+        destination_address: toAddressSnapshot(deliveryAddress),
+        service_address: toAddressSnapshot(pickupAddress),
         scheduled_start_at: startDate.toISOString(),
         scheduled_end_at: endDate.toISOString(),
-        target_supply_id: targetSupplyId || undefined,
+        description: `${formatAddress(pickupAddress)} 到 ${formatAddress(deliveryAddress)}吊运`,
       };
+      if (lengthCM > 0) payload.cargo_length_cm = lengthCM;
+      if (widthCM > 0) payload.cargo_width_cm = widthCM;
+      if (heightCM > 0) payload.cargo_height_cm = heightCM;
+      if (lengthCM > 0 && widthCM > 0 && heightCM > 0) {
+        payload.cargo_volume_m3 = lengthCM * widthCM * heightCM / 1000000;
+      }
 
-      await demandV2Service.create(payload as any);
-      Taro.showToast({ title: '快捷下单成功', icon: 'success' });
+      const result = await supplyService.createDirectOrder(supplyId, payload);
+      Taro.showToast({ title: '下单成功，待确认', icon: 'success' });
       setTimeout(() => {
-        Taro.navigateBack({ delta: targetSupplyId ? 2 : 1 }).catch(() => Taro.switchTab({ url: '/pages/home/index' }));
+        Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${result.order_id}` })
+          .catch(() => Taro.switchTab({ url: '/pages/home/index' }));
       }, 1500);
     } catch (e: any) {
       Taro.showToast({ title: e.message || '下单失败', icon: 'none' });
@@ -265,30 +331,46 @@ export default function QuickOrderPage() {
 
           <View className='form-item'>
             <Text className='form-label'>货物重量 *</Text>
-            <Input className='form-input' type='digit' placeholder='例如：120' value={cargoWeight} onInput={(e) => setCargoWeight(e.detail.value)} />
+            <View className='input-unit-wrap'>
+              <Input className='form-input' type='digit' placeholder='例如：120' value={cargoWeight} onInput={(e) => setCargoWeight(e.detail.value)} />
+              <Text className='input-unit'>kg</Text>
+            </View>
           </View>
           <View className='form-item'>
             <Text className='form-label'>货物类型</Text>
             <Input className='form-input' placeholder='例如：塔材、设备箱' value={cargoType} onInput={(e) => setCargoType(e.detail.value)} />
           </View>
+          <Text className='form-section-label'>货物尺寸（cm，可选）</Text>
+          <View className='dimension-row'>
+            <Input className='dimension-input' type='digit' placeholder='长' value={cargoLength} onInput={(e) => setCargoLength(e.detail.value)} />
+            <Input className='dimension-input' type='digit' placeholder='宽' value={cargoWidth} onInput={(e) => setCargoWidth(e.detail.value)} />
+            <Input className='dimension-input' type='digit' placeholder='高' value={cargoHeight} onInput={(e) => setCargoHeight(e.detail.value)} />
+          </View>
 
           <Text className='form-section-label'>作业场景 *</Text>
           <View className='scene-list'>
             {SCENE_OPTIONS.map((s) => (
-              <View key={s.key} className={`scene-chip ${cargoScene === s.key ? 'active' : ''}`} onClick={() => setCargoScene(s.key)}>
-                <Text className={`scene-text ${cargoScene === s.key ? 'active-text' : ''}`}>{s.label}</Text>
+              <View
+                key={s.key}
+                className={`scene-chip ${!customCargoScene.trim() && cargoScene === s.key ? 'active' : ''}`}
+                onClick={() => {
+                  setCargoScene(s.key);
+                  setCustomCargoScene('');
+                }}
+              >
+                <Text className={`scene-text ${!customCargoScene.trim() && cargoScene === s.key ? 'active-text' : ''}`}>{s.label}</Text>
               </View>
             ))}
           </View>
+          <Input
+            className='form-input custom-scene-input'
+            placeholder='其他场景，可直接填写'
+            value={customCargoScene}
+            onInput={(e) => setCustomCargoScene(e.detail.value)}
+          />
 
-          <View className='form-item'>
-            <Text className='form-label'>预计开始</Text>
-            <Input className='form-input' placeholder='例如：2026-05-10 09:00' value={startTime} onInput={(e) => setStartTime(e.detail.value)} />
-          </View>
-          <View className='form-item border-none'>
-            <Text className='form-label'>预计结束</Text>
-            <Input className='form-input' placeholder='例如：2026-05-10 11:00' value={endTime} onInput={(e) => setEndTime(e.detail.value)} />
-          </View>
+          <DateTimeField label='预计开始' value={startTime} onChange={setStartTime} required />
+          <DateTimeField label='预计结束' value={endTime} onChange={setEndTime} required />
         </View>
 
         {hasAirspaceHardBlock ? (

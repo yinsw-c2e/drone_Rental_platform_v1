@@ -25,6 +25,9 @@ export const authService = {
   wechatLogin: (code: string) =>
     apiV1.post<{ user: User; token: TokenPair }>('/auth/wechat-login', { code }),
 
+  wechatMiniLogin: (code: string) =>
+    apiV1.post<AuthPayload>('/auth/wechat-mini-login', { code }),
+
   qqLogin: (accessToken: string) =>
     apiV1.post<{ user: User; token: TokenPair }>('/auth/qq-login', { access_token: accessToken }),
 };

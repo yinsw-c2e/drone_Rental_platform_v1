@@ -31,6 +31,7 @@ export default function PublishSupplyPage() {
   const [pricingUnit, setPricingUnit] = useState('per_trip');
   const [pricingRule, setPricingRule] = useState('');
   const [slots, setSlots] = useState('');
+  const [customCargoScene, setCustomCargoScene] = useState('');
 
   const toggleScene = (scene: string) => {
     setSelectedScenes(prev =>
@@ -42,6 +43,11 @@ export default function PublishSupplyPage() {
     if (!title.trim()) { Taro.showToast({ title: '请输入服务标题', icon: 'none' }); return; }
     if (!droneId) { Taro.showToast({ title: '请输入无人机ID', icon: 'none' }); return; }
     if (!price || Number(price) <= 0) { Taro.showToast({ title: '请输入有效价格', icon: 'none' }); return; }
+    const customScene = customCargoScene.trim();
+    const effectiveScenes = customScene
+      ? Array.from(new Set([...selectedScenes, customScene]))
+      : selectedScenes;
+    if (effectiveScenes.length === 0) { Taro.showToast({ title: '请至少选择一个适用场景', icon: 'none' }); return; }
 
     setSubmitting(true);
     try {
@@ -49,7 +55,7 @@ export default function PublishSupplyPage() {
         drone_id: Number(droneId),
         title: title.trim(),
         description: description.trim(),
-        cargo_scenes: selectedScenes,
+        cargo_scenes: effectiveScenes,
         base_price_amount: Math.round(Number(price) * 100),
         pricing_unit: pricingUnit,
         pricing_rule: pricingRule.trim() ? { summary: pricingRule.trim() } : undefined,
@@ -100,6 +106,12 @@ export default function PublishSupplyPage() {
                 );
               })}
             </View>
+            <Input
+              className="publish-input publish-custom-scene-input"
+              placeholder="其他场景，可直接填写"
+              value={customCargoScene}
+              onInput={e => setCustomCargoScene(e.detail.value)}
+            />
 
             <Text className="publish-label">服务说明</Text>
             <Textarea className="publish-textarea" placeholder="说明你的执行经验、具体适用范围和交付保障能力" value={description} onInput={e => setDescription(e.detail.value)} />

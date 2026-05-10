@@ -1,13 +1,17 @@
 // @ts-nocheck
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView } from '@tarojs/components';
+import React, { useState, useCallback } from 'react';
+import { Image, View, Text, ScrollView } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store/store';
 import { orderV2Service, confirmReceipt } from '../../../services/orderV2';
-import { orderAnomalyV2Service } from '../../../services/orderAnomalyV2';
-import { V2OrderDetail, V2OrderTimelineEvent } from '../../../types';
-import { getObjectStatusMeta, formatAmountYuan } from '../../../utils';
+import { V2OrderDetail } from '../../../types';
+import { getObjectStatusMeta } from '../../../utils';
+import heroBgImage from '../../../assets/order-detail/images/order_detail_hero_bg_750x360.png';
+import calendarIcon from '../../../assets/order-detail/icons/calendar_line.png';
+import chevronIcon from '../../../assets/order-detail/icons/chevron_right.png';
+import locationIcon from '../../../assets/order-detail/icons/location_line.png';
+import timelineClockIcon from '../../../assets/order-detail/icons/timeline_clock.png';
 import './index.scss';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -129,11 +133,36 @@ const getTimelineTitle = (item: any) => {
   return TIMELINE_SOURCE_LABELS[sourceType] ? `${TIMELINE_SOURCE_LABELS[sourceType]}更新` : '订单状态更新';
 };
 
-function DetailRow({ label, value, highlight, long }: { label: string; value?: string; highlight?: boolean; long?: boolean }) {
+function SectionGlyph({ type }: { type: 'progress' | 'action' | 'task' }) {
+  if (type === 'action') {
+    return (
+      <View className="section-glyph section-glyph-action">
+        <View className="section-glyph-action-handle" />
+        <View className="section-glyph-action-body" />
+        <View className="section-glyph-action-lock" />
+      </View>
+    );
+  }
+
+  return (
+    <View className={`section-glyph section-glyph-${type}`}>
+      {type === 'progress' && <View className="section-glyph-clip" />}
+      {type === 'task' && <View className="section-glyph-corner" />}
+      <View className="section-glyph-line section-glyph-line-a" />
+      <View className="section-glyph-line section-glyph-line-b" />
+      <View className="section-glyph-line section-glyph-line-c" />
+    </View>
+  );
+}
+
+function DetailRow({ label, value, highlight, long, icon }: { label: string; value?: string; highlight?: boolean; long?: boolean; icon?: string }) {
   return (
     <View className={`detail-row${long ? ' detail-row-long' : ''}`}>
-      <Text className="detail-row-label">{label}</Text>
-      <Text className="detail-row-value" style={highlight ? { color: '#F5222D', fontWeight: '800' } : {}}>{value || '-'}</Text>
+      <View className="detail-row-label-wrap">
+        {icon ? <Image className="detail-row-icon" src={icon} mode="aspectFit" /> : null}
+        <Text className="detail-row-label">{label}</Text>
+      </View>
+      <Text className={`detail-row-value${highlight ? ' detail-row-value-highlight' : ''}`}>{value || '-'}</Text>
     </View>
   );
 }
@@ -145,6 +174,7 @@ export default function OrderDetailPage() {
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [scrollTarget, setScrollTarget] = useState('');
 
   const load = useCallback(async () => {
     if (!orderId) { setLoading(false); return; }
@@ -166,13 +196,12 @@ export default function OrderDetailPage() {
   const status = detail.status || '';
   const fin = (detail as any).financial_summary || {};
   const progress = getProgressInfo(status, isClient, isProvider);
-  const progressColor = status === 'pending_payment' ? '#1677FF' : status === 'completed' ? '#52C41A' : status === 'cancelled' || status === 'provider_rejected' ? '#6B7280' : '#FA8C16';
-  const progressBgColor = status === 'pending_payment' ? 'rgba(22,119,255,0.10)' : status === 'completed' ? 'rgba(82,196,26,0.12)' : status === 'cancelled' || status === 'provider_rejected' ? 'rgba(107,114,128,0.12)' : 'rgba(250,140,22,0.12)';
   const canConfirmProvider = status === 'pending_provider_confirmation' && isProvider;
   const canPay = status === 'pending_payment' && isClient;
   const canConfirmReceipt = status === 'delivered' && isClient;
   const canCancelOrder = !['completed', 'cancelled', 'provider_rejected', 'in_transit', 'delivered'].includes(status) && (isClient || isProvider);
   const hasOrderActions = canConfirmProvider || canPay || canConfirmReceipt || canCancelOrder;
+  const timelineItems = ((detail as any).timeline || []);
 
   const doAction = async (fn: () => Promise<any>, msg: string) => {
     setActionLoading(true);
@@ -185,20 +214,33 @@ export default function OrderDetailPage() {
   const handleReject = () => Taro.showModal({ title: '拒绝订单', content: '确认拒绝？' }).then(r => r.confirm && doAction(() => orderV2Service.providerReject(orderId, '机主拒绝'), '已拒绝'));
   const handleCancel = () => Taro.showModal({ title: '取消订单', content: '确定取消？' }).then(r => r.confirm && doAction(() => orderV2Service.cancel(orderId, '用户取消'), '已取消'));
   const handleReceipt = () => Taro.showModal({ title: '确认签收', content: '确认已收到货物？' }).then(r => r.confirm && doAction(() => confirmReceipt(orderId), '签收成功'));
+  const handleTimelineJump = () => {
+    if (!timelineItems.length) return;
+    setScrollTarget('');
+    setTimeout(() => setScrollTarget('order-timeline-section'), 0);
+  };
 
   return (
     <View className="order-detail-page">
-      <ScrollView scrollY className="order-detail-scroll">
+      <ScrollView scrollY scrollWithAnimation scrollIntoView={scrollTarget} className="order-detail-scroll">
         {/* Hero */}
         <View className="order-detail-hero">
+          <Image className="order-detail-hero-bg" src={heroBgImage} mode="aspectFill" />
           <View className="order-detail-hero-top">
             <Text className="order-detail-hero-no">{detail.order_no}</Text>
-            <Text className="status-badge" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <Text className="order-detail-status-pill">
               {STATUS_LABELS[status] || getObjectStatusMeta('order', status).label}
             </Text>
           </View>
           <Text className="order-detail-hero-title">{detail.title}</Text>
-          <Text className="order-detail-hero-route">{detail.service_address || '未设置起点'}{detail.dest_address ? ` → ${detail.dest_address}` : ''}</Text>
+          <View className="order-detail-hero-route">
+            <View className="order-detail-hero-route-pin" />
+            <View className="order-detail-hero-route-texts">
+              <Text>{detail.service_address || '未设置起点'} →</Text>
+              <Text>{detail.dest_address || '未设置终点'}</Text>
+            </View>
+          </View>
+          <View className="order-detail-hero-divider" />
           <View className="order-detail-hero-summary">
             <View className="order-detail-hero-metric">
               <Text className="order-detail-hero-metric-label">订单金额</Text>
@@ -210,28 +252,33 @@ export default function OrderDetailPage() {
         {/* Progress Focus */}
         <View className="progress-focus-card">
           <View className="progress-focus-header">
-            <View className="focus-indicator" style={{ background: progressColor }} />
-            <Text className="focus-eyebrow" style={{ color: progressColor }}>{progress.eyebrow}</Text>
-            {progress.eta ? (
-              <View className="focus-eta-pill" style={{ background: progressBgColor }}>
-                <Text className="focus-eta-text" style={{ color: progressColor }}>{progress.eta}</Text>
-              </View>
-            ) : null}
+            <View className="progress-focus-title-wrap">
+              <SectionGlyph type="progress" />
+              <Text className="section-title section-title-inline">订单进度</Text>
+            </View>
+            <View className="focus-eta-pill" onClick={handleTimelineJump}>
+              <Text className="focus-eta-text">查看订单时间线</Text>
+              <Image className="focus-eta-icon" src={chevronIcon} mode="aspectFit" />
+            </View>
           </View>
-          <Text className="focus-title">{progress.title}</Text>
-          <Text className="focus-desc">{progress.desc}</Text>
+          <View className="progress-focus-main">
+            <Image className="progress-main-icon" src={timelineClockIcon} mode="aspectFit" />
+            <View className="progress-main-content">
+              <Text className="focus-title">{progress.title}</Text>
+              <Text className="focus-desc">{progress.desc}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Action buttons */}
-        {hasOrderActions && <View className="card">
-          <Text className="section-title">操作</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: '8px' }}>
-            {canConfirmProvider && (
-              <View>
-                <View className="order-action-btn order-action-btn-primary" onClick={handleConfirm}><Text className="order-action-btn-text order-action-btn-text-primary">{actionLoading ? '处理中...' : '确认承接'}</Text></View>
-                <View className="order-action-btn order-action-btn-danger" onClick={handleReject}><Text className="order-action-btn-text order-action-btn-text-danger">拒绝订单</Text></View>
-              </View>
-            )}
+        {hasOrderActions && <View className="card action-card">
+          <View className="section-head-left">
+            <SectionGlyph type="action" />
+            <Text className="section-title section-title-inline">操作</Text>
+          </View>
+          <View className="order-action-list">
+            {canConfirmProvider && <View className="order-action-btn order-action-btn-primary" onClick={handleConfirm}><Text className="order-action-btn-text order-action-btn-text-primary">{actionLoading ? '处理中...' : '确认承接'}</Text></View>}
+            {canConfirmProvider && <View className="order-action-btn order-action-btn-danger" onClick={handleReject}><Text className="order-action-btn-text order-action-btn-text-danger">拒绝订单</Text></View>}
             {canPay && <View className="order-action-btn order-action-btn-primary" onClick={() => Taro.navigateTo({ url: `/pages/payment/index?orderId=${orderId}` })}><Text className="order-action-btn-text order-action-btn-text-primary">去支付</Text></View>}
             {canConfirmReceipt && <View className="order-action-btn order-action-btn-primary" onClick={handleReceipt}><Text className="order-action-btn-text order-action-btn-text-primary">确认签收</Text></View>}
             {canCancelOrder && <View className="order-action-btn order-action-btn-danger" onClick={handleCancel}><Text className="order-action-btn-text order-action-btn-text-danger">取消订单</Text></View>}
@@ -240,31 +287,38 @@ export default function OrderDetailPage() {
 
         {/* Task info */}
         <View className="card">
-          <Text className="section-title">任务信息</Text>
-          <DetailRow label="起始地址" value={detail.service_address} long />
-          <DetailRow label="目的地址" value={detail.dest_address} long />
-          <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} />
-          <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} />
+          <View className="section-head-left">
+            <SectionGlyph type="task" />
+            <Text className="section-title section-title-inline">任务信息</Text>
+          </View>
+          <View className="detail-list">
+            <DetailRow label="起始地址" value={detail.service_address} icon={locationIcon} />
+            <DetailRow label="目的地址" value={detail.dest_address} icon={locationIcon} />
+            <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} icon={calendarIcon} />
+            <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} icon={calendarIcon} />
+          </View>
         </View>
 
         {/* Participants */}
         <View className="card">
           <Text className="section-title">参与方</Text>
           <View className="participant-card">
-            <View className="participant-avatar" style={{ background: '#114178' }}><Text className="participant-avatar-text">{summarizeParty(client, '客').charAt(0)}</Text></View>
+            <View className="participant-avatar participant-avatar-blue"><Text className="participant-avatar-text">{summarizeParty(client, '客').charAt(0)}</Text></View>
             <View className="participant-body">
               <Text className="participant-label">客户</Text>
               <Text className="participant-name">{summarizeParty(client, '客户')}</Text>
               <Text className="participant-meta">{isClient ? '当前账号 · 我' : '等待补充联系方式'}</Text>
             </View>
+            <Image className="participant-chevron" src={chevronIcon} mode="aspectFit" />
           </View>
           <View className="participant-card">
-            <View className="participant-avatar" style={{ background: '#389e0d' }}><Text className="participant-avatar-text">{summarizeParty(provider, '承').charAt(0)}</Text></View>
+            <View className="participant-avatar participant-avatar-green"><Text className="participant-avatar-text">{summarizeParty(provider, '承').charAt(0)}</Text></View>
             <View className="participant-body">
               <Text className="participant-label">承接方</Text>
               <Text className="participant-name">{summarizeParty(provider, '待确认机主')}</Text>
               <Text className="participant-meta">{isProvider ? '当前账号 · 我' : '等待补充联系方式'}</Text>
             </View>
+            <Image className="participant-chevron" src={chevronIcon} mode="aspectFit" />
           </View>
         </View>
 
@@ -282,28 +336,33 @@ export default function OrderDetailPage() {
         </View>
 
         {/* Timeline */}
-        {(detail as any).timeline && (detail as any).timeline.length > 0 && (
-          <View className="card">
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <Text className="section-title" style={{ marginBottom: 0 }}>订单动态汇总</Text>
-              <Text style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '600' }}>{(detail as any).timeline.length} 条记录</Text>
+        {timelineItems.length > 0 && (
+          <View className="card timeline-card" id="order-timeline-section">
+            <View className="timeline-card-head">
+              <Text className="section-title section-title-inline">订单动态汇总</Text>
+              <Text className="timeline-count">{timelineItems.length} 条记录</Text>
             </View>
             <View className="timeline-list">
-              {((detail as any).timeline || []).map((item: any, i: number) => (
-                <View key={i} className="timeline-item">
+              {timelineItems.map((item: any, i: number) => {
+                const isCurrent = i === timelineItems.length - 1;
+                return (
+                <View key={i} className={`timeline-item ${isCurrent ? 'timeline-item-current' : ''}`}>
                   <View className="timeline-axis">
-                    <View className="timeline-dot"><Text className="timeline-dot-text">{item.source_type === 'payment' ? '💰' : item.source_type === 'dispatch_task' ? '📋' : '📍'}</Text></View>
-                    {i < ((detail as any).timeline.length - 1) && <View className="timeline-line" />}
+                    <View className={`timeline-dot ${isCurrent ? 'timeline-dot-current' : ''}`} />
+                    {i < (timelineItems.length - 1) && <View className="timeline-line" />}
                   </View>
-                  <View className="timeline-body">
+                  <View className={`timeline-body ${isCurrent ? 'timeline-body-current' : ''}`}>
                     <View className="timeline-title-row">
                       <Text className="timeline-title">{getTimelineTitle(item)}</Text>
-                      <Text className="timeline-time">{item.occurred_at ? new Date(item.occurred_at).toLocaleDateString() : ''}</Text>
+                      <Text className="timeline-time">{formatDateTime(item.occurred_at || item.created_at)}</Text>
                     </View>
-                    {item.description && <Text className="timeline-desc">{item.description}</Text>}
+                    <View className="timeline-bottom-row">
+                      {(item.description || item.note) && <Text className="timeline-desc">{item.description || item.note}</Text>}
+                      {isCurrent && <Text className="timeline-current-pill">当前进度</Text>}
+                    </View>
                   </View>
                 </View>
-              ))}
+              )})}
             </View>
           </View>
         )}

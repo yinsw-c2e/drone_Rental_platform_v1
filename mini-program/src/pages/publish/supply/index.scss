@@ -1,14 +1,17 @@
 // 上架服务页面样式 — 复用 publish/demand 的共享样式
 .publish-wrap {
-  height: 100%;
+  height: 100vh;
+  min-height: 100vh;
   flex: 1;
   display: flex;
   flex-direction: column;
   background: #F5F7FA;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .publish-steps {
+  flex-shrink: 0;
   padding: 16px 40px;
   background: #FFFFFF;
   border-bottom: 1px solid #EEEFF2;
@@ -64,11 +67,13 @@
 
 .publish-scroll {
   flex: 1;
-  height: 100%;
+  height: 0;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .publish-scroll > .card {
-  margin: 16px 16px 112px;
+  margin: 16px 16px calc(132px + env(safe-area-inset-bottom));
   padding: 18px;
   border-radius: 16px;
 }
@@ -130,6 +135,10 @@
 .publish-option-text-active {
   color: #1677FF;
   font-weight: 600;
+}
+
+.publish-custom-scene-input {
+  margin-top: 2px;
 }
 
 .publish-budget-row {

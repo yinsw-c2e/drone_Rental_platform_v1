@@ -4,179 +4,91 @@
   right: 0;
   bottom: 0;
   z-index: 999;
-  background: #ffffff;
-  border-top: 1px solid #edf0f4;
-  box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.04);
+  height: calc(66px + constant(safe-area-inset-bottom));
+  height: calc(66px + env(safe-area-inset-bottom));
   padding-bottom: constant(safe-area-inset-bottom);
   padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 -5px 16px rgba(20, 40, 80, 0.07);
+  backdrop-filter: blur(9px);
 }
 
 .custom-tabbar-inner {
-  height: 60px;
+  height: 66px;
   display: flex;
   flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
 }
 
 .tabbar-item {
-  flex: 1;
+  position: relative;
+  width: 80px;
   min-width: 0;
+  height: 55px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #8b94a3;
 }
 
 .tabbar-item-active {
-  color: #2563eb;
+  color: #1f6bff;
 }
 
 .tabbar-icon-shell {
-  width: 38px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  width: 27px;
+  height: 27px;
   margin-bottom: 2px;
-  border-radius: 16px;
-  background: transparent;
-}
-
-.tabbar-item-active .tabbar-icon-shell {
-  background: #eff6ff;
-}
-
-.tabbar-icon {
-  width: 24px;
-  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+}
+
+.tabbar-badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff3045, #ff4d5e);
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+.tabbar-badge-text {
+  color: #ffffff;
+  font-size: 9px;
+  line-height: 12px;
+  font-weight: 900;
+}
+
+.tabbar-icon-img {
+  width: 27px;
+  height: 27px;
+  display: block;
 }
 
 .tabbar-label {
-  font-size: 13px;
-  line-height: 17px;
-  font-weight: 600;
-  color: #8b94a3;
-}
-
-.tabbar-item-active .tabbar-label {
-  color: #2563eb;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 15px;
   font-weight: 700;
 }
 
-.home-panel {
-  position: relative;
-  width: 22px;
-  height: 22px;
-  border: 1px solid #8b94a3;
-  border-radius: 7px;
-  box-sizing: border-box;
-}
-
-.home-panel-line {
-  position: absolute;
-  background: #8b94a3;
-  border-radius: 999px;
-}
-
-.home-panel-line-v {
-  top: 4px;
-  bottom: 4px;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-}
-
-.home-panel-line-h {
-  left: 4px;
-  right: 4px;
-  top: 50%;
-  height: 1px;
-  transform: translateY(-50%);
-}
-
-.tabbar-item-active .home-panel {
-  border-color: #2563eb;
-}
-
-.tabbar-item-active .home-panel-line {
-  background: #2563eb;
-}
-
-.message-bubble {
-  position: relative;
-  width: 23px;
-  height: 17px;
-  border: 1px solid #8b94a3;
-  border-radius: 7px;
-  box-sizing: border-box;
-}
-
-.message-line {
-  width: 9px;
-  height: 1px;
-  margin-left: 5px;
-  margin-top: 3px;
-  border-radius: 999px;
-  background: #8b94a3;
-}
-
-.message-line-long {
-  width: 13px;
-  margin-top: 4px;
-}
-
-.message-tail {
-  position: absolute;
-  left: 6px;
-  bottom: -4px;
-  width: 7px;
-  height: 7px;
-  border-left: 1px solid #8b94a3;
-  border-bottom: 1px solid #8b94a3;
-  background: #ffffff;
-  transform: rotate(-28deg);
-  box-sizing: border-box;
-}
-
-.tabbar-item-active .message-bubble {
-  border-color: #2563eb;
-}
-
-.tabbar-item-active .message-line {
-  background: #2563eb;
-}
-
-.tabbar-item-active .message-tail {
-  border-color: #2563eb;
-}
-
-.profile-icon {
-  flex-direction: column;
-}
-
-.profile-head {
-  width: 9px;
-  height: 9px;
-  border: 1px solid #8b94a3;
-  border-radius: 50%;
-  box-sizing: border-box;
-}
-
-.profile-body {
-  width: 20px;
-  height: 10px;
-  margin-top: 3px;
-  border: 1px solid #8b94a3;
-  border-radius: 12px 12px 6px 6px;
-  box-sizing: border-box;
-}
-
-.tabbar-item-active .profile-head,
-.tabbar-item-active .profile-body {
-  border-color: #2563eb;
-  background: transparent;
+.tabbar-item-active .tabbar-label {
+  color: #1f6bff;
+  font-weight: 800;
 }

@@ -9,25 +9,11 @@
       bindtap="switchTab"
     >
       <view class="tabbar-icon-shell">
-        <view wx:if="{{item.key == 'home'}}" class="tabbar-icon home-icon">
-          <view class="home-panel">
-            <view class="home-panel-line home-panel-line-v"></view>
-            <view class="home-panel-line home-panel-line-h"></view>
-          </view>
+        <view wx:if="{{item.badge}}" class="tabbar-badge">
+          <text class="tabbar-badge-text">{{item.badge}}</text>
         </view>
 
-        <view wx:elif="{{item.key == 'messages'}}" class="tabbar-icon message-icon">
-          <view class="message-bubble">
-            <view class="message-line message-line-long"></view>
-            <view class="message-line"></view>
-            <view class="message-tail"></view>
-          </view>
-        </view>
-
-        <view wx:else class="tabbar-icon profile-icon">
-          <view class="profile-head"></view>
-          <view class="profile-body"></view>
-        </view>
+        <image class="tabbar-icon-img" src="{{selected == index ? item.selectedIconPath : item.iconPath}}" mode="aspectFit"></image>
       </view>
 
       <text class="tabbar-label">{{item.text}}</text>
