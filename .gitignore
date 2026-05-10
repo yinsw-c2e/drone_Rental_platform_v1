@@ -87,3 +87,6 @@ AUX
 # react-native-update
 .update
 .pushy
+
+/external_resource/**/*
+/design_handoff/**/*
