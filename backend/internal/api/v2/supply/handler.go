@@ -25,6 +25,7 @@ func (h *Handler) List(c *gin.Context) {
 
 	query := service.SupplyMarketQuery{
 		Region:      c.Query("region"),
+		Keyword:     c.Query("keyword"),
 		CargoScene:  c.Query("cargo_scene"),
 		ServiceType: c.Query("service_type"),
 	}

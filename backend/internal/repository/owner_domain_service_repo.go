@@ -7,7 +7,7 @@ import (
 	"wurenji-backend/internal/model"
 )
 
-func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, cargoScene, serviceType string, minPayloadKG float64, acceptsDirectOrder *bool, page, pageSize int) ([]model.OwnerSupply, int64, error) {
+func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, serviceType string, minPayloadKG float64, acceptsDirectOrder *bool, page, pageSize int) ([]model.OwnerSupply, int64, error) {
 	var supplies []model.OwnerSupply
 	var total int64
 
@@ -24,6 +24,22 @@ func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, cargoScene, serviceTyp
 	if trimmed := strings.TrimSpace(region); trimmed != "" {
 		like := "%" + trimmed + "%"
 		query = query.Where("(drones.city LIKE ? OR CAST(owner_supplies.service_area_snapshot AS CHAR) LIKE ?)", like, like)
+	}
+	if trimmed := strings.TrimSpace(keyword); trimmed != "" {
+		like := "%" + trimmed + "%"
+		query = query.Where(
+			`(
+				owner_supplies.title LIKE ? OR
+				owner_supplies.supply_no LIKE ? OR
+				CAST(owner_supplies.cargo_scenes AS CHAR) LIKE ? OR
+				CAST(owner_supplies.service_area_snapshot AS CHAR) LIKE ? OR
+				drones.city LIKE ? OR
+				drones.brand LIKE ? OR
+				drones.model LIKE ? OR
+				drones.serial_number LIKE ?
+			)`,
+			like, like, like, like, like, like, like, like,
+		)
 	}
 	if trimmed := strings.TrimSpace(cargoScene); trimmed != "" {
 		query = query.Where("JSON_CONTAINS(owner_supplies.cargo_scenes, JSON_ARRAY(?))", trimmed)

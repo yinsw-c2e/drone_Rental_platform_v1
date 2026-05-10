@@ -127,6 +127,7 @@ type ClientEligibilityView struct {
 
 type SupplyMarketQuery struct {
 	Region             string
+	Keyword            string
 	CargoScene         string
 	ServiceType        string
 	MinPayloadKG       float64
@@ -408,6 +409,7 @@ func (s *ClientService) ListMarketplaceSupplies(query SupplyMarketQuery, page, p
 	}
 	return s.ownerDomainRepo.ListMarketplaceSupplies(
 		query.Region,
+		query.Keyword,
 		query.CargoScene,
 		query.ServiceType,
 		query.MinPayloadKG,
