@@ -146,8 +146,8 @@ export default function ClientProfileScreen({navigation}: any) {
 
   const summaryItems = useMemo(
     () => [
-      {label: '需求', value: client?.total_orders || 0},
-      {label: '已完成', value: client?.completed_orders || 0},
+      {label: '需求', value: client?.demand_count ?? 0},
+      {label: '完成订单', value: client?.completed_orders || 0},
       {label: '总消费', value: client?.total_spending ? `¥${(client.total_spending / 100).toFixed(0)}` : '0'},
       {label: '评分', value: client?.average_rating?.toFixed(1) || '5.0'},
     ],

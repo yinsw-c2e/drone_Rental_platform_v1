@@ -27,6 +27,7 @@ const SCENE_OPTIONS = [
   {key: 'island_supply', label: '海岛补给'},
   {key: 'emergency', label: '应急救援'},
 ];
+const SCENE_OPTION_KEYS = new Set(SCENE_OPTIONS.map(option => option.key));
 
 const PRICING_OPTIONS = [
   {key: 'per_trip', label: '按架次'},
@@ -90,6 +91,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
   const [address, setAddress] = useState<AddressData | null>(null);
   const [acceptsDirectOrder, setAcceptsDirectOrder] = useState(true);
   const [selectedScenes, setSelectedScenes] = useState<string[]>(['power_grid']);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [drones, setDrones] = useState<Drone[]>([]);
   const [selectedDroneId, setSelectedDroneId] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -127,7 +129,10 @@ export default function PublishOfferScreen({route, navigation}: any) {
     setAvailableSlotsSummary(summarizeFlexibleValue(supply.available_time_slots, ''));
     setAddress(parseAddressData(supply.service_area_snapshot));
     setAcceptsDirectOrder(Boolean(supply.accepts_direct_order));
-    setSelectedScenes((supply.cargo_scenes || []).length > 0 ? supply.cargo_scenes : ['power_grid']);
+    const presetScenes = (supply.cargo_scenes || []).filter(scene => SCENE_OPTION_KEYS.has(scene));
+    const customScenes = (supply.cargo_scenes || []).filter(scene => !SCENE_OPTION_KEYS.has(scene));
+    setSelectedScenes(presetScenes.length > 0 ? presetScenes : customScenes.length > 0 ? [] : ['power_grid']);
+    setCustomCargoScene(customScenes.join('、'));
     setSelectedDroneId(supply.drone_id || supply.drone?.id || 0);
   }, []);
 
@@ -163,10 +168,15 @@ export default function PublishOfferScreen({route, navigation}: any) {
     setSelectedScenes(prev => {
       if (prev.includes(scene)) {
         const next = prev.filter(item => item !== scene);
-        return next.length > 0 ? next : prev;
+        return next.length > 0 || customCargoScene.trim() ? next : prev;
       }
       return [...prev, scene];
     });
+  };
+
+  const getEffectiveScenes = () => {
+    const customScene = customCargoScene.trim();
+    return customScene ? Array.from(new Set([...selectedScenes, customScene])) : selectedScenes;
   };
 
   const buildPayload = (status: 'draft' | 'active') => ({
@@ -174,7 +184,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
     title: title.trim(),
     description: description.trim(),
     service_types: ['heavy_cargo_lift_transport'],
-    cargo_scenes: selectedScenes,
+    cargo_scenes: getEffectiveScenes(),
     service_area_snapshot: buildAddressSnapshot(address),
     base_price_amount: Math.round((Number(pricingText) || 0) * 100),
     pricing_unit: pricingUnit,
@@ -197,7 +207,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
       Alert.alert('提示', '请选择一架无人机');
       return;
     }
-    if (selectedScenes.length === 0) {
+    if (getEffectiveScenes().length === 0) {
       Alert.alert('提示', '请至少选择一个服务场景');
       return;
     }
@@ -333,6 +343,13 @@ export default function PublishOfferScreen({route, navigation}: any) {
                     );
                   })}
                 </View>
+                <TextInput
+                  style={[styles.fieldInput, styles.customSceneInput]}
+                  placeholder="其他场景，可直接填写"
+                  placeholderTextColor={theme.textHint}
+                  value={customCargoScene}
+                  onChangeText={setCustomCargoScene}
+                />
               </View>
 
               <View style={styles.inputGroup}>
@@ -675,6 +692,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   sceneBtnTextActive: {
     color: theme.primaryText,
     fontWeight: '700',
+  },
+  customSceneInput: {
+    marginTop: 8,
   },
   switchBox: {
     flexDirection: 'row',

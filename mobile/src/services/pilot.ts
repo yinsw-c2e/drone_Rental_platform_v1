@@ -1,4 +1,4 @@
-import api from './api';
+import api, {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -224,19 +224,19 @@ export const getPilotById = async (id: number): Promise<Pilot> => {
 
 // 提交资质证书
 export const submitCertification = async (data: SubmitCertificationRequest): Promise<PilotCertification> => {
-  const res: any = await api.post('/pilot/certification', data);
+  const res: any = await apiV2.post('/pilot/certifications', data);
   return res.data;
 };
 
 // 获取证书列表
 export const getCertifications = async (): Promise<PilotCertification[]> => {
-  const res: any = await api.get('/pilot/certifications');
-  return res.data;
+  const res: any = await apiV2.get('/pilot/certifications');
+  return res.data || [];
 };
 
 // 提交无犯罪记录证明
 export const submitCriminalCheck = async (docUrl: string): Promise<void> => {
-  await api.post('/pilot/criminal-check', {doc_url: docUrl});
+  await apiV2.post('/pilot/criminal-check', {doc_url: docUrl});
 };
 
 // 提交健康证明
@@ -244,7 +244,7 @@ export const submitHealthCheck = async (data: {
   doc_url: string;
   expire_date: string;
 }): Promise<void> => {
-  await api.post('/pilot/health-check', data);
+  await apiV2.post('/pilot/health-check', data);
 };
 
 // ==================== 飞行记录 ====================

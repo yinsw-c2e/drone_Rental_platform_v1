@@ -15,6 +15,7 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 import {API_ROOT_URL} from '../../constants';
 import {launchImageLibrary} from 'react-native-image-picker';
+import DateOnlyField from '../../components/DateOnlyField';
 import {droneService} from '../../services/drone';
 import api from '../../services/api';
 import {useTheme} from '../../theme/ThemeContext';
@@ -116,8 +117,6 @@ export default function DroneCertificationScreen({route, navigation}: any) {
     }
   };
 
-  const validateDate = (dateStr: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
-
   const openForm = (type: CertType) => {
     setActiveType(type);
     setShowModal(true);
@@ -141,7 +140,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
 
   const handleSubmitInsurance = async () => {
     if (!insurancePolicyNo.trim()) return Alert.alert('提示', '请输入保单号');
-    if (!insuranceExpireDate || !validateDate(insuranceExpireDate)) return Alert.alert('提示', '请输入日期 (YYYY-MM-DD)');
+    if (!insuranceExpireDate) return Alert.alert('提示', '请选择到期日期');
     if (!insuranceDoc) return Alert.alert('提示', '请上传保单');
     setSubmitting(true);
     try {
@@ -164,7 +163,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
 
   const handleSubmitAirworthiness = async () => {
     if (!airworthinessCertNo.trim()) return Alert.alert('提示', '请输入证书编号');
-    if (!airworthinessExpire || !validateDate(airworthinessExpire)) return Alert.alert('提示', '请输入日期 (YYYY-MM-DD)');
+    if (!airworthinessExpire) return Alert.alert('提示', '请选择有效期');
     if (!airworthinessDoc) return Alert.alert('提示', '请上传证书照片');
     setSubmitting(true);
     try {
@@ -280,7 +279,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
         </View>
 
         <View style={styles.infoBanner}>
-          <Text style={styles.infoBannerText}>💡 资质审核通常在 1-2 个工作日内完成。资质齐备后，您的服务将获得“已核验”标识并提升排名。</Text>
+          <Text style={styles.infoBannerText}>资质结果以平台核验状态为准。资质齐备后，您的服务将获得“已核验”标识并提升排名。</Text>
         </View>
       </ScrollView>
 
@@ -304,7 +303,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
                   <FormInput label="承保公司 *" placeholder="如：中国人保" value={insuranceCompany} onChange={setInsuranceCompany} theme={theme} />
                   <View style={styles.rowInputs}>
                     <View style={{flex: 1}}><FormInput label="保额 (万) *" placeholder="500" value={insuranceCoverage} onChange={setInsuranceCoverage} keyboardType="numeric" theme={theme} /></View>
-                    <View style={{flex: 1}}><FormInput label="到期日期 *" placeholder="YYYY-MM-DD" value={insuranceExpireDate} onChange={setInsuranceExpireDate} theme={theme} /></View>
+                    <View style={{flex: 1}}><DateOnlyField label="到期日期" value={insuranceExpireDate} onChange={setInsuranceExpireDate} theme={theme} required /></View>
                   </View>
                   <FormUpload label="保单扫描件 *" value={insuranceDoc} onPress={() => pickImage(setInsuranceDoc)} theme={theme} />
                 </View>
@@ -312,7 +311,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
               {activeType === 'airworthiness' && (
                 <View style={styles.formGroupContainer}>
                   <FormInput label="证书编号 *" placeholder="请输入证书编号" value={airworthinessCertNo} onChange={setAirworthinessCertNo} theme={theme} />
-                  <FormInput label="有效期至 *" placeholder="YYYY-MM-DD" value={airworthinessExpire} onChange={setAirworthinessExpire} theme={theme} />
+                  <DateOnlyField label="有效期至" value={airworthinessExpire} onChange={setAirworthinessExpire} theme={theme} required />
                   <FormUpload label="证书照片 *" value={airworthinessDoc} onPress={() => pickImage(setAirworthinessDoc)} theme={theme} />
                 </View>
               )}

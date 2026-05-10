@@ -73,6 +73,7 @@ export default function CargoDetailScreen({route, navigation}: any) {
       params: {
         peerId: cargo.publisher_id,
         peerName: cargo.publisher?.nickname || '发布者',
+        peerAvatar: cargo.publisher?.avatar_url || '',
       },
     });
   };

@@ -1,5 +1,5 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {Alert, View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {Alert, View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, Image} from 'react-native';
 import {messageService} from '../../services/message';
 import {Message} from '../../types';
 import {useSelector} from 'react-redux';
@@ -7,24 +7,45 @@ import {RootState} from '../../store/store';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
+function getMessageTime(message: Message) {
+  const timestamp = message.created_at ? new Date(message.created_at).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function normalizeMessages(messages: Message[]) {
+  return [...messages].sort((a, b) => {
+    const timeDelta = getMessageTime(a) - getMessageTime(b);
+    if (timeDelta !== 0) {
+      return timeDelta;
+    }
+    return Number(a.id || 0) - Number(b.id || 0);
+  });
+}
+
+function getAvatarInitial(name?: string, fallback = '') {
+  const text = (name || fallback).trim();
+  return Array.from(text)[0] || '用';
+}
+
 export default function ChatScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
-  const {conversationId, peerId, peerName} = route.params;
+  const {conversationId, peerId, peerName, peerAvatar} = route.params;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const listRef = useRef<FlatList<Message>>(null);
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
   const fetchMessages = useCallback(async () => {
     try {
       if (conversationId) {
         const res = await messageService.getMessages(conversationId, 1, 50);
-        setMessages((res.data?.items || []).reverse());
-        messageService.markRead(conversationId);
+        setMessages(normalizeMessages(res.data?.items || []));
+        messageService.markRead(conversationId).catch(() => undefined);
       } else {
         const res = await messageService.getMessagesByPeer(peerId, 1, 50);
-        setMessages((res.data.list || []).reverse());
-        messageService.markReadByPeer(peerId);
+        setMessages(normalizeMessages(res.data.list || []));
+        messageService.markReadByPeer(peerId).catch(() => undefined);
       }
     } catch (e) {
       console.error(e);
@@ -47,7 +68,7 @@ export default function ChatScreen({route, navigation}: any) {
     if (!inputText.trim()) return;
     try {
       const res = await messageService.send(peerId, inputText.trim());
-      setMessages(prev => [...prev, res.data]);
+      setMessages(prev => normalizeMessages([...prev, res.data]));
       setInputText('');
       // 触发全局事件通知会话列表刷新
       if (route.params?.onMessageSent) {
@@ -62,10 +83,24 @@ export default function ChatScreen({route, navigation}: any) {
 
   const renderMessage = ({item}: {item: Message}) => {
     const isMine = item.sender_id === currentUser?.id;
+    const avatarUrl = isMine ? currentUser?.avatar_url : peerAvatar;
+    const avatarInitial = isMine
+      ? getAvatarInitial(currentUser?.nickname || currentUser?.phone, '我')
+      : getAvatarInitial(peerName, '用');
+
     return (
       <View style={[styles.msgRow, isMine && styles.msgRowRight]}>
-        <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-          <Text style={[styles.msgText, isMine && {color: theme.btnPrimaryText}]}>{item.content}</Text>
+        <View style={[styles.avatar, isMine ? styles.avatarMine : styles.avatarOther]}>
+          {avatarUrl ? (
+            <Image source={{uri: avatarUrl}} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{avatarInitial}</Text>
+          )}
+        </View>
+        <View style={[styles.messageMain, isMine && styles.messageMainMine]}>
+          <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
+            <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{item.content}</Text>
+          </View>
         </View>
       </View>
     );
@@ -91,10 +126,13 @@ export default function ChatScreen({route, navigation}: any) {
           <Text style={styles.noticeText}>聊天仅用于沟通协作。成交前手机号、邮箱、微信等敏感联系方式会被平台规则拦截，正式状态推进仍以系统通知和业务页面为准。</Text>
         </View>
         <FlatList
+          ref={listRef}
           data={messages}
           keyExtractor={item => String(item.id)}
           renderItem={renderMessage}
           contentContainerStyle={styles.listContent}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({animated: true})}
+          onLayout={() => listRef.current?.scrollToEnd({animated: false})}
         />
         <View style={styles.inputBar}>
           <TextInput
@@ -136,14 +174,38 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   noticeTitle: {fontSize: 13, fontWeight: '700', color: theme.warning},
   noticeText: {marginTop: 4, fontSize: 12, lineHeight: 18, color: theme.warning},
-  msgRow: {flexDirection: 'row', marginBottom: 12},
-  msgRowRight: {justifyContent: 'flex-end'},
+  msgRow: {flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12},
+  msgRowRight: {flexDirection: 'row-reverse'},
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  avatarOther: {
+    marginRight: 8,
+    backgroundColor: theme.card,
+    borderColor: theme.divider,
+  },
+  avatarMine: {
+    marginLeft: 8,
+    backgroundColor: theme.primary + '22',
+    borderColor: theme.primary + '33',
+  },
+  avatarImage: {width: 36, height: 36, borderRadius: 18},
+  avatarText: {fontSize: 15, fontWeight: '700', color: theme.text},
+  messageMain: {maxWidth: '76%', alignItems: 'flex-start'},
+  messageMainMine: {alignItems: 'flex-end'},
   flexOne: {flex: 1},
   listContent: {padding: 12},
-  bubble: {maxWidth: '75%', padding: 12, borderRadius: 12},
-  bubbleMine: {backgroundColor: theme.primary, borderBottomRightRadius: 4},
-  bubbleOther: {backgroundColor: theme.card, borderBottomLeftRadius: 4},
+  bubble: {maxWidth: '100%', padding: 12, borderRadius: 14},
+  bubbleMine: {backgroundColor: theme.primary, borderTopRightRadius: 5},
+  bubbleOther: {backgroundColor: theme.card, borderTopLeftRadius: 5},
   msgText: {fontSize: 15, color: theme.text},
+  msgTextMine: {color: theme.btnPrimaryText},
   inputBar: {flexDirection: 'row', padding: 8, backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.divider},
   input: {flex: 1, height: 40, backgroundColor: theme.bgSecondary, borderRadius: 20, paddingHorizontal: 16, fontSize: 15},
   sendBtn: {width: 60, height: 40, backgroundColor: theme.primary, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 8},

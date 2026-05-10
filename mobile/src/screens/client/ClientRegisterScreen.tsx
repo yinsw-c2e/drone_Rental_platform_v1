@@ -15,7 +15,7 @@ import {launchImageLibrary} from 'react-native-image-picker';
 import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import {registerEnterprise, RegisterEnterpriseRequest} from '../../services/client';
-import api from '../../services/api';
+import {apiV2} from '../../services/api';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -54,10 +54,10 @@ export default function ClientRegisterScreen({navigation}: any) {
           name: asset.fileName || 'business-license.jpg',
         } as any);
 
-        const uploadRes: any = await api.post('/pilot/upload-cert', formData, {
+        const uploadRes: any = await apiV2.post('/pilot/upload-cert', formData, {
           headers: {'Content-Type': 'multipart/form-data'},
         });
-        setLicenseDoc(uploadRes.data.url);
+        setLicenseDoc(uploadRes.data?.url || '');
         Alert.alert('上传成功', '营业执照图片已上传。');
       }
     } catch (e: any) {

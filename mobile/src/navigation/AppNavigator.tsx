@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { markMeInitialized, setMeSummary } from '../store/slices/authSlice';
@@ -10,6 +10,19 @@ import { wsService } from '../services/websocket';
 import { useTheme } from '../theme/ThemeContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
+
+const navigationRef = createNavigationContainerRef<any>();
+let hasPromptedVerificationThisSession = false;
+const VERIFICATION_PROMPT_STATUSES = new Set([
+  '',
+  'unverified',
+  'not_verified',
+  'not_submitted',
+  'rejected',
+  'failed',
+]);
+const shouldPromptVerification = (status?: string | null) =>
+  VERIFICATION_PROMPT_STATUSES.has(String(status || '').trim().toLowerCase());
 
 export default function AppNavigator() {
   const { theme } = useTheme();
@@ -84,8 +97,41 @@ export default function AppNavigator() {
       });
   }, [isAuthenticated, user?.id]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      hasPromptedVerificationThisSession = false;
+      return;
+    }
+    if (
+      !meInitialized ||
+      !user ||
+      !shouldPromptVerification(user.id_verified) ||
+      hasPromptedVerificationThisSession
+    ) {
+      return;
+    }
+    hasPromptedVerificationThisSession = true;
+    setTimeout(() => {
+      Alert.alert(
+        '完成实名认证',
+        '完成实名认证后可发布需求、直达下单并提升账号可信度。是否现在去认证？',
+        [
+          {text: '稍后', style: 'cancel'},
+          {
+            text: '去认证',
+            onPress: () => {
+              if (navigationRef.isReady()) {
+                navigationRef.navigate('Verification');
+              }
+            },
+          },
+        ],
+      );
+    }, 300);
+  }, [isAuthenticated, meInitialized, user]);
+
   return (
-    <NavigationContainer key={navigatorKey}>
+    <NavigationContainer key={navigatorKey} ref={navigationRef}>
       {isAuthenticated && bootstrapping ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />

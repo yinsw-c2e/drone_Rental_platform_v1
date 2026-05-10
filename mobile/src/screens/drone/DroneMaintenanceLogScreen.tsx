@@ -13,6 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import DateOnlyField from '../../components/DateOnlyField';
 import api from '../../services/api';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -92,10 +93,6 @@ export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
     setNextDate('');
   };
 
-  const validateDate = (dateStr: string): boolean => {
-    return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
-  };
-
   const getTypeLabel = (value: string): string => {
     const found = MAINTENANCE_TYPES.find(t => t.value === value);
     return found?.label || value;
@@ -106,8 +103,8 @@ export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
       Alert.alert('提示', '请输入维护描述');
       return;
     }
-    if (!performedAt || !validateDate(performedAt)) {
-      Alert.alert('提示', '请输入正确的维护日期 (YYYY-MM-DD)');
+    if (!performedAt) {
+      Alert.alert('提示', '请选择维护日期');
       return;
     }
 
@@ -250,13 +247,7 @@ export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
               />
 
               {/* 维护日期 */}
-              <Text style={styles.label}>维护日期 *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD"
-                value={performedAt}
-                onChangeText={setPerformedAt}
-              />
+              <DateOnlyField label="维护日期" value={performedAt} onChange={setPerformedAt} theme={theme} required />
 
               {/* 执行人 */}
               <Text style={styles.label}>执行人</Text>
@@ -278,13 +269,7 @@ export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
               />
 
               {/* 下次维护日期 */}
-              <Text style={styles.label}>下次维护日期</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD (选填)"
-                value={nextDate}
-                onChangeText={setNextDate}
-              />
+              <DateOnlyField label="下次维护日期" value={nextDate} onChange={setNextDate} theme={theme} />
 
               {/* 提交 */}
               <TouchableOpacity

@@ -35,6 +35,15 @@ import type {AppTheme} from '../../theme/index';
 type DemandStep = 1 | 2;
 type DraftSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
+const getInitialSceneState = (scene?: string) => {
+  const sceneKey = scene || DEMAND_SCENE_OPTIONS[0].key;
+  const isPreset = DEMAND_SCENE_OPTIONS.some(option => option.key === sceneKey);
+  return {
+    presetScene: isPreset ? sceneKey : DEMAND_SCENE_OPTIONS[0].key,
+    customScene: isPreset ? '' : sceneKey,
+  };
+};
+
 export default function EditDemandScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
@@ -46,8 +55,11 @@ export default function EditDemandScreen({navigation, route}: any) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [cargoScene, setCargoScene] = useState(DEMAND_SCENE_OPTIONS[0].key);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [cargoWeight, setCargoWeight] = useState('');
-  const [cargoVolume, setCargoVolume] = useState('');
+  const [cargoLength, setCargoLength] = useState('');
+  const [cargoWidth, setCargoWidth] = useState('');
+  const [cargoHeight, setCargoHeight] = useState('');
   const [cargoType, setCargoType] = useState('');
   const [specialRequirements, setSpecialRequirements] = useState('');
   const [tripCount, setTripCount] = useState('1');
@@ -74,16 +86,17 @@ export default function EditDemandScreen({navigation, route}: any) {
   const hydratedRef = useRef(false);
   const autoSaveEnabledRef = useRef(false);
   const lastSavedSnapshotRef = useRef('');
+  const effectiveCargoScene = customCargoScene.trim() || cargoScene;
 
   const suggestedTitle = useMemo(
     () =>
       generateSuggestedTitle({
-        sceneKey: cargoScene,
+        sceneKey: effectiveCargoScene,
         serviceAddress,
         departureAddress,
         destinationAddress,
       }),
-    [cargoScene, departureAddress, destinationAddress, serviceAddress],
+    [departureAddress, destinationAddress, effectiveCargoScene, serviceAddress],
   );
 
   const handleMagicTitle = () => {
@@ -93,11 +106,13 @@ export default function EditDemandScreen({navigation, route}: any) {
   const buildPayload = useCallback(
     (): DemandUpsertPayload => {
       const weight = Number(cargoWeight);
-      const volume = Number(cargoVolume);
+      const lengthCM = Number(cargoLength);
+      const widthCM = Number(cargoWidth);
+      const heightCM = Number(cargoHeight);
       return {
         title: suggestedTitle,
         service_type: 'heavy_cargo_lift_transport',
-        cargo_scene: cargoScene,
+        cargo_scene: effectiveCargoScene,
         description: description.trim() || undefined,
         ...(hasRoute
           ? {
@@ -110,7 +125,12 @@ export default function EditDemandScreen({navigation, route}: any) {
         scheduled_start_at: startDate.toISOString(),
         scheduled_end_at: endDate.toISOString(),
         cargo_weight_kg: weight > 0 ? weight : undefined,
-        cargo_volume_m3: volume > 0 ? volume : undefined,
+        cargo_length_cm: lengthCM > 0 ? lengthCM : undefined,
+        cargo_width_cm: widthCM > 0 ? widthCM : undefined,
+        cargo_height_cm: heightCM > 0 ? heightCM : undefined,
+        cargo_volume_m3: lengthCM > 0 && widthCM > 0 && heightCM > 0
+          ? lengthCM * widthCM * heightCM / 1000000
+          : undefined,
         cargo_type: cargoType.trim() || undefined,
         cargo_special_requirements: specialRequirements.trim() || undefined,
         estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
@@ -124,14 +144,16 @@ export default function EditDemandScreen({navigation, route}: any) {
       allowsPilotCandidate,
       budgetMax,
       budgetMin,
-      cargoScene,
       cargoType,
-      cargoVolume,
+      cargoHeight,
+      cargoLength,
       cargoWeight,
+      cargoWidth,
       departureAddress,
       description,
       destinationAddress,
       endDate,
+      effectiveCargoScene,
       hasRoute,
       expiresAt,
       serviceAddress,
@@ -158,9 +180,13 @@ export default function EditDemandScreen({navigation, route}: any) {
     setDemandStatus(demand.status || 'draft');
     setTitle(demand.title || '');
     setDescription(demand.description || '');
-    setCargoScene(demand.cargo_scene || DEMAND_SCENE_OPTIONS[0].key);
+    const sceneState = getInitialSceneState(demand.cargo_scene);
+    setCargoScene(sceneState.presetScene);
+    setCustomCargoScene(sceneState.customScene);
     setCargoWeight(demand.cargo_weight_kg ? String(demand.cargo_weight_kg) : '');
-    setCargoVolume(demand.cargo_volume_m3 ? String(demand.cargo_volume_m3) : '');
+    setCargoLength(demand.cargo_length_cm ? String(demand.cargo_length_cm) : '');
+    setCargoWidth(demand.cargo_width_cm ? String(demand.cargo_width_cm) : '');
+    setCargoHeight(demand.cargo_height_cm ? String(demand.cargo_height_cm) : '');
     setCargoType(demand.cargo_type || '');
     setSpecialRequirements(demand.cargo_special_requirements || '');
     setTripCount(demand.estimated_trip_count ? String(demand.estimated_trip_count) : '1');
@@ -203,6 +229,9 @@ export default function EditDemandScreen({navigation, route}: any) {
       scheduled_start_at: start.toISOString(),
       scheduled_end_at: end.toISOString(),
       cargo_weight_kg: demand.cargo_weight_kg || undefined,
+      cargo_length_cm: demand.cargo_length_cm || undefined,
+      cargo_width_cm: demand.cargo_width_cm || undefined,
+      cargo_height_cm: demand.cargo_height_cm || undefined,
       cargo_volume_m3: demand.cargo_volume_m3 || undefined,
       cargo_type: demand.cargo_type || undefined,
       cargo_special_requirements: demand.cargo_special_requirements || undefined,
@@ -473,14 +502,24 @@ export default function EditDemandScreen({navigation, route}: any) {
                 {DEMAND_SCENE_OPTIONS.map(option => (
                   <TouchableOpacity
                     key={option.key}
-                    style={[styles.sceneBtn, cargoScene === option.key && styles.sceneBtnActive]}
-                    onPress={() => setCargoScene(option.key)}>
-                    <Text style={[styles.sceneBtnText, cargoScene === option.key && styles.sceneBtnTextActive]}>
+                    style={[styles.sceneBtn, !customCargoScene.trim() && cargoScene === option.key && styles.sceneBtnActive]}
+                    onPress={() => {
+                      setCargoScene(option.key);
+                      setCustomCargoScene('');
+                    }}>
+                    <Text style={[styles.sceneBtnText, !customCargoScene.trim() && cargoScene === option.key && styles.sceneBtnTextActive]}>
                       {option.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+              <TextInput
+                style={[styles.input, styles.customSceneInput]}
+                placeholder="其他场景，可直接填写"
+                placeholderTextColor={theme.textHint}
+                value={customCargoScene}
+                onChangeText={setCustomCargoScene}
+              />
 
               <View style={styles.addressSection}>
                 {hasRoute ? (
@@ -576,28 +615,41 @@ export default function EditDemandScreen({navigation, route}: any) {
             </View>
 
             <View style={styles.inputCard}>
-              <View style={styles.rowInputs}>
-                <View style={{flex: 1}}>
-                  <Text style={styles.label}>货物类型</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="如：塔材"
-                    placeholderTextColor={theme.textHint}
-                    value={cargoType}
-                    onChangeText={setCargoType}
-                  />
-                </View>
-                <View style={{flex: 1}}>
-                  <Text style={styles.label}>体积 (m³)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    placeholder="可选"
-                    placeholderTextColor={theme.textHint}
-                    value={cargoVolume}
-                    onChangeText={setCargoVolume}
-                  />
-                </View>
+              <Text style={styles.label}>货物类型</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="如：塔材"
+                placeholderTextColor={theme.textHint}
+                value={cargoType}
+                onChangeText={setCargoType}
+              />
+
+              <Text style={styles.label}>货物尺寸 (cm)</Text>
+              <View style={styles.dimensionRow}>
+                <TextInput
+                  style={[styles.input, styles.dimensionInput]}
+                  keyboardType="numeric"
+                  placeholder="长"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoLength}
+                  onChangeText={setCargoLength}
+                />
+                <TextInput
+                  style={[styles.input, styles.dimensionInput]}
+                  keyboardType="numeric"
+                  placeholder="宽"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoWidth}
+                  onChangeText={setCargoWidth}
+                />
+                <TextInput
+                  style={[styles.input, styles.dimensionInput]}
+                  keyboardType="numeric"
+                  placeholder="高"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoHeight}
+                  onChangeText={setCargoHeight}
+                />
               </View>
 
               <View style={styles.rowInputs}>
@@ -881,6 +933,9 @@ const getStyles = (theme: AppTheme) =>
       color: theme.primaryText,
       fontWeight: '700',
     },
+    customSceneInput: {
+      marginTop: 8,
+    },
     addressSection: {
       marginTop: 8,
     },
@@ -950,10 +1005,18 @@ const getStyles = (theme: AppTheme) =>
       color: theme.info,
       textAlign: 'center',
     },
-    rowInputs: {
-      flexDirection: 'row',
-      gap: 12,
-    },
+	    rowInputs: {
+	      flexDirection: 'row',
+	      gap: 12,
+	    },
+	    dimensionRow: {
+	      flexDirection: 'row',
+	      gap: 10,
+	    },
+	    dimensionInput: {
+	      flex: 1,
+	      minWidth: 0,
+	    },
     textarea: {
       minHeight: 100,
       textAlignVertical: 'top',

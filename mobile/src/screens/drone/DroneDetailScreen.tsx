@@ -57,7 +57,11 @@ export default function DroneDetailScreen({route, navigation}: any) {
     }
     navigation.navigate('Messages', {
       screen: 'Chat',
-      params: {peerId: drone.owner_id, peerName: drone.owner?.nickname || '机主'},
+      params: {
+        peerId: drone.owner_id,
+        peerName: drone.owner?.nickname || '机主',
+        peerAvatar: drone.owner?.avatar_url || '',
+      },
     });
   };
 

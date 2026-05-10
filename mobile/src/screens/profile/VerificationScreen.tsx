@@ -31,7 +31,9 @@ export default function VerificationScreen({_navigation}: any) {
       const res = await userService.getIDVerifyStatus();
       const data = res.data;
       if (data) {
-        setStatus(data.id_verified || 'unverified');
+        const nextStatus = data.id_verified || 'unverified';
+        setStatus(nextStatus);
+        dispatch(updateUser({id_verified: nextStatus}));
         if (data.real_name) setRealName(data.real_name);
         if (data.id_number) setIdNumber(data.id_number);
         if (data.reject_reason) setRejectReason(data.reject_reason);
@@ -43,11 +45,19 @@ export default function VerificationScreen({_navigation}: any) {
     } finally {
       setLoading(false);
     }
-  }, [user?.id_verified]);
+  }, [dispatch, user?.id_verified]);
 
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  useEffect(() => {
+    if (status !== 'pending') {
+      return undefined;
+    }
+    const timer = setInterval(fetchStatus, 5000);
+    return () => clearInterval(timer);
+  }, [fetchStatus, status]);
 
   const validateIdNumber = (id: string): boolean => {
     // 简易校验：18位身份证号
@@ -78,7 +88,7 @@ export default function VerificationScreen({_navigation}: any) {
       });
       setStatus('pending');
       dispatch(updateUser({id_verified: 'pending'}));
-      Alert.alert('提交成功', '您的实名认证信息已提交，请等待审核');
+      Alert.alert('提交成功', '认证结果以实名核验返回为准，完成后权限将自动更新。');
     } catch (e: any) {
       Alert.alert('提交失败', e?.response?.data?.message || '请稍后重试');
     } finally {
@@ -103,7 +113,7 @@ export default function VerificationScreen({_navigation}: any) {
             <Text style={{fontSize: 48}}>{'\u2705'}</Text>
           </View>
           <Text style={styles.resultTitle}>实名认证已通过</Text>
-          <Text style={styles.resultDesc}>您的身份信息已经过平台人工验证</Text>
+          <Text style={styles.resultDesc}>您的身份信息已通过实名核验</Text>
           
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
@@ -134,7 +144,7 @@ export default function VerificationScreen({_navigation}: any) {
           </View>
           <Text style={styles.resultTitle}>认证审核中</Text>
           <Text style={styles.resultDesc}>
-            您的实名认证信息正在审核中，预计1-3个工作日内完成，请耐心等待
+            您的实名认证信息已提交，当前为模拟核验，预计 1 分钟内自动完成。
           </Text>
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
@@ -211,7 +221,7 @@ export default function VerificationScreen({_navigation}: any) {
           <View style={styles.tipList}>
             <Text style={styles.tipText}>1. 实名认证后可提升信用等级，获得更多平台权限</Text>
             <Text style={styles.tipText}>2. 您的信息将被严格保密，仅用于身份验证</Text>
-            <Text style={styles.tipText}>3. 审核通常在1-3个工作日内完成</Text>
+            <Text style={styles.tipText}>3. 认证结果以实名核验返回为准，完成后权限将自动更新</Text>
           </View>
         </View>
       </ScrollView>

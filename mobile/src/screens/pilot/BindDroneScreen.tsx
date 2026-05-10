@@ -13,6 +13,7 @@ import {
   bindDrone,
   BindDroneRequest,
 } from '../../services/pilot';
+import DateOnlyField from '../../components/DateOnlyField';
 import {droneService} from '../../services/drone';
 import {Drone} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
@@ -66,22 +67,13 @@ export default function BindDroneScreen({navigation}: any) {
     }
   };
 
-  const validateDate = (dateStr: string): boolean => {
-    const regex = /^\d{4}-\d{2}-\d{2}$/;
-    return regex.test(dateStr);
-  };
-
   const handleSubmit = async () => {
     if (!selectedDrone) {
       Alert.alert('提示', '请选择要绑定的无人机');
       return;
     }
-    if (!effectiveFrom || !validateDate(effectiveFrom)) {
-      Alert.alert('提示', '请输入正确的生效日期 (格式: YYYY-MM-DD)');
-      return;
-    }
-    if (effectiveTo && !validateDate(effectiveTo)) {
-      Alert.alert('提示', '到期日期格式不正确 (格式: YYYY-MM-DD)');
+    if (!effectiveFrom) {
+      Alert.alert('提示', '请选择生效日期');
       return;
     }
 
@@ -215,22 +207,10 @@ export default function BindDroneScreen({navigation}: any) {
             </View>
 
             {/* 生效日期 */}
-            <Text style={styles.label}>生效日期 *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={effectiveFrom}
-              onChangeText={setEffectiveFrom}
-            />
+            <DateOnlyField label="生效日期" value={effectiveFrom} onChange={setEffectiveFrom} theme={theme} required />
 
             {/* 到期日期 */}
-            <Text style={styles.label}>到期日期 (选填，不填为长期)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              value={effectiveTo}
-              onChangeText={setEffectiveTo}
-            />
+            <DateOnlyField label="到期日期 (选填，不填为长期)" value={effectiveTo} onChange={setEffectiveTo} theme={theme} />
 
             {/* 提交 */}
             <TouchableOpacity

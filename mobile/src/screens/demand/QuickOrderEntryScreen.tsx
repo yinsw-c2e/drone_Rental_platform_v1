@@ -59,6 +59,9 @@ export default function QuickOrderEntryScreen({navigation}: any) {
   const [cargoScene, setCargoScene] = useState(sceneOptions[0].key);
   const [customCargoScene, setCustomCargoScene] = useState('');
   const [cargoWeight, setCargoWeight] = useState('');
+  const [cargoLength, setCargoLength] = useState('');
+  const [cargoWidth, setCargoWidth] = useState('');
+  const [cargoHeight, setCargoHeight] = useState('');
   const [cargoType, setCargoType] = useState('');
   const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
@@ -137,15 +140,26 @@ export default function QuickOrderEntryScreen({navigation}: any) {
     isAirspaceHardBlocked(pickupAirspace) || isAirspaceHardBlocked(deliveryAirspace);
   const effectiveCargoScene = customCargoScene.trim() || cargoScene;
 
-  const buildDraft = (): QuickOrderDraft => ({
-    cargo_scene: effectiveCargoScene,
-    cargo_type: cargoType.trim() || '重载物资',
-    cargo_weight_kg: Number(cargoWeight) || undefined,
-    departure_address: pickupAddress,
-    destination_address: deliveryAddress,
-    scheduled_start_at: startDate.toISOString(),
-    scheduled_end_at: endDate.toISOString(),
-  });
+  const buildDraft = (): QuickOrderDraft => {
+    const lengthCM = Number(cargoLength);
+    const widthCM = Number(cargoWidth);
+    const heightCM = Number(cargoHeight);
+    return {
+      cargo_scene: effectiveCargoScene,
+      cargo_type: cargoType.trim() || '重载物资',
+      cargo_weight_kg: Number(cargoWeight) || undefined,
+      cargo_length_cm: lengthCM > 0 ? lengthCM : undefined,
+      cargo_width_cm: widthCM > 0 ? widthCM : undefined,
+      cargo_height_cm: heightCM > 0 ? heightCM : undefined,
+      cargo_volume_m3: lengthCM > 0 && widthCM > 0 && heightCM > 0
+        ? lengthCM * widthCM * heightCM / 1000000
+        : undefined,
+      departure_address: pickupAddress,
+      destination_address: deliveryAddress,
+      scheduled_start_at: startDate.toISOString(),
+      scheduled_end_at: endDate.toISOString(),
+    };
+  };
 
   const handleNext = () => {
     if (!pickupAddress || !deliveryAddress) {
@@ -249,6 +263,34 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             value={cargoType}
             onChangeText={setCargoType}
           />
+
+          <Text style={styles.label}>货物尺寸 (cm)</Text>
+          <View style={styles.dimensionRow}>
+            <TextInput
+              style={[styles.input, styles.dimensionInput]}
+              keyboardType="numeric"
+              placeholder="长"
+              placeholderTextColor={theme.textHint}
+              value={cargoLength}
+              onChangeText={setCargoLength}
+            />
+            <TextInput
+              style={[styles.input, styles.dimensionInput]}
+              keyboardType="numeric"
+              placeholder="宽"
+              placeholderTextColor={theme.textHint}
+              value={cargoWidth}
+              onChangeText={setCargoWidth}
+            />
+            <TextInput
+              style={[styles.input, styles.dimensionInput]}
+              keyboardType="numeric"
+              placeholder="高"
+              placeholderTextColor={theme.textHint}
+              value={cargoHeight}
+              onChangeText={setCargoHeight}
+            />
+          </View>
 
           <Text style={styles.label}>作业场景 *</Text>
           <View style={styles.optionRow}>
@@ -364,8 +406,16 @@ const getStyles = (theme: AppTheme) =>
       borderColor: theme.primary,
       backgroundColor: theme.primary + '22',
     },
-    optionText: {fontSize: 13, color: theme.textSub},
-    optionTextActive: {color: theme.primary, fontWeight: '700'},
+	    optionText: {fontSize: 13, color: theme.textSub},
+	    optionTextActive: {color: theme.primary, fontWeight: '700'},
+	    dimensionRow: {
+	      flexDirection: 'row',
+	      gap: 10,
+	    },
+	    dimensionInput: {
+	      flex: 1,
+	      minWidth: 0,
+	    },
     submitBtn: {
       marginTop: 8,
       height: 50,

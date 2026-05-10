@@ -1,6 +1,9 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Alert,
+  Animated,
   FlatList,
+  PanResponder,
   RefreshControl,
   SafeAreaView,
   SectionList,
@@ -33,6 +36,8 @@ type NotificationBucket = {
   title: string;
   icon: string;
 };
+
+const DELETE_WIDTH = 76;
 
 const notificationBucketMap: Record<string, NotificationBucket> = {
   demand: {key: 'demand', title: '需求动态', icon: '🧾'},
@@ -129,6 +134,96 @@ function resolveNotificationTitle(notification: V2NotificationSummary) {
 function resolveNotificationSubtitle(notification: V2NotificationSummary) {
   const extra = notification.extra_data || {};
   return extra.order_no || extra.dispatch_no || extra.quote_no || extra.demand_no || '';
+}
+
+function SwipeableConversationItem({
+  item,
+  styles,
+  onPress,
+  onDelete,
+}: {
+  item: ConversationSummary;
+  styles: ReturnType<typeof getStyles>;
+  onPress: (item: ConversationSummary) => void;
+  onDelete: (item: ConversationSummary) => void;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const [open, setOpen] = useState(false);
+
+  const animateTo = useCallback(
+    (value: number) => {
+      Animated.spring(translateX, {
+        toValue: value,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 80,
+      }).start();
+      setOpen(value < 0);
+    },
+    [translateX],
+  );
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderMove: (_, gesture) => {
+          const base = open ? -DELETE_WIDTH : 0;
+          const next = Math.max(-DELETE_WIDTH, Math.min(0, base + gesture.dx));
+          translateX.setValue(next);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const shouldOpen = (open ? -DELETE_WIDTH : 0) + gesture.dx < -DELETE_WIDTH / 2;
+          animateTo(shouldOpen ? -DELETE_WIDTH : 0);
+        },
+        onPanResponderTerminate: () => animateTo(open ? -DELETE_WIDTH : 0),
+      }),
+    [animateTo, open, translateX],
+  );
+
+  return (
+    <View style={styles.swipeWrap}>
+      <TouchableOpacity style={styles.deleteAction} onPress={() => onDelete(item)} activeOpacity={0.85}>
+        <Text style={styles.deleteText}>删除</Text>
+      </TouchableOpacity>
+      <Animated.View
+        style={[styles.swipeItem, open && styles.swipeItemOpen, {transform: [{translateX}]}]}
+        {...panResponder.panHandlers}>
+        <TouchableOpacity
+          style={[styles.item, open && styles.itemOpen]}
+          activeOpacity={0.85}
+          onPress={() => {
+            if (open) {
+              animateTo(0);
+              return;
+            }
+            onPress(item);
+          }}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>👤</Text>
+          </View>
+          <View style={styles.content}>
+            <View style={styles.topRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                用户 {item.peer_id}
+              </Text>
+              <Text style={styles.time}>{formatTime(item.last_time)}</Text>
+            </View>
+            <View style={styles.bottomRow}>
+              <Text style={styles.lastMsg} numberOfLines={1}>
+                {item.last_type === 'image' ? '[图片]' : item.last_message || '暂无消息'}
+              </Text>
+              {item.unread_count > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
 }
 
 export default function ConversationListScreen({navigation}: any) {
@@ -263,38 +358,54 @@ export default function ConversationListScreen({navigation}: any) {
     [markNotificationReadLocally, navigation, roleSummary],
   );
 
+  const openConversation = useCallback(
+    async (item: ConversationSummary) => {
+      if (Number(item.unread_count || 0) > 0) {
+        setConversations(prev =>
+          prev.map(conversation =>
+            conversation.conversation_id === item.conversation_id
+              ? {...conversation, unread_count: 0}
+              : conversation,
+          ),
+        );
+        try {
+          await messageService.markRead(item.conversation_id);
+        } catch (error) {
+          console.warn('标记会话已读失败:', error);
+        }
+      }
+      navigation.navigate('Chat', {
+        conversationId: item.conversation_id,
+        peerId: item.peer_id,
+        peerName: item.peer_name || `用户 ${item.peer_id}`,
+        peerAvatar: item.peer_avatar_url || '',
+        onMessageSent: fetchData,
+      });
+    },
+    [fetchData, navigation],
+  );
+
+  const deleteConversation = useCallback(async (item: ConversationSummary) => {
+    let previous: ConversationSummary[] = [];
+    setConversations(prev => {
+      previous = prev;
+      return prev.filter(conversation => conversation.conversation_id !== item.conversation_id);
+    });
+    try {
+      await messageService.deleteConversation(item.conversation_id);
+    } catch (error: any) {
+      setConversations(previous);
+      Alert.alert('删除失败', error?.message || '请稍后重试');
+    }
+  }, []);
+
   const renderConversation = ({item}: {item: ConversationSummary}) => (
-    <TouchableOpacity
-      style={styles.item}
-      onPress={() =>
-        navigation.navigate('Chat', {
-          conversationId: item.conversation_id,
-          peerId: item.peer_id,
-          onMessageSent: fetchData,
-        })
-      }>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>👤</Text>
-      </View>
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            用户 {item.peer_id}
-          </Text>
-          <Text style={styles.time}>{formatTime(item.last_time)}</Text>
-        </View>
-        <View style={styles.bottomRow}>
-          <Text style={styles.lastMsg} numberOfLines={1}>
-            {item.last_type === 'image' ? '[图片]' : item.last_message || '暂无消息'}
-          </Text>
-          {item.unread_count > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-    </TouchableOpacity>
+    <SwipeableConversationItem
+      item={item}
+      styles={styles}
+      onPress={openConversation}
+      onDelete={deleteConversation}
+    />
   );
 
   const renderNotificationItem = ({item}: {item: V2NotificationSummary}) => {
@@ -467,13 +578,45 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   sectionTitle: {fontSize: 15, fontWeight: '800', color: theme.text},
   sectionMeta: {fontSize: 12, color: theme.textSub},
+  swipeWrap: {
+    height: 76,
+    marginBottom: 10,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  swipeItem: {
+    height: 76,
+    backgroundColor: theme.card,
+    borderRadius: 18,
+  },
+  swipeItemOpen: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  deleteAction: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: DELETE_WIDTH,
+    height: 76,
+    backgroundColor: theme.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopRightRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  deleteText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: '800'},
   item: {
     flexDirection: 'row',
     backgroundColor: theme.card,
     padding: 14,
     borderRadius: 18,
-    marginBottom: 10,
     alignItems: 'center',
+    height: 76,
+  },
+  itemOpen: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
   },
   avatar: {
     width: 48,

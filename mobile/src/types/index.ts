@@ -3,8 +3,15 @@ export interface User {
   phone: string;
   nickname: string;
   avatar_url?: string;
-  user_type?: 'drone_owner' | 'renter' | 'cargo_owner' | 'client' | 'admin' | 'pilot' | 'both';
-  id_verified?: 'pending' | 'approved' | 'rejected';
+  user_type?:
+    | 'drone_owner'
+    | 'renter'
+    | 'cargo_owner'
+    | 'client'
+    | 'admin'
+    | 'pilot'
+    | 'both';
+  id_verified?: 'unverified' | 'pending' | 'approved' | 'verified' | 'rejected';
   credit_score?: number;
   status?: string;
   created_at?: string;
@@ -20,7 +27,7 @@ export interface RoleSummary {
 }
 
 export interface MeSummary {
-  user: Pick<User, 'id' | 'phone' | 'nickname' | 'avatar_url'>;
+  user: Pick<User, 'id' | 'phone' | 'nickname' | 'avatar_url' | 'id_verified'>;
   role_summary: RoleSummary;
 }
 
@@ -220,6 +227,8 @@ export interface ConversationSummary {
   last_time: string;
   last_type: string;
   peer_id: number;
+  peer_name?: string;
+  peer_avatar_url?: string;
   unread_count: number;
 }
 
@@ -398,6 +407,9 @@ export interface DirectOrderInput {
   scheduled_end_at: string;
   cargo_weight_kg: number;
   cargo_volume_m3?: number;
+  cargo_length_cm?: number;
+  cargo_width_cm?: number;
+  cargo_height_cm?: number;
   cargo_type: string;
   cargo_special_requirements?: string;
   description?: string;
@@ -418,6 +430,9 @@ export interface QuickOrderDraft {
   cargo_type?: string;
   cargo_weight_kg?: number;
   cargo_volume_m3?: number;
+  cargo_length_cm?: number;
+  cargo_width_cm?: number;
+  cargo_height_cm?: number;
   departure_address?: AddressData | null;
   destination_address?: AddressData | null;
   scheduled_start_at?: string;
@@ -500,6 +515,9 @@ export interface DemandDetail extends DemandSummary {
   service_address?: AddressSnapshot | null;
   cargo_weight_kg?: number;
   cargo_volume_m3?: number;
+  cargo_length_cm?: number;
+  cargo_width_cm?: number;
+  cargo_height_cm?: number;
   cargo_type?: string;
   cargo_special_requirements?: string;
   estimated_trip_count?: number;
@@ -591,6 +609,9 @@ export interface V2PilotProfile {
   availability_status: string;
   service_radius_km: number;
   service_radius: number;
+  service_base_address?: string;
+  service_base_latitude?: number;
+  service_base_longitude?: number;
   current_city?: string;
   service_cities?: string[];
   special_skills?: string[];
@@ -1008,8 +1029,8 @@ export interface V2OrderAnomalySummary {
   total: number;
   critical_count: number;
   warning_count: number;
-  by_anomaly_type: {key: string; count: number}[];
-  by_order_status: {key: string; count: number}[];
+  by_anomaly_type: { key: string; count: number }[];
+  by_order_status: { key: string; count: number }[];
 }
 
 export interface V2OrderFinancialSummary {

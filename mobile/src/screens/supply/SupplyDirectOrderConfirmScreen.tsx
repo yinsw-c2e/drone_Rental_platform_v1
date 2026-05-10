@@ -134,9 +134,15 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
   const [cargoWeight, setCargoWeight] = useState(
     normalizedQuickOrderDraft?.cargo_weight_kg ? String(normalizedQuickOrderDraft.cargo_weight_kg) : '',
   );
-  const cargoVolume = normalizedQuickOrderDraft?.cargo_volume_m3
-    ? String(normalizedQuickOrderDraft.cargo_volume_m3)
-    : '';
+  const [cargoLength, setCargoLength] = useState(
+    normalizedQuickOrderDraft?.cargo_length_cm ? String(normalizedQuickOrderDraft.cargo_length_cm) : '',
+  );
+  const [cargoWidth, setCargoWidth] = useState(
+    normalizedQuickOrderDraft?.cargo_width_cm ? String(normalizedQuickOrderDraft.cargo_width_cm) : '',
+  );
+  const [cargoHeight, setCargoHeight] = useState(
+    normalizedQuickOrderDraft?.cargo_height_cm ? String(normalizedQuickOrderDraft.cargo_height_cm) : '',
+  );
   const [cargoType, setCargoType] = useState(normalizedQuickOrderDraft?.cargo_type || '');
   const [specialRequirements, setSpecialRequirements] = useState(
     normalizedQuickOrderDraft?.special_requirements || '',
@@ -284,7 +290,9 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
     }
 
     const weight = Number(cargoWeight);
-    const volume = Number(cargoVolume || 0);
+    const lengthCM = Number(cargoLength);
+    const widthCM = Number(cargoWidth);
+    const heightCM = Number(cargoHeight);
     if (!weight || weight <= 0) {
       Alert.alert('请补充信息', '请填写有效的货物重量。');
       return;
@@ -305,7 +313,12 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
         scheduled_start_at: startDate.toISOString(),
         scheduled_end_at: endDate.toISOString(),
         cargo_weight_kg: weight,
-        cargo_volume_m3: volume > 0 ? volume : undefined,
+        cargo_length_cm: lengthCM > 0 ? lengthCM : undefined,
+        cargo_width_cm: widthCM > 0 ? widthCM : undefined,
+        cargo_height_cm: heightCM > 0 ? heightCM : undefined,
+        cargo_volume_m3: lengthCM > 0 && widthCM > 0 && heightCM > 0
+          ? lengthCM * widthCM * heightCM / 1000000
+          : undefined,
         cargo_type: cargoType.trim() || '重载物资',
         cargo_special_requirements: specialRequirements.trim() || undefined,
         description: description.trim() || undefined,
@@ -445,7 +458,7 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
 
         <ObjectCard>
           <Text style={styles.sectionTitle}>货物详细信息</Text>
-          <View style={styles.cargoGrid}>
+            <View style={styles.cargoGrid}>
             <View style={styles.cargoInputWrap}>
               <Text style={styles.inputLabel}>货物类型</Text>
               <TextInput
@@ -465,7 +478,32 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
                 placeholder="重量"
               />
             </View>
-          </View>
+            </View>
+
+            <Text style={styles.inputLabel}>货物尺寸 (cm)</Text>
+            <View style={styles.dimensionRow}>
+              <TextInput
+                style={[styles.flatInput, styles.dimensionInput]}
+                keyboardType="numeric"
+                value={cargoLength}
+                onChangeText={setCargoLength}
+                placeholder="长"
+              />
+              <TextInput
+                style={[styles.flatInput, styles.dimensionInput]}
+                keyboardType="numeric"
+                value={cargoWidth}
+                onChangeText={setCargoWidth}
+                placeholder="宽"
+              />
+              <TextInput
+                style={[styles.flatInput, styles.dimensionInput]}
+                keyboardType="numeric"
+                value={cargoHeight}
+                onChangeText={setCargoHeight}
+                placeholder="高"
+              />
+            </View>
 
           <Text style={styles.inputLabel}>特殊要求（可选）</Text>
           <TextInput
@@ -615,6 +653,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   cargoInputWrap: {flex: 1},
   inputLabel: {fontSize: 11, fontWeight: '700', color: theme.textHint, marginBottom: 6, textTransform: 'uppercase'},
   flatInput: {backgroundColor: theme.bgSecondary, borderRadius: 10, borderWidth: 1, borderColor: theme.divider, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.text},
+  dimensionRow: {flexDirection: 'row', gap: 10, marginBottom: 14},
+  dimensionInput: {flex: 1, minWidth: 0},
   flatTextArea: {backgroundColor: theme.bgSecondary, borderRadius: 10, borderWidth: 1, borderColor: theme.divider, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.text, minHeight: 80, textAlignVertical: 'top'},
   priceSummary: {marginTop: 10, padding: 20, backgroundColor: theme.primaryBg, borderRadius: 20},
   priceDetailRow: {flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8},

@@ -70,8 +70,12 @@ export default function PublishDemandScreen({navigation}: any) {
   // Step 1
   const [title, setTitle] = useState('');
   const [cargoScene, setCargoScene] = useState(sceneOptions[0].key);
+  const [customCargoScene, setCustomCargoScene] = useState('');
   const [serviceAddress, setServiceAddress] = useState<AddressData | null>(null);
   const [cargoWeight, setCargoWeight] = useState('');
+  const [cargoLength, setCargoLength] = useState('');
+  const [cargoWidth, setCargoWidth] = useState('');
+  const [cargoHeight, setCargoHeight] = useState('');
 
   // Step 2
   const [tripCount, setTripCount] = useState('1');
@@ -159,21 +163,33 @@ export default function PublishDemandScreen({navigation}: any) {
     }
   };
 
-  const getPayload = () => ({
-    title: title.trim(),
-    service_type: 'heavy_cargo_lift_transport' as const,
-    cargo_scene: cargoScene,
-    description: description.trim() || undefined,
-    service_address: toAddressSnapshot(serviceAddress),
-    scheduled_start_at: startDate.toISOString(),
-    scheduled_end_at: endDate.toISOString(),
-    cargo_weight_kg: Number(cargoWeight),
-    estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
-    budget_min: budgetMin ? Math.round(Number(budgetMin) * 100) : undefined,
-    budget_max: budgetMax ? Math.round(Number(budgetMax) * 100) : undefined,
-    allows_pilot_candidate: true,
-    expires_at: expiresAt,
-  });
+  const getPayload = () => {
+    const lengthCM = Number(cargoLength);
+    const widthCM = Number(cargoWidth);
+    const heightCM = Number(cargoHeight);
+    const effectiveCargoScene = customCargoScene.trim() || cargoScene;
+    return {
+      title: title.trim(),
+      service_type: 'heavy_cargo_lift_transport' as const,
+      cargo_scene: effectiveCargoScene,
+      description: description.trim() || undefined,
+      service_address: toAddressSnapshot(serviceAddress),
+      scheduled_start_at: startDate.toISOString(),
+      scheduled_end_at: endDate.toISOString(),
+      cargo_weight_kg: Number(cargoWeight),
+      cargo_length_cm: lengthCM > 0 ? lengthCM : undefined,
+      cargo_width_cm: widthCM > 0 ? widthCM : undefined,
+      cargo_height_cm: heightCM > 0 ? heightCM : undefined,
+      cargo_volume_m3: lengthCM > 0 && widthCM > 0 && heightCM > 0
+        ? lengthCM * widthCM * heightCM / 1000000
+        : undefined,
+      estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
+      budget_min: budgetMin ? Math.round(Number(budgetMin) * 100) : undefined,
+      budget_max: budgetMax ? Math.round(Number(budgetMax) * 100) : undefined,
+      allows_pilot_candidate: true,
+      expires_at: expiresAt,
+    };
+  };
 
   const handleNextStep = () => {
     if (!title.trim()) return Alert.alert('提示', '请输入需求标题');
@@ -255,18 +271,35 @@ export default function PublishDemandScreen({navigation}: any) {
               {sceneOptions.map(option => (
                 <TouchableOpacity
                   key={option.key}
-                  style={[styles.optionBtn, cargoScene === option.key && styles.optionBtnActive]}
-                  onPress={() => setCargoScene(option.key)}>
-                  <Text style={[styles.optionText, cargoScene === option.key && styles.optionTextActive]}>{option.label}</Text>
+                  style={[styles.optionBtn, !customCargoScene.trim() && cargoScene === option.key && styles.optionBtnActive]}
+                  onPress={() => {
+                    setCargoScene(option.key);
+                    setCustomCargoScene('');
+                  }}>
+                  <Text style={[styles.optionText, !customCargoScene.trim() && cargoScene === option.key && styles.optionTextActive]}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <TextInput
+              style={[styles.input, styles.customSceneInput]}
+              placeholder="其他场景，可直接填写"
+              placeholderTextColor={theme.textHint}
+              value={customCargoScene}
+              onChangeText={setCustomCargoScene}
+            />
 
             <Text style={styles.label}>服务地址 *</Text>
             <AddressInputField value={serviceAddress} placeholder="点击选择主要作业地址" onSelect={setServiceAddress} />
 
             <Text style={styles.label}>货物重量 (kg) *</Text>
             <TextInput style={styles.input} keyboardType="numeric" placeholder="例如：80" value={cargoWeight} onChangeText={setCargoWeight} />
+
+            <Text style={styles.label}>货物尺寸 (cm)</Text>
+            <View style={styles.dimensionRow}>
+              <TextInput style={[styles.input, styles.dimensionInput]} keyboardType="numeric" placeholder="长" value={cargoLength} onChangeText={setCargoLength} />
+              <TextInput style={[styles.input, styles.dimensionInput]} keyboardType="numeric" placeholder="宽" value={cargoWidth} onChangeText={setCargoWidth} />
+              <TextInput style={[styles.input, styles.dimensionInput]} keyboardType="numeric" placeholder="高" value={cargoHeight} onChangeText={setCargoHeight} />
+            </View>
 
             <View style={styles.tipCard}>
               <Text style={styles.tipTitle}>💡 草稿提示</Text>
@@ -411,6 +444,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   timeHint: {fontSize: 12, color: theme.textSub, marginBottom: 8},
   timeRecommend: {fontSize: 12, color: theme.primaryText, marginTop: 6},
   optionRow: {flexDirection: 'row', flexWrap: 'wrap'},
+  dimensionRow: {flexDirection: 'row', gap: 10},
+  dimensionInput: {flex: 1, minWidth: 0},
   optionBtn: {
     paddingHorizontal: 14,
     paddingVertical: 9,
@@ -427,6 +462,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   optionText: {fontSize: 13, color: theme.textSub},
   optionTextActive: {color: theme.primaryText, fontWeight: '600'},
+  customSceneInput: {marginTop: 8},
   budgetRow: {flexDirection: 'row', alignItems: 'center'},
   flexInput: {flex: 1},
   split: {marginHorizontal: 10, color: theme.textHint},

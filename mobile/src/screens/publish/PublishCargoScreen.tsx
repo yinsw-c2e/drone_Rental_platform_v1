@@ -78,8 +78,14 @@ export default function PublishCargoScreen({route, navigation}: any) {
   const [cargoWeight, setCargoWeight] = useState(
     quickOrderDraft?.cargo_weight_kg ? String(quickOrderDraft.cargo_weight_kg) : '',
   );
-  const [cargoVolume, setCargoVolume] = useState(
-    quickOrderDraft?.cargo_volume_m3 ? String(quickOrderDraft.cargo_volume_m3) : '',
+  const [cargoLength, setCargoLength] = useState(
+    quickOrderDraft?.cargo_length_cm ? String(quickOrderDraft.cargo_length_cm) : '',
+  );
+  const [cargoWidth, setCargoWidth] = useState(
+    quickOrderDraft?.cargo_width_cm ? String(quickOrderDraft.cargo_width_cm) : '',
+  );
+  const [cargoHeight, setCargoHeight] = useState(
+    quickOrderDraft?.cargo_height_cm ? String(quickOrderDraft.cargo_height_cm) : '',
   );
   const [cargoDescription, setCargoDescription] = useState(quickOrderDraft?.description || '');
   const [specialRequirements, setSpecialRequirements] = useState(
@@ -199,7 +205,9 @@ export default function PublishCargoScreen({route, navigation}: any) {
   const buildPayload = useCallback(
     (mode: 'draft' | 'publish'): DemandUpsertPayload => {
       const weight = Number(cargoWeight);
-      const volume = Number(cargoVolume);
+      const lengthCM = Number(cargoLength);
+      const widthCM = Number(cargoWidth);
+      const heightCM = Number(cargoHeight);
       const trip = Math.max(Number(tripCount) || 1, 1);
       return {
         title: mode === 'publish' ? suggestedTitle : suggestedTitle,
@@ -211,7 +219,12 @@ export default function PublishCargoScreen({route, navigation}: any) {
         scheduled_start_at: startDate.toISOString(),
         scheduled_end_at: endDate.toISOString(),
         cargo_weight_kg: weight > 0 ? weight : undefined,
-        cargo_volume_m3: volume > 0 ? volume : undefined,
+        cargo_length_cm: lengthCM > 0 ? lengthCM : undefined,
+        cargo_width_cm: widthCM > 0 ? widthCM : undefined,
+        cargo_height_cm: heightCM > 0 ? heightCM : undefined,
+        cargo_volume_m3: lengthCM > 0 && widthCM > 0 && heightCM > 0
+          ? lengthCM * widthCM * heightCM / 1000000
+          : undefined,
         cargo_type: cargoType.trim() || undefined,
         cargo_special_requirements: specialRequirements.trim() || undefined,
         estimated_trip_count: trip,
@@ -225,8 +238,10 @@ export default function PublishCargoScreen({route, navigation}: any) {
       cargoDescription,
       effectiveCargoScene,
       cargoType,
-      cargoVolume,
+      cargoHeight,
+      cargoLength,
       cargoWeight,
+      cargoWidth,
       deliveryAddress,
       expiresAt,
       pickupAddress,
@@ -581,28 +596,41 @@ export default function PublishCargoScreen({route, navigation}: any) {
             </View>
 
             <View style={styles.inputCard}>
-              <View style={styles.rowInputs}>
-                <View style={{flex: 1}}>
-                  <Text style={styles.label}>货物类型</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="如：塔材"
-                    placeholderTextColor={theme.textHint}
-                    value={cargoType}
-                    onChangeText={setCargoType}
-                  />
-                </View>
-                <View style={{flex: 1}}>
-                  <Text style={styles.label}>体积 (m³)</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    placeholder="可选"
-                    placeholderTextColor={theme.textHint}
-                    value={cargoVolume}
-                    onChangeText={setCargoVolume}
-                  />
-                </View>
+              <Text style={styles.label}>货物类型</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="如：塔材"
+                placeholderTextColor={theme.textHint}
+                value={cargoType}
+                onChangeText={setCargoType}
+              />
+
+              <Text style={styles.label}>货物尺寸 (cm)</Text>
+              <View style={styles.dimensionRow}>
+                <TextInput
+                  style={[styles.input, styles.dimensionInput]}
+                  keyboardType="numeric"
+                  placeholder="长"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoLength}
+                  onChangeText={setCargoLength}
+                />
+                <TextInput
+                  style={[styles.input, styles.dimensionInput]}
+                  keyboardType="numeric"
+                  placeholder="宽"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoWidth}
+                  onChangeText={setCargoWidth}
+                />
+                <TextInput
+                  style={[styles.input, styles.dimensionInput]}
+                  keyboardType="numeric"
+                  placeholder="高"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoHeight}
+                  onChangeText={setCargoHeight}
+                />
               </View>
 
               <View style={styles.rowInputs}>
@@ -922,11 +950,19 @@ const getStyles = (theme: AppTheme) =>
       fontWeight: '800',
       color: theme.text,
     },
-    rowInputs: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    textarea: {
+	    rowInputs: {
+	      flexDirection: 'row',
+	      gap: 12,
+	    },
+	    dimensionRow: {
+	      flexDirection: 'row',
+	      gap: 10,
+	    },
+	    dimensionInput: {
+	      flex: 1,
+	      minWidth: 0,
+	    },
+	    textarea: {
       minHeight: 100,
       textAlignVertical: 'top',
     },

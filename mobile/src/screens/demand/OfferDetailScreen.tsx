@@ -108,6 +108,8 @@ export default function OfferDetailScreen({route, navigation}: any) {
   }
 
   const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
+  const ownerUserId = Number(supply.owner_user_id || supply.owner?.id || 0);
+  const canContactOwner = ownerUserId > 0 && ownerUserId !== user?.id;
   const droneLabel = supply.drone ? `${supply.drone.brand} ${supply.drone.model}` : '未关联设备';
   const serviceAreaText = summarizeServiceArea(supply.service_area_snapshot);
   const pricingRuleText = summarizeFlexibleValue(supply.pricing_rule, '按基础价格执行');
@@ -222,16 +224,26 @@ export default function OfferDetailScreen({route, navigation}: any) {
         ) : (
           <>
             <TouchableOpacity
-              style={[styles.secondaryBtn, {flex: 1}]}
+              style={[styles.secondaryBtn, {flex: 1}, !canContactOwner && styles.disabledBtn]}
               onPress={() => {
+                if (!ownerUserId) {
+                  Alert.alert('暂无法联系', '该服务暂未提供可联系的机主账号。');
+                  return;
+                }
+                if (ownerUserId === user?.id) {
+                  Alert.alert('无法联系自己', '这是您自己的服务。');
+                  return;
+                }
                 navigation.navigate('Messages', {
                   screen: 'Chat',
                   params: {
-                    peerId: supply.owner?.id || 0,
-                    peerName: supply.owner?.nickname || '机主',
+                    peerId: ownerUserId,
+                    peerName: ownerLabel,
+                    peerAvatar: supply.owner?.avatar_url || '',
                   },
                 });
-              }}>
+              }}
+              disabled={!canContactOwner}>
               <Text style={styles.secondaryBtnText}>联系机主</Text>
             </TouchableOpacity>
             <TouchableOpacity

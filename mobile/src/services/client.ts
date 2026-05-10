@@ -24,6 +24,7 @@ export interface Client {
   preferred_cargo_types: string[];
   default_pickup_address: string;
   default_delivery_address: string;
+  demand_count: number;
   total_orders: number;
   completed_orders: number;
   cancelled_orders: number;

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {launchImageLibrary} from 'react-native-image-picker';
+import DateOnlyField from '../../components/DateOnlyField';
 import {
   getCertifications,
   submitCertification,
@@ -22,7 +23,7 @@ import {
   PilotCertification,
   SubmitCertificationRequest,
 } from '../../services/pilot';
-import api from '../../services/api';
+import {apiV2} from '../../services/api';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -114,7 +115,7 @@ export default function CertificationUploadScreen({_navigation}: any) {
           name: asset.fileName || 'cert.jpg',
         } as any);
 
-        const uploadRes: any = await api.post('/pilot/upload-cert', formData, {
+        const uploadRes: any = await apiV2.post('/pilot/upload-cert', formData, {
           headers: {'Content-Type': 'multipart/form-data'},
         });
         setCertImage(uploadRes.data.url);
@@ -143,8 +144,8 @@ export default function CertificationUploadScreen({_navigation}: any) {
         await submitCriminalCheck(certImage);
         Alert.alert('成功', '无犯罪记录证明已提交');
       } else if (certType === 'health_check') {
-        if (!healthExpireDate || !validateDate(healthExpireDate)) {
-          Alert.alert('提示', '请输入健康证明有效期 (格式: YYYY-MM-DD)');
+	        if (!healthExpireDate || !validateDate(healthExpireDate)) {
+	          Alert.alert('提示', '请选择健康证明有效期');
           setSubmitting(false);
           return;
         }
@@ -170,13 +171,13 @@ export default function CertificationUploadScreen({_navigation}: any) {
           setSubmitting(false);
           return;
         }
-        if (!issueDate || !validateDate(issueDate)) {
-          Alert.alert('提示', '请输入正确的发证日期 (格式: YYYY-MM-DD)');
+	        if (!issueDate || !validateDate(issueDate)) {
+	          Alert.alert('提示', '请选择发证日期');
           setSubmitting(false);
           return;
         }
-        if (!expireDate || !validateDate(expireDate)) {
-          Alert.alert('提示', '请输入正确的有效期 (格式: YYYY-MM-DD)');
+	        if (!expireDate || !validateDate(expireDate)) {
+	          Alert.alert('提示', '请选择有效期');
           setSubmitting(false);
           return;
         }
@@ -343,14 +344,7 @@ export default function CertificationUploadScreen({_navigation}: any) {
                   </View>
                 ) : certType === 'health_check' ? (
                   <View style={styles.formGroup}>
-                    <Text style={styles.label}>有效期至 *</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={theme.textHint}
-                      value={healthExpireDate}
-                      onChangeText={setHealthExpireDate}
-                    />
+                    <DateOnlyField label="有效期至" value={healthExpireDate} onChange={setHealthExpireDate} theme={theme} required />
                   </View>
                 ) : (
                   <>
@@ -390,25 +384,11 @@ export default function CertificationUploadScreen({_navigation}: any) {
 
                     <View style={styles.row}>
                       <View style={[styles.formGroup, {flex: 1}]}>
-                        <Text style={styles.label}>发证日期 *</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="YYYY-MM-DD"
-                          placeholderTextColor={theme.textHint}
-                          value={issueDate}
-                          onChangeText={setIssueDate}
-                        />
+                        <DateOnlyField label="发证日期" value={issueDate} onChange={setIssueDate} theme={theme} required />
                       </View>
                       <View style={{width: 12}} />
                       <View style={[styles.formGroup, {flex: 1}]}>
-                        <Text style={styles.label}>有效期至 *</Text>
-                        <TextInput
-                          style={styles.input}
-                          placeholder="YYYY-MM-DD"
-                          placeholderTextColor={theme.textHint}
-                          value={expireDate}
-                          onChangeText={setExpireDate}
-                        />
+                        <DateOnlyField label="有效期至" value={expireDate} onChange={setExpireDate} theme={theme} required />
                       </View>
                     </View>
                   </>

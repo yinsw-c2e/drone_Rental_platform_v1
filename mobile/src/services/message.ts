@@ -32,7 +32,10 @@ export const messageService = {
     }),
 
   markRead: (conversationId: string) =>
-    api.put<any, ApiResponse>(`/message/${conversationId}/read`),
+    apiV2.post<any, V2ApiResponse>(`/conversations/${encodeURIComponent(conversationId)}/read`),
+
+  deleteConversation: (conversationId: string) =>
+    apiV2.delete<any, V2ApiResponse>(`/conversations/${encodeURIComponent(conversationId)}`),
 
   // Mark messages from peer as read
   markReadByPeer: (peerId: number) =>
