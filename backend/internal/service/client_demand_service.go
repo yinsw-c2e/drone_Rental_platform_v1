@@ -34,6 +34,9 @@ type ClientDemandInput struct {
 	ScheduledEndAt           *time.Time            `json:"scheduled_end_at"`
 	CargoWeightKG            *float64              `json:"cargo_weight_kg"`
 	CargoVolumeM3            *float64              `json:"cargo_volume_m3"`
+	CargoLengthCM            *float64              `json:"cargo_length_cm"`
+	CargoWidthCM             *float64              `json:"cargo_width_cm"`
+	CargoHeightCM            *float64              `json:"cargo_height_cm"`
 	CargoType                *string               `json:"cargo_type"`
 	CargoSpecialRequirements *string               `json:"cargo_special_requirements"`
 	EstimatedTripCount       *int                  `json:"estimated_trip_count"`
@@ -599,6 +602,18 @@ func applyDemandInput(demand *model.Demand, input *ClientDemandInput) error {
 	if input.CargoVolumeM3 != nil {
 		demand.CargoVolumeM3 = *input.CargoVolumeM3
 	}
+	if input.CargoLengthCM != nil {
+		demand.CargoLengthCM = *input.CargoLengthCM
+	}
+	if input.CargoWidthCM != nil {
+		demand.CargoWidthCM = *input.CargoWidthCM
+	}
+	if input.CargoHeightCM != nil {
+		demand.CargoHeightCM = *input.CargoHeightCM
+	}
+	if input.CargoVolumeM3 == nil && demand.CargoLengthCM > 0 && demand.CargoWidthCM > 0 && demand.CargoHeightCM > 0 {
+		demand.CargoVolumeM3 = calculateCargoVolumeM3(demand.CargoLengthCM, demand.CargoWidthCM, demand.CargoHeightCM)
+	}
 	if input.CargoType != nil {
 		demand.CargoType = strings.TrimSpace(*input.CargoType)
 	}
@@ -644,13 +659,20 @@ func validateDemandDraft(demand *model.Demand) error {
 	if demand.BudgetMin > 0 && demand.BudgetMax > 0 && demand.BudgetMax < demand.BudgetMin {
 		return errors.New("预算上限不能小于预算下限")
 	}
-	if demand.CargoWeightKG < 0 || demand.CargoVolumeM3 < 0 {
-		return errors.New("货物重量或体积不能为负数")
+	if demand.CargoWeightKG < 0 || demand.CargoVolumeM3 < 0 || demand.CargoLengthCM < 0 || demand.CargoWidthCM < 0 || demand.CargoHeightCM < 0 {
+		return errors.New("货物重量或尺寸不能为负数")
 	}
 	if demand.ScheduledStartAt != nil && demand.ScheduledEndAt != nil && demand.ScheduledEndAt.Before(*demand.ScheduledStartAt) {
 		return errors.New("预约结束时间不能早于开始时间")
 	}
 	return nil
+}
+
+func calculateCargoVolumeM3(lengthCM, widthCM, heightCM float64) float64 {
+	if lengthCM <= 0 || widthCM <= 0 || heightCM <= 0 {
+		return 0
+	}
+	return lengthCM * widthCM * heightCM / 1000000
 }
 
 func validateDemandForPublish(demand *model.Demand) error {

@@ -67,6 +67,46 @@ func (h *Handler) ListMessages(c *gin.Context) {
 	response.V2SuccessList(c, items, total)
 }
 
+func (h *Handler) MarkRead(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	conversationID := c.Param("conversation_id")
+	if conversationID == "" {
+		response.V2ValidationError(c, "invalid conversation_id")
+		return
+	}
+
+	if err := h.messageService.MarkAsRead(conversationID, userID); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{"conversation_id": conversationID, "is_read": true})
+}
+
+func (h *Handler) DeleteConversation(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	conversationID := c.Param("conversation_id")
+	if conversationID == "" {
+		response.V2ValidationError(c, "invalid conversation_id")
+		return
+	}
+
+	if err := h.messageService.HideConversation(conversationID, userID); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{"conversation_id": conversationID, "deleted": true})
+}
+
 func buildConversationSummary(conversation *repository.ConversationSummary) gin.H {
 	if conversation == nil {
 		return gin.H{}
@@ -77,6 +117,8 @@ func buildConversationSummary(conversation *repository.ConversationSummary) gin.
 		"last_time":       conversation.LastTime,
 		"last_type":       conversation.LastType,
 		"peer_id":         conversation.PeerID,
+		"peer_name":       conversation.PeerName,
+		"peer_avatar_url": conversation.PeerAvatarURL,
 		"unread_count":    conversation.UnreadCount,
 	}
 }

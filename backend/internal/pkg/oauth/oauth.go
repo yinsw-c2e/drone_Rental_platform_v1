@@ -143,6 +143,55 @@ func (w *WeChatOAuth) GetUserInfo(code string) (*OAuthUserInfo, error) {
 	}, nil
 }
 
+// GetMiniProgramUserInfo 微信小程序登录获取用户标识。
+// 流程：wx.login code -> jscode2session -> openid/unionid。
+func (w *WeChatOAuth) GetMiniProgramUserInfo(code string) (*OAuthUserInfo, error) {
+	query := url.Values{}
+	query.Set("appid", w.config.AppID)
+	query.Set("secret", w.config.AppSecret)
+	query.Set("js_code", code)
+	query.Set("grant_type", "authorization_code")
+
+	sessionURL := "https://api.weixin.qq.com/sns/jscode2session?" + query.Encode()
+	sessionResp, err := w.client.Get(sessionURL)
+	if err != nil {
+		w.logger.Error("wechat mini jscode2session failed", zap.Error(err))
+		return nil, fmt.Errorf("jscode2session failed: %w", err)
+	}
+	defer sessionResp.Body.Close()
+
+	sessionBody, err := io.ReadAll(sessionResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read jscode2session response failed: %w", err)
+	}
+
+	var sessionResult struct {
+		OpenID     string `json:"openid"`
+		SessionKey string `json:"session_key"`
+		UnionID    string `json:"unionid"`
+		ErrCode    int    `json:"errcode"`
+		ErrMsg     string `json:"errmsg"`
+	}
+
+	if err := json.Unmarshal(sessionBody, &sessionResult); err != nil {
+		return nil, fmt.Errorf("parse jscode2session response failed: %w", err)
+	}
+
+	if sessionResult.ErrCode != 0 {
+		return nil, fmt.Errorf("wechat mini session error: %d %s", sessionResult.ErrCode, sessionResult.ErrMsg)
+	}
+	if sessionResult.OpenID == "" {
+		return nil, fmt.Errorf("wechat mini session missing openid")
+	}
+
+	return &OAuthUserInfo{
+		OpenID:   sessionResult.OpenID,
+		UnionID:  sessionResult.UnionID,
+		Nickname: "微信用户",
+		Platform: "wechat",
+	}, nil
+}
+
 // ============================================================
 // QQ登录
 // ============================================================

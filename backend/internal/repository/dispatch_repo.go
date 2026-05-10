@@ -257,7 +257,10 @@ func (r *DispatchRepo) ListCandidatesByPilot(pilotID int64, page, pageSize int) 
 
 // FindAvailablePilotDronePairs 查找可用的飞手-无人机组合
 func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, minLoad float64, licenseType string) ([]PilotDronePair, error) {
-	distanceExpr := `(6371 * acos(cos(radians(?)) * cos(radians(p.current_latitude)) * cos(radians(p.current_longitude) - radians(?)) + sin(radians(?)) * sin(radians(p.current_latitude))))`
+	baseLatExpr := `COALESCE(NULLIF(p.service_base_latitude, 0), NULLIF(pp.service_base_latitude, 0), NULLIF(p.current_latitude, 0))`
+	baseLngExpr := `COALESCE(NULLIF(p.service_base_longitude, 0), NULLIF(pp.service_base_longitude, 0), NULLIF(p.current_longitude, 0))`
+	serviceRadiusExpr := `COALESCE(NULLIF(p.service_radius, 0), NULLIF(pp.service_radius_km, 0), 50)`
+	distanceExpr := `(6371 * acos(cos(radians(?)) * cos(radians(` + baseLatExpr + `)) * cos(radians(` + baseLngExpr + `) - radians(?)) + sin(radians(?)) * sin(radians(` + baseLatExpr + `))))`
 
 	query := `
 		SELECT 
@@ -267,8 +270,9 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 			p.total_flight_hours,
 			p.service_rating as pilot_rating,
 			p.credit_score as pilot_credit_score,
-			p.current_latitude as pilot_latitude,
-			p.current_longitude as pilot_longitude,
+			` + baseLatExpr + ` as pilot_latitude,
+			` + baseLngExpr + ` as pilot_longitude,
+			` + serviceRadiusExpr + ` as pilot_service_radius_km,
 			d.id as drone_id,
 			d.owner_id,
 			d.max_load,
@@ -281,6 +285,7 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 			d.longitude as drone_longitude,
 			` + distanceExpr + ` as distance
 		FROM pilots p
+		LEFT JOIN pilot_profiles pp ON pp.user_id = p.user_id AND pp.deleted_at IS NULL
 		INNER JOIN pilot_drone_bindings pdb ON p.id = pdb.pilot_id AND pdb.status = 'active'
 		INNER JOIN drones d ON pdb.drone_id = d.id
 		WHERE p.availability_status = 'online'
@@ -290,16 +295,16 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 		AND d.uom_verified = 'verified'
 		AND d.insurance_verified = 'verified'
 		AND d.airworthiness_verified = 'verified'
+		AND ` + baseLatExpr + ` IS NOT NULL
+		AND ` + baseLngExpr + ` IS NOT NULL
 		AND d.mtow_kg >= ?
 		AND COALESCE(NULLIF(d.max_payload_kg, 0), d.max_load) >= ?
-		AND ` + distanceExpr + ` < ?
 	`
 
 	args := []interface{}{
 		lat, lng, lat,
 		model.HeavyLiftMinMTOWKG,
 		maxFloat(minLoad, model.HeavyLiftMinPayloadKG),
-		lat, lng, lat, radiusKM,
 	}
 
 	if licenseType != "" {
@@ -307,7 +312,8 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 		args = append(args, licenseType)
 	}
 
-	query += " ORDER BY distance ASC LIMIT 50"
+	query += " HAVING distance < ? AND distance <= pilot_service_radius_km ORDER BY distance ASC LIMIT 50"
+	args = append(args, radiusKM)
 
 	var pairs []PilotDronePair
 	err := r.db.Raw(query, args...).Scan(&pairs).Error
@@ -316,25 +322,26 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 
 // PilotDronePair 飞手-无人机组合
 type PilotDronePair struct {
-	PilotID          int64   `json:"pilot_id"`
-	PilotUserID      int64   `json:"pilot_user_id"`
-	CAACLicenseType  string  `json:"caac_license_type"`
-	TotalFlightHours float64 `json:"total_flight_hours"`
-	PilotRating      float64 `json:"pilot_rating"`
-	PilotCreditScore int     `json:"pilot_credit_score"`
-	PilotLatitude    float64 `json:"pilot_latitude"`
-	PilotLongitude   float64 `json:"pilot_longitude"`
-	DroneID          int64   `json:"drone_id"`
-	OwnerID          int64   `json:"owner_id"`
-	MaxLoad          float64 `json:"max_load"`
-	MaxFlightTime    int     `json:"max_flight_time"`
-	MaxDistance      float64 `json:"max_distance"`
-	DroneRating      float64 `json:"drone_rating"`
-	HourlyPrice      int64   `json:"hourly_price"`
-	DailyPrice       int64   `json:"daily_price"`
-	DroneLatitude    float64 `json:"drone_latitude"`
-	DroneLongitude   float64 `json:"drone_longitude"`
-	Distance         float64 `json:"distance"`
+	PilotID              int64   `json:"pilot_id"`
+	PilotUserID          int64   `json:"pilot_user_id"`
+	CAACLicenseType      string  `json:"caac_license_type"`
+	TotalFlightHours     float64 `json:"total_flight_hours"`
+	PilotRating          float64 `json:"pilot_rating"`
+	PilotCreditScore     int     `json:"pilot_credit_score"`
+	PilotLatitude        float64 `json:"pilot_latitude"`
+	PilotLongitude       float64 `json:"pilot_longitude"`
+	PilotServiceRadiusKM float64 `json:"pilot_service_radius_km"`
+	DroneID              int64   `json:"drone_id"`
+	OwnerID              int64   `json:"owner_id"`
+	MaxLoad              float64 `json:"max_load"`
+	MaxFlightTime        int     `json:"max_flight_time"`
+	MaxDistance          float64 `json:"max_distance"`
+	DroneRating          float64 `json:"drone_rating"`
+	HourlyPrice          int64   `json:"hourly_price"`
+	DailyPrice           int64   `json:"daily_price"`
+	DroneLatitude        float64 `json:"drone_latitude"`
+	DroneLongitude       float64 `json:"drone_longitude"`
+	Distance             float64 `json:"distance"`
 }
 
 func maxFloat(a, b float64) float64 {

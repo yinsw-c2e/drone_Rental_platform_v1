@@ -179,6 +179,15 @@ func main() {
 		zapLogger.Info("WeChat OAuth initialized")
 	}
 
+	var wechatMiniOAuth *oauth.WeChatOAuth
+	if cfg.OAuth.IsWeChatMiniEnabled() {
+		wechatMiniOAuth = oauth.NewWeChatOAuth(oauth.WeChatOAuthConfig{
+			AppID:     cfg.OAuth.WeChatMini.AppID,
+			AppSecret: cfg.OAuth.WeChatMini.AppSecret,
+		}, zapLogger)
+		zapLogger.Info("WeChat Mini Program OAuth initialized")
+	}
+
 	var qqOAuth *oauth.QQOAuth
 	if cfg.OAuth.IsQQEnabled() {
 		qqOAuth = oauth.NewQQOAuth(oauth.QQOAuthConfig{
@@ -240,7 +249,7 @@ func main() {
 
 	// Init handlers
 	handlers := &v1.Handlers{
-		Auth:       auth.NewHandler(authService, wechatOAuth, qqOAuth),
+		Auth:       auth.NewHandler(authService, wechatOAuth, wechatMiniOAuth, qqOAuth),
 		User:       user.NewHandler(userService, uploadService),
 		Drone:      drone.NewHandler(droneService, uploadService),
 		Owner:      ownerhandler.NewHandler(ownerService, droneService),
@@ -262,7 +271,7 @@ func main() {
 		Insurance:  insurancehandler.NewHandler(insuranceService),
 		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, cfg.Server.Mode, handlers.Admin, handlers.Analytics, handlers.Client)
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, cfg.Server.Mode, handlers.Admin, handlers.Analytics, handlers.Client)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)
@@ -348,6 +357,7 @@ func autoMigrate(db *gorm.DB) {
 		&model.Refund{},
 		&model.DisputeRecord{},
 		&model.Message{},
+		&model.ConversationUserState{},
 		&model.Review{},
 		&model.MatchingRecord{},
 		&model.SystemConfig{},

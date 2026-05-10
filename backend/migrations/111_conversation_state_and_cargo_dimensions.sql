@@ -1,0 +1,85 @@
+CREATE TABLE IF NOT EXISTS conversation_user_states (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  peer_id BIGINT NOT NULL,
+  conversation_id VARCHAR(50) NOT NULL,
+  hidden_at DATETIME NULL,
+  hidden_before_message_id BIGINT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY idx_conversation_user_state_user_peer (user_id, peer_id),
+  KEY idx_conversation_user_states_conversation_id (conversation_id),
+  KEY idx_conversation_user_states_hidden_before (hidden_before_message_id)
+);
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'demands' AND COLUMN_NAME = 'cargo_length_cm') = 0,
+  'ALTER TABLE demands ADD COLUMN cargo_length_cm DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cargo_volume_m3',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'demands' AND COLUMN_NAME = 'cargo_width_cm') = 0,
+  'ALTER TABLE demands ADD COLUMN cargo_width_cm DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cargo_length_cm',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'demands' AND COLUMN_NAME = 'cargo_height_cm') = 0,
+  'ALTER TABLE demands ADD COLUMN cargo_height_cm DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cargo_width_cm',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'cargo_weight_kg') = 0,
+  'ALTER TABLE orders ADD COLUMN cargo_weight_kg DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER service_type',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'cargo_volume_m3') = 0,
+  'ALTER TABLE orders ADD COLUMN cargo_volume_m3 DECIMAL(10,3) NOT NULL DEFAULT 0 AFTER cargo_weight_kg',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'cargo_length_cm') = 0,
+  'ALTER TABLE orders ADD COLUMN cargo_length_cm DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cargo_volume_m3',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'cargo_width_cm') = 0,
+  'ALTER TABLE orders ADD COLUMN cargo_width_cm DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cargo_length_cm',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'cargo_height_cm') = 0,
+  'ALTER TABLE orders ADD COLUMN cargo_height_cm DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER cargo_width_cm',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

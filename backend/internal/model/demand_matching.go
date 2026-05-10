@@ -83,6 +83,9 @@ type Demand struct {
 	ScheduledEndAt             *time.Time `json:"scheduled_end_at"`
 	CargoWeightKG              float64    `gorm:"type:decimal(10,2)" json:"cargo_weight_kg"`
 	CargoVolumeM3              float64    `gorm:"type:decimal(10,3)" json:"cargo_volume_m3"`
+	CargoLengthCM              float64    `gorm:"type:decimal(10,2)" json:"cargo_length_cm"`
+	CargoWidthCM               float64    `gorm:"type:decimal(10,2)" json:"cargo_width_cm"`
+	CargoHeightCM              float64    `gorm:"type:decimal(10,2)" json:"cargo_height_cm"`
 	CargoType                  string     `gorm:"type:varchar(50)" json:"cargo_type"`
 	CargoSpecialRequirements   string     `gorm:"type:text" json:"cargo_special_requirements"`
 	EstimatedTripCount         int        `gorm:"default:1" json:"estimated_trip_count"`

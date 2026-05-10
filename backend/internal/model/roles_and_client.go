@@ -28,6 +28,9 @@ type Pilot struct {
 	CurrentLatitude       float64        `gorm:"type:decimal(10,7)" json:"current_latitude"`
 	CurrentLongitude      float64        `gorm:"type:decimal(10,7)" json:"current_longitude"`
 	CurrentCity           string         `gorm:"type:varchar(50);index" json:"current_city"`
+	ServiceBaseAddress    string         `gorm:"type:varchar(255)" json:"service_base_address"`
+	ServiceBaseLatitude   float64        `gorm:"type:decimal(10,7);index" json:"service_base_latitude"`
+	ServiceBaseLongitude  float64        `gorm:"type:decimal(10,7);index" json:"service_base_longitude"`
 	ServiceRadius         float64        `gorm:"type:decimal(10,2);default:50" json:"service_radius"`         // 服务范围(公里)
 	SpecialSkills         JSON           `gorm:"type:json" json:"special_skills"`                             // 特殊技能: 夜航、山区、应急等
 	VerificationStatus    string         `gorm:"type:varchar(20);default:pending" json:"verification_status"` // pending, verified, rejected

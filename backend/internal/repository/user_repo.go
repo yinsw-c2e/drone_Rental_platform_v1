@@ -68,6 +68,12 @@ func (r *UserRepo) GetByWechatOpenID(openID string) (*model.User, error) {
 	return &user, err
 }
 
+func (r *UserRepo) GetByWechatUnionID(unionID string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("wechat_union_id = ?", unionID).First(&user).Error
+	return &user, err
+}
+
 func (r *UserRepo) GetByQQOpenID(openID string) (*model.User, error) {
 	var user model.User
 	err := r.db.Where("qq_open_id = ?", openID).First(&user).Error

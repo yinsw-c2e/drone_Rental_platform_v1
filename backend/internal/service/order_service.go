@@ -310,6 +310,11 @@ func (s *OrderService) createDemandMarketOrderWithRepos(
 		ExecutionMode:          executionMode,
 		Title:                  demand.Title,
 		ServiceType:            demand.ServiceType,
+		CargoWeightKG:          demand.CargoWeightKG,
+		CargoVolumeM3:          demand.CargoVolumeM3,
+		CargoLengthCM:          demand.CargoLengthCM,
+		CargoWidthCM:           demand.CargoWidthCM,
+		CargoHeightCM:          demand.CargoHeightCM,
 		StartTime:              startAt,
 		EndTime:                endAt,
 		ServiceLatitude:        serviceLat,
@@ -358,6 +363,9 @@ type DirectOrderInput struct {
 	ScheduledEndAt           *time.Time            `json:"scheduled_end_at"`
 	CargoWeightKG            *float64              `json:"cargo_weight_kg"`
 	CargoVolumeM3            *float64              `json:"cargo_volume_m3"`
+	CargoLengthCM            *float64              `json:"cargo_length_cm"`
+	CargoWidthCM             *float64              `json:"cargo_width_cm"`
+	CargoHeightCM            *float64              `json:"cargo_height_cm"`
 	CargoType                *string               `json:"cargo_type"`
 	CargoSpecialRequirements *string               `json:"cargo_special_requirements"`
 	Description              *string               `json:"description"`
@@ -460,6 +468,10 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 	if err != nil {
 		return nil, err
 	}
+	cargoWeightKG, cargoVolumeM3, cargoLengthCM, cargoWidthCM, cargoHeightCM := resolveDirectOrderCargo(input)
+	if cargoWeightKG < 0 || cargoVolumeM3 < 0 || cargoLengthCM < 0 || cargoWidthCM < 0 || cargoHeightCM < 0 {
+		return nil, errors.New("货物重量或尺寸不能为负数")
+	}
 	startAt, endAt := resolveDirectOrderSchedule(input)
 	serviceAddr, serviceLat, serviceLng := resolveDirectOrderPrimaryAddress(input)
 	destAddr, destLat, destLng := resolveDirectOrderDestination(input)
@@ -494,6 +506,11 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 		ExecutionMode:          executionMode,
 		Title:                  buildDirectOrderTitle(supply, input),
 		ServiceType:            serviceType,
+		CargoWeightKG:          cargoWeightKG,
+		CargoVolumeM3:          cargoVolumeM3,
+		CargoLengthCM:          cargoLengthCM,
+		CargoWidthCM:           cargoWidthCM,
+		CargoHeightCM:          cargoHeightCM,
 		StartTime:              startAt,
 		EndTime:                endAt,
 		ServiceLatitude:        serviceLat,
@@ -1605,6 +1622,31 @@ func resolveDirectOrderSchedule(input *DirectOrderInput) (time.Time, time.Time) 
 		endAt = startAt.Add(2 * time.Hour)
 	}
 	return startAt, endAt
+}
+
+func resolveDirectOrderCargo(input *DirectOrderInput) (weightKG, volumeM3, lengthCM, widthCM, heightCM float64) {
+	if input == nil {
+		return
+	}
+	if input.CargoWeightKG != nil {
+		weightKG = *input.CargoWeightKG
+	}
+	if input.CargoVolumeM3 != nil {
+		volumeM3 = *input.CargoVolumeM3
+	}
+	if input.CargoLengthCM != nil {
+		lengthCM = *input.CargoLengthCM
+	}
+	if input.CargoWidthCM != nil {
+		widthCM = *input.CargoWidthCM
+	}
+	if input.CargoHeightCM != nil {
+		heightCM = *input.CargoHeightCM
+	}
+	if volumeM3 <= 0 && lengthCM > 0 && widthCM > 0 && heightCM > 0 {
+		volumeM3 = calculateCargoVolumeM3(lengthCM, widthCM, heightCM)
+	}
+	return
 }
 
 func buildDirectOrderTitle(supply *model.OwnerSupply, input *DirectOrderInput) string {

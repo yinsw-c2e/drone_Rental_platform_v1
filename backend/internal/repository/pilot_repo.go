@@ -102,15 +102,16 @@ func (r *PilotRepo) FindNearby(lat, lng, radiusKM float64, limit int) ([]model.P
 	var pilots []model.Pilot
 	// 使用 Haversine 公式计算距离
 	err := r.db.Raw(`
-		SELECT p.*, 
-		(6371 * acos(cos(radians(?)) * cos(radians(current_latitude)) * cos(radians(current_longitude) - radians(?)) + sin(radians(?)) * sin(radians(current_latitude)))) AS distance
+		SELECT p.*,
+		(6371 * acos(cos(radians(?)) * cos(radians(COALESCE(NULLIF(p.service_base_latitude, 0), NULLIF(pp.service_base_latitude, 0), NULLIF(p.current_latitude, 0)))) * cos(radians(COALESCE(NULLIF(p.service_base_longitude, 0), NULLIF(pp.service_base_longitude, 0), NULLIF(p.current_longitude, 0))) - radians(?)) + sin(radians(?)) * sin(radians(COALESCE(NULLIF(p.service_base_latitude, 0), NULLIF(pp.service_base_latitude, 0), NULLIF(p.current_latitude, 0)))))) AS distance
 		FROM pilots p
+		LEFT JOIN pilot_profiles pp ON pp.user_id = p.user_id AND pp.deleted_at IS NULL
 		WHERE p.deleted_at IS NULL 
 		AND p.verification_status = 'verified'
 		AND p.availability_status = 'online'
-		AND p.current_latitude IS NOT NULL 
-		AND p.current_longitude IS NOT NULL
-		HAVING distance <= ?
+		AND COALESCE(NULLIF(p.service_base_latitude, 0), NULLIF(pp.service_base_latitude, 0), NULLIF(p.current_latitude, 0)) IS NOT NULL
+		AND COALESCE(NULLIF(p.service_base_longitude, 0), NULLIF(pp.service_base_longitude, 0), NULLIF(p.current_longitude, 0)) IS NOT NULL
+		HAVING distance <= ? AND distance <= COALESCE(NULLIF(p.service_radius, 0), NULLIF(pp.service_radius_km, 0), 50)
 		ORDER BY distance
 		LIMIT ?
 	`, lat, lng, lat, radiusKM, limit).Scan(&pilots).Error

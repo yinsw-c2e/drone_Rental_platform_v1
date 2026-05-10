@@ -1,6 +1,8 @@
 package jwt
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -26,6 +28,14 @@ var (
 
 func GenerateTokenPair(userID int64, userType, secret string, accessExpire, refreshExpire int) (*TokenPair, error) {
 	now := time.Now()
+	accessID, err := newTokenID()
+	if err != nil {
+		return nil, err
+	}
+	refreshID, err := newTokenID()
+	if err != nil {
+		return nil, err
+	}
 
 	// Access Token
 	accessClaims := Claims{
@@ -35,6 +45,7 @@ func GenerateTokenPair(userID int64, userType, secret string, accessExpire, refr
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(accessExpire) * time.Second)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			Issuer:    "wurenji",
+			ID:        accessID,
 		},
 	}
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
@@ -51,6 +62,7 @@ func GenerateTokenPair(userID int64, userType, secret string, accessExpire, refr
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(refreshExpire) * time.Second)),
 			IssuedAt:  jwt.NewNumericDate(now),
 			Issuer:    "wurenji-refresh",
+			ID:        refreshID,
 		},
 	}
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
@@ -64,6 +76,14 @@ func GenerateTokenPair(userID int64, userType, secret string, accessExpire, refr
 		RefreshToken: refreshTokenStr,
 		ExpiresIn:    int64(accessExpire),
 	}, nil
+}
+
+func newTokenID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }
 
 func ParseToken(tokenStr, secret string) (*Claims, error) {

@@ -80,6 +80,7 @@ type ClientProfileView struct {
 	DefaultDeliveryAddress     string                 `json:"default_delivery_address,omitempty"`
 	PreferredCity              string                 `json:"preferred_city,omitempty"`
 	Remark                     string                 `json:"remark,omitempty"`
+	DemandCount                int                    `json:"demand_count"`
 	TotalOrders                int                    `json:"total_orders"`
 	CompletedOrders            int                    `json:"completed_orders"`
 	CancelledOrders            int                    `json:"cancelled_orders"`
@@ -302,7 +303,18 @@ func (s *ClientService) GetCurrentProfile(userID int64) (*ClientProfileView, err
 		return nil, err
 	}
 
-	return buildClientProfileView(client, roleProfile, user), nil
+	view := buildClientProfileView(client, roleProfile, user)
+	if stats, err := s.loadCurrentClientUsageStats(userID); err != nil {
+		return nil, err
+	} else if stats != nil && view != nil {
+		view.DemandCount = int(stats.DemandCount)
+		view.TotalOrders = int(stats.TotalOrders)
+		view.CompletedOrders = int(stats.CompletedOrders)
+		view.CancelledOrders = int(stats.CancelledOrders)
+		view.TotalSpending = stats.TotalSpending
+	}
+
+	return view, nil
 }
 
 func (s *ClientService) GetCurrentEligibility(userID int64) (*ClientEligibilityView, error) {
@@ -448,6 +460,53 @@ func (s *ClientService) GetDemandStats(demandIDs []int64) (map[int64]DemandStats
 		}
 	}
 	return result, nil
+}
+
+type clientUsageStats struct {
+	DemandCount     int64
+	TotalOrders     int64
+	CompletedOrders int64
+	CancelledOrders int64
+	TotalSpending   int64
+}
+
+func (s *ClientService) loadCurrentClientUsageStats(userID int64) (*clientUsageStats, error) {
+	if s == nil || s.clientRepo == nil || s.clientRepo.DB() == nil {
+		return nil, nil
+	}
+
+	db := s.clientRepo.DB()
+	stats := &clientUsageStats{}
+	if err := db.Model(&model.Demand{}).
+		Where("client_user_id = ?", userID).
+		Count(&stats.DemandCount).Error; err != nil {
+		return nil, err
+	}
+
+	type orderStatsRow struct {
+		TotalOrders     int64
+		CompletedOrders int64
+		CancelledOrders int64
+		TotalSpending   int64
+	}
+	var orderStats orderStatsRow
+	if err := db.Model(&model.Order{}).
+		Select(`
+			COUNT(*) AS total_orders,
+			COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS completed_orders,
+			COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS cancelled_orders,
+			COALESCE(SUM(CASE WHEN paid_at IS NOT NULL THEN total_amount ELSE 0 END), 0) AS total_spending
+		`, "completed", "cancelled").
+		Where("(client_user_id = ? OR (client_user_id = 0 AND renter_id = ?))", userID, userID).
+		Scan(&orderStats).Error; err != nil {
+		return nil, err
+	}
+
+	stats.TotalOrders = orderStats.TotalOrders
+	stats.CompletedOrders = orderStats.CompletedOrders
+	stats.CancelledOrders = orderStats.CancelledOrders
+	stats.TotalSpending = orderStats.TotalSpending
+	return stats, nil
 }
 
 // List 获取客户列表

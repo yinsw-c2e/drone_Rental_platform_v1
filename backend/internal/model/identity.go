@@ -14,7 +14,7 @@ type User struct {
 	AvatarURL     string         `gorm:"type:varchar(500)" json:"avatar_url"`
 	UserType      string         `gorm:"type:varchar(20);default:renter" json:"user_type"` // pilot, drone_owner, renter, cargo_owner, admin
 	IDCardNo      string         `gorm:"type:varchar(255)" json:"-"`
-	IDVerified    string         `gorm:"type:varchar(20);default:pending" json:"id_verified"` // pending, approved, rejected
+	IDVerified    string         `gorm:"type:varchar(20);default:unverified" json:"id_verified"` // unverified, pending, approved, rejected
 	CreditScore   int            `gorm:"default:100" json:"credit_score"`
 	Status        string         `gorm:"type:varchar(20);default:active" json:"status"` // active, suspended, banned
 	WechatOpenID  string         `gorm:"type:varchar(100);index" json:"-"`
@@ -68,18 +68,21 @@ func (OwnerProfile) TableName() string {
 }
 
 type PilotProfile struct {
-	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID              int64          `gorm:"uniqueIndex;not null" json:"user_id"`
-	VerificationStatus  string         `gorm:"type:varchar(20);default:pending;index" json:"verification_status"`
-	AvailabilityStatus  string         `gorm:"type:varchar(20);default:offline;index" json:"availability_status"`
-	ServiceRadiusKM     int            `gorm:"default:50" json:"service_radius_km"`
-	ServiceCities       JSON           `gorm:"type:json" json:"service_cities"`
-	SkillTags           JSON           `gorm:"type:json" json:"skill_tags"`
-	CAACLicenseNo       string         `gorm:"type:varchar(50);index" json:"caac_license_no"`
-	CAACLicenseExpireAt *time.Time     `json:"caac_license_expire_at"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                   int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID               int64          `gorm:"uniqueIndex;not null" json:"user_id"`
+	VerificationStatus   string         `gorm:"type:varchar(20);default:pending;index" json:"verification_status"`
+	AvailabilityStatus   string         `gorm:"type:varchar(20);default:offline;index" json:"availability_status"`
+	ServiceRadiusKM      int            `gorm:"default:50" json:"service_radius_km"`
+	ServiceBaseAddress   string         `gorm:"type:varchar(255)" json:"service_base_address"`
+	ServiceBaseLatitude  float64        `gorm:"type:decimal(10,7);index" json:"service_base_latitude"`
+	ServiceBaseLongitude float64        `gorm:"type:decimal(10,7);index" json:"service_base_longitude"`
+	ServiceCities        JSON           `gorm:"type:json" json:"service_cities"`
+	SkillTags            JSON           `gorm:"type:json" json:"skill_tags"`
+	CAACLicenseNo        string         `gorm:"type:varchar(50);index" json:"caac_license_no"`
+	CAACLicenseExpireAt  *time.Time     `json:"caac_license_expire_at"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
 
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }

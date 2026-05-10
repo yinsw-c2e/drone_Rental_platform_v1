@@ -102,6 +102,11 @@ func UpsertOrderSnapshotBundle(r *OrderArtifactRepo, order *model.Order, demand 
 	if err := r.UpsertSnapshot(order.ID, "execution", BuildExecutionSnapshot(order)); err != nil {
 		return err
 	}
+	if order.CargoWeightKG > 0 || order.CargoVolumeM3 > 0 || order.CargoLengthCM > 0 || order.CargoWidthCM > 0 || order.CargoHeightCM > 0 {
+		if err := r.UpsertSnapshot(order.ID, "cargo", BuildOrderCargoSnapshot(order)); err != nil {
+			return err
+		}
+	}
 	if demand != nil {
 		if err := r.UpsertSnapshot(order.ID, "demand", BuildDemandSnapshot(demand)); err != nil {
 			return err
@@ -114,6 +119,16 @@ func UpsertOrderSnapshotBundle(r *OrderArtifactRepo, order *model.Order, demand 
 	}
 
 	return nil
+}
+
+func BuildOrderCargoSnapshot(order *model.Order) model.JSON {
+	return mustArtifactJSON(map[string]interface{}{
+		"cargo_weight_kg": order.CargoWeightKG,
+		"cargo_volume_m3": order.CargoVolumeM3,
+		"cargo_length_cm": order.CargoLengthCM,
+		"cargo_width_cm":  order.CargoWidthCM,
+		"cargo_height_cm": order.CargoHeightCM,
+	})
 }
 
 func BuildClientSnapshot(order *model.Order) model.JSON {
@@ -171,6 +186,9 @@ func BuildDemandSnapshot(demand *model.Demand) model.JSON {
 		"service_address_snapshot":     demand.ServiceAddressSnapshot,
 		"cargo_weight_kg":              demand.CargoWeightKG,
 		"cargo_volume_m3":              demand.CargoVolumeM3,
+		"cargo_length_cm":              demand.CargoLengthCM,
+		"cargo_width_cm":               demand.CargoWidthCM,
+		"cargo_height_cm":              demand.CargoHeightCM,
 		"cargo_type":                   demand.CargoType,
 		"cargo_special_requirements":   demand.CargoSpecialRequirements,
 		"estimated_trip_count":         demand.EstimatedTripCount,

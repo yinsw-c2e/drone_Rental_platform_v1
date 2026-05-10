@@ -92,6 +92,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, hub *ws.Hub, cfg *config.Config,
 		authGroup.POST("/login", h.Auth.Login)
 		authGroup.POST("/refresh-token", h.Auth.RefreshToken)
 		authGroup.POST("/wechat-login", h.Auth.WeChatLogin)
+		authGroup.POST("/wechat-mini-login", h.Auth.WeChatMiniLogin)
 		authGroup.POST("/qq-login", h.Auth.QQLogin)
 	}
 

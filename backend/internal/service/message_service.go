@@ -168,6 +168,13 @@ func (s *MessageService) MarkAsRead(conversationID string, userID int64) error {
 	return s.messageRepo.MarkAsRead(conversationID, userID)
 }
 
+func (s *MessageService) HideConversation(conversationID string, userID int64) error {
+	if conversationID == "" {
+		return errors.New("会话不能为空")
+	}
+	return s.messageRepo.HideConversation(conversationID, userID)
+}
+
 func (s *MessageService) GetUnreadCount(userID int64) (int64, error) {
 	return s.messageRepo.GetUnreadCount(userID)
 }

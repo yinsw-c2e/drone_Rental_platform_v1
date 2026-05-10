@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/repository"
 )
 
 func TestBuildClientEligibilityViewAllowsVerifiedPersonalUser(t *testing.T) {
@@ -119,6 +121,76 @@ func TestBuildClientProfileViewUsesIdentityStatusAndExpandedFields(t *testing.T)
 	}
 	if view.Eligibility == nil || !view.Eligibility.CanCreateDirectOrder {
 		t.Fatalf("expected embedded eligibility to be ready, got %#v", view.Eligibility)
+	}
+}
+
+func TestGetCurrentProfileUsesLiveDemandAndOrderStats(t *testing.T) {
+	db := newServiceTestDB(t, &model.User{}, &model.Client{}, &model.ClientProfile{}, &model.Order{}, &model.Demand{})
+	svc := NewClientService(
+		repository.NewClientRepo(db),
+		repository.NewUserRepo(db),
+		repository.NewRoleProfileRepo(db),
+		nil,
+		repository.NewDemandDomainRepo(db),
+		nil,
+	)
+
+	user := &model.User{
+		ID:         41,
+		Phone:      "13800000041",
+		Nickname:   "客户统计样本",
+		UserType:   "client",
+		Status:     "active",
+		IDVerified: "approved",
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&model.Client{
+		UserID:              user.ID,
+		ClientType:          "individual",
+		VerificationStatus:  "verified",
+		PlatformCreditScore: 600,
+		TotalOrders:         0,
+		CompletedOrders:     0,
+		TotalSpending:       0,
+		Status:              "active",
+	}).Error; err != nil {
+		t.Fatalf("seed stale client profile: %v", err)
+	}
+	if err := db.Create(&model.ClientProfile{UserID: user.ID, Status: "active"}).Error; err != nil {
+		t.Fatalf("seed client role profile: %v", err)
+	}
+
+	paidAt := time.Now()
+	orders := []model.Order{
+		{OrderNo: "WRJ-LIVE-001", OrderType: "cargo", RenterID: user.ID, ClientUserID: user.ID, Status: "completed", TotalAmount: 120000, PaidAt: &paidAt},
+		{OrderNo: "WRJ-LIVE-002", OrderType: "cargo", RenterID: user.ID, ClientUserID: user.ID, Status: "pending_dispatch", TotalAmount: 80000, PaidAt: &paidAt},
+		{OrderNo: "WRJ-LIVE-003", OrderType: "cargo", RenterID: user.ID, ClientUserID: user.ID, Status: "cancelled", TotalAmount: 99000},
+	}
+	if err := db.Create(&orders).Error; err != nil {
+		t.Fatalf("seed orders: %v", err)
+	}
+	demands := []model.Demand{
+		{DemandNo: "DM-LIVE-001", ClientUserID: user.ID, Title: "电网塔材吊运", ServiceType: "cargo", CargoScene: "电网建设", Status: "quoting"},
+		{DemandNo: "DM-LIVE-002", ClientUserID: user.ID, Title: "海岛给养", ServiceType: "cargo", CargoScene: "海岛补给", Status: "draft"},
+	}
+	if err := db.Create(&demands).Error; err != nil {
+		t.Fatalf("seed demands: %v", err)
+	}
+
+	view, err := svc.GetCurrentProfile(user.ID)
+	if err != nil {
+		t.Fatalf("GetCurrentProfile() error = %v", err)
+	}
+	if view.DemandCount != 2 {
+		t.Fatalf("expected live demand count 2, got %d", view.DemandCount)
+	}
+	if view.TotalOrders != 3 || view.CompletedOrders != 1 || view.CancelledOrders != 1 {
+		t.Fatalf("expected live order stats 3/1/1, got %d/%d/%d", view.TotalOrders, view.CompletedOrders, view.CancelledOrders)
+	}
+	if view.TotalSpending != 200000 {
+		t.Fatalf("expected paid spending 200000, got %d", view.TotalSpending)
 	}
 }
 

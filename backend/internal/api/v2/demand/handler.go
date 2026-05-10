@@ -302,6 +302,11 @@ func buildDemandSummary(demand *model.Demand, stats service.DemandStats, viewerS
 		"service_address_text":   resolveDemandAddressText(demand),
 		"scheduled_start_at":     demand.ScheduledStartAt,
 		"scheduled_end_at":       demand.ScheduledEndAt,
+		"cargo_weight_kg":        demand.CargoWeightKG,
+		"cargo_volume_m3":        demand.CargoVolumeM3,
+		"cargo_length_cm":        demand.CargoLengthCM,
+		"cargo_width_cm":         demand.CargoWidthCM,
+		"cargo_height_cm":        demand.CargoHeightCM,
 		"budget_min":             demand.BudgetMin,
 		"budget_max":             demand.BudgetMax,
 		"allows_pilot_candidate": demand.AllowsPilotCandidate,
@@ -333,6 +338,9 @@ func buildDemandDetail(demand *model.Demand, stats service.DemandStats, viewerSt
 	data["service_address"] = demand.ServiceAddressSnapshot
 	data["cargo_weight_kg"] = demand.CargoWeightKG
 	data["cargo_volume_m3"] = demand.CargoVolumeM3
+	data["cargo_length_cm"] = demand.CargoLengthCM
+	data["cargo_width_cm"] = demand.CargoWidthCM
+	data["cargo_height_cm"] = demand.CargoHeightCM
 	data["cargo_type"] = demand.CargoType
 	data["cargo_special_requirements"] = demand.CargoSpecialRequirements
 	data["estimated_trip_count"] = demand.EstimatedTripCount

@@ -379,8 +379,9 @@ func (p *PushConfig) IsJPushEnabled() bool {
 
 // OAuthConfig 第三方登录配置
 type OAuthConfig struct {
-	WeChat WeChatOAuthCfg `mapstructure:"wechat"` // 微信登录配置
-	QQ     QQOAuthCfg     `mapstructure:"qq"`     // QQ登录配置
+	WeChat     WeChatOAuthCfg `mapstructure:"wechat"`      // 微信 App 登录配置
+	WeChatMini WeChatOAuthCfg `mapstructure:"wechat_mini"` // 微信小程序登录配置
+	QQ         QQOAuthCfg     `mapstructure:"qq"`          // QQ登录配置
 }
 
 // WeChatOAuthCfg 微信OAuth配置
@@ -398,6 +399,11 @@ type QQOAuthCfg struct {
 // IsWeChatEnabled 检查微信登录是否已配置
 func (o *OAuthConfig) IsWeChatEnabled() bool {
 	return o.WeChat.AppID != "" && o.WeChat.AppSecret != ""
+}
+
+// IsWeChatMiniEnabled 检查微信小程序登录是否已配置
+func (o *OAuthConfig) IsWeChatMiniEnabled() bool {
+	return o.WeChatMini.AppID != "" && o.WeChatMini.AppSecret != ""
 }
 
 // IsQQEnabled 检查QQ登录是否已配置
@@ -503,6 +509,7 @@ func (c *Config) PrintConfigStatus() {
 	fmt.Printf("高德地图: %s\n", boolToStatus(c.Amap.IsEnabled()))
 	fmt.Printf("推送服务: %s (%s)\n", boolToStatus(c.Push.IsJPushEnabled()), c.Push.Provider)
 	fmt.Printf("微信登录: %s\n", boolToStatus(c.OAuth.IsWeChatEnabled()))
+	fmt.Printf("微信小程序登录: %s\n", boolToStatus(c.OAuth.IsWeChatMiniEnabled()))
 	fmt.Printf("QQ登录: %s\n", boolToStatus(c.OAuth.IsQQEnabled()))
 	fmt.Println("========================================")
 }

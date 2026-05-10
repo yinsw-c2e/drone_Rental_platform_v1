@@ -82,6 +82,9 @@ type RegisterPilotReq struct {
 	CAACLicenseExpireDate *time.Time `json:"caac_license_expire_date"`
 	CAACLicenseImage      string     `json:"caac_license_image" binding:"required"`
 	ServiceRadius         float64    `json:"service_radius"`
+	ServiceBaseAddress    string     `json:"service_base_address"`
+	ServiceBaseLatitude   float64    `json:"service_base_latitude"`
+	ServiceBaseLongitude  float64    `json:"service_base_longitude"`
 	SpecialSkills         []string   `json:"special_skills"`
 }
 
@@ -96,30 +99,36 @@ type PilotProfileInput struct {
 	CAACLicenseExpireDate *time.Time `json:"caac_license_expire_date"`
 	CAACLicenseImage      string     `json:"caac_license_image"`
 	ServiceRadius         *float64   `json:"service_radius"`
+	ServiceBaseAddress    string     `json:"service_base_address"`
+	ServiceBaseLatitude   *float64   `json:"service_base_latitude"`
+	ServiceBaseLongitude  *float64   `json:"service_base_longitude"`
 	SpecialSkills         []string   `json:"special_skills"`
 	CurrentCity           string     `json:"current_city"`
 }
 
 type PilotProfileView struct {
-	ID                  int64                 `json:"id"`
-	UserID              int64                 `json:"user_id"`
-	CAACLicenseNo       string                `json:"caac_license_no"`
-	CAACLicenseType     string                `json:"caac_license_type"`
-	CAACLicenseExpireAt *time.Time            `json:"caac_license_expire_at,omitempty"`
-	CAACLicenseImage    string                `json:"caac_license_image,omitempty"`
-	VerificationStatus  string                `json:"verification_status"`
-	AvailabilityStatus  string                `json:"availability_status"`
-	ServiceRadiusKM     int                   `json:"service_radius_km"`
-	ServiceRadius       float64               `json:"service_radius"`
-	CurrentCity         string                `json:"current_city,omitempty"`
-	ServiceCities       model.JSON            `json:"service_cities,omitempty"`
-	SpecialSkills       model.JSON            `json:"special_skills,omitempty"`
-	SkillTags           model.JSON            `json:"skill_tags,omitempty"`
-	ServiceRating       float64               `json:"service_rating"`
-	CreditScore         int                   `json:"credit_score"`
-	Eligibility         *PilotEligibilityView `json:"eligibility,omitempty"`
-	CreatedAt           time.Time             `json:"created_at"`
-	UpdatedAt           time.Time             `json:"updated_at"`
+	ID                   int64                 `json:"id"`
+	UserID               int64                 `json:"user_id"`
+	CAACLicenseNo        string                `json:"caac_license_no"`
+	CAACLicenseType      string                `json:"caac_license_type"`
+	CAACLicenseExpireAt  *time.Time            `json:"caac_license_expire_at,omitempty"`
+	CAACLicenseImage     string                `json:"caac_license_image,omitempty"`
+	VerificationStatus   string                `json:"verification_status"`
+	AvailabilityStatus   string                `json:"availability_status"`
+	ServiceRadiusKM      int                   `json:"service_radius_km"`
+	ServiceRadius        float64               `json:"service_radius"`
+	ServiceBaseAddress   string                `json:"service_base_address,omitempty"`
+	ServiceBaseLatitude  float64               `json:"service_base_latitude,omitempty"`
+	ServiceBaseLongitude float64               `json:"service_base_longitude,omitempty"`
+	CurrentCity          string                `json:"current_city,omitempty"`
+	ServiceCities        model.JSON            `json:"service_cities,omitempty"`
+	SpecialSkills        model.JSON            `json:"special_skills,omitempty"`
+	SkillTags            model.JSON            `json:"skill_tags,omitempty"`
+	ServiceRating        float64               `json:"service_rating"`
+	CreditScore          int                   `json:"credit_score"`
+	Eligibility          *PilotEligibilityView `json:"eligibility,omitempty"`
+	CreatedAt            time.Time             `json:"created_at"`
+	UpdatedAt            time.Time             `json:"updated_at"`
 }
 
 type PilotEligibilityBlocker struct {
@@ -180,6 +189,9 @@ func (s *PilotService) Register(userID int64, req *RegisterPilotReq) (*model.Pil
 		CAACLicenseExpireDate: req.CAACLicenseExpireDate,
 		CAACLicenseImage:      req.CAACLicenseImage,
 		ServiceRadius:         serviceRadius,
+		ServiceBaseAddress:    strings.TrimSpace(req.ServiceBaseAddress),
+		ServiceBaseLatitude:   req.ServiceBaseLatitude,
+		ServiceBaseLongitude:  req.ServiceBaseLongitude,
 		CreditScore:           500, // 初始信用分
 		VerificationStatus:    "pending",
 		AvailabilityStatus:    "offline",
@@ -263,10 +275,17 @@ func (s *PilotService) UpsertCurrentProfile(userID int64, input *PilotProfileInp
 			CAACLicenseType:       input.CAACLicenseType,
 			CAACLicenseExpireDate: input.CAACLicenseExpireDate,
 			CAACLicenseImage:      input.CAACLicenseImage,
+			ServiceBaseAddress:    input.ServiceBaseAddress,
 			SpecialSkills:         input.SpecialSkills,
 		}
 		if input.ServiceRadius != nil {
 			req.ServiceRadius = *input.ServiceRadius
+		}
+		if input.ServiceBaseLatitude != nil {
+			req.ServiceBaseLatitude = *input.ServiceBaseLatitude
+		}
+		if input.ServiceBaseLongitude != nil {
+			req.ServiceBaseLongitude = *input.ServiceBaseLongitude
 		}
 		created, createErr := s.Register(userID, req)
 		if createErr != nil {
@@ -302,6 +321,19 @@ func (s *PilotService) UpsertCurrentProfile(userID int64, input *PilotProfileInp
 	}
 	if input.ServiceRadius != nil && *input.ServiceRadius > 0 {
 		updates["service_radius"] = *input.ServiceRadius
+	}
+	if strings.TrimSpace(input.ServiceBaseAddress) != "" {
+		updates["service_base_address"] = strings.TrimSpace(input.ServiceBaseAddress)
+	}
+	if input.ServiceBaseLatitude != nil || input.ServiceBaseLongitude != nil {
+		if input.ServiceBaseLatitude == nil || input.ServiceBaseLongitude == nil {
+			return nil, errors.New("服务基准地点坐标不完整")
+		}
+		if !isValidCoordinate(*input.ServiceBaseLatitude, *input.ServiceBaseLongitude) {
+			return nil, errors.New("服务基准地点坐标无效")
+		}
+		updates["service_base_latitude"] = *input.ServiceBaseLatitude
+		updates["service_base_longitude"] = *input.ServiceBaseLongitude
 	}
 	if len(input.SpecialSkills) > 0 {
 		updates["special_skills"] = model.JSON(mustMarshalJSON(input.SpecialSkills))
@@ -366,6 +398,24 @@ func (s *PilotService) UpdateLocation(pilotID int64, lat, lng float64, city stri
 	return s.pilotRepo.UpdateLocation(pilotID, lat, lng, city)
 }
 
+func isValidCoordinate(lat, lng float64) bool {
+	return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat == 0 && lng == 0)
+}
+
+func hasServiceBaseLocation(pilot *model.Pilot) bool {
+	if pilot == nil {
+		return false
+	}
+	return isValidCoordinate(pilot.ServiceBaseLatitude, pilot.ServiceBaseLongitude)
+}
+
+func hasServiceBaseProfileLocation(profile *model.PilotProfile) bool {
+	if profile == nil {
+		return false
+	}
+	return isValidCoordinate(profile.ServiceBaseLatitude, profile.ServiceBaseLongitude)
+}
+
 // UpdateAvailability 更新接单状态
 func (s *PilotService) UpdateAvailability(pilotID int64, status string) error {
 	validStatus := map[string]bool{"online": true, "busy": true, "offline": true}
@@ -380,6 +430,9 @@ func (s *PilotService) UpdateAvailability(pilotID int64, status string) error {
 	}
 	if pilot.VerificationStatus != "verified" && status == "online" {
 		return errors.New("飞手资质尚未审核通过，无法上线接单")
+	}
+	if status == "online" && !hasServiceBaseLocation(pilot) {
+		return errors.New("请先设置服务基准地点后再上线接单")
 	}
 
 	db := s.pilotRepo.DB()
@@ -927,8 +980,14 @@ func (s *PilotService) SubmitCertification(pilotID int64, req *SubmitCertificati
 	// 验证证书类型
 	validTypes := map[string]bool{
 		"caac_license":      true,
+		"aopa_cert":         true,
+		"utc_cert":          true,
 		"training":          true,
+		"training_cert":     true,
 		"emergency":         true,
+		"health_check":      true,
+		"insurance":         true,
+		"other":             true,
 		"special_operation": true,
 	}
 	if !validTypes[req.CertType] {
@@ -1357,12 +1416,15 @@ func (s *PilotService) ensurePilotProfile(userID int64, req *RegisterPilotReq) e
 	}
 
 	profile := &model.PilotProfile{
-		UserID:              userID,
-		VerificationStatus:  "pending",
-		AvailabilityStatus:  "offline",
-		ServiceRadiusKM:     int(math.Round(req.ServiceRadius)),
-		CAACLicenseNo:       req.CAACLicenseNo,
-		CAACLicenseExpireAt: req.CAACLicenseExpireDate,
+		UserID:               userID,
+		VerificationStatus:   "pending",
+		AvailabilityStatus:   "offline",
+		ServiceRadiusKM:      int(math.Round(req.ServiceRadius)),
+		ServiceBaseAddress:   strings.TrimSpace(req.ServiceBaseAddress),
+		ServiceBaseLatitude:  req.ServiceBaseLatitude,
+		ServiceBaseLongitude: req.ServiceBaseLongitude,
+		CAACLicenseNo:        req.CAACLicenseNo,
+		CAACLicenseExpireAt:  req.CAACLicenseExpireDate,
 	}
 	if profile.ServiceRadiusKM <= 0 {
 		profile.ServiceRadiusKM = 50
@@ -1402,38 +1464,45 @@ func (s *PilotService) syncPilotRoleProfile(pilot *model.Pilot) error {
 		return nil
 	}
 
-	profile := &model.PilotProfile{
-		UserID:              pilot.UserID,
-		VerificationStatus:  pilot.VerificationStatus,
-		AvailabilityStatus:  pilot.AvailabilityStatus,
-		ServiceRadiusKM:     int(math.Round(pilot.ServiceRadius)),
-		CAACLicenseNo:       pilot.CAACLicenseNo,
-		CAACLicenseExpireAt: pilot.CAACLicenseExpireDate,
+	desiredProfile := &model.PilotProfile{
+		UserID:               pilot.UserID,
+		VerificationStatus:   pilot.VerificationStatus,
+		AvailabilityStatus:   pilot.AvailabilityStatus,
+		ServiceRadiusKM:      int(math.Round(pilot.ServiceRadius)),
+		ServiceBaseAddress:   pilot.ServiceBaseAddress,
+		ServiceBaseLatitude:  pilot.ServiceBaseLatitude,
+		ServiceBaseLongitude: pilot.ServiceBaseLongitude,
+		CAACLicenseNo:        pilot.CAACLicenseNo,
+		CAACLicenseExpireAt:  pilot.CAACLicenseExpireDate,
 	}
-	if profile.ServiceRadiusKM <= 0 {
-		profile.ServiceRadiusKM = 50
+	if desiredProfile.ServiceRadiusKM <= 0 {
+		desiredProfile.ServiceRadiusKM = 50
 	}
-	profile.ServiceCities = model.JSON(mustMarshalJSON([]string{}))
+	desiredProfile.ServiceCities = model.JSON(mustMarshalJSON([]string{}))
 	if pilot.CurrentCity != "" {
-		profile.ServiceCities = model.JSON(mustMarshalJSON([]string{pilot.CurrentCity}))
+		desiredProfile.ServiceCities = model.JSON(mustMarshalJSON([]string{pilot.CurrentCity}))
 	}
-	profile.SkillTags = model.JSON(mustMarshalJSON([]string{}))
+	desiredProfile.SkillTags = model.JSON(mustMarshalJSON([]string{}))
 	if len(pilot.SpecialSkills) > 0 {
-		profile.SkillTags = model.JSON(append([]byte(nil), pilot.SpecialSkills...))
+		desiredProfile.SkillTags = model.JSON(append([]byte(nil), pilot.SpecialSkills...))
 	}
 
-	if err := s.roleProfileRepo.EnsurePilotProfile(profile); err != nil {
+	createProfile := *desiredProfile
+	if err := s.roleProfileRepo.EnsurePilotProfile(&createProfile); err != nil {
 		return err
 	}
 
 	updates := map[string]interface{}{
 		"verification_status":    pilot.VerificationStatus,
 		"availability_status":    pilot.AvailabilityStatus,
-		"service_radius_km":      profile.ServiceRadiusKM,
+		"service_radius_km":      desiredProfile.ServiceRadiusKM,
+		"service_base_address":   desiredProfile.ServiceBaseAddress,
+		"service_base_latitude":  desiredProfile.ServiceBaseLatitude,
+		"service_base_longitude": desiredProfile.ServiceBaseLongitude,
 		"caac_license_no":        pilot.CAACLicenseNo,
 		"caac_license_expire_at": pilot.CAACLicenseExpireDate,
-		"service_cities":         profile.ServiceCities,
-		"skill_tags":             profile.SkillTags,
+		"service_cities":         desiredProfile.ServiceCities,
+		"skill_tags":             desiredProfile.SkillTags,
 		"updated_at":             time.Now(),
 	}
 
@@ -1481,15 +1550,18 @@ func (s *PilotService) handleOwnerBindingResponse(pilotUserID, bindingID int64, 
 
 func (s *PilotService) buildDemandCandidateSnapshot(pilot *model.Pilot, profile *model.PilotProfile) model.JSON {
 	snapshot := map[string]interface{}{
-		"pilot_user_id":       0,
-		"verification_status": "",
-		"availability_status": "",
-		"service_radius_km":   0,
-		"service_city":        "",
-		"caac_license_type":   "",
-		"service_rating":      0.0,
-		"credit_score":        0,
-		"generated_at":        time.Now(),
+		"pilot_user_id":          0,
+		"verification_status":    "",
+		"availability_status":    "",
+		"service_radius_km":      0,
+		"service_city":           "",
+		"service_base_address":   "",
+		"service_base_latitude":  0.0,
+		"service_base_longitude": 0.0,
+		"caac_license_type":      "",
+		"service_rating":         0.0,
+		"credit_score":           0,
+		"generated_at":           time.Now(),
 	}
 
 	if pilot != nil {
@@ -1498,6 +1570,9 @@ func (s *PilotService) buildDemandCandidateSnapshot(pilot *model.Pilot, profile 
 		snapshot["availability_status"] = pilot.AvailabilityStatus
 		snapshot["service_radius_km"] = int(math.Round(pilot.ServiceRadius))
 		snapshot["service_city"] = pilot.CurrentCity
+		snapshot["service_base_address"] = pilot.ServiceBaseAddress
+		snapshot["service_base_latitude"] = pilot.ServiceBaseLatitude
+		snapshot["service_base_longitude"] = pilot.ServiceBaseLongitude
 		snapshot["caac_license_type"] = pilot.CAACLicenseType
 		snapshot["service_rating"] = pilot.ServiceRating
 		snapshot["credit_score"] = pilot.CreditScore
@@ -1512,6 +1587,13 @@ func (s *PilotService) buildDemandCandidateSnapshot(pilot *model.Pilot, profile 
 		if profile.ServiceRadiusKM > 0 {
 			snapshot["service_radius_km"] = profile.ServiceRadiusKM
 		}
+		if profile.ServiceBaseAddress != "" {
+			snapshot["service_base_address"] = profile.ServiceBaseAddress
+		}
+		if hasServiceBaseProfileLocation(profile) {
+			snapshot["service_base_latitude"] = profile.ServiceBaseLatitude
+			snapshot["service_base_longitude"] = profile.ServiceBaseLongitude
+		}
 	}
 
 	return model.JSON(mustMarshalJSON(snapshot))
@@ -1523,27 +1605,43 @@ func buildPilotProfileView(pilot *model.Pilot, profile *model.PilotProfile) *Pil
 	}
 
 	view := &PilotProfileView{
-		ID:                  pilot.ID,
-		UserID:              pilot.UserID,
-		CAACLicenseNo:       pilot.CAACLicenseNo,
-		CAACLicenseType:     pilot.CAACLicenseType,
-		CAACLicenseExpireAt: pilot.CAACLicenseExpireDate,
-		CAACLicenseImage:    pilot.CAACLicenseImage,
-		VerificationStatus:  pilot.VerificationStatus,
-		AvailabilityStatus:  pilot.AvailabilityStatus,
-		ServiceRadius:       pilot.ServiceRadius,
-		CurrentCity:         pilot.CurrentCity,
-		SpecialSkills:       pilot.SpecialSkills,
-		ServiceRating:       pilot.ServiceRating,
-		CreditScore:         pilot.CreditScore,
-		CreatedAt:           pilot.CreatedAt,
-		UpdatedAt:           pilot.UpdatedAt,
+		ID:                   pilot.ID,
+		UserID:               pilot.UserID,
+		CAACLicenseNo:        pilot.CAACLicenseNo,
+		CAACLicenseType:      pilot.CAACLicenseType,
+		CAACLicenseExpireAt:  pilot.CAACLicenseExpireDate,
+		CAACLicenseImage:     pilot.CAACLicenseImage,
+		VerificationStatus:   pilot.VerificationStatus,
+		AvailabilityStatus:   pilot.AvailabilityStatus,
+		ServiceRadiusKM:      int(math.Round(pilot.ServiceRadius)),
+		ServiceRadius:        pilot.ServiceRadius,
+		ServiceBaseAddress:   pilot.ServiceBaseAddress,
+		ServiceBaseLatitude:  pilot.ServiceBaseLatitude,
+		ServiceBaseLongitude: pilot.ServiceBaseLongitude,
+		CurrentCity:          pilot.CurrentCity,
+		SpecialSkills:        pilot.SpecialSkills,
+		ServiceRating:        pilot.ServiceRating,
+		CreditScore:          pilot.CreditScore,
+		CreatedAt:            pilot.CreatedAt,
+		UpdatedAt:            pilot.UpdatedAt,
+	}
+	if view.ServiceRadiusKM <= 0 {
+		view.ServiceRadiusKM = 50
 	}
 
 	if profile != nil {
-		view.ServiceRadiusKM = profile.ServiceRadiusKM
 		view.ServiceCities = profile.ServiceCities
 		view.SkillTags = profile.SkillTags
+		if view.ServiceRadiusKM <= 0 && profile.ServiceRadiusKM > 0 {
+			view.ServiceRadiusKM = profile.ServiceRadiusKM
+		}
+		if strings.TrimSpace(view.ServiceBaseAddress) == "" && profile.ServiceBaseAddress != "" {
+			view.ServiceBaseAddress = profile.ServiceBaseAddress
+		}
+		if !hasServiceBaseLocation(pilot) && hasServiceBaseProfileLocation(profile) {
+			view.ServiceBaseLatitude = profile.ServiceBaseLatitude
+			view.ServiceBaseLongitude = profile.ServiceBaseLongitude
+		}
 		if view.VerificationStatus == "" {
 			view.VerificationStatus = profile.VerificationStatus
 		}

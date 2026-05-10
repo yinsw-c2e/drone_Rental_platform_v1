@@ -2,12 +2,15 @@ package service
 
 import (
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/repository"
 )
+
+const simulatedIDVerificationAutoApproveDelay = time.Minute
 
 type RoleSummary struct {
 	HasClientRole     bool `json:"has_client_role"`
@@ -19,10 +22,11 @@ type RoleSummary struct {
 }
 
 type MeUser struct {
-	ID        int64  `json:"id"`
-	Phone     string `json:"phone"`
-	Nickname  string `json:"nickname"`
-	AvatarURL string `json:"avatar_url"`
+	ID         int64  `json:"id"`
+	Phone      string `json:"phone"`
+	Nickname   string `json:"nickname"`
+	AvatarURL  string `json:"avatar_url"`
+	IDVerified string `json:"id_verified"`
 }
 
 type MeSummary struct {
@@ -71,10 +75,11 @@ func (s *UserService) GetMe(userID int64) (*MeSummary, error) {
 
 	return &MeSummary{
 		User: MeUser{
-			ID:        user.ID,
-			Phone:     user.Phone,
-			Nickname:  user.Nickname,
-			AvatarURL: user.AvatarURL,
+			ID:         user.ID,
+			Phone:      user.Phone,
+			Nickname:   user.Nickname,
+			AvatarURL:  user.AvatarURL,
+			IDVerified: user.IDVerified,
 		},
 		RoleSummary: *roleSummary,
 	}, nil
@@ -170,10 +175,36 @@ func (s *UserService) SubmitIDVerification(userID int64, idCardNo string) error 
 		return errors.New("已通过实名认证")
 	}
 
-	return s.userRepo.UpdateFields(userID, map[string]interface{}{
+	if err := s.userRepo.UpdateFields(userID, map[string]interface{}{
 		"id_card_no":  idCardNo,
 		"id_verified": "pending",
+	}); err != nil {
+		return err
+	}
+
+	s.scheduleSimulatedIDVerificationAutoApproval(userID, idCardNo, simulatedIDVerificationAutoApproveDelay)
+	return nil
+}
+
+func (s *UserService) scheduleSimulatedIDVerificationAutoApproval(userID int64, idCardNo string, delay time.Duration) {
+	if delay <= 0 {
+		_ = s.approvePendingSimulatedIDVerification(userID, idCardNo)
+		return
+	}
+	time.AfterFunc(delay, func() {
+		_ = s.approvePendingSimulatedIDVerification(userID, idCardNo)
 	})
+}
+
+func (s *UserService) approvePendingSimulatedIDVerification(userID int64, idCardNo string) error {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return err
+	}
+	if user.IDVerified != "pending" || user.IDCardNo != idCardNo {
+		return nil
+	}
+	return s.userRepo.UpdateFields(userID, map[string]interface{}{"id_verified": "approved"})
 }
 
 func (s *UserService) GetPublicProfile(userID int64) (*model.User, error) {

@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -142,6 +145,7 @@ func (s *AuthService) Register(phone, password, nickname string) (*model.User, *
 		PasswordHash: string(hash),
 		Nickname:     nickname,
 		UserType:     "renter",
+		IDVerified:   "unverified",
 		Status:       "active",
 	}
 	if err := s.createUserWithDefaultProfiles(user); err != nil {
@@ -191,10 +195,11 @@ func (s *AuthService) LoginByCode(phone, code string) (*model.User, *jwtpkg.Toke
 	if err != nil {
 		// Auto register
 		user = &model.User{
-			Phone:    phone,
-			Nickname: "用户" + phone[len(phone)-4:],
-			UserType: "renter",
-			Status:   "active",
+			Phone:      phone,
+			Nickname:   "用户" + phone[len(phone)-4:],
+			UserType:   "renter",
+			IDVerified: "unverified",
+			Status:     "active",
 		}
 		if err := s.createUserWithDefaultProfiles(user); err != nil {
 			return nil, nil, err
@@ -272,6 +277,13 @@ func (s *AuthService) IsTokenBlacklisted(token string) bool {
 // OAuthLogin 第三方登录（微信/QQ）
 // 如果openID对应用户已存在则登录，否则自动注册
 func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform string) (*model.User, *jwtpkg.TokenPair, error) {
+	openID = strings.TrimSpace(openID)
+	unionID = strings.TrimSpace(unionID)
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	if openID == "" {
+		return nil, nil, errors.New("第三方登录凭证无效")
+	}
+
 	var user *model.User
 	var err error
 
@@ -279,22 +291,31 @@ func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform str
 	switch platform {
 	case "wechat":
 		user, err = s.userRepo.GetByWechatOpenID(openID)
+		if errors.Is(err, gorm.ErrRecordNotFound) && unionID != "" {
+			user, err = s.userRepo.GetByWechatUnionID(unionID)
+		}
 	case "qq":
 		user, err = s.userRepo.GetByQQOpenID(openID)
 	default:
 		return nil, nil, fmt.Errorf("不支持的登录平台: %s", platform)
 	}
 
-	if err != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, err
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 用户不存在，自动注册
 		if nickname == "" {
 			nickname = platform + "用户"
 		}
 		user = &model.User{
-			Nickname:  nickname,
-			AvatarURL: avatar,
-			UserType:  "renter",
-			Status:    "active",
+			Phone:      buildOAuthPlaceholderPhone(platform, openID),
+			Nickname:   nickname,
+			AvatarURL:  avatar,
+			UserType:   "renter",
+			IDVerified: "unverified",
+			Status:     "active",
 		}
 		switch platform {
 		case "wechat":
@@ -307,6 +328,8 @@ func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform str
 		if err := s.createUserWithDefaultProfiles(user); err != nil {
 			return nil, nil, fmt.Errorf("创建用户失败: %w", err)
 		}
+	} else if platform == "wechat" {
+		s.bindMissingWechatIdentity(user, openID, unionID)
 	}
 
 	if user.Status != "active" {
@@ -324,9 +347,53 @@ func (s *AuthService) OAuthLogin(openID, unionID, nickname, avatar, platform str
 	return user, tokens, nil
 }
 
+func buildOAuthPlaceholderPhone(platform, openID string) string {
+	prefix := "oa"
+	switch platform {
+	case "wechat":
+		prefix = "wx"
+	case "qq":
+		prefix = "qq"
+	}
+
+	sum := sha1.Sum([]byte(platform + ":" + openID))
+	return prefix + "_" + hex.EncodeToString(sum[:])[:17]
+}
+
+func (s *AuthService) bindMissingWechatIdentity(user *model.User, openID, unionID string) {
+	if user == nil || user.ID == 0 {
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if user.WechatOpenID == "" && openID != "" {
+		updates["wechat_open_id"] = openID
+	}
+	if user.WechatUnionID == "" && unionID != "" {
+		updates["wechat_union_id"] = unionID
+	}
+	if len(updates) == 0 {
+		return
+	}
+
+	if err := s.userRepo.UpdateFields(user.ID, updates); err != nil {
+		s.logger.Warn("绑定微信登录标识失败", zap.Int64("user_id", user.ID), zap.Error(err))
+		return
+	}
+	if v, ok := updates["wechat_open_id"].(string); ok {
+		user.WechatOpenID = v
+	}
+	if v, ok := updates["wechat_union_id"].(string); ok {
+		user.WechatUnionID = v
+	}
+}
+
 func (s *AuthService) createUserWithDefaultProfiles(user *model.User) error {
 	if user == nil {
 		return errors.New("用户参数不能为空")
+	}
+	if strings.TrimSpace(user.IDVerified) == "" {
+		user.IDVerified = "unverified"
 	}
 
 	db := s.userRepo.DB()

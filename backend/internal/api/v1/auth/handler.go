@@ -9,13 +9,14 @@ import (
 )
 
 type Handler struct {
-	authService *service.AuthService
-	wechatOAuth *oauth.WeChatOAuth
-	qqOAuth     *oauth.QQOAuth
+	authService     *service.AuthService
+	wechatOAuth     *oauth.WeChatOAuth
+	wechatMiniOAuth *oauth.WeChatOAuth
+	qqOAuth         *oauth.QQOAuth
 }
 
-func NewHandler(authService *service.AuthService, wechatOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth) *Handler {
-	return &Handler{authService: authService, wechatOAuth: wechatOAuth, qqOAuth: qqOAuth}
+func NewHandler(authService *service.AuthService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth) *Handler {
+	return &Handler{authService: authService, wechatOAuth: wechatOAuth, wechatMiniOAuth: wechatMiniOAuth, qqOAuth: qqOAuth}
 }
 
 type SendCodeReq struct {
@@ -166,6 +167,39 @@ func (h *Handler) WeChatLogin(c *gin.Context) {
 	}
 
 	// 使用第三方登录信息进行登录或注册
+	user, tokens, err := h.authService.OAuthLogin(wxUser.OpenID, wxUser.UnionID, wxUser.Nickname, wxUser.Avatar, "wechat")
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"user":  user,
+		"token": tokens,
+	})
+}
+
+// WeChatMiniLogin 微信小程序登录
+func (h *Handler) WeChatMiniLogin(c *gin.Context) {
+	var req struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "code不能为空")
+		return
+	}
+
+	if h.wechatMiniOAuth == nil || !h.wechatMiniOAuth.IsEnabled() {
+		response.Error(c, response.CodeParamError, "微信小程序登录未配置")
+		return
+	}
+
+	wxUser, err := h.wechatMiniOAuth.GetMiniProgramUserInfo(req.Code)
+	if err != nil {
+		response.Error(c, response.CodeUnauthorized, "微信小程序授权失败: "+err.Error())
+		return
+	}
+
 	user, tokens, err := h.authService.OAuthLogin(wxUser.OpenID, wxUser.UnionID, wxUser.Nickname, wxUser.Avatar, "wechat")
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())

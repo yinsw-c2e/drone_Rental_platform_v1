@@ -2,7 +2,10 @@ package pilot
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -10,15 +13,17 @@ import (
 	v2common "wurenji-backend/internal/api/v2/common"
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/response"
+	"wurenji-backend/internal/pkg/upload"
 	"wurenji-backend/internal/service"
 )
 
 type Handler struct {
-	pilotService *service.PilotService
+	pilotService  *service.PilotService
+	uploadService *upload.UploadService
 }
 
-func NewHandler(pilotService *service.PilotService) *Handler {
-	return &Handler{pilotService: pilotService}
+func NewHandler(pilotService *service.PilotService, uploadService *upload.UploadService) *Handler {
+	return &Handler{pilotService: pilotService, uploadService: uploadService}
 }
 
 func (h *Handler) GetProfile(c *gin.Context) {
@@ -48,7 +53,15 @@ func (h *Handler) UpsertProfile(c *gin.Context) {
 		response.V2ValidationError(c, "invalid pilot profile payload")
 		return
 	}
-	if req.CAACLicenseType == "" && req.CAACLicenseNo == "" && req.CAACLicenseImage == "" && req.ServiceRadius == nil && len(req.SpecialSkills) == 0 && req.CurrentCity == "" {
+	if req.CAACLicenseType == "" &&
+		req.CAACLicenseNo == "" &&
+		req.CAACLicenseImage == "" &&
+		req.ServiceRadius == nil &&
+		req.ServiceBaseAddress == "" &&
+		req.ServiceBaseLatitude == nil &&
+		req.ServiceBaseLongitude == nil &&
+		len(req.SpecialSkills) == 0 &&
+		req.CurrentCity == "" {
 		response.V2ValidationError(c, "empty pilot profile payload")
 		return
 	}
@@ -59,6 +72,170 @@ func (h *Handler) UpsertProfile(c *gin.Context) {
 		return
 	}
 	response.V2Success(c, profile)
+}
+
+func (h *Handler) UploadCertImage(c *gin.Context) {
+	if h.uploadService == nil {
+		response.V2Error(c, 500, response.V2CodeInternalError, "upload service unavailable")
+		return
+	}
+	if middleware.GetUserID(c) == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.V2ValidationError(c, "请选择文件")
+		return
+	}
+
+	url, err := h.uploadService.SaveFile(file, "certifications")
+	if err != nil {
+		response.V2ValidationError(c, err.Error())
+		return
+	}
+	response.V2Success(c, gin.H{"url": url})
+}
+
+func (h *Handler) SubmitCertification(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	pilot, err := h.pilotService.GetByUserID(userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	var payload struct {
+		CertType         string `json:"cert_type" binding:"required"`
+		CertName         string `json:"cert_name"`
+		CertNo           string `json:"cert_no"`
+		Issuer           string `json:"issuer"`
+		IssuingAuthority string `json:"issuing_authority"`
+		IssueDate        string `json:"issue_date"`
+		ExpireDate       string `json:"expire_date"`
+		CertImage        string `json:"cert_image" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		response.V2ValidationError(c, "invalid certification payload")
+		return
+	}
+	issueDate, err := parseFlexibleDate(payload.IssueDate)
+	if err != nil {
+		response.V2ValidationError(c, "invalid issue_date")
+		return
+	}
+	expireDate, err := parseFlexibleDate(payload.ExpireDate)
+	if err != nil {
+		response.V2ValidationError(c, "invalid expire_date")
+		return
+	}
+	issuer := strings.TrimSpace(payload.IssuingAuthority)
+	if issuer == "" {
+		issuer = strings.TrimSpace(payload.Issuer)
+	}
+	req := service.SubmitCertificationReq{
+		CertType:         payload.CertType,
+		CertName:         payload.CertName,
+		CertNo:           payload.CertNo,
+		IssuingAuthority: issuer,
+		IssueDate:        issueDate,
+		ExpireDate:       expireDate,
+		CertImage:        payload.CertImage,
+	}
+
+	cert, err := h.pilotService.SubmitCertification(pilot.ID, &req)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, cert)
+}
+
+func (h *Handler) ListCertifications(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	pilot, err := h.pilotService.GetByUserID(userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	certs, err := h.pilotService.GetCertifications(pilot.ID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, certs)
+}
+
+func (h *Handler) SubmitCriminalCheck(c *gin.Context) {
+	h.submitPilotDoc(c, "criminal")
+}
+
+func (h *Handler) SubmitHealthCheck(c *gin.Context) {
+	h.submitPilotDoc(c, "health")
+}
+
+func (h *Handler) submitPilotDoc(c *gin.Context, docType string) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	pilot, err := h.pilotService.GetByUserID(userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	var req struct {
+		DocURL     string `json:"doc_url" binding:"required"`
+		ExpireDate string `json:"expire_date"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid certification document payload")
+		return
+	}
+	expireDate, err := parseFlexibleDate(req.ExpireDate)
+	if err != nil {
+		response.V2ValidationError(c, "invalid expire_date")
+		return
+	}
+
+	if docType == "criminal" {
+		err = h.pilotService.SubmitCriminalCheck(pilot.ID, req.DocURL, expireDate)
+	} else {
+		err = h.pilotService.SubmitHealthCheck(pilot.ID, req.DocURL, expireDate)
+	}
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{"status": "pending"})
+}
+
+func parseFlexibleDate(value string) (*time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	for _, layout := range []string{time.RFC3339, "2006-01-02", "2006-01-02 15:04"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return &parsed, nil
+		}
+	}
+	return nil, errors.New("invalid date")
 }
 
 func (h *Handler) UpdateAvailability(c *gin.Context) {

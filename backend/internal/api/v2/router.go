@@ -27,6 +27,7 @@ import (
 	v2settlement "wurenji-backend/internal/api/v2/settlement"
 	v2supply "wurenji-backend/internal/api/v2/supply"
 	pushpkg "wurenji-backend/internal/pkg/push"
+	uploadpkg "wurenji-backend/internal/pkg/upload"
 	"wurenji-backend/internal/service"
 )
 
@@ -55,7 +56,7 @@ type Handlers struct {
 	ClientLegacy *v1client.Handler
 }
 
-func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, serverMode string, adminHandler *v1admin.Handler, analyticsHandler *v1analytics.Handler, clientLegacyHandler *v1client.Handler) *Handlers {
+func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, uploadService *uploadpkg.UploadService, serverMode string, adminHandler *v1admin.Handler, analyticsHandler *v1analytics.Handler, clientLegacyHandler *v1client.Handler) *Handlers {
 	return &Handlers{
 		Base:         base.NewHandler(),
 		Auth:         v2auth.NewHandler(authService, userService),
@@ -66,7 +67,7 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Supply:       v2supply.NewHandler(clientService),
 		Demand:       v2demand.NewHandler(clientService),
 		Owner:        v2owner.NewHandler(ownerService, droneService),
-		Pilot:        v2pilot.NewHandler(pilotService),
+		Pilot:        v2pilot.NewHandler(pilotService, uploadService),
 		Order:        v2order.NewHandler(orderService, dispatchService, flightService),
 		Dispatch:     v2dispatch.NewHandler(dispatchService, orderService),
 		Flight:       v2flight.NewHandler(flightService, orderService),
@@ -163,6 +164,11 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		{
 			pilotGroup.GET("/profile", h.Pilot.GetProfile)
 			pilotGroup.PUT("/profile", h.Pilot.UpsertProfile)
+			pilotGroup.POST("/upload-cert", h.Pilot.UploadCertImage)
+			pilotGroup.POST("/certifications", h.Pilot.SubmitCertification)
+			pilotGroup.GET("/certifications", h.Pilot.ListCertifications)
+			pilotGroup.POST("/criminal-check", h.Pilot.SubmitCriminalCheck)
+			pilotGroup.POST("/health-check", h.Pilot.SubmitHealthCheck)
 			pilotGroup.PATCH("/availability", h.Pilot.UpdateAvailability)
 			pilotGroup.GET("/owner-bindings", h.Pilot.ListOwnerBindings)
 			pilotGroup.POST("/owner-bindings", h.Pilot.ApplyOwnerBinding)
@@ -239,6 +245,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		{
 			conversationGroup.GET("", h.Message.ListConversations)
 			conversationGroup.GET("/:conversation_id/messages", h.Message.ListMessages)
+			conversationGroup.POST("/:conversation_id/read", h.Message.MarkRead)
+			conversationGroup.DELETE("/:conversation_id", h.Message.DeleteConversation)
 		}
 
 		if h.ClientLegacy != nil {

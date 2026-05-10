@@ -28,6 +28,11 @@ type Order struct {
 	ExecutionMode          string         `gorm:"type:varchar(30);default:self_execute;index" json:"execution_mode"`
 	Title                  string         `gorm:"type:varchar(200)" json:"title"`
 	ServiceType            string         `gorm:"type:varchar(30)" json:"service_type"`
+	CargoWeightKG          float64        `gorm:"type:decimal(10,2)" json:"cargo_weight_kg"`
+	CargoVolumeM3          float64        `gorm:"type:decimal(10,3)" json:"cargo_volume_m3"`
+	CargoLengthCM          float64        `gorm:"type:decimal(10,2)" json:"cargo_length_cm"`
+	CargoWidthCM           float64        `gorm:"type:decimal(10,2)" json:"cargo_width_cm"`
+	CargoHeightCM          float64        `gorm:"type:decimal(10,2)" json:"cargo_height_cm"`
 	StartTime              time.Time      `json:"start_time"`
 	EndTime                time.Time      `json:"end_time"`
 	ServiceLatitude        float64        `gorm:"type:decimal(10,7)" json:"service_latitude"`
@@ -180,6 +185,21 @@ type Message struct {
 
 func (Message) TableName() string {
 	return "messages"
+}
+
+type ConversationUserState struct {
+	ID                    int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID                int64      `gorm:"index:idx_conversation_user_state_user_peer,unique;index;not null" json:"user_id"`
+	PeerID                int64      `gorm:"index:idx_conversation_user_state_user_peer,unique;index;not null" json:"peer_id"`
+	ConversationID        string     `gorm:"type:varchar(50);index;not null" json:"conversation_id"`
+	HiddenAt              *time.Time `json:"hidden_at"`
+	HiddenBeforeMessageID int64      `gorm:"index;default:0" json:"hidden_before_message_id"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+}
+
+func (ConversationUserState) TableName() string {
+	return "conversation_user_states"
 }
 
 type Review struct {
