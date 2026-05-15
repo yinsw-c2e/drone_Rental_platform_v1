@@ -2,16 +2,19 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
+  Modal,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import {useSelector} from 'react-redux';
 
-import EmptyState from '../../components/business/EmptyState';
 import {demandV2Service} from '../../services/demandV2';
 import {supplyService} from '../../services/supply';
 import {RootState} from '../../store/store';
@@ -26,8 +29,69 @@ import {formatSupplyPricing, getSupplySceneLabel} from '../../utils/supplyMeta';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {marketAssets} from '../../assets/miniProgramAssets';
 
 type MarketTab = 'demand' | 'supply';
+
+const serviceThumbs = [
+  marketAssets.cardDrone1,
+  marketAssets.cardDrone2,
+  marketAssets.cardDrone3,
+];
+
+const capabilityLabels = ['专业飞手团队', '合规运营', '安全可靠'];
+
+const regionFilters = [
+  {label: '全部地区', value: ''},
+  {label: '佛山', value: '佛山'},
+  {label: '广州', value: '广州'},
+  {label: '深圳', value: '深圳'},
+  {label: '东莞', value: '东莞'},
+  {label: '中山', value: '中山'},
+];
+
+const payloadFilters = [
+  {label: '全部载重', value: 0},
+  {label: '50kg以上', value: 50},
+  {label: '80kg以上', value: 80},
+  {label: '100kg以上', value: 100},
+];
+
+const sceneFilters = [
+  {label: '全部场景', value: ''},
+  {label: '电网建设', value: 'power_grid'},
+  {label: '山区农副产品', value: 'mountain_agriculture'},
+  {label: '高原给养', value: 'plateau_supply'},
+  {label: '海岛补给', value: 'island_supply'},
+  {label: '应急救援', value: 'emergency'},
+];
+
+const getSceneValueFromKeyword = (keyword: string) => {
+  const text = keyword.trim().toLowerCase();
+  if (!text) {
+    return '';
+  }
+  const matched = sceneFilters.slice(1).find(item =>
+    item.value.toLowerCase().includes(text) ||
+    item.label.toLowerCase().includes(text) ||
+    text.includes(item.label.toLowerCase()),
+  );
+  return matched?.value || '';
+};
+
+const getSupplySearchableText = (item: any) => [
+  item.title,
+  item.supply_no,
+  item.service_area_snapshot?.text,
+  item.service_area_snapshot?.city,
+  item.service_area_snapshot?.district,
+  item.drone?.city,
+  item.drone?.brand,
+  item.drone?.model,
+  item.drone?.serial_number,
+  ...(item.cargo_scenes || []),
+  ...(item.cargo_scenes || []).map((scene: string) => getSupplySceneLabel(scene)),
+].filter(Boolean).join(' ').toLowerCase();
 
 export default function MarketHubScreen({navigation}: any) {
   const {theme} = useTheme();
@@ -46,6 +110,22 @@ export default function MarketHubScreen({navigation}: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [demands, setDemands] = useState<DemandSummary[]>([]);
   const [supplies, setSupplies] = useState<SupplySummary[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [filterPanelVisible, setFilterPanelVisible] = useState(false);
+  const [regionIndex, setRegionIndex] = useState(0);
+  const [payloadIndex, setPayloadIndex] = useState(0);
+  const [sceneIndex, setSceneIndex] = useState(0);
+
+  const selectedRegion = regionFilters[regionIndex] || regionFilters[0];
+  const selectedPayload = payloadFilters[payloadIndex] || payloadFilters[0];
+  const selectedScene = sceneFilters[sceneIndex] || sceneFilters[0];
+  const hasActiveFilters = Boolean(
+    appliedKeyword ||
+    selectedRegion.value ||
+    selectedPayload.value ||
+    selectedScene.value,
+  );
 
   const fetchDemands = useCallback(async () => {
     try {
@@ -60,9 +140,14 @@ export default function MarketHubScreen({navigation}: any) {
   const fetchSupplies = useCallback(async () => {
     try {
       // 展示支持直达下单的重载供给
+      const sceneFromKeyword = getSceneValueFromKeyword(appliedKeyword);
       const res = await supplyService.list({
         page: 1,
-        page_size: 10,
+        page_size: 20,
+        keyword: sceneFromKeyword && !selectedScene.value ? undefined : appliedKeyword || undefined,
+        region: selectedRegion.value || undefined,
+        min_payload_kg: selectedPayload.value || undefined,
+        cargo_scene: selectedScene.value || sceneFromKeyword || undefined,
         accepts_direct_order: true,
         service_type: 'heavy_cargo_lift_transport',
       });
@@ -70,7 +155,7 @@ export default function MarketHubScreen({navigation}: any) {
     } catch (error) {
       console.warn('获取服务流失败:', error);
     }
-  }, []);
+  }, [appliedKeyword, selectedPayload.value, selectedRegion.value, selectedScene.value]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -86,6 +171,13 @@ export default function MarketHubScreen({navigation}: any) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedKeyword(searchText.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -103,22 +195,106 @@ export default function MarketHubScreen({navigation}: any) {
     navigation.navigate('PublishCargo');
   }, [navigation]);
 
+  const applySearch = useCallback(() => {
+    setAppliedKeyword(searchText.trim());
+  }, [searchText]);
+
+  const resetFilters = useCallback(() => {
+    setSearchText('');
+    setAppliedKeyword('');
+    setRegionIndex(0);
+    setPayloadIndex(0);
+    setSceneIndex(0);
+  }, []);
+
+  const handleFilterButton = useCallback(() => {
+    setAppliedKeyword(searchText.trim());
+    setFilterPanelVisible(true);
+  }, [searchText]);
+
+  const confirmFilterPanel = useCallback(() => {
+    setAppliedKeyword(searchText.trim());
+    setFilterPanelVisible(false);
+  }, [searchText]);
+
+  const closeFilterPanel = useCallback(() => {
+    setFilterPanelVisible(false);
+  }, []);
+
+  const filteredDemands = useMemo(() => {
+    const keyword = appliedKeyword.trim().toLowerCase();
+    return demands.filter((item: any) => {
+      const sceneLabel = getDemandSceneLabel(item.cargo_scene);
+      const searchable = [
+        item.title,
+        item.cargo_scene,
+        sceneLabel,
+        resolveDemandPrimaryAddress(item),
+        item.departure_address?.text,
+        item.destination_address?.text,
+        item.service_address?.text,
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (keyword && !searchable.includes(keyword)) {
+        return false;
+      }
+      if (selectedRegion.value && !searchable.includes(selectedRegion.value.toLowerCase())) {
+        return false;
+      }
+      if (selectedPayload.value && Number(item.cargo_weight_kg || item.max_payload_kg || 0) < selectedPayload.value) {
+        return false;
+      }
+      if (selectedScene.value && String(item.cargo_scene || '') !== selectedScene.value) {
+        return false;
+      }
+      return true;
+    });
+  }, [appliedKeyword, demands, selectedPayload.value, selectedRegion.value, selectedScene.value]);
+
+  const filteredSupplies = useMemo(() => {
+    const keyword = appliedKeyword.trim().toLowerCase();
+    return supplies.filter((item: any) => {
+      const searchable = getSupplySearchableText(item);
+      if (keyword && !searchable.includes(keyword)) {
+        return false;
+      }
+      if (selectedRegion.value && !searchable.includes(selectedRegion.value.toLowerCase())) {
+        return false;
+      }
+      if (selectedPayload.value && Number(item.max_payload_kg || 0) < selectedPayload.value) {
+        return false;
+      }
+      if (selectedScene.value && !(item.cargo_scenes || []).includes(selectedScene.value)) {
+        return false;
+      }
+      return true;
+    });
+  }, [appliedKeyword, selectedPayload.value, selectedRegion.value, selectedScene.value, supplies]);
+
+  const items = activeTab === 'demand' ? filteredDemands : filteredSupplies;
+
   const renderDemandItem = ({item}: {item: DemandSummary}) => (
     <TouchableOpacity
       activeOpacity={0.8}
       style={[styles.demandCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
       onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitleWrap}>
-          <Text style={[styles.title, {color: theme.text}]} numberOfLines={2}>{item.title}</Text>
+      <View style={styles.demandMain}>
+        <View style={styles.demandIconWrap}>
+          <Image source={marketAssets.taskHall} style={styles.demandIcon} resizeMode="contain" />
         </View>
-      </View>
-      <View style={styles.metaBlockRow}>
-        <View style={[styles.metaBadge, {backgroundColor: theme.bgSecondary}]}>
-          <Text style={[styles.metaBadgeText, {color: theme.textSub}]}>{getDemandSceneLabel(item.cargo_scene)}</Text>
-        </View>
-        <View style={[styles.metaBadge, {backgroundColor: theme.bgSecondary}]}>
-          <Text style={[styles.metaBadgeText, {color: theme.textSub}]}>{resolveDemandPrimaryAddress(item)}</Text>
+        <View style={styles.demandInfo}>
+          <Text style={[styles.title, {color: theme.text}]} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <View style={styles.demandMetaBadges}>
+            <View style={[styles.metaBadge, {backgroundColor: theme.bgSecondary}]}>
+              <Text style={[styles.metaBadgeText, {color: theme.textSub}]}>{getDemandSceneLabel(item.cargo_scene)}</Text>
+            </View>
+            <View style={[styles.metaBadge, styles.addressBadge, {backgroundColor: theme.bgSecondary}]}>
+              <Text style={[styles.metaBadgeText, {color: theme.textSub}]} numberOfLines={1}>
+                {resolveDemandPrimaryAddress(item)}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
       <View style={styles.cardFooter}>
@@ -128,22 +304,46 @@ export default function MarketHubScreen({navigation}: any) {
     </TouchableOpacity>
   );
 
-  const renderSupplyItem = ({item}: {item: SupplySummary}) => (
+  const renderSupplyItem = ({item, index}: {item: SupplySummary; index: number}) => (
     <TouchableOpacity
       activeOpacity={0.8}
       style={[styles.serviceCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
       onPress={() => navigation.navigate('OfferDetail', {id: item.id})}>
       <View style={styles.serviceImagePlaceholder}>
-        <Text style={styles.serviceEmoji}>🚁</Text>
+        <Image
+          source={serviceThumbs[index % serviceThumbs.length]}
+          style={styles.serviceImage}
+          resizeMode="cover"
+        />
       </View>
       <View style={styles.serviceInfo}>
         <Text style={[styles.title, {color: theme.text}]} numberOfLines={2}>{item.title}</Text>
-        <View style={styles.metaBlockRow}>
-          <Text style={[styles.metaText, {color: theme.textSub}]}>最大载重 {item.max_payload_kg || 0}kg</Text>
-          <Text style={[styles.metaText, {color: theme.textHint}]}> • </Text>
-          <Text style={[styles.metaText, {color: theme.textSub}]} numberOfLines={1}>
-            {(item.cargo_scenes || []).map(s => getSupplySceneLabel(s)).join('/')}
-          </Text>
+        <View style={styles.supplyMetaRow}>
+          <View style={styles.supplyMetaItem}>
+            <Image source={marketAssets.markerHex} style={styles.supplyMetaIcon} resizeMode="contain" />
+            <Text style={[styles.supplyMetaText, {color: theme.textSub}]}>最大载重 {item.max_payload_kg || 0}kg</Text>
+          </View>
+          {(item.cargo_scenes || []).slice(0, 2).map(scene => (
+            <View key={scene} style={styles.supplyMetaItem}>
+              <Image source={marketAssets.markerHex} style={styles.supplyMetaIcon} resizeMode="contain" />
+              <Text style={[styles.supplySceneText, {color: theme.textSub}]} numberOfLines={1}>
+                {getSupplySceneLabel(scene)}
+              </Text>
+            </View>
+          ))}
+          {(item.cargo_scenes || []).length === 0 ? (
+            <View style={styles.supplyMetaItem}>
+              <Image source={marketAssets.markerHex} style={styles.supplyMetaIcon} resizeMode="contain" />
+              <Text style={[styles.supplySceneText, {color: theme.textSub}]} numberOfLines={1}>
+                服务场景待补充
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.capabilityRow}>
+          {capabilityLabels.map(label => (
+            <Text key={label} style={styles.capabilityText}>{label}</Text>
+          ))}
         </View>
         <View style={styles.serviceFooter}>
           <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
@@ -156,18 +356,6 @@ export default function MarketHubScreen({navigation}: any) {
   );
 
   const mainAction = useMemo(() => {
-    if (isClientFocused) {
-      if (activeTab === 'supply') {
-        return {
-          label: '找不到合适服务？发布任务',
-          onPress: handlePublishTaskPress,
-        };
-      }
-      return {
-        label: '先去找服务',
-        onPress: handleQuickOrderPress,
-      };
-    }
     if (activeTab === 'demand') {
       return {
         label: effectiveRoleSummary.has_client_role ? '发布任务' : '查看全部任务',
@@ -178,47 +366,98 @@ export default function MarketHubScreen({navigation}: any) {
       label: effectiveRoleSummary.has_owner_role ? '上架服务' : '查看全部服务',
       onPress: () => navigation.navigate(effectiveRoleSummary.has_owner_role ? 'PublishOffer' : 'OfferList'),
     };
-  }, [activeTab, effectiveRoleSummary, handlePublishTaskPress, handleQuickOrderPress, isClientFocused, navigation]);
+  }, [activeTab, effectiveRoleSummary, navigation]);
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
-        {isClientFocused ? (
-          <View style={styles.entryCard}>
+        <View style={styles.entryGrid}>
+          {isClientFocused ? (
             <View style={styles.entryActionRow}>
               <TouchableOpacity
                 style={[styles.entryActionBtn, styles.entryPrimaryBtn]}
                 onPress={handleQuickOrderPress}>
+                <Image source={marketAssets.lightning} style={styles.entryActionIcon} resizeMode="contain" />
                 <Text style={styles.entryPrimaryTitle}>快速下单</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.entryActionBtn, styles.entrySecondaryBtn]}
                 onPress={handlePublishTaskPress}>
+                <Image source={marketAssets.plusBox} style={styles.entryActionIcon} resizeMode="contain" />
                 <Text style={styles.entrySecondaryTitle}>发布任务</Text>
               </TouchableOpacity>
             </View>
+          ) : null}
+          <View style={styles.entryActionRow}>
+            <TouchableOpacity
+              style={[styles.entryActionBtn, activeTab === 'demand' && styles.entrySoftActive]}
+              onPress={() => setActiveTab('demand')}>
+              <Image source={marketAssets.taskHall} style={styles.entryActionIcon} resizeMode="contain" />
+              <Text style={[styles.entrySecondaryTitle, activeTab === 'demand' && styles.entrySoftActiveText]}>
+                {isClientFocused ? '任务大厅' : '看需求'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.entryActionBtn, activeTab === 'supply' && styles.entrySoftActive]}
+              onPress={() => setActiveTab('supply')}>
+              <Image source={marketAssets.serviceHex} style={styles.entryActionIcon} resizeMode="contain" />
+              <Text style={[styles.entrySecondaryTitle, activeTab === 'supply' && styles.entrySoftActiveText]}>
+                {isClientFocused ? '找服务' : '看服务'}
+              </Text>
+            </TouchableOpacity>
           </View>
-        ) : null}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'demand' && styles.tabActive]}
-            onPress={() => setActiveTab('demand')}>
-            <Text style={[styles.tabText, activeTab === 'demand' && styles.tabTextActive]}>
-              {isClientFocused ? '任务大厅' : '看需求'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'supply' && styles.tabActive]}
-            onPress={() => setActiveTab('supply')}>
-            <Text style={[styles.tabText, activeTab === 'supply' && styles.tabTextActive]}>
-              {isClientFocused ? '找服务' : '看服务'}
-            </Text>
-          </TouchableOpacity>
+        </View>
+        <View style={styles.filterPanel}>
+          <View style={styles.searchRow}>
+            <View style={[styles.searchBox, appliedKeyword && styles.searchBoxActive]}>
+              <Image source={marketAssets.search} style={styles.searchIcon} resizeMode="contain" />
+              <TextInput
+                value={searchText}
+                onChangeText={value => {
+                  setSearchText(value);
+                  if (!value.trim()) {
+                    setAppliedKeyword('');
+                  }
+                }}
+                onSubmitEditing={applySearch}
+                onBlur={applySearch}
+                placeholder={activeTab === 'demand' ? '搜索任务名称、地址或场景' : '搜索服务名称、场景或关键词'}
+                placeholderTextColor="#AEB8C8"
+                style={styles.searchInput}
+                returnKeyType="search"
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
+              onPress={handleFilterButton}
+              activeOpacity={0.82}>
+              <Image source={marketAssets.filter} style={styles.filterIcon} resizeMode="contain" />
+              <Text style={[styles.filterBtnText, hasActiveFilters && styles.filterBtnTextActive]}>筛选</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.filterChipRow}>
+            {[
+              {item: selectedRegion, active: Boolean(selectedRegion.value), onPress: () => setFilterPanelVisible(true)},
+              {item: selectedPayload, active: Boolean(selectedPayload.value), onPress: () => setFilterPanelVisible(true)},
+              {item: selectedScene, active: Boolean(selectedScene.value), onPress: () => setFilterPanelVisible(true)},
+            ].map(({item, active, onPress}) => (
+              <TouchableOpacity
+                key={item.label}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={onPress}
+                activeOpacity={0.82}>
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]} numberOfLines={1}>
+                  {item.label}
+                </Text>
+                <Image source={marketAssets.chevronDown} style={styles.filterChipIcon} resizeMode="contain" />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </View>
 
       <FlatList<any>
-        data={activeTab === 'demand' ? demands : supplies}
+        data={items}
         keyExtractor={item => String(item.id)}
         renderItem={activeTab === 'demand' ? renderDemandItem : renderSupplyItem}
         contentContainerStyle={styles.listContent}
@@ -227,16 +466,20 @@ export default function MarketHubScreen({navigation}: any) {
           loading ? (
             <ActivityIndicator style={styles.loading} color={theme.primary} />
           ) : (
-            <EmptyState
-              icon={activeTab === 'demand' ? '📋' : '🛩️'}
-              title={
-                isClientFocused
+            <View style={styles.emptyState}>
+              <Image
+                source={activeTab === 'demand' ? marketAssets.taskHall : marketAssets.serviceHex}
+                style={styles.emptyStateIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.emptyStateText}>
+                {isClientFocused
                   ? activeTab === 'demand'
                     ? '当前还没有公开任务'
                     : '当前还没有可快速下单的服务'
-                  : `暂无公开${activeTab === 'demand' ? '需求' : '服务'}`
-              }
-            />
+                  : `暂无公开${activeTab === 'demand' ? '需求' : '服务'}`}
+              </Text>
+            </View>
           )
         }
       />
@@ -245,10 +488,10 @@ export default function MarketHubScreen({navigation}: any) {
         {isClientFocused ? (
           <TouchableOpacity
             style={styles.mainBtn}
-            onPress={activeTab === 'supply' ? handlePublishTaskPress : handleQuickOrderPress}>
-            <Text style={styles.mainBtnText}>
-              {activeTab === 'supply' ? '没看到合适服务？发布任务' : '想直接成交？去快速下单'}
-            </Text>
+            onPress={handlePublishTaskPress}>
+            <Image source={marketAssets.docCta} style={styles.ctaIcon} resizeMode="contain" />
+            <Text style={styles.mainBtnText}>找不到合适服务？发布任务</Text>
+            <Image source={marketAssets.arrowRight} style={styles.ctaArrow} resizeMode="contain" />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.mainBtn} onPress={mainAction.onPress}>
@@ -256,44 +499,104 @@ export default function MarketHubScreen({navigation}: any) {
           </TouchableOpacity>
         )}
       </View>
+
+      <Modal
+        visible={filterPanelVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeFilterPanel}>
+        <TouchableOpacity style={styles.filterMask} activeOpacity={1} onPress={closeFilterPanel}>
+          <View style={styles.filterSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.filterSheetHead}>
+              <Text style={styles.filterSheetTitle}>{activeTab === 'demand' ? '筛选任务' : '筛选服务'}</Text>
+              <TouchableOpacity onPress={resetFilters} activeOpacity={0.82}>
+                <Text style={styles.filterReset}>重置</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {[
+                {title: '地区', options: regionFilters, activeIndex: regionIndex, setIndex: setRegionIndex},
+                {title: '载重', options: payloadFilters, activeIndex: payloadIndex, setIndex: setPayloadIndex},
+                {title: '场景', options: sceneFilters, activeIndex: sceneIndex, setIndex: setSceneIndex},
+              ].map(group => (
+                <View key={group.title} style={styles.filterGroup}>
+                  <Text style={styles.filterGroupTitle}>{group.title}</Text>
+                  <View style={styles.filterOptionRow}>
+                    {group.options.map((option, index) => (
+                      <TouchableOpacity
+                        key={option.label}
+                        style={[styles.filterOption, group.activeIndex === index && styles.filterOptionActive]}
+                        onPress={() => group.setIndex(index)}
+                        activeOpacity={0.82}>
+                        <Text style={[styles.filterOptionText, group.activeIndex === index && styles.filterOptionTextActive]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.filterSheetActions}>
+              <TouchableOpacity style={styles.filterCancelBtn} onPress={closeFilterPanel} activeOpacity={0.82}>
+                <Text style={styles.filterCancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.filterConfirmBtn} onPress={confirmFilterPanel} activeOpacity={0.86}>
+                <Text style={styles.filterConfirmText}>完成筛选</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  container: {flex: 1, backgroundColor: theme.bg},
   header: {
     backgroundColor: theme.bg,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.divider,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
-  entryCard: {
-    borderRadius: 18,
-    padding: 10,
-    marginBottom: 12,
-    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primaryBg,
-    borderWidth: 1,
-    borderColor: theme.isDark ? 'rgba(0,212,255,0.16)' : theme.primaryBorder,
+  entryGrid: {
+    gap: 9,
   },
   entryActionRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 9,
   },
   entryActionBtn: {
     flex: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    height: 44,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E4EAF3',
+    shadowColor: '#162A4E',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: theme.isDark ? 0 : 0.04,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  entryActionIcon: {
+    width: 18,
+    height: 18,
   },
   entryPrimaryBtn: {
-    backgroundColor: theme.primary,
+    backgroundColor: '#1B6CFF',
+    borderColor: 'transparent',
   },
   entrySecondaryBtn: {
-    backgroundColor: theme.card,
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
+    backgroundColor: '#FFFFFF',
   },
   entryPrimaryTitle: {
     fontSize: 15,
@@ -302,104 +605,228 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     textAlign: 'center',
   },
   entrySecondaryTitle: {
-    fontSize: 15,
-    color: theme.text,
-    fontWeight: '800',
+    fontSize: 14,
+    color: '#334155',
+    fontWeight: '700',
     textAlign: 'center',
   },
-  tabBar: {
+  entrySoftActive: {
+    backgroundColor: '#EDF3FF',
+    borderColor: '#DDE8FF',
+  },
+  entrySoftActiveText: {
+    color: '#1B6CFF',
+  },
+  filterPanel: {
+    marginTop: 10,
+  },
+  searchRow: {
     flexDirection: 'row',
-    backgroundColor: theme.bgSecondary,
-    borderRadius: 12,
-    padding: 4,
+    gap: 8,
   },
-  tab: {
+  searchBox: {
     flex: 1,
-    paddingVertical: 8,
+    minWidth: 0,
+    height: 41,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#E4EAF3',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
+    gap: 7,
   },
-  tabActive: {
-    backgroundColor: theme.card,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+  searchBoxActive: {
+    borderColor: '#C7D8FF',
+    backgroundColor: '#FBFDFF',
   },
-  tabText: {
-    fontSize: 14,
-    color: theme.textSub,
+  searchIcon: {
+    width: 14,
+    height: 14,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    height: 39,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    color: '#151D2D',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  filterBtn: {
+    width: 75,
+    height: 41,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#E4EAF3',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  filterBtnActive: {
+    borderColor: '#C7D8FF',
+    backgroundColor: '#EDF3FF',
+  },
+  filterIcon: {
+    width: 14,
+    height: 14,
+  },
+  filterBtnText: {
+    color: '#334155',
+    fontSize: 12,
     fontWeight: '600',
   },
-  tabTextActive: {
-    color: theme.primary,
-    fontWeight: '700',
+  filterBtnTextActive: {
+    color: '#1B6CFF',
+  },
+  filterChipRow: {
+    marginTop: 9,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterChip: {
+    flex: 1,
+    minWidth: 0,
+    height: 35,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#E4EAF3',
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+  },
+  filterChipActive: {
+    borderColor: '#C7D8FF',
+    backgroundColor: '#EDF3FF',
+  },
+  filterChipText: {
+    color: '#46516B',
+    fontSize: 11,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  filterChipTextActive: {
+    color: '#1B6CFF',
+    fontWeight: '600',
+  },
+  filterChipIcon: {
+    width: 9,
+    height: 9,
   },
   listContent: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 100,
   },
   demandCard: {
-    marginBottom: 14,
-    borderRadius: 20,
+    marginBottom: 11,
+    padding: 12,
+    borderRadius: 15,
     borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowColor: '#162A4E',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
     elevation: 2,
   },
   serviceCard: {
-    marginBottom: 14,
-    borderRadius: 20,
+    marginBottom: 11,
+    padding: 12,
+    borderRadius: 15,
     borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowColor: '#162A4E',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
     elevation: 2,
     flexDirection: 'row',
+    gap: 11,
   },
   serviceImagePlaceholder: {
-    width: 100,
-    backgroundColor: 'rgba(0,0,0,0.03)',
+    width: 121,
+    height: 118,
+    borderRadius: 10,
+    backgroundColor: '#EAF0FA',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  serviceEmoji: {
-    fontSize: 32,
+  serviceImage: {
+    width: '100%',
+    height: '100%',
   },
   serviceInfo: {
     flex: 1,
-    padding: 14,
+    minWidth: 0,
   },
-  cardHeader: {
-    marginBottom: 8,
-    paddingTop: 14,
-    paddingHorizontal: 14,
+  demandMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  cardTitleWrap: {
+  demandIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 13,
+    backgroundColor: '#EDF3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demandIcon: {
+    width: 24,
+    height: 24,
+  },
+  demandInfo: {
     flex: 1,
+    minWidth: 0,
   },
   budget: {
-    fontSize: 18,
+    fontSize: 17,
+    lineHeight: 23,
     color: theme.danger,
-    fontWeight: '800',
+    fontWeight: '700',
+    flexShrink: 0,
   },
   price: {
-    fontSize: 18,
+    fontSize: 17,
+    lineHeight: 23,
     color: theme.danger,
-    fontWeight: '800',
+    fontWeight: '700',
     flexShrink: 1,
   },
   title: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '800',
-    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  demandMetaBadges: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    minWidth: 0,
+  },
+  metaBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    maxWidth: '100%',
+  },
+  addressBadge: {
+    flex: 1,
+    minWidth: 0,
+  },
+  metaBadgeText: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '600',
   },
   metaBlockRow: {
     flexDirection: 'row',
@@ -408,26 +835,62 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
   },
-  metaBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  supplyMetaRow: {
+    marginTop: 9,
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
   },
-  metaBadgeText: {
+  supplyMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    minWidth: 0,
+  },
+  supplyMetaIcon: {
+    width: 10,
+    height: 10,
+    flexShrink: 0,
+  },
+  supplyMetaText: {
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: '500',
+    flexShrink: 0,
+  },
+  supplySceneText: {
+    maxWidth: 58,
+    minWidth: 0,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  capabilityRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    gap: 8,
+    marginTop: 10,
+    minWidth: 0,
+  },
+  capabilityText: {
+    paddingRight: 8,
+    color: '#98A2B3',
     fontSize: 11,
-    fontWeight: '600',
-  },
-  metaText: {
-    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '500',
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingHorizontal: 14,
-    paddingBottom: 14,
+    gap: 12,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F3F6',
   },
   serviceFooter: {
     flexDirection: 'row',
@@ -437,7 +900,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginTop: 14,
   },
   timeText: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 12,
+    lineHeight: 17,
     fontWeight: '500',
   },
   orderBtn: {
@@ -454,6 +920,32 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   loading: {
     paddingVertical: 40,
   },
+  emptyState: {
+    marginTop: 22,
+    paddingVertical: 34,
+    paddingHorizontal: 18,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#162A4E',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.04,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  emptyStateIcon: {
+    width: 30,
+    height: 30,
+    marginBottom: 10,
+  },
+  emptyStateText: {
+    color: '#657189',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -465,10 +957,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderTopColor: theme.divider,
   },
   mainBtn: {
-    backgroundColor: theme.primary,
+    backgroundColor: '#1B6CFF',
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     shadowColor: theme.primary,
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.2,
@@ -479,5 +974,130 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '800',
+  },
+  ctaIcon: {
+    width: 17,
+    height: 17,
+  },
+  ctaArrow: {
+    width: 11,
+    height: 11,
+  },
+  filterMask: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.28)',
+    justifyContent: 'flex-end',
+  },
+  filterSheet: {
+    maxHeight: '78%',
+    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 22,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#162A4E',
+    shadowOffset: {width: 0, height: -10},
+    shadowOpacity: 0.16,
+    shadowRadius: 32,
+    elevation: 10,
+  },
+  filterSheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  filterSheetTitle: {
+    color: '#101828',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+  },
+  filterReset: {
+    color: '#1B6CFF',
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  filterGroup: {
+    marginTop: 13,
+  },
+  filterGroupTitle: {
+    marginBottom: 9,
+    color: '#334155',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  filterOptionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+  filterOption: {
+    minWidth: 76,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#E4EAF3',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterOptionActive: {
+    borderColor: '#1B6CFF',
+    backgroundColor: '#EDF3FF',
+  },
+  filterOptionText: {
+    color: '#46516B',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  filterOptionTextActive: {
+    color: '#1B6CFF',
+    fontWeight: '700',
+  },
+  filterSheetActions: {
+    marginTop: 20,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  filterCancelBtn: {
+    flex: 1,
+    height: 43,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E4EAF3',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterConfirmBtn: {
+    flex: 1,
+    height: 43,
+    borderRadius: 22,
+    backgroundColor: '#1B6CFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1B6CFF',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  filterCancelText: {
+    color: '#334155',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  filterConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
 });

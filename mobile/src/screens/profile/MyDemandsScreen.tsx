@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -24,6 +25,7 @@ import {
 import {formatAmountYuan} from '../../utils/supplyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {myDemandsAssets} from '../../assets/miniProgramAssets';
 
 const STATUS_GROUPS = [
   {key: 'all', label: '全部'},
@@ -71,7 +73,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await demandV2Service.listMyDemands({page: 1, page_size: 100});
+      const res = await demandV2Service.listMyDemands({page: 1, page_size: 50});
       setDemands(res.data?.items || []);
     } catch (error) {
       console.warn('获取我的需求失败:', error);
@@ -107,8 +109,8 @@ export default function MyDemandsScreen({navigation, route}: any) {
         style={[styles.demandCard, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
         onPress={() => navigation.navigate('DemandDetail', {id: item.id})}>
         <View style={styles.cardTop}>
-          <StatusBadge label="" meta={getObjectStatusMeta('demand', item.status)} />
           <Text style={styles.demandNo}>{item.demand_no}</Text>
+          <StatusBadge label="" meta={getObjectStatusMeta('demand', item.status)} />
         </View>
 
         <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
@@ -122,18 +124,18 @@ export default function MyDemandsScreen({navigation, route}: any) {
 
         <View style={styles.cardStats}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, hasQuotes && {color: theme.primaryText}]}>{item.quote_count}</Text>
-            <Text style={styles.statLabel}>收到报价</Text>
+            <Text style={[styles.statValue, styles.statValueBlue, hasQuotes && {color: theme.primaryText}]}>{item.quote_count}</Text>
+            <Text style={styles.statLabel}>报价</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{item.candidate_pilot_count}</Text>
+            <Text style={[styles.statValue, styles.statValueOrange]}>{item.candidate_pilot_count}</Text>
             <Text style={styles.statLabel}>候选飞手</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{formatAmountYuan(item.budget_max)}</Text>
-            <Text style={styles.statLabel}>预算上限</Text>
+            <Text style={[styles.statValue, styles.statValueRed]}>{formatAmountYuan(item.budget_max)}</Text>
+            <Text style={styles.statLabel}>预算</Text>
           </View>
         </View>
 
@@ -164,6 +166,16 @@ export default function MyDemandsScreen({navigation, route}: any) {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+      <View style={styles.hero}>
+        <View style={styles.heroCopy}>
+          <View style={styles.heroTitleRow}>
+            <Text style={styles.heroTitle}>我的需求</Text>
+            <View style={styles.heroTitleDot} />
+          </View>
+          <Text style={styles.heroSub}>管理我的全部需求订单，实时掌握进度与状态</Text>
+        </View>
+        <Image source={myDemandsAssets.hero} style={styles.heroImage} resizeMode="contain" />
+      </View>
       <View style={styles.filterBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           {STATUS_GROUPS.map(group => (
@@ -194,7 +206,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
             <View style={styles.emptyWrap}>
               <EmptyState
                 icon="📝"
-                title={activeGroup === 'all' ? '还没有发布需求' : '暂无相关状态的任务'}
+                title={activeGroup === 'all' ? '还没有发布需求' : '暂无相关状态的需求'}
                 description="发布任务后，专业机组会为您提供精准报价方案。"
                 actionText="立即发布"
                 onAction={() => navigation.navigate('PublishCargo')}
@@ -210,21 +222,64 @@ export default function MyDemandsScreen({navigation, route}: any) {
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
     container: {flex: 1, backgroundColor: theme.bg},
+    hero: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      marginBottom: 10,
+      minHeight: 132,
+      borderRadius: 0,
+      backgroundColor: '#F3F8FF',
+      flexDirection: 'row',
+      alignItems: 'center',
+      overflow: 'hidden',
+      paddingLeft: 16,
+    },
+    heroCopy: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 16,
+      paddingRight: 8,
+    },
+    heroTitleRow: {flexDirection: 'row', alignItems: 'flex-start'},
+    heroTitle: {
+      fontSize: 28,
+      lineHeight: 34,
+      color: theme.text,
+      fontWeight: '900',
+    },
+    heroTitleDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginLeft: 4,
+      marginTop: 3,
+      backgroundColor: '#2B76FF',
+    },
+    heroSub: {
+      marginTop: 9,
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.textSub,
+      fontWeight: '500',
+    },
+    heroImage: {
+      width: 112,
+      height: 98,
+      marginRight: 4,
+    },
     filterBar: {
       backgroundColor: theme.bg,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
     },
     filterScroll: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
     },
     tabChip: {
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 20,
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: '#E8EDF2',
     },
     tabChipActive: {
       backgroundColor: theme.primary,
@@ -238,14 +293,14 @@ const getStyles = (theme: AppTheme) =>
       color: '#FFFFFF',
     },
     listContent: {
-      padding: 16,
+      padding: 12,
       paddingBottom: 40,
     },
     demandCard: {
-      borderRadius: 20,
+      borderRadius: 16,
       borderWidth: 1,
-      padding: 16,
-      marginBottom: 16,
+      padding: 14,
+      marginBottom: 10,
       shadowColor: '#000',
       shadowOffset: {width: 0, height: 2},
       shadowOpacity: 0.04,
@@ -256,9 +311,12 @@ const getStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      gap: 10,
       marginBottom: 12,
     },
     demandNo: {
+      flex: 1,
+      minWidth: 0,
       fontSize: 11,
       color: theme.textHint,
       fontWeight: '700',
@@ -293,8 +351,8 @@ const getStyles = (theme: AppTheme) =>
     },
     cardStats: {
       flexDirection: 'row',
-      backgroundColor: theme.bgSecondary,
-      borderRadius: 14,
+      backgroundColor: '#F8FBFF',
+      borderRadius: 10,
       paddingVertical: 12,
       marginTop: 16,
     },
@@ -307,6 +365,9 @@ const getStyles = (theme: AppTheme) =>
       fontWeight: '800',
       color: theme.text,
     },
+    statValueBlue: {color: '#1F6DFF'},
+    statValueOrange: {color: '#FF8A00'},
+    statValueRed: {color: '#F5222D'},
     statLabel: {
       fontSize: 10,
       color: theme.textHint,

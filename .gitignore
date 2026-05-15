@@ -24,6 +24,7 @@ build/
 *~
 
 # Local AI / agent tooling
+.ai/
 AGENTS.md
 GEMINI.md
 .agents/skills/uiux-delegate/SKILL.md

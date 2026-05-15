@@ -445,12 +445,12 @@ export default function ClientProfileScreen({navigation}: any) {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bgSecondary,
+    backgroundColor: theme.bg,
   },
   content: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 32,
-    gap: 14,
+    gap: 12,
   },
   loadingWrap: {
     flex: 1,
@@ -462,8 +462,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.textSub,
   },
   heroCard: {
-    backgroundColor: theme.primary,
-    paddingVertical: 16,
+    backgroundColor: '#2563EB',
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 0,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -475,8 +477,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
   },
   heroTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
     color: theme.btnPrimaryText,
   },
   heroBadges: {
@@ -499,14 +501,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginTop: 14,
+    marginTop: 16,
   },
   summaryItem: {
-    flex: 1,
+    width: '48%',
     backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    borderRadius: 16,
+    padding: 12,
     alignItems: 'center',
   },
   summaryValue: {
@@ -521,6 +522,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   sectionCard: {
     gap: 12,
+    borderRadius: 16,
+    padding: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -529,8 +532,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.text,
   },
   helpIcon: {
@@ -578,9 +581,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: theme.cardBorder,
+    borderColor: theme.inputBorder,
     borderRadius: 12,
-    backgroundColor: theme.bgSecondary,
+    backgroundColor: theme.inputBg,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
@@ -595,10 +598,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: theme.primaryBg,
+    backgroundColor: theme.inputBg,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   chipActive: {
     backgroundColor: theme.primaryBg,
+    borderColor: theme.primaryBorder,
   },
   chipText: {
     fontSize: 13,

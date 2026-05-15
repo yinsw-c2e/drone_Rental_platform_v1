@@ -37,10 +37,10 @@ export default function OwnerProfilePage() {
         workbenchRes,
       ] = await Promise.all([
         ownerService.getProfile().catch(() => null),
-        droneService.myDrones({ page: 1, page_size: 100 }).catch(() => null),
-        ownerService.listMySupplies({ page: 1, page_size: 100 }).catch(() => null),
-        ownerService.listMyQuotes({ page: 1, page_size: 100 }).catch(() => null),
-        ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 100 }).catch(() => null),
+        droneService.myDrones({ page: 1, page_size: 50 }).catch(() => null),
+        ownerService.listMySupplies({ page: 1, page_size: 50 }).catch(() => null),
+        ownerService.listMyQuotes({ page: 1, page_size: 50 }).catch(() => null),
+        ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 50 }).catch(() => null),
         ownerService.getWorkbench().catch(() => null),
       ]);
 

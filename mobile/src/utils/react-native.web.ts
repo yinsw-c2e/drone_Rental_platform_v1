@@ -2,6 +2,22 @@
 // so that Vite/Rollup can resolve the named imports at build time.
 // @ts-expect-error react-native-web has no type declarations
 export * from 'react-native-web';
+import React from 'react';
+
+export function codegenNativeComponent(_name: string) {
+  return React.forwardRef<any, any>((props, ref) =>
+    React.createElement('div', {...props, ref}),
+  );
+}
+
+export function codegenNativeCommands<T = Record<string, never>>() {
+  return {} as T;
+}
+
+export const TurboModuleRegistry = {
+  get: () => null,
+  getEnforcing: () => ({}),
+};
 
 // PermissionsAndroid is Android-only; provide a no-op stub for web builds.
 export const PermissionsAndroid = {

@@ -9,8 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Modal,
-  FlatList,
+  Image,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -21,6 +20,7 @@ import {setCredentials} from '../../store/slices/authSlice';
 import {THIRD_PARTY_LOGIN} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {loginAssets} from '../../assets/miniProgramAssets';
 
 const QUICK_LOGIN_ACCOUNTS = {
   client: [
@@ -44,6 +44,24 @@ const QUICK_LOGIN_ACCOUNTS = {
 type AccountItem = {label: string; phone: string; password: string; role: string};
 type DropdownKey = 'client' | 'owner' | 'pilot' | 'composite' | 'admin';
 
+const ROLE_CATEGORIES: Array<{key: DropdownKey; label: string; color: string}> = [
+  {key: 'client', label: '客户', color: '#2A78FF'},
+  {key: 'owner', label: '机主', color: '#19A974'},
+  {key: 'pilot', label: '飞手', color: '#FA8C16'},
+  {key: 'composite', label: '复合', color: '#F5222D'},
+];
+
+const ROLE_ACCOUNTS: Record<DropdownKey, AccountItem[]> = {
+  client: QUICK_LOGIN_ACCOUNTS.client,
+  owner: QUICK_LOGIN_ACCOUNTS.owner,
+  pilot: QUICK_LOGIN_ACCOUNTS.pilot,
+  composite: [
+    ...QUICK_LOGIN_ACCOUNTS.composite,
+    ...QUICK_LOGIN_ACCOUNTS.admin,
+  ],
+  admin: QUICK_LOGIN_ACCOUNTS.admin,
+};
+
 export default function LoginScreen({navigation}: any) {
   const {theme, toggleTheme} = useTheme();
   const insets = useSafeAreaInsets();
@@ -52,11 +70,10 @@ export default function LoginScreen({navigation}: any) {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
-  const [loginMode, setLoginMode] = useState<'code' | 'password'>('code');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginMode, setLoginMode] = useState<'code' | 'password'>('password');
   const [countdown, setCountdown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [dropdown, setDropdown] = useState<{key: DropdownKey; visible: boolean} | null>(null);
-  const [selected, setSelected] = useState<{[k in DropdownKey]?: AccountItem}>({});
   const requestIdRef = useRef(0);
   const mountedRef = useRef(true);
   const submittingRef = useRef(false);
@@ -140,10 +157,6 @@ export default function LoginScreen({navigation}: any) {
     }
   };
 
-  const handleQQLogin = () => {
-    Alert.alert('QQ登录', 'QQ登录需要在QQ互联平台注册应用并集成SDK。\n\n当前开发模式，请使用手机号登录。', [{text: '确定'}]);
-  };
-
   const sendCode = async () => {
     if (!phone || phone.length !== 11) {
       Alert.alert('提示', '请输入正确的手机号');
@@ -211,11 +224,14 @@ export default function LoginScreen({navigation}: any) {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={theme.isDark ? ['#060B18', '#0A1025', '#111D35'] : [theme.bg, theme.bgTertiary, theme.bg]}
+        colors={theme.isDark ? ['#060B18', '#0A1025', '#111D35'] : ['#EEF7FF', '#F6FAFF', '#ECF5FF', '#F7FBFF']}
         style={StyleSheet.absoluteFill}
         start={{x: 0.5, y: 0}}
         end={{x: 0.5, y: 1}}
       />
+      {!theme.isDark ? (
+        <Image source={loginAssets.bg} style={styles.bgImage} resizeMode="contain" />
+      ) : null}
       {theme.isDark && (
         <>
           <View style={[styles.glowOrb, {top: -80, left: -60, backgroundColor: 'rgba(0,212,255,0.07)'}]} />
@@ -229,21 +245,31 @@ export default function LoginScreen({navigation}: any) {
           contentContainerStyle={[styles.scrollContent, {paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24}]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>无人机服务</Text>
-          <Text style={styles.subtitle}>登录 / 注册</Text>
+          <View style={styles.hero}>
+            <Text style={styles.title}>无人机服务</Text>
+            <View style={styles.subtitleRow}>
+              <View style={styles.subtitleLine} />
+              <Text style={styles.subtitle}>重载运输调度平台</Text>
+              <View style={styles.subtitleLine} />
+            </View>
+          </View>
 
           <View style={styles.formCard}>
-            <TextInput
-              style={styles.input}
-              placeholder="手机号"
-              placeholderTextColor={theme.inputPlaceholder}
-              keyboardType="phone-pad"
-              maxLength={11}
-              value={phone}
-              onChangeText={setPhone}
-            />
+            <View style={styles.inputRow}>
+              <Image source={loginAssets.phone} style={styles.inputIcon} resizeMode="contain" />
+              <TextInput
+                style={styles.input}
+                placeholder="手机号"
+                placeholderTextColor={theme.inputPlaceholder}
+                keyboardType="phone-pad"
+                maxLength={11}
+                value={phone}
+                onChangeText={setPhone}
+              />
+            </View>
             {loginMode === 'code' ? (
-              <View style={styles.codeRow}>
+              <View style={[styles.inputRow, styles.codeRow]}>
+                <Image source={loginAssets.lock} style={styles.inputIcon} resizeMode="contain" />
                 <TextInput
                   style={[styles.input, styles.codeInput]}
                   placeholder="验证码"
@@ -263,14 +289,20 @@ export default function LoginScreen({navigation}: any) {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TextInput
-                style={styles.input}
-                placeholder="密码"
-                placeholderTextColor={theme.inputPlaceholder}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+              <View style={styles.inputRow}>
+                <Image source={loginAssets.lock} style={styles.inputIcon} resizeMode="contain" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="密码"
+                  placeholderTextColor={theme.inputPlaceholder}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(value => !value)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Image source={loginAssets.eyeOff} style={styles.eyeIcon} resizeMode="contain" />
+                </TouchableOpacity>
+              </View>
             )}
             <TouchableOpacity
               style={[styles.loginBtn, submitting && styles.loginBtnDisabled]}
@@ -300,90 +332,47 @@ export default function LoginScreen({navigation}: any) {
             </View>
             <View style={styles.thirdPartyButtons}>
               <TouchableOpacity style={styles.thirdPartyBtn} onPress={handleWeChatLogin}>
-                <View style={styles.tpIconWrap}>
-                  <Text style={styles.tpIcon}>{'💬'}</Text>
+                <View style={[styles.tpIconWrap, styles.wechatIconWrap]}>
+                  <Image source={loginAssets.wechat} style={styles.wechatIcon} resizeMode="contain" />
                 </View>
-                <Text style={styles.tpLabel}>微信</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.thirdPartyBtn} onPress={handleQQLogin}>
-                <View style={styles.tpIconWrap}>
-                  <Text style={styles.tpIcon}>{'🐧'}</Text>
-                </View>
-                <Text style={styles.tpLabel}>QQ</Text>
+                <Text style={styles.tpLabel}>微信登录</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.devSection}>
-            <Text style={styles.devTitle}>🛠️ 开发模式快速登录</Text>
-            {([
-              {key: 'client' as DropdownKey, label: '📦 客户', color: theme.primary},
-              {key: 'owner' as DropdownKey, label: '🚁 机主', color: theme.success},
-              {key: 'pilot' as DropdownKey, label: '✈️ 飞手', color: theme.warning},
-              {key: 'composite' as DropdownKey, label: '🧩 复合身份', color: theme.danger},
-            ]).map(({key, label, color}) => {
-              const acct = selected[key];
+            <View style={styles.devTitleRow}>
+              <Image source={loginAssets.tools} style={styles.devToolsIcon} resizeMode="contain" />
+              <Text style={styles.devTitle}>开发模式快速登录</Text>
+            </View>
+            {ROLE_CATEGORIES.map(({key, label, color}) => {
+              const accounts = ROLE_ACCOUNTS[key] || [];
               return (
-                <View key={key} style={styles.devRow}>
-                  <TouchableOpacity
-                    style={styles.devDropdown}
-                    onPress={() => setDropdown({key, visible: true})}>
-                    <Text style={[styles.devDropdownLabel, {color}]}>{label}</Text>
-                    <Text style={styles.devDropdownValue} numberOfLines={1}>
-                      {acct ? acct.label : `选择${label.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27FF}]|\s/gu, '')}账号`}
-                    </Text>
-                    <Text style={styles.devDropdownArrow}>▾</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.devLoginBtn, {backgroundColor: acct ? color : theme.textHint}]}
-                    onPress={() => acct && quickLogin(acct.phone, acct.password)}
-                    disabled={!acct || submitting}>
-                    <Text style={styles.devLoginBtnText}>{submitting ? '...' : '登录'}</Text>
-                  </TouchableOpacity>
+                <View key={key} style={styles.devGroup}>
+                  <View style={styles.devRoleRow}>
+                    <Image source={loginAssets.user} style={styles.devUserIcon} resizeMode="contain" />
+                    <Text style={[styles.devRoleText, {color}]}>{label}</Text>
+                  </View>
+                  <View style={styles.devAccountList}>
+                    {accounts.map(account => (
+                      <TouchableOpacity
+                        key={account.phone}
+                        activeOpacity={0.76}
+                        style={[styles.devAccountBtn, {borderColor: color}]}
+                        onPress={() => quickLogin(account.phone, account.password)}
+                        disabled={submitting}>
+                        <Text style={[styles.devAccountText, {color}]}>
+                          {submitting ? '登录中...' : account.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {accounts.length === 0 ? (
+                    <Text style={styles.devEmpty}>暂无可用账号</Text>
+                  ) : null}
                 </View>
               );
             })}
-            <Modal
-              visible={!!dropdown?.visible}
-              transparent
-              animationType="fade"
-              onRequestClose={() => setDropdown(null)}>
-              <TouchableOpacity
-                style={styles.modalMask}
-                activeOpacity={1}
-                onPress={() => setDropdown(null)}>
-                <View style={styles.modalBox}>
-                  <Text style={styles.modalTitle}>
-                    {dropdown ? {
-                      client: '📦 选择客户账号',
-                      owner: '🚁 选择机主账号',
-                      pilot: '✈️ 选择飞手账号',
-                      composite: '🧩 选择复合身份账号',
-                      admin: '⚙️ 选择管理员账号',
-                    }[dropdown.key] : ''}
-                  </Text>
-                  <FlatList
-                    data={dropdown ? QUICK_LOGIN_ACCOUNTS[dropdown.key] : []}
-                    keyExtractor={item => item.phone}
-                    renderItem={({item}) => (
-                      <TouchableOpacity
-                        style={[styles.modalItem, selected[dropdown!.key]?.phone === item.phone && styles.modalItemActive]}
-                        onPress={() => {
-                          setSelected(prev => ({...prev, [dropdown!.key]: item}));
-                          setDropdown(null);
-                        }}>
-                        <Text style={[styles.modalItemText, selected[dropdown!.key]?.phone === item.phone && styles.modalItemTextActive]}>
-                          {item.label}
-                        </Text>
-                        {selected[dropdown!.key]?.phone === item.phone && (
-                          <Text style={styles.modalItemCheck}>✓</Text>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </TouchableOpacity>
-            </Modal>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -402,86 +391,187 @@ export default function LoginScreen({navigation}: any) {
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   root: {flex: 1, backgroundColor: theme.bg},
+  bgImage: {
+    position: 'absolute',
+    top: -260,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 520,
+    opacity: 0.98,
+  },
   kavFlex: {flex: 1},
-  scrollContent: {paddingHorizontal: 28},
+  scrollContent: {paddingHorizontal: 17},
   glowOrb: {position: 'absolute', width: 260, height: 260, borderRadius: 130},
+  hero: {
+    alignItems: 'center',
+    transform: [{translateX: -47}, {translateY: 15}],
+  },
   title: {
-    fontSize: 30, fontWeight: '800', color: theme.primary, textAlign: 'center', letterSpacing: 2,
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: '700',
+    color: theme.isDark ? theme.primary : '#0D3F92',
+    textAlign: 'center',
+    letterSpacing: 0,
     textShadowColor: theme.isDark ? theme.primary : 'transparent',
     textShadowOffset: {width: 0, height: 0},
     textShadowRadius: theme.isDark ? 24 : 0,
   },
-  subtitle: {fontSize: 15, color: theme.textSub, textAlign: 'center', marginTop: 8, marginBottom: 36, letterSpacing: 1},
+  subtitleRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  subtitleLine: {
+    width: 42,
+    height: 1,
+    backgroundColor: '#CFD8E5',
+  },
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#7E8AA0',
+    textAlign: 'center',
+    fontWeight: '600',
+    letterSpacing: 0,
+  },
   formCard: {
-    backgroundColor: theme.isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
-    borderRadius: 20, padding: 20, borderWidth: 1,
-    borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : theme.cardBorder,
+    marginTop: 126,
+    backgroundColor: theme.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.95)',
+    borderRadius: 15,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(230,236,245,0.92)',
     shadowColor: theme.isDark ? 'transparent' : '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: {width: 0, height: 7},
     shadowOpacity: theme.isDark ? 0 : 0.06,
-    shadowRadius: theme.isDark ? 0 : 16,
+    shadowRadius: theme.isDark ? 0 : 17,
     elevation: theme.isDark ? 0 : 4,
   },
-  input: {
-    height: 50, borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 12,
-    paddingHorizontal: 16, fontSize: 16, marginBottom: 14, backgroundColor: theme.inputBg, color: theme.inputText,
+  inputRow: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: theme.isDark ? theme.inputBg : 'rgba(248,250,253,0.88)',
+    borderWidth: 1,
+    borderColor: theme.isDark ? theme.inputBorder : '#D7E0EE',
+    marginBottom: 11,
   },
-  codeRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 14},
-  codeInput: {flex: 1, marginRight: 12, marginBottom: 0},
-  codeBtn: {height: 50, paddingHorizontal: 16, backgroundColor: theme.btnPrimary, borderRadius: 12, justifyContent: 'center'},
+  inputIcon: {
+    width: 18,
+    height: 18,
+  },
+  eyeIcon: {
+    width: 18,
+    height: 18,
+    opacity: 0.72,
+  },
+  input: {
+    flex: 1,
+    height: 46,
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    fontSize: 14,
+    backgroundColor: 'transparent',
+    color: theme.inputText,
+  },
+  codeRow: {marginBottom: 11},
+  codeInput: {flex: 1, marginRight: 0, marginBottom: 0},
+  codeBtn: {
+    height: 30,
+    minWidth: 78,
+    paddingHorizontal: 9,
+    backgroundColor: theme.btnPrimary,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   codeBtnDisabled: {backgroundColor: theme.textHint},
-  codeBtnText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: '600'},
+  codeBtnText: {color: theme.btnPrimaryText, fontSize: 11, fontWeight: '600'},
   loginBtn: {
-    height: 52, backgroundColor: theme.btnPrimary, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: 4,
+    height: 48,
+    backgroundColor: theme.btnPrimary,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 5,
     shadowColor: theme.primary,
-    shadowOffset: {width: 0, height: theme.isDark ? 0 : 4},
-    shadowOpacity: theme.isDark ? 0.4 : 0.25,
-    shadowRadius: theme.isDark ? 16 : 8,
+    shadowOffset: {width: 0, height: theme.isDark ? 0 : 5},
+    shadowOpacity: theme.isDark ? 0.4 : 0.18,
+    shadowRadius: theme.isDark ? 16 : 12,
     elevation: theme.isDark ? 8 : 6,
   },
   loginBtnDisabled: {opacity: 0.6},
-  loginBtnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: '700', letterSpacing: 4},
-  linksRow: {flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, paddingHorizontal: 4},
-  linkText: {color: theme.primary, fontSize: 14},
-  thirdPartySection: {marginTop: 32},
+  loginBtnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '700', letterSpacing: 0},
+  linksRow: {flexDirection: 'row', justifyContent: 'space-between', marginTop: 19, paddingHorizontal: 4},
+  linkText: {color: theme.primary, fontSize: 13, fontWeight: '500'},
+  thirdPartySection: {marginTop: 41},
   dividerRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 24},
-  dividerLine: {flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.divider},
-  dividerText: {color: theme.textHint, fontSize: 13, marginHorizontal: 14},
+  dividerLine: {flex: 1, height: 1, backgroundColor: '#D8E0EC'},
+  dividerText: {color: '#8F9AAC', fontSize: 12, marginHorizontal: 10},
   thirdPartyButtons: {flexDirection: 'row', justifyContent: 'center'},
   thirdPartyBtn: {alignItems: 'center', marginHorizontal: 28},
   tpIconWrap: {
-    width: 52, height: 52, borderRadius: 26,
+    width: 47, height: 47, borderRadius: 24,
     backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : theme.bgTertiary,
-    borderWidth: 1, borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : theme.cardBorder,
+    borderWidth: theme.isDark ? 1 : 4,
+    borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.96)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 6,
+    shadowColor: '#165A2D',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: theme.isDark ? 0 : 0.16,
+    shadowRadius: 10,
   },
-  tpIcon: {fontSize: 24},
-  tpLabel: {fontSize: 12, color: theme.textSub},
-  devSection: {marginTop: 36, paddingTop: 20, borderTopWidth: 1, borderTopColor: theme.divider},
-  devTitle: {fontSize: 13, color: theme.textHint, textAlign: 'center', marginBottom: 12},
-  devRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8},
-  devDropdown: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', height: 42,
-    borderWidth: 1, borderColor: theme.inputBorder, borderRadius: 10, paddingHorizontal: 10, backgroundColor: theme.inputBg,
+  wechatIconWrap: {backgroundColor: '#19C160'},
+  wechatIcon: {width: 29, height: 29},
+  tpLabel: {fontSize: 12, color: '#334155'},
+  devSection: {
+    marginTop: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 15,
+    borderRadius: 13,
+    backgroundColor: theme.isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.95)',
+    borderWidth: 1,
+    borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(230,236,245,0.96)',
+    shadowColor: '#173366',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: theme.isDark ? 0 : 0.05,
+    shadowRadius: 13,
+    elevation: theme.isDark ? 0 : 2,
   },
-  devDropdownLabel: {fontSize: 12, fontWeight: '600', marginRight: 6, minWidth: 44},
-  devDropdownValue: {flex: 1, fontSize: 12, color: theme.textSub},
-  devDropdownArrow: {fontSize: 12, color: theme.textHint, marginLeft: 4},
-  devLoginBtn: {height: 42, paddingHorizontal: 16, borderRadius: 10, justifyContent: 'center', alignItems: 'center'},
-  devLoginBtnText: {color: theme.btnPrimaryText, fontSize: 13, fontWeight: '600'},
-  modalMask: {flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24},
-  modalBox: {
-    backgroundColor: theme.isDark ? theme.bgSecondary : '#FFFFFF',
-    borderRadius: 16, width: '100%', maxHeight: 340, overflow: 'hidden',
-    borderWidth: theme.isDark ? 1 : 0,
-    borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'transparent',
+  devTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 0,
   },
-  modalTitle: {fontSize: 15, fontWeight: '600', color: theme.text, textAlign: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.divider},
-  modalItem: {flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider},
-  modalItemActive: {backgroundColor: theme.primaryBg},
-  modalItemText: {flex: 1, fontSize: 14, color: theme.text},
-  modalItemTextActive: {color: theme.primary, fontWeight: '600'},
-  modalItemCheck: {fontSize: 16, color: theme.primary},
+  devToolsIcon: {
+    width: 15,
+    height: 15,
+    marginRight: 6,
+  },
+  devTitle: {fontSize: 12, color: '#8D97A8', fontWeight: '500'},
+  devGroup: {marginTop: 11},
+  devRoleRow: {flexDirection: 'row', alignItems: 'center', gap: 6},
+  devUserIcon: {width: 14, height: 14},
+  devRoleText: {fontSize: 14, lineHeight: 20, fontWeight: '600'},
+  devAccountList: {marginTop: 7, gap: 7},
+  devAccountBtn: {
+    minHeight: 38,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    justifyContent: 'center',
+    paddingHorizontal: 11,
+  },
+  devAccountText: {fontSize: 13, lineHeight: 18, fontWeight: '600'},
+  devEmpty: {paddingVertical: 7, color: theme.textHint, fontSize: 12},
   themeToggle: {position: 'absolute', right: 20, zIndex: 999},
   togglePill: {
     width: 44, height: 44, borderRadius: 22,

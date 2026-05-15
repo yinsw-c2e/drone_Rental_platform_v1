@@ -100,7 +100,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
     try {
       const [orderRes, bindingRes] = await Promise.all([
         orderV2Service.get(orderId),
-        ownerService.listPilotBindings({status: 'active', page: 1, page_size: 100}),
+        ownerService.listPilotBindings({status: 'active', page: 1, page_size: 50}),
       ]);
       const orderDetail = orderRes.data || null;
       const activeBindings = bindingRes.data?.items || [];

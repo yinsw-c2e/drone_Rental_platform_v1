@@ -29,13 +29,13 @@ export default function SourceTag({source}: Props) {
 const styles = StyleSheet.create({
   tag: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
     borderWidth: 1,
   },
   text: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

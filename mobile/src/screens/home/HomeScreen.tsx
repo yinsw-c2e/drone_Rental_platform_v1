@@ -8,6 +8,7 @@ import React, {
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   ActivityIndicator,
+  Image,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -46,6 +47,7 @@ import {formatDemandBudget, resolveDemandPrimaryAddress} from '../../utils/deman
 import {formatAmountYuan} from '../../utils/supplyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {workbenchAssets} from '../../assets/miniProgramAssets';
 
 type RoleView = 'all' | 'client' | 'owner' | 'pilot';
 
@@ -248,6 +250,61 @@ const getPriorityUrgencyLabel = (urgency: number) => {
   return '顺手处理';
 };
 
+const getActionAsset = (key: string) => {
+  if (key.includes('service-hub')) {
+    return workbenchAssets.entryBrowseService;
+  }
+  if (key.includes('quick-order')) {
+    return workbenchAssets.entryQuickOrder;
+  }
+  if (key.includes('publish')) {
+    return workbenchAssets.entryPublishTask;
+  }
+  if (key.includes('demands')) {
+    return workbenchAssets.entryInquiryTask;
+  }
+  if (key.includes('progress')) {
+    return workbenchAssets.entryMyDemand;
+  }
+  if (key.includes('demand')) {
+    return workbenchAssets.entryBrowseService;
+  }
+  if (key.includes('offer') || key.includes('supplies') || key.includes('fulfillment') || key.includes('assigned') || key.includes('nearby')) {
+    return workbenchAssets.entryQuickOrder;
+  }
+  if (key.includes('profile') || key.includes('drones')) {
+    return workbenchAssets.entryMyDemand;
+  }
+  switch (key) {
+    case 'service-hub':
+      return workbenchAssets.entryBrowseService;
+    case 'progress':
+      return workbenchAssets.entryMyDemand;
+    case 'quick-order':
+      return workbenchAssets.entryQuickOrder;
+    case 'publish':
+      return workbenchAssets.entryPublishTask;
+    case 'my-demands':
+      return workbenchAssets.entryInquiryTask;
+    case 'profile':
+    case 'drones':
+      return workbenchAssets.entryMyDemand;
+    case 'offer':
+    case 'supplies':
+    case 'fulfill':
+    case 'assigned':
+    case 'nearby':
+      return workbenchAssets.entryQuickOrder;
+    default:
+      return workbenchAssets.entryBrowseService;
+  }
+};
+
+const getHeroActionAsset = (title: string) =>
+  title.includes('发布') || title.includes('上架')
+    ? workbenchAssets.plusCircle
+    : workbenchAssets.quickOrder;
+
 function ActionPill({
   title,
   onPress,
@@ -275,6 +332,11 @@ function ActionPill({
             },
       ]}
     >
+      <Image
+        source={getHeroActionAsset(title)}
+        style={styles.heroActionIcon}
+        resizeMode="contain"
+      />
       <Text
         style={[
           styles.heroActionText,
@@ -309,7 +371,11 @@ function QuickActionCard({
           { backgroundColor: palette.bg, borderColor: palette.border },
         ]}
       >
-        <Text style={styles.quickActionIcon}>{action.icon}</Text>
+        <Image
+          source={getActionAsset(action.key)}
+          style={styles.quickActionIconImage}
+          resizeMode="contain"
+        />
         {typeof action.badge === 'number' && action.badge > 0 ? (
           <View
             style={[styles.quickActionBadge, { backgroundColor: palette.text }]}
@@ -329,38 +395,38 @@ function getHeroTheme(role: RoleView): HeroTheme {
   switch (role) {
     case 'client':
       return {
-        gradient: ['#0f8f61', '#17a36b'],
-        accent: '#0f8f61',
+        gradient: ['#0756D8', '#2F82FF'],
+        accent: '#135ED9',
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
-        softText: 'rgba(239,255,247,0.88)',
+        softText: 'rgba(255,255,255,0.9)',
         eyebrow: '客户概览',
       };
     case 'owner':
       return {
-        gradient: ['#0f5cab', '#1d4ed8'],
-        accent: '#0f5cab',
+        gradient: ['#0756D8', '#2F82FF'],
+        accent: '#135ED9',
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
-        softText: 'rgba(230,244,255,0.88)',
+        softText: 'rgba(255,255,255,0.9)',
         eyebrow: '机主概览',
       };
     case 'pilot':
       return {
-        gradient: ['#b45309', '#d97706'],
-        accent: '#b45309',
+        gradient: ['#0756D8', '#2F82FF'],
+        accent: '#135ED9',
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
-        softText: 'rgba(255,247,237,0.9)',
+        softText: 'rgba(255,255,255,0.9)',
         eyebrow: '飞手概览',
       };
     default:
       return {
-        gradient: ['#0f4c81', '#0f766e'],
-        accent: '#0f5cab',
+        gradient: ['#0756D8', '#2F82FF'],
+        accent: '#135ED9',
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
-        softText: 'rgba(236,253,245,0.9)',
+        softText: 'rgba(255,255,255,0.9)',
         eyebrow: '今日概览',
       };
   }
@@ -515,7 +581,7 @@ export default function HomeScreen({ navigation }: any) {
           (async () => {
             const [demandRes, orderRes] = await Promise.all([
               demandV2Service.listMyDemands({page: 1, page_size: 40}),
-              orderV2Service.list({role: 'client', page: 1, page_size: 100}),
+              orderV2Service.list({role: 'client', page: 1, page_size: 50}),
             ]);
 
             (demandRes.data?.items || [])
@@ -591,7 +657,7 @@ export default function HomeScreen({ navigation }: any) {
           (async () => {
             const [demandRes, orderRes] = await Promise.all([
               demandV2Service.listMarketplaceDemands({page: 1, page_size: 40}),
-              orderV2Service.list({role: 'owner', page: 1, page_size: 100}),
+              orderV2Service.list({role: 'owner', page: 1, page_size: 50}),
             ]);
 
             (demandRes.data?.items || []).forEach((item: DemandSummary) => {
@@ -654,7 +720,7 @@ export default function HomeScreen({ navigation }: any) {
       if (rolesToLoad.includes('pilot')) {
         tasks.push(
           (async () => {
-            const dispatchRes = await dispatchV2Service.list({role: 'pilot', page: 1, page_size: 100});
+            const dispatchRes = await dispatchV2Service.list({role: 'pilot', page: 1, page_size: 50});
 
             (dispatchRes.data?.items || []).forEach((task: V2DispatchTaskSummary) => {
               const taskStatus = String(task.status || '').toLowerCase();
@@ -1027,20 +1093,20 @@ export default function HomeScreen({ navigation }: any) {
   const quickActions = useMemo<DashboardAction[]>(() => {
     const platformEntries: DashboardAction[] = [
       {
-        key: 'platform-service-hub',
-        title: '服务大厅',
-        desc: '浏览服务、公开需求和供需入口',
+        key: 'service-hub',
+        title: '浏览服务',
+        desc: '查看供给与需求',
         icon: '🧭',
         tone: 'blue',
         onPress: () => navigation.navigate('ServiceHub'),
       },
       {
-        key: 'platform-progress-center',
-        title: '订单进度',
-        desc: '统一查看全部订单与履约状态',
+        key: 'progress',
+        title: '我的需求',
+        desc: '查看我的需求',
         icon: '📋',
         tone: 'teal',
-        onPress: () => navigation.navigate('ProgressCenter'),
+        onPress: () => navigation.navigate('MyDemands'),
       },
     ];
 
@@ -1049,30 +1115,27 @@ export default function HomeScreen({ navigation }: any) {
         return [
           ...platformEntries,
           {
-            key: 'client-quick-order',
+            key: 'quick-order',
             title: '快速下单',
-            desc:
-              currentDashboard.market_totals.supply_count > 0
-                ? `当前有 ${currentDashboard.market_totals.supply_count} 个服务支持直达下单，先补最小信息再筛选`
-                : '先补最小信息，系统会帮你筛选支持直达下单的服务',
+            desc: '直达下单',
             icon: '📦',
             tone: 'blue',
             onPress: () => navigation.navigate('QuickOrderEntry'),
           },
           {
-            key: 'client-publish',
+            key: 'publish',
             title: '发布任务',
-            desc: '复杂需求先发起任务，后续再比价和补资料',
+            desc: '发起需求',
             icon: '📝',
-            tone: 'green',
+            tone: 'orange',
             onPress: () => navigation.navigate('PublishCargo'),
           },
           {
-            key: 'client-demands',
+            key: 'my-demands',
             title: '询价中的任务',
-            desc: '只看仍在开放报价阶段的任务，和首页数字保持一致',
+            desc: '开放报价中的需求',
             icon: '🗂️',
-            tone: 'teal',
+            tone: 'purple',
             onPress: () => navigation.navigate('MyDemands', {statusFilter: 'quoting'}),
             badge: currentDashboard.role_views.client.open_demand_count,
           },
@@ -1326,6 +1389,17 @@ export default function HomeScreen({ navigation }: any) {
               style={StyleSheet.absoluteFill}
               start={{x: 0, y: 0}}
               end={{x: 1, y: 1}}
+            />
+            <Image
+              source={workbenchAssets.hero}
+              style={styles.heroBgImage}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['rgba(4,76,213,0.18)', 'rgba(4,76,213,0.08)', 'rgba(4,76,213,0.02)']}
+              style={styles.heroImageOverlay}
+              start={{x: 0, y: 0.5}}
+              end={{x: 1, y: 0.5}}
             />
             <View style={styles.heroTopRow}>
               <View style={styles.heroCopyWrap}>
@@ -1678,9 +1752,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginHorizontal: CONTENT_SIDE_MARGIN,
   },
   tabsWrap: {
-    marginTop: 10,
+    marginTop: 8,
     borderRadius: 18,
-    padding: 5,
+    padding: 3,
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: theme.isDark ? 'rgba(255,255,255,0.06)' : theme.cardBorder,
@@ -1694,8 +1768,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 14,
+    minHeight: 28,
+    paddingVertical: 5,
+    borderRadius: 15,
   },
   roleTabActive: {},
   roleTabText: {
@@ -1705,85 +1780,116 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   roleTabTextActive: {},
   hero: {
     marginTop: 12,
-    borderRadius: 26,
+    height: 170,
+    borderRadius: 15,
     overflow: 'hidden',
-    paddingTop: 18,
-    paddingBottom: 22,
+    backgroundColor: '#0753D8',
     shadowColor: theme.isDark ? 'rgba(0,212,255,0.3)' : '#000',
-    shadowOffset: {width: 0, height: theme.isDark ? 0 : 4},
-    shadowOpacity: theme.isDark ? 0.5 : 0.08,
-    shadowRadius: theme.isDark ? 20 : 12,
+    shadowOffset: {width: 0, height: theme.isDark ? 0 : 9},
+    shadowOpacity: theme.isDark ? 0.5 : 0.2,
+    shadowRadius: theme.isDark ? 20 : 24,
     elevation: 6,
   },
+  heroBgImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    zIndex: 0,
+  },
+  heroImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
   heroTopRow: {
+    position: 'relative',
+    zIndex: 2,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: HERO_SIDE_PADDING,
+    paddingTop: 14,
   },
   heroCopyWrap: {
     flex: 1,
     paddingRight: 14,
   },
   heroEyebrow: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 3,
   },
   heroTitle: {
-    fontSize: 28,
-    lineHeight: 34,
+    maxWidth: 245,
+    fontSize: 20,
+    lineHeight: 24,
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '900',
     textShadowColor: 'rgba(0,0,0,0.2)',
     textShadowOffset: {width: 0, height: 1},
     textShadowRadius: 4,
   },
   heroSubtitle: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 20,
-    color: 'rgba(255,255,255,0.88)',
+    maxWidth: 260,
+    marginTop: 7,
+    fontSize: 12,
+    lineHeight: 17,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
   },
   alertPill: {
-    minWidth: 74,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    minWidth: 112,
+    height: 28,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    paddingHorizontal: 13,
+    paddingVertical: 0,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#0B3282',
+    shadowOffset: {width: 0, height: 5},
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
   },
   alertPillValue: {
-    fontSize: 20,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 3,
+    color: '#F04438',
   },
   alertPillLabel: {
-    marginTop: 4,
+    marginLeft: 4,
     fontSize: 11,
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: '#F04438',
+    fontWeight: '800',
   },
   heroActionRow: {
-    marginTop: 16,
+    position: 'absolute',
+    left: HERO_SIDE_PADDING,
+    bottom: 15,
+    zIndex: 3,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    paddingHorizontal: HERO_SIDE_PADDING,
+    gap: 9,
   },
   heroActionBtn: {
+    minWidth: 86,
+    height: 34,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingHorizontal: 15,
+    paddingVertical: 0,
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroActionIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
   },
   heroActionText: {
     fontSize: 13,
+    lineHeight: 17,
     fontWeight: '800',
   },
   heroActionTextGhost: {
@@ -2035,7 +2141,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 10,
   },
   quickGridPanel: {
-    borderRadius: 24,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: QUICK_GRID_PANEL_HORIZONTAL_PADDING,
     paddingVertical: 14,
@@ -2055,14 +2161,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   quickActionIconWrap: {
     width: 50,
     height: 50,
-    borderRadius: 18,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     marginBottom: 10,
   },
-  quickActionIcon: {
-    fontSize: 20,
+  quickActionIconImage: {
+    width: 34,
+    height: 34,
   },
   quickActionBadge: {
     position: 'absolute',

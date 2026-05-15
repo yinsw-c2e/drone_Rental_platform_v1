@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   FlatList,
+  Image,
   PanResponder,
   RefreshControl,
   SafeAreaView,
@@ -21,6 +22,7 @@ import {RootState} from '../../store/store';
 import {ConversationSummary, V2NotificationSummary} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {messageAssets} from '../../assets/miniProgramAssets';
 
 type MessageCenterTab = 'notifications' | 'conversations';
 
@@ -200,7 +202,11 @@ function SwipeableConversationItem({
             onPress(item);
           }}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
+            <Image
+              source={item.peer_avatar_url ? {uri: item.peer_avatar_url} : messageAssets.avatarUser}
+              style={styles.avatarImage}
+              resizeMode="cover"
+            />
           </View>
           <View style={styles.content}>
             <View style={styles.topRow}>
@@ -240,7 +246,7 @@ export default function ConversationListScreen({navigation}: any) {
   const fetchData = useCallback(async () => {
     try {
       const [notificationRes, conversationRes] = await Promise.all([
-        notificationV2Service.list({page: 1, page_size: 100}),
+        notificationV2Service.list({page: 1, page_size: 50}),
         messageService.getConversations(),
       ]);
 
@@ -409,12 +415,11 @@ export default function ConversationListScreen({navigation}: any) {
   );
 
   const renderNotificationItem = ({item}: {item: V2NotificationSummary}) => {
-    const bucket = resolveNotificationBucket(item);
     const subtitle = resolveNotificationSubtitle(item);
     return (
       <TouchableOpacity style={styles.notificationItem} onPress={() => navigateByNotification(item)}>
         <View style={styles.notificationIconWrap}>
-          <Text style={styles.notificationIcon}>{bucket.icon}</Text>
+          <Image source={messageAssets.packageBox} style={styles.notificationIconImage} resizeMode="contain" />
         </View>
         <View style={styles.notificationContent}>
           <View style={styles.topRow}>
@@ -441,7 +446,7 @@ export default function ConversationListScreen({navigation}: any) {
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>消息</Text>
-        <Text style={styles.headerSubtitle}>系统通知承载业务事件，会话消息只用于沟通</Text>
+        <Text style={styles.headerSubtitle}>系统通知承载业务事件，会话消息用于即时沟通</Text>
       </View>
 
       <View style={styles.tabWrap}>
@@ -474,9 +479,10 @@ export default function ConversationListScreen({navigation}: any) {
           renderItem={renderNotificationItem}
           renderSectionHeader={({section}) => (
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {section.icon} {section.title}
-              </Text>
+              <View style={styles.sectionTitleWrap}>
+                <Image source={messageAssets.packageBox} style={styles.sectionIconImage} resizeMode="contain" />
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+              </View>
               <Text style={styles.sectionMeta}>{section.data.filter(item => !item.is_read).length} 未读</Text>
             </View>
           )}
@@ -520,23 +526,24 @@ export default function ConversationListScreen({navigation}: any) {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {flex: 1, backgroundColor: theme.bg},
   header: {
-    backgroundColor: theme.card,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.divider,
+    backgroundColor: theme.bg,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 18,
   },
-  headerTitle: {fontSize: 22, fontWeight: '800', color: theme.text},
-  headerSubtitle: {marginTop: 6, fontSize: 12, lineHeight: 18, color: theme.textSub},
+  headerTitle: {fontSize: 28, lineHeight: 32, fontWeight: '900', color: theme.text},
+  headerSubtitle: {marginTop: 12, fontSize: 13, lineHeight: 18, color: theme.textSub},
   tabWrap: {
     flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 4,
-    backgroundColor: theme.tabBg,
+    height: 44,
+    marginHorizontal: 23,
+    marginTop: 8,
+    marginBottom: 20,
+    padding: 3,
+    backgroundColor: 'rgba(226,232,240,0.72)',
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(207,216,229,0.78)',
   },
   tabBtn: {
     flex: 1,
@@ -544,50 +551,60 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 999,
-    paddingVertical: 10,
+    height: 36,
   },
   tabBtnActive: {
-    backgroundColor: theme.card,
+    backgroundColor: 'rgba(255,255,255,0.96)',
     shadowColor: theme.primary,
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: {width: 0, height: 5},
     elevation: 1,
   },
-  tabText: {fontSize: 14, fontWeight: '700', color: theme.textSub},
-  tabTextActive: {color: theme.primaryText},
+  tabText: {fontSize: 14, fontWeight: '800', color: theme.textSub},
+  tabTextActive: {color: '#1F6BFF', fontWeight: '900'},
   tabBadge: {
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: theme.danger,
+    backgroundColor: '#FF3045',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
     marginLeft: 6,
   },
   tabBadgeText: {color: theme.btnPrimaryText, fontSize: 10, fontWeight: '700'},
-  listContent: {paddingHorizontal: 16, paddingBottom: 24},
-  emptyListContent: {flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24},
+  listContent: {paddingHorizontal: 23, paddingBottom: 112},
+  emptyListContent: {flexGrow: 1, paddingHorizontal: 23, paddingBottom: 112},
   sectionHeader: {
-    marginTop: 8,
-    marginBottom: 8,
+    height: 24,
+    marginBottom: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  sectionTitle: {fontSize: 15, fontWeight: '800', color: theme.text},
-  sectionMeta: {fontSize: 12, color: theme.textSub},
+  sectionTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  sectionIconImage: {
+    width: 22,
+    height: 22,
+    marginRight: 6,
+  },
+  sectionTitle: {fontSize: 16, lineHeight: 21, fontWeight: '900', color: theme.text},
+  sectionMeta: {fontSize: 13, color: theme.textSub, fontWeight: '600'},
   swipeWrap: {
     height: 76,
     marginBottom: 10,
-    borderRadius: 18,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   swipeItem: {
     height: 76,
     backgroundColor: theme.card,
-    borderRadius: 18,
+    borderRadius: 12,
   },
   swipeItemOpen: {
     borderTopRightRadius: 0,
@@ -602,15 +619,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     backgroundColor: theme.danger,
     justifyContent: 'center',
     alignItems: 'center',
-    borderTopRightRadius: 18,
-    borderBottomRightRadius: 18,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
   },
   deleteText: {color: theme.btnPrimaryText, fontSize: 14, fontWeight: '800'},
   item: {
     flexDirection: 'row',
     backgroundColor: theme.card,
     padding: 14,
-    borderRadius: 18,
+    borderRadius: 12,
     alignItems: 'center',
     height: 76,
   },
@@ -622,12 +639,17 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: theme.primaryBg,
+    backgroundColor: '#EEF5FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
   },
-  avatarText: {fontSize: 22},
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
   content: {flex: 1},
   topRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   name: {fontSize: 15, fontWeight: '700', color: theme.text, flex: 1, marginRight: 8},
@@ -648,7 +670,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,
-    borderRadius: 18,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 10,
   },
@@ -656,12 +678,15 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.primaryBg,
+    backgroundColor: '#EEF5FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  notificationIcon: {fontSize: 20},
+  notificationIconImage: {
+    width: 29,
+    height: 29,
+  },
   notificationContent: {flex: 1},
   notificationSubtitle: {marginTop: 2, fontSize: 12, color: theme.primaryText, fontWeight: '600'},
   notificationBody: {marginTop: 4, fontSize: 13, lineHeight: 19, color: theme.textSub},
@@ -674,7 +699,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   chatHint: {
     backgroundColor: theme.warning + '22',
-    borderRadius: 16,
+    borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
     marginBottom: 12,

@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -33,6 +34,7 @@ import {
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {isAirspaceHardBlocked} from '../../utils/airspaceRisk';
+import {publishTaskAssets} from '../../assets/miniProgramAssets';
 
 type DemandStep = 1 | 2;
 type DraftSaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -311,7 +313,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
         lastSavedSnapshotRef.current = payloadSnapshot;
         autoSaveEnabledRef.current = true;
         if (options?.showSuccess) {
-          Alert.alert('草稿已保存', '可以稍后在“我的任务 > 草稿”里继续完善。');
+          Alert.alert('草稿已保存', '可以稍后在“我的需求 > 草稿”里继续完善。');
         }
         return nextDraftId;
       } catch (error: any) {
@@ -400,7 +402,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
       }
       await demandV2Service.update(nextDraftId, buildPayload('publish'));
       await demandV2Service.publish(nextDraftId);
-      Alert.alert('发布成功', '任务已进入公开任务列表，后续可以在“我的任务”里继续跟进报价。', [
+      Alert.alert('发布成功', '任务已进入公开任务列表，后续可以在“我的需求”里继续跟进报价。', [
         {text: '查看任务', onPress: () => navigation.replace('DemandDetail', {id: nextDraftId})},
       ]);
     } catch (error: any) {
@@ -469,9 +471,19 @@ export default function PublishCargoScreen({route, navigation}: any) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>发布任务</Text>
+            <Text style={styles.heroTitle}>让合适机组主动报价</Text>
+            <Text style={styles.heroSub}>填写地址、载重和时间后，可保存草稿或直接发布。</Text>
+          </View>
+          <Image source={publishTaskAssets.clipboard} style={styles.heroImage} resizeMode="contain" />
+        </View>
+
         {currentStep === 1 ? (
           <View style={styles.formSection}>
             <View style={styles.sectionHeader}>
+              <Image source={publishTaskAssets.pinBlue} style={styles.sectionIcon} resizeMode="contain" />
               <Text style={styles.sectionTitle}>1. 核心需求信息</Text>
             </View>
 
@@ -592,6 +604,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
         ) : (
           <View style={styles.formSection}>
             <View style={styles.sectionHeader}>
+              <Image source={publishTaskAssets.lightbulb} style={styles.sectionIcon} resizeMode="contain" />
               <Text style={styles.sectionTitle}>2. 更多细节 (选填)</Text>
             </View>
 
@@ -813,21 +826,72 @@ const getStyles = (theme: AppTheme) =>
       fontWeight: '500',
     },
     content: {paddingBottom: 40},
+    heroCard: {
+      marginHorizontal: 12,
+      marginTop: 12,
+      minHeight: 126,
+      borderRadius: 18,
+      backgroundColor: '#E6F4FF',
+      borderWidth: 1,
+      borderColor: '#91CAFF',
+      flexDirection: 'row',
+      alignItems: 'center',
+      overflow: 'hidden',
+      paddingLeft: 16,
+    },
+    heroCopy: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 16,
+    },
+    heroEyebrow: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: '800',
+    },
+    heroTitle: {
+      marginTop: 6,
+      fontSize: 20,
+      lineHeight: 25,
+      color: theme.text,
+      fontWeight: '900',
+    },
+    heroSub: {
+      marginTop: 6,
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.textSub,
+      fontWeight: '600',
+    },
+    heroImage: {
+      width: 118,
+      height: 108,
+      marginRight: 0,
+    },
     formSection: {
-      padding: 16,
+      padding: 12,
     },
     sectionHeader: {
-      marginBottom: 16,
+      marginBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    sectionIcon: {
+      width: 22,
+      height: 22,
+      marginRight: 8,
     },
     sectionTitle: {
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '800',
       color: theme.text,
     },
     inputCard: {
       backgroundColor: theme.card,
-      borderRadius: 20,
-      padding: 16,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
       shadowColor: '#000',
       shadowOffset: {width: 0, height: 2},
       shadowOpacity: 0.05,
@@ -842,7 +906,7 @@ const getStyles = (theme: AppTheme) =>
       marginTop: 16,
     },
     input: {
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.inputBg,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.inputBorder,
@@ -860,7 +924,7 @@ const getStyles = (theme: AppTheme) =>
       width: 44,
       height: 44,
       borderRadius: 12,
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
@@ -897,7 +961,7 @@ const getStyles = (theme: AppTheme) =>
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 10,
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.inputBg,
       borderWidth: 1,
       borderColor: 'transparent',
     },
@@ -921,7 +985,7 @@ const getStyles = (theme: AppTheme) =>
       marginTop: 8,
     },
     formAddressInput: {
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.inputBg,
       borderRadius: 12,
     },
     addressSpacer: {
@@ -935,7 +999,7 @@ const getStyles = (theme: AppTheme) =>
       flex: 1,
     },
     timeBtn: {
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.inputBg,
       borderRadius: 12,
       padding: 12,
       alignItems: 'center',

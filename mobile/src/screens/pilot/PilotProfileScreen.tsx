@@ -112,9 +112,9 @@ export default function PilotProfileScreen({ navigation }: any) {
     try {
       const [profileRes, flightRecords, dispatchRes] = await Promise.all([
         pilotV2Service.getProfile().catch(() => null),
-        pilotV2Service.listAllFlightRecords({ page_size: 100 }),
+        pilotV2Service.listAllFlightRecords({ page_size: 50 }),
         dispatchV2Service
-          .list({ role: 'pilot', page: 1, page_size: 100 })
+          .list({ role: 'pilot', page: 1, page_size: 50 })
           .catch(() => null),
       ]);
 
@@ -598,18 +598,17 @@ function EntryItem({
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bgSecondary },
+    container: { flex: 1, backgroundColor: theme.bg },
     content: { paddingBottom: 40 },
     loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     loadingText: { fontSize: 15, color: theme.textSub },
 
     headerHero: {
-      backgroundColor: theme.primary,
-      paddingHorizontal: 20,
-      paddingTop: 24,
-      paddingBottom: 28,
-      borderBottomLeftRadius: 32,
-      borderBottomRightRadius: 32,
+      backgroundColor: '#7C3AED',
+      borderRadius: 24,
+      padding: 18,
+      margin: 12,
+      marginBottom: 12,
     },
     headerTop: {
       flexDirection: 'row',
@@ -618,27 +617,28 @@ const getStyles = (theme: AppTheme) =>
     },
     headerGreeting: {
       fontSize: 24,
-      fontWeight: '800',
+      fontWeight: '700',
       color: '#FFFFFF',
     },
     headerSubtitle: {
       fontSize: 13,
       color: 'rgba(255,255,255,0.8)',
-      marginTop: 4,
+      marginTop: 6,
     },
     headerStatusRow: {
       marginTop: 2,
     },
     statsGrid: {
       flexDirection: 'row',
-      marginTop: 24,
+      flexWrap: 'wrap',
+      marginTop: 16,
       gap: 10,
     },
     statsCard: {
-      flex: 1,
+      width: '48%',
       backgroundColor: 'rgba(255,255,255,0.12)',
       borderRadius: 16,
-      paddingVertical: 14,
+      padding: 12,
       alignItems: 'center',
     },
     statsValue: {
@@ -654,22 +654,23 @@ const getStyles = (theme: AppTheme) =>
     },
 
     section: {
-      marginTop: 20,
-      paddingHorizontal: 16,
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 16,
+      marginHorizontal: 12,
+      marginBottom: 12,
     },
     sectionTitle: {
-      fontSize: 18,
-      fontWeight: '800',
+      fontSize: 16,
+      fontWeight: '600',
       color: theme.text,
       marginBottom: 12,
     },
 
     readinessCard: {
-      backgroundColor: theme.card,
-      borderRadius: 24,
-      padding: 20,
-      borderWidth: 1,
-      borderColor: theme.divider,
+      backgroundColor: theme.inputBg,
+      borderRadius: 14,
+      padding: 14,
     },
     readinessHeader: {
       flexDirection: 'row',
@@ -726,11 +727,9 @@ const getStyles = (theme: AppTheme) =>
     switchBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.card,
-      padding: 18,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: theme.divider,
+      backgroundColor: theme.inputBg,
+      padding: 14,
+      borderRadius: 14,
     },
     switchText: {
       flex: 1,
@@ -846,12 +845,10 @@ const getStyles = (theme: AppTheme) =>
     },
     entryCard: {
       width: '30.5%',
-      backgroundColor: theme.card,
+      backgroundColor: theme.inputBg,
       borderRadius: 16,
       padding: 14,
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: theme.divider,
       position: 'relative',
     },
     entryIcon: {

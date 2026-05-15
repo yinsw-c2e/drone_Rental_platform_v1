@@ -80,7 +80,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
 
   const loadData = useCallback(async () => {
     try {
-      const res = await dispatchV2Service.list({role: 'owner', page: 1, page_size: 100});
+      const res = await dispatchV2Service.list({role: 'owner', page: 1, page_size: 50});
       setTasks(res.data?.items || []);
     } catch (error) {
       console.error('获取正式派单列表失败:', error);

@@ -135,67 +135,67 @@ export const darkTheme: AppTheme = {
  * Clean surfaces, soft shadows, clear hierarchy
  * ────────────────────────────────────────────── */
 export const lightTheme: AppTheme = {
-  // Layered backgrounds (lightest → slightly tinted)
-  bg: '#F5F7FA',          // page background — cool gray
-  bgSecondary: '#FFFFFF',  // elevated card / sheet
-  bgTertiary: '#EDF1F7',   // recessed wells
+  // Align with the current mini-program global app.scss.
+  bg: '#F5F7FB',
+  bgSecondary: '#FFFFFF',
+  bgTertiary: '#F9FAFB',
 
-  // Cards: crisp white with subtle border
+  // Cards
   card: '#FFFFFF',
-  cardBorder: '#E2E8F0',
-  cardHighlight: '#2563EB',
+  cardBorder: '#E8ECF1',
+  cardHighlight: '#1677FF',
 
-  // Text hierarchy (4.5:1+ contrast on bg)
-  text: '#0F172A',         // primary — near black
-  textSub: '#64748B',      // secondary — slate
-  textHint: '#94A3B8',     // tertiary / placeholder
-  textInverse: '#FFFFFF',  // on dark / accent surfaces
+  // Text hierarchy
+  text: '#1A1D26',
+  textSub: '#6B7280',
+  textHint: '#9CA3AF',
+  textInverse: '#FFFFFF',
 
-  // Accent — professional blue
-  primary: '#2563EB',
-  primaryBg: '#EFF6FF',
-  primaryBorder: '#93C5FD',
-  primaryText: '#1D4ED8',
+  // Accent
+  primary: '#1677FF',
+  primaryBg: '#E6F4FF',
+  primaryBorder: '#91CAFF',
+  primaryText: '#1677FF',
 
-  // Inputs — white with clean border
-  inputBg: '#FFFFFF',
-  inputBorder: '#CBD5E1',
-  inputText: '#0F172A',
-  inputPlaceholder: '#94A3B8',
+  // Inputs
+  inputBg: '#F9FAFB',
+  inputBorder: '#E5E7EB',
+  inputText: '#1A1D26',
+  inputPlaceholder: '#9CA3AF',
 
-  divider: '#E2E8F0',
+  divider: '#EEEFF2',
 
   // Tabs
   tabBg: '#FFFFFF',
-  tabActiveBg: '#EFF6FF',
-  tabText: '#64748B',
-  tabActiveText: '#2563EB',
+  tabActiveBg: '#E6F4FF',
+  tabText: '#6B7280',
+  tabActiveText: '#1677FF',
 
   // Buttons
-  btnPrimary: '#2563EB',
+  btnPrimary: '#1677FF',
   btnPrimaryText: '#FFFFFF',
   btnGhost: 'transparent',
-  btnGhostBorder: '#2563EB',
-  btnGhostText: '#2563EB',
+  btnGhostBorder: '#1677FF',
+  btnGhostText: '#1677FF',
 
-  // Semantic status (clear & readable)
-  success: '#16A34A',
-  warning: '#D97706',
-  danger: '#DC2626',
-  info: '#2563EB',
+  // Semantic status
+  success: '#52C41A',
+  warning: '#FA8C16',
+  danger: '#F5222D',
+  info: '#13C2C2',
 
   // Decorative
   heroOverlay: 'rgba(255,255,255,0)',
-  badgeBg: '#F1F5F9',
-  badgeBorder: '#CBD5E1',
+  badgeBg: '#F5F7FA',
+  badgeBorder: '#E8ECF1',
 
   // Bottom nav
-  navBg: '#FFFFFF',
-  navBorder: '#E2E8F0',
-  navText: '#0F172A',
-  navIconActive: '#2563EB',
-  navIconInactive: '#94A3B8',
+  navBg: 'rgba(255,255,255,0.92)',
+  navBorder: '#EEEFF2',
+  navText: '#64748B',
+  navIconActive: '#1F6BFF',
+  navIconInactive: '#64748B',
 
-  refreshColor: '#2563EB',
+  refreshColor: '#1677FF',
   isDark: false,
 };

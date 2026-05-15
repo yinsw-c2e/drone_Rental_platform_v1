@@ -33,12 +33,12 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
+    paddingVertical: 3,
+    borderRadius: 10,
     borderWidth: 1,
   },
   text: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

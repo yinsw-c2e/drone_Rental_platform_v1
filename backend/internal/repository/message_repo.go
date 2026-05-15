@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -24,9 +25,12 @@ func (r *MessageRepo) Create(msg *model.Message) error {
 func (r *MessageRepo) GetConversationMessages(conversationID string, page, pageSize int) ([]model.Message, int64, error) {
 	var messages []model.Message
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Message{}).Where("conversation_id = ?", conversationID)
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&messages).Error
 	return messages, total, err
 }
@@ -192,6 +196,7 @@ func (r *MessageRepo) GetUnreadNotificationCount(userID int64) (int64, error) {
 func (r *MessageRepo) ListSystemNotifications(userID int64, page, pageSize int) ([]model.Message, int64, error) {
 	var messages []model.Message
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Message{}).
 		Where("receiver_id = ? AND sender_id = ?", userID, 0)
@@ -226,12 +231,15 @@ func (r *MessageRepo) MarkNotificationRead(id, userID int64) error {
 func (r *MessageRepo) GetMessagesByPeer(userID, peerID int64, page, pageSize int) ([]model.Message, int64, error) {
 	var messages []model.Message
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Message{}).Where(
 		"(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)",
 		userID, peerID, peerID, userID,
 	)
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&messages).Error
 	return messages, total, err
 }

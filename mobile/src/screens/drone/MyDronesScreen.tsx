@@ -128,7 +128,7 @@ export default function MyDronesScreen({navigation}: any) {
 
   const handleViewActiveOrder = useCallback(async (droneId: number) => {
     try {
-      const res = await orderV2Service.list({role: 'owner', page: 1, page_size: 100});
+      const res = await orderV2Service.list({role: 'owner', page: 1, page_size: 50});
       const list = res.data?.items || [];
       const matched = list
         .filter((order: V2OrderSummary) => getOrderDroneId(order) === droneId && isDroneStillOccupiedByOrder(order))
@@ -160,7 +160,7 @@ export default function MyDronesScreen({navigation}: any) {
 
   const fetchDrones = useCallback(async () => {
     try {
-      const res = await droneService.myDrones({page: 1, page_size: 100});
+      const res = await droneService.myDrones({page: 1, page_size: 50});
       setDrones(res.data?.list || []);
     } catch (e) {
       console.warn('获取无人机列表失败:', e);

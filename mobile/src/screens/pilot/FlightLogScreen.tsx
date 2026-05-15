@@ -41,7 +41,7 @@ export default function FlightLogScreen({navigation}: any) {
 
   const loadData = useCallback(async () => {
     try {
-      const allRecords = await pilotV2Service.listAllFlightRecords({page_size: 100});
+      const allRecords = await pilotV2Service.listAllFlightRecords({page_size: 50});
       setRecords(sortFlightRecords(allRecords));
     } catch (error) {
       console.error('获取真实履约飞行记录失败:', error);

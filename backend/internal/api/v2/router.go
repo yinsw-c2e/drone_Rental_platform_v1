@@ -125,6 +125,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		demandGroup := authenticated.Group("/demands")
 		{
 			demandGroup.POST("", h.Demand.Create)
+			demandGroup.GET("", h.Demand.ListMarketplace)
 			demandGroup.GET("/my", h.Demand.ListMine)
 			demandGroup.GET("/:demand_id", h.Demand.Get)
 			demandGroup.PATCH("/:demand_id", h.Demand.Update)

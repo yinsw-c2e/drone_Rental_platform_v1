@@ -60,7 +60,7 @@ export default function MyOffersScreen({ navigation }: any) {
     try {
       const res = await ownerService.listMySupplies({
         page: 1,
-        page_size: 100,
+        page_size: 50,
       });
       setOffers(res.data?.items || []);
     } catch (error) {

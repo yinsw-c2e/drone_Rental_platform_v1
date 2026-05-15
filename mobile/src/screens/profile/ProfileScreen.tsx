@@ -31,6 +31,7 @@ import {pilotV2Service} from '../../services/pilotV2';
 import {getEffectiveRoleSummary} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {profileAssets} from '../../assets/miniProgramAssets';
 
 let ActionSheetIOS: any;
 if (Platform.OS === 'ios') {
@@ -138,6 +139,40 @@ const capabilityCatalog = [
     desc: '同时具备机主与飞手能力后，机主可选择自执行。',
   },
 ] as const;
+
+const getMenuAsset = (key: string) => {
+  switch (key) {
+    case 'orders':
+      return profileAssets.cellOrder;
+    case 'demands':
+    case 'quotes':
+    case 'offers':
+      return profileAssets.cellTask;
+    case 'client-profile':
+      return profileAssets.cellArchive;
+    case 'verify':
+      return profileAssets.cellLock;
+    case 'owner-profile':
+      return profileAssets.identityOwner;
+    case 'pilot':
+    case 'pilot-register':
+      return profileAssets.cellFlyer;
+    case 'drones':
+      return profileAssets.identityDrone;
+    case 'edit':
+      return profileAssets.cellEdit;
+    case 'settings':
+      return profileAssets.cellSetting;
+    default:
+      return profileAssets.cellArchive;
+  }
+};
+
+const getIdentityAsset = (key: string) => {
+  if (key === 'client') return profileAssets.identityUser;
+  if (key === 'owner') return profileAssets.identityOwner;
+  return profileAssets.identityDrone;
+};
 
 export default function ProfileScreen({navigation}: any) {
   const {theme} = useTheme();
@@ -530,12 +565,22 @@ export default function ProfileScreen({navigation}: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.hero}>
+          {!theme.isDark ? (
+            <Image source={profileAssets.hero} style={styles.heroBgImage} resizeMode="cover" />
+          ) : null}
+          <TouchableOpacity
+            style={styles.heroProfileArrow}
+            activeOpacity={0.72}
+            onPress={() => navigation.navigate('EditProfile')}>
+            <Text style={styles.heroProfileArrowText}>›</Text>
+          </TouchableOpacity>
           <View style={styles.heroTop}>
             <TouchableOpacity onPress={handleAvatarPress} disabled={uploading} style={styles.avatarWrap}>
               {user?.avatar_url ? (
                 <Image source={{uri: user.avatar_url}} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarFallback}>
+                  <Image source={profileAssets.defaultAvatar} style={styles.defaultAvatarImage} resizeMode="cover" />
                   <Text style={styles.avatarText}>{user?.nickname?.charAt(0) || 'U'}</Text>
                 </View>
               )}
@@ -557,8 +602,12 @@ export default function ProfileScreen({navigation}: any) {
           </View>
 
           <View style={styles.heroStatsRow}>
-            {accountHighlights.map(item => (
-              <TouchableOpacity key={item.label} style={styles.heroStatItem} activeOpacity={0.6} onPress={() => navigation.navigate(item.screen)}>
+            {accountHighlights.map((item, index) => (
+              <TouchableOpacity
+                key={item.label}
+                style={[styles.heroStatItem, index > 0 && styles.heroStatItemDivider]}
+                activeOpacity={0.6}
+                onPress={() => navigation.navigate(item.screen)}>
                 <Text style={styles.heroStatValue}>{item.value}</Text>
                 <Text style={styles.heroStatLabel}>{item.label}</Text>
               </TouchableOpacity>
@@ -580,7 +629,7 @@ export default function ProfileScreen({navigation}: any) {
                   ]}
                   onPress={() => navigation.navigate(item.screen)}>
                   <View style={styles.menuIconWrap}>
-                    <Text style={styles.menuIcon}>{item.icon}</Text>
+                    <Image source={getMenuAsset(item.key)} style={styles.menuIconImage} resizeMode="contain" />
                   </View>
                   <View style={styles.menuRowCopy}>
                     <Text style={styles.menuRowTitle}>{item.title}</Text>
@@ -590,7 +639,7 @@ export default function ProfileScreen({navigation}: any) {
                       {item.rightText}
                     </Text>
                   ) : null}
-                  <Text style={styles.menuChevron}>›</Text>
+                  <Image source={profileAssets.chevronRight} style={styles.menuChevronImage} resizeMode="contain" />
                 </TouchableOpacity>
               ))}
             </View>
@@ -630,15 +679,13 @@ export default function ProfileScreen({navigation}: any) {
                     ]}
                     onPress={() => navigation.navigate(card.screen)}>
                     <View style={styles.menuIconWrap}>
-                      <Text style={styles.menuIcon}>
-                        {card.key === 'client' ? '👔' : card.key === 'owner' ? '🧭' : '🎮'}
-                      </Text>
+                      <Image source={getIdentityAsset(card.key)} style={styles.menuIconImage} resizeMode="contain" />
                     </View>
                     <View style={styles.menuRowCopy}>
                       <Text style={styles.menuRowTitle}>{card.label}</Text>
                     </View>
                     <StatusBadge label={card.statusLabel} tone={card.statusTone} />
-                    <Text style={styles.menuChevron}>›</Text>
+                    <Image source={profileAssets.chevronRight} style={styles.menuChevronImage} resizeMode="contain" />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -655,7 +702,11 @@ export default function ProfileScreen({navigation}: any) {
                       index === capabilityItems.length - 1 ? styles.menuRowLast : null,
                     ]}>
                     <View style={styles.menuIconWrap}>
-                      <Text style={styles.menuIcon}>{item.enabled ? '✓' : '·'}</Text>
+                      <Image
+                        source={item.enabled ? profileAssets.chipCheck : profileAssets.chipStar}
+                        style={styles.menuIconImage}
+                        resizeMode="contain"
+                      />
                     </View>
                     <View style={styles.menuRowCopy}>
                       <Text style={styles.menuRowTitle}>{item.label}</Text>
@@ -693,54 +744,103 @@ export default function ProfileScreen({navigation}: any) {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bgSecondary,
+    backgroundColor: theme.bg,
   },
   content: {
-    padding: 14,
-    paddingBottom: 28,
+    padding: 12,
+    paddingBottom: 112,
   },
   hero: {
-    borderRadius: 28,
-    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-    padding: 20,
+    position: 'relative',
+    height: 165,
+    borderRadius: 15,
+    backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : '#0753D8',
+    padding: 0,
     marginBottom: 12,
+    overflow: 'hidden',
     borderWidth: theme.isDark ? 1 : 0,
     borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
+    shadowColor: '#125EDC',
+    shadowOffset: {width: 0, height: 9},
+    shadowOpacity: theme.isDark ? 0 : 0.2,
+    shadowRadius: 24,
+    elevation: 6,
   },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  heroBgImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatarImage: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: theme.primaryBg,
-  },
-  avatarFallback: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+  heroProfileArrow: {
+    position: 'absolute',
+    zIndex: 3,
+    right: 15,
+    top: 14,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  heroProfileArrowText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 24,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  heroTop: {
+    position: 'relative',
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 17,
+    paddingTop: 18,
+  },
+  avatarWrap: {
+    position: 'relative',
+    width: 66,
+    height: 66,
+  },
+  avatarImage: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: theme.primaryBg,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.86)',
+  },
+  avatarFallback: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.86)',
+  },
+  defaultAvatarImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
   avatarText: {
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '800',
     color: theme.btnPrimaryText,
   },
   avatarBadge: {
     position: 'absolute',
-    right: -4,
-    bottom: -4,
+    left: 18,
+    bottom: -2,
     backgroundColor: theme.card,
     borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    minWidth: 30,
+    height: 17,
+    paddingHorizontal: 6,
+    paddingVertical: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarBadgeText: {
     fontSize: 10,
@@ -749,38 +849,52 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   heroBody: {
     flex: 1,
-    marginLeft: 16,
+    minWidth: 0,
+    marginLeft: 14,
+    paddingRight: 20,
   },
   heroName: {
-    fontSize: 24,
+    fontSize: 19,
+    lineHeight: 23,
     color: theme.isDark ? theme.text : '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '900',
   },
   heroPhone: {
-    marginTop: 6,
-    fontSize: 13,
-    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 16,
+    color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.92)',
   },
   heroBadgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
+    gap: 6,
+    marginTop: 9,
   },
   heroStatsRow: {
+    position: 'relative',
+    zIndex: 2,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 18,
+    height: 63,
+    marginTop: 17,
     borderTopWidth: 1,
-    borderTopColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.12)',
-    paddingTop: 16,
+    borderTopColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.22)',
+    paddingHorizontal: 17,
+    alignItems: 'center',
   },
   heroStatItem: {
     flex: 1,
     alignItems: 'center',
+    position: 'relative',
+  },
+  heroStatItemDivider: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.26)',
   },
   heroStatValue: {
-    fontSize: 24,
+    fontSize: 22,
+    lineHeight: 24,
     color: theme.isDark ? theme.primary : '#FFFFFF',
     fontWeight: '800',
   },
@@ -841,7 +955,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontWeight: '800',
   },
   menuGroupBody: {
-    borderRadius: 22,
+    borderRadius: 16,
     backgroundColor: theme.card,
     borderWidth: 1,
     borderColor: theme.cardBorder,
@@ -863,7 +977,7 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   menuIconWrap: {
     width: 38,
     height: 38,
-    borderRadius: 13,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.primaryBg,
@@ -872,6 +986,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 18,
     color: theme.primaryText,
     fontWeight: '800',
+  },
+  menuIconImage: {
+    width: 22,
+    height: 22,
   },
   menuRowCopy: {
     flex: 1,
@@ -894,9 +1012,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.textHint,
     fontWeight: '500',
   },
+  menuChevronImage: {
+    width: 16,
+    height: 16,
+  },
   roleOverview: {
     marginBottom: 12,
-    borderRadius: 22,
+    borderRadius: 16,
     backgroundColor: theme.card,
     borderWidth: 1,
     borderColor: theme.cardBorder,

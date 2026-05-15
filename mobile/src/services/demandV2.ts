@@ -43,6 +43,9 @@ export type DemandUpsertPayload = {
 };
 
 export const demandV2Service = {
+  listMarketplaceFeed: (params?: DemandListParams) =>
+    apiV2.get<any, V2ApiResponse<V2ListData<DemandSummary>, V2PageMeta>>('/demands', {params}),
+
   listMarketplaceDemands: (params?: DemandListParams) =>
     apiV2.get<any, V2ApiResponse<V2ListData<DemandSummary>, V2PageMeta>>('/owner/demands/recommended', {params}),
 

@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 )
 
 // FlightRepo 飞行监控数据仓库
@@ -114,10 +115,9 @@ func (r *FlightRepo) GetLatestPosition(orderID int64) (*model.FlightPosition, er
 // GetPositionsByOrder 获取订单的位置记录
 func (r *FlightRepo) GetPositionsByOrder(orderID int64, limit int) ([]model.FlightPosition, error) {
 	var positions []model.FlightPosition
+	limit = limits.NormalizeLimit(limit, limits.DefaultPositionHistoryLimit, limits.MaxPositionHistoryLimit)
 	query := r.db.Where("order_id = ?", orderID).Order("recorded_at DESC")
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
+	query = query.Limit(limit)
 	err := query.Find(&positions).Error
 	return positions, err
 }
@@ -791,11 +791,10 @@ func (r *FlightRepo) GetRoutesByOwner(ownerID int64) ([]model.SavedRoute, error)
 // GetPublicRoutes 获取公开路线
 func (r *FlightRepo) GetPublicRoutes(limit int) ([]model.SavedRoute, error) {
 	var routes []model.SavedRoute
+	limit = limits.NormalizeLimit(limit, limits.DefaultRouteLimit, limits.MaxRouteLimit)
 	query := r.db.Where("visibility IN ? AND status = ?", []string{"shared", "public"}, "active").
-		Order("rating DESC, use_count DESC")
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
+		Order("rating DESC, use_count DESC").
+		Limit(limit)
 	err := query.Find(&routes).Error
 	return routes, err
 }
@@ -803,6 +802,7 @@ func (r *FlightRepo) GetPublicRoutes(limit int) ([]model.SavedRoute, error) {
 // FindNearbyRoutes 查找附近起点的路线
 func (r *FlightRepo) FindNearbyRoutes(lat, lng float64, radiusKM float64) ([]model.SavedRoute, error) {
 	var routes []model.SavedRoute
+	radiusKM = limits.NormalizeRadiusKM(radiusKM, 10)
 	// 使用 Haversine 公式的简化版本(小范围近似)
 	// 1度纬度约111km
 	latDelta := radiusKM / 111.0
@@ -810,7 +810,9 @@ func (r *FlightRepo) FindNearbyRoutes(lat, lng float64, radiusKM float64) ([]mod
 
 	err := r.db.Where("status = ? AND start_latitude BETWEEN ? AND ? AND start_longitude BETWEEN ? AND ?",
 		"active", lat-latDelta, lat+latDelta, lng-lngDelta, lng+lngDelta).
-		Order("use_count DESC").Find(&routes).Error
+		Order("use_count DESC").
+		Limit(limits.MaxRouteLimit).
+		Find(&routes).Error
 	return routes, err
 }
 

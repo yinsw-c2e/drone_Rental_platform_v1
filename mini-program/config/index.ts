@@ -1,4 +1,7 @@
 import { defineConfig } from '@tarojs/cli';
+import path from 'path';
+
+const resolveNodeModule = (pkg: string) => path.resolve(__dirname, '..', 'node_modules', pkg);
 
 export default defineConfig({
   projectName: 'wurenji-mini',
@@ -29,6 +32,17 @@ export default defineConfig({
     enable: false,
   },
   mini: {
+    compile: {
+      include: [
+        resolveNodeModule('@reduxjs/toolkit'),
+        resolveNodeModule('immer'),
+        resolveNodeModule('react-redux'),
+        resolveNodeModule('redux'),
+        resolveNodeModule('redux-thunk'),
+        resolveNodeModule('reselect'),
+        resolveNodeModule('use-sync-external-store'),
+      ],
+    },
     postcss: {
       pxtransform: {
         enable: true,

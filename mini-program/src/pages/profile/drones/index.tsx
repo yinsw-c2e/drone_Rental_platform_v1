@@ -44,7 +44,7 @@ export default function MyDronesPage() {
 
   useDidShow(() => {
     setLoading(true);
-    droneService.myDrones({ page: 1, page_size: 100 }).then((res: any) => {
+    droneService.myDrones({ page: 1, page_size: 50 }).then((res: any) => {
       setDrones(res.list || res.data?.list || res.items || []);
     }).catch(() => {})
     .finally(() => setLoading(false));

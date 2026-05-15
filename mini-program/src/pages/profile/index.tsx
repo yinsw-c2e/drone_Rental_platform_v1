@@ -16,7 +16,7 @@ import { logout, setMeSummary, updateUser } from '../../store/slices/authSlice';
 import { RootState } from '../../store/store';
 import { getEffectiveRoleSummary } from '../../utils/roleSummary';
 import { syncCustomTabBar } from '../../utils/tabBar';
-import profileBgImage from '../../assets/mine/images/mine_profile_drone_bg_750x330.png';
+import profileBgImage from '../../assets/mine/images/mine_profile_drone_bg_750x330.jpg';
 import defaultAvatarImage from '../../assets/mine/images/default_avatar_circle.png';
 import cellOrderIcon from '../../assets/mine/icons/cell_order.png';
 import cellTaskIcon from '../../assets/mine/icons/cell_task.png';
@@ -170,7 +170,7 @@ export default function ProfilePage() {
           ? ownerService.listMyQuotes({ page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
         summary.has_owner_role
-          ? droneService.myDrones({ page: 1, page_size: 100 }).catch(() => null)
+          ? droneService.myDrones({ page: 1, page_size: 50 }).catch(() => null)
           : Promise.resolve(null),
         summary.has_owner_role
           ? ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 1 }).catch(() => null)

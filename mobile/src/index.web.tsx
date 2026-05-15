@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider, useSelector, useDispatch } from 'react-redux';
 import {
@@ -20,57 +20,53 @@ import {
 import { API_V2_BASE_URL } from './constants';
 import { sessionService } from './services/session';
 
-// Import screens directly
-import LoginScreen from './screens/auth/LoginScreen';
-import RegisterScreen from './screens/auth/RegisterScreen';
-import HomeScreen from './screens/home/HomeScreen';
-import MarketHubScreen from './screens/market/MarketHubScreen';
-import FulfillmentHubScreen from './screens/fulfillment/FulfillmentHubScreen';
-import OrderListScreen from './screens/order/OrderListScreen';
-import OrderDetailScreen from './screens/order/OrderDetailScreen';
-import PaymentScreen from './screens/order/PaymentScreen';
-import ReviewScreen from './screens/order/ReviewScreen';
-import OrderAfterSaleScreen from './screens/order/OrderAfterSaleScreen';
-import ContractScreen from './screens/order/ContractScreen';
-import ContractDocumentScreen from './screens/order/ContractDocumentScreen';
-import ChatScreen from './screens/message/ChatScreen';
-import ConversationListScreen from './screens/message/ConversationListScreen';
-import ProfileScreen from './screens/profile/ProfileScreen';
-import OwnerProfileScreen from './screens/owner/OwnerProfileScreen';
-import OwnerPilotBindingsScreen from './screens/owner/OwnerPilotBindingsScreen';
-
-// Import profile screens
-import EditProfileScreen from './screens/profile/EditProfileScreen';
-import MyDemandsScreen from './screens/profile/MyDemandsScreen';
-import MyOffersScreen from './screens/profile/MyOffersScreen';
-import MyQuotesScreen from './screens/profile/MyQuotesScreen';
-import SettingsScreen from './screens/profile/SettingsScreen';
-import VerificationScreen from './screens/profile/VerificationScreen';
-import PilotRegisterScreen from './screens/pilot/PilotRegisterScreen';
-import PilotProfileScreen from './screens/pilot/PilotProfileScreen';
-import PilotOwnerBindingsScreen from './screens/pilot/PilotOwnerBindingsScreen';
-import ClientProfileScreen from './screens/client/ClientProfileScreen';
-import DispatchTaskListScreen from './screens/dispatch/DispatchTaskListScreen';
-import DispatchTaskDetailScreen from './screens/dispatch/DispatchTaskDetailScreen';
-import PilotTaskListScreen from './screens/dispatch/PilotTaskListScreen';
-import CreateDispatchTaskScreen from './screens/dispatch/CreateDispatchTaskScreen';
-import FlightMonitoringScreen from './screens/flight/FlightMonitoringScreen';
-import TrajectoryScreen from './screens/flight/TrajectoryScreen';
 import TabGlyph from './components/navigation/TabGlyph';
 
-// Import additional screens for navigation
-import DroneDetailScreen from './screens/drone/DroneDetailScreen';
-import NearbyDronesScreen from './screens/drone/NearbyDronesScreen';
-import AddDroneScreen from './screens/drone/AddDroneScreen';
-import MyDronesScreen from './screens/drone/MyDronesScreen';
-import DemandListScreen from './screens/demand/DemandListScreen';
-import DemandDetailScreen from './screens/demand/DemandDetailScreen';
-import DemandQuoteComposeScreen from './screens/demand/DemandQuoteComposeScreen';
-import OfferListScreen from './screens/demand/OfferListScreen';
-import OfferDetailScreen from './screens/demand/OfferDetailScreen';
-import PublishDemandScreen from './screens/publish/PublishDemandScreen';
-import PublishOfferScreen from './screens/publish/PublishOfferScreen';
-import PublishCargoScreen from './screens/publish/PublishCargoScreen';
+const LoginScreen = React.lazy(() => import('./screens/auth/LoginScreen'));
+const RegisterScreen = React.lazy(() => import('./screens/auth/RegisterScreen'));
+const HomeScreen = React.lazy(() => import('./screens/home/HomeScreen'));
+const MarketHubScreen = React.lazy(() => import('./screens/market/MarketHubScreen'));
+const FulfillmentHubScreen = React.lazy(() => import('./screens/fulfillment/FulfillmentHubScreen'));
+const OrderListScreen = React.lazy(() => import('./screens/order/OrderListScreen'));
+const OrderDetailScreen = React.lazy(() => import('./screens/order/OrderDetailScreen'));
+const PaymentScreen = React.lazy(() => import('./screens/order/PaymentScreen'));
+const ReviewScreen = React.lazy(() => import('./screens/order/ReviewScreen'));
+const OrderAfterSaleScreen = React.lazy(() => import('./screens/order/OrderAfterSaleScreen'));
+const ContractScreen = React.lazy(() => import('./screens/order/ContractScreen'));
+const ContractDocumentScreen = React.lazy(() => import('./screens/order/ContractDocumentScreen'));
+const ChatScreen = React.lazy(() => import('./screens/message/ChatScreen'));
+const ConversationListScreen = React.lazy(() => import('./screens/message/ConversationListScreen'));
+const ProfileScreen = React.lazy(() => import('./screens/profile/ProfileScreen'));
+const OwnerProfileScreen = React.lazy(() => import('./screens/owner/OwnerProfileScreen'));
+const OwnerPilotBindingsScreen = React.lazy(() => import('./screens/owner/OwnerPilotBindingsScreen'));
+const EditProfileScreen = React.lazy(() => import('./screens/profile/EditProfileScreen'));
+const MyDemandsScreen = React.lazy(() => import('./screens/profile/MyDemandsScreen'));
+const MyOffersScreen = React.lazy(() => import('./screens/profile/MyOffersScreen'));
+const MyQuotesScreen = React.lazy(() => import('./screens/profile/MyQuotesScreen'));
+const SettingsScreen = React.lazy(() => import('./screens/profile/SettingsScreen'));
+const VerificationScreen = React.lazy(() => import('./screens/profile/VerificationScreen'));
+const PilotRegisterScreen = React.lazy(() => import('./screens/pilot/PilotRegisterScreen'));
+const PilotProfileScreen = React.lazy(() => import('./screens/pilot/PilotProfileScreen'));
+const PilotOwnerBindingsScreen = React.lazy(() => import('./screens/pilot/PilotOwnerBindingsScreen'));
+const ClientProfileScreen = React.lazy(() => import('./screens/client/ClientProfileScreen'));
+const DispatchTaskListScreen = React.lazy(() => import('./screens/dispatch/DispatchTaskListScreen'));
+const DispatchTaskDetailScreen = React.lazy(() => import('./screens/dispatch/DispatchTaskDetailScreen'));
+const PilotTaskListScreen = React.lazy(() => import('./screens/dispatch/PilotTaskListScreen'));
+const CreateDispatchTaskScreen = React.lazy(() => import('./screens/dispatch/CreateDispatchTaskScreen'));
+const FlightMonitoringScreen = React.lazy(() => import('./screens/flight/FlightMonitoringScreen'));
+const TrajectoryScreen = React.lazy(() => import('./screens/flight/TrajectoryScreen'));
+const DroneDetailScreen = React.lazy(() => import('./screens/drone/DroneDetailScreen'));
+const NearbyDronesScreen = React.lazy(() => import('./screens/drone/NearbyDronesScreen'));
+const AddDroneScreen = React.lazy(() => import('./screens/drone/AddDroneScreen'));
+const MyDronesScreen = React.lazy(() => import('./screens/drone/MyDronesScreen'));
+const DemandListScreen = React.lazy(() => import('./screens/demand/DemandListScreen'));
+const DemandDetailScreen = React.lazy(() => import('./screens/demand/DemandDetailScreen'));
+const DemandQuoteComposeScreen = React.lazy(() => import('./screens/demand/DemandQuoteComposeScreen'));
+const OfferListScreen = React.lazy(() => import('./screens/demand/OfferListScreen'));
+const OfferDetailScreen = React.lazy(() => import('./screens/demand/OfferDetailScreen'));
+const PublishDemandScreen = React.lazy(() => import('./screens/publish/PublishDemandScreen'));
+const PublishOfferScreen = React.lazy(() => import('./screens/publish/PublishOfferScreen'));
+const PublishCargoScreen = React.lazy(() => import('./screens/publish/PublishCargoScreen'));
 
 // Create React Router compatible navigation wrapper
 function createRouterNavigation(navigate: any) {
@@ -284,17 +280,40 @@ function createMockRoute(params: any = {}) {
   return { params };
 }
 
+function WebLoadingFallback() {
+  return (
+    <View style={loadingStyles.container}>
+      <Text style={loadingStyles.text}>加载中...</Text>
+    </View>
+  );
+}
+
 const mainStyles = StyleSheet.create({
   container: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F7FB',
   },
   content: {
     flex: 1,
     overflow: 'scroll',
     minHeight: 0,
+  },
+});
+
+const loadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    minHeight: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F7FB',
+  },
+  text: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 function TabBar({
@@ -305,9 +324,7 @@ function TabBar({
   onTabPress: (tab: string) => void;
 }) {
   const tabs = [
-    { key: 'Home', label: '首页', icon: 'home' as const },
-    { key: 'Market', label: '服务', icon: 'discover' as const },
-    { key: 'Orders', label: '进度', icon: 'orders' as const },
+    { key: 'Home', label: '工作台', icon: 'home' as const },
     { key: 'Messages', label: '消息', icon: 'messages' as const },
     { key: 'Profile', label: '我的', icon: 'profile' as const },
   ];
@@ -328,7 +345,7 @@ function TabBar({
           >
             <TabGlyph
               name={tab.icon}
-              color={activeTab === tab.key ? '#1890ff' : '#999'}
+              focused={activeTab === tab.key}
               size={20}
             />
           </View>
@@ -349,12 +366,15 @@ function TabBar({
 const tabStyles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingBottom: 6,
-    paddingTop: 4,
-    height: 56,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderTopWidth: 0,
+    paddingBottom: 8,
+    paddingTop: 6,
+    height: 66,
+    shadowColor: '#142850',
+    shadowOffset: {width: 0, height: -5},
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
   },
   tab: {
     flex: 1,
@@ -369,13 +389,13 @@ const tabStyles = StyleSheet.create({
     opacity: 1,
   },
   label: {
-    fontSize: 10,
-    color: '#999',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '700',
   },
   labelActive: {
-    color: '#1890ff',
-    fontWeight: '700',
+    color: '#1F6BFF',
+    fontWeight: '800',
   },
 });
 
@@ -1001,29 +1021,31 @@ function WebAppInner() {
 
   return (
     <BrowserRouter>
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        {isLoggedIn ? (
-          <MainView onLogout={() => store.dispatch(logout())} />
-        ) : (
-          <AuthView onLogin={handleDemoLogin} />
-        )}
-        {isLoading && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 16 }}>登录中...</Text>
-          </View>
-        )}
-      </View>
+      <Suspense fallback={<WebLoadingFallback />}>
+        <View style={{ flex: 1, backgroundColor: '#F5F7FB' }}>
+          {isLoggedIn ? (
+            <MainView onLogout={() => store.dispatch(logout())} />
+          ) : (
+            <AuthView onLogin={handleDemoLogin} />
+          )}
+          {isLoading && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 16 }}>登录中...</Text>
+            </View>
+          )}
+        </View>
+      </Suspense>
     </BrowserRouter>
   );
 }

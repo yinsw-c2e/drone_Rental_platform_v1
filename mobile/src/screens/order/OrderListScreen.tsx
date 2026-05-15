@@ -213,7 +213,7 @@ export default function OrderListScreen({navigation, route}: any) {
             role,
             status: exactStatusFilter || undefined,
             page: 1,
-            page_size: 100,
+            page_size: 50,
           });
           return {role, orders: res.data?.items || []};
         }),
@@ -244,7 +244,7 @@ export default function OrderListScreen({navigation, route}: any) {
       const anomalyRes = await orderAnomalyV2Service.list({
         role: anomalyRole,
         page: 1,
-        page_size: 100,
+        page_size: 50,
       });
       setAnomalyLookup(buildOrderAnomalyLookup(anomalyRes.data?.items || []));
     } catch (error) {

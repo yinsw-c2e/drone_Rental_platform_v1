@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 )
 
 func (r *DemandDomainRepo) CreateDemand(demand *model.Demand) error {
@@ -34,6 +35,7 @@ func (r *DemandDomainRepo) UpdateDemandFields(id int64, fields map[string]interf
 func (r *DemandDomainRepo) ListDemandsByClientUser(clientUserID int64, status string, page, pageSize int) ([]model.Demand, int64, error) {
 	var demands []model.Demand
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Demand{}).Where("client_user_id = ?", clientUserID)
 	if status != "" {
@@ -55,6 +57,7 @@ func (r *DemandDomainRepo) ListDemandsByClientUser(clientUserID int64, status st
 func (r *DemandDomainRepo) AdminListDemands(page, pageSize int, filters map[string]interface{}) ([]model.Demand, int64, error) {
 	var demands []model.Demand
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Demand{}).
 		Joins("LEFT JOIN users ON users.id = demands.client_user_id")
@@ -135,6 +138,52 @@ func (r *DemandDomainRepo) CountActiveCandidatesByDemandIDs(demandIDs []int64) (
 
 	for _, item := range rows {
 		result[item.DemandID] = item.Total
+	}
+	return result, nil
+}
+
+func (r *DemandDomainRepo) ListLatestQuotesByDemandIDsAndOwner(demandIDs []int64, ownerUserID int64) (map[int64]*model.DemandQuote, error) {
+	result := make(map[int64]*model.DemandQuote)
+	if len(demandIDs) == 0 || ownerUserID == 0 {
+		return result, nil
+	}
+
+	var quotes []model.DemandQuote
+	if err := r.db.
+		Where("demand_id IN ? AND owner_user_id = ?", demandIDs, ownerUserID).
+		Order("demand_id ASC, id DESC").
+		Find(&quotes).Error; err != nil {
+		return nil, err
+	}
+
+	for i := range quotes {
+		quote := &quotes[i]
+		if _, exists := result[quote.DemandID]; !exists {
+			result[quote.DemandID] = quote
+		}
+	}
+	return result, nil
+}
+
+func (r *DemandDomainRepo) ListLatestCandidatesByDemandIDsAndPilot(demandIDs []int64, pilotUserID int64) (map[int64]*model.DemandCandidatePilot, error) {
+	result := make(map[int64]*model.DemandCandidatePilot)
+	if len(demandIDs) == 0 || pilotUserID == 0 {
+		return result, nil
+	}
+
+	var candidates []model.DemandCandidatePilot
+	if err := r.db.
+		Where("demand_id IN ? AND pilot_user_id = ?", demandIDs, pilotUserID).
+		Order("demand_id ASC, id DESC").
+		Find(&candidates).Error; err != nil {
+		return nil, err
+	}
+
+	for i := range candidates {
+		candidate := &candidates[i]
+		if _, exists := result[candidate.DemandID]; !exists {
+			result[candidate.DemandID] = candidate
+		}
 	}
 	return result, nil
 }

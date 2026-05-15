@@ -103,19 +103,14 @@ function MessageStackScreen() {
   );
 }
 
-const tabIcon = (name: string, color: string) => {
-  const iconMap: Record<
-    string,
-    'home' | 'discover' | 'orders' | 'messages' | 'profile'
-  > = {
+const tabIcon = (name: string, focused: boolean) => {
+  const iconMap: Record<string, 'home' | 'messages' | 'profile'> = {
     Home: 'home',
-    Market: 'discover',
-    Orders: 'orders',
     Messages: 'messages',
     Profile: 'profile',
   };
 
-  return <TabGlyph name={iconMap[name] || 'home'} color={color} />;
+  return <TabGlyph name={iconMap[name] || 'home'} focused={focused} />;
 };
 
 function MainTabs() {
@@ -124,12 +119,30 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({ color }) => tabIcon(route.name, color),
+        tabBarIcon: ({ focused }) => tabIcon(route.name, focused),
         tabBarActiveTintColor: theme.navIconActive,
         tabBarInactiveTintColor: theme.navIconInactive,
         tabBarStyle: {
           backgroundColor: theme.navBg,
           borderTopColor: theme.navBorder,
+          height: 66,
+          paddingTop: 6,
+          paddingBottom: 8,
+          borderTopWidth: 0,
+          shadowColor: '#142850',
+          shadowOffset: {width: 0, height: -5},
+          shadowOpacity: 0.07,
+          shadowRadius: 16,
+          elevation: 12,
+        },
+        tabBarItemStyle: {
+          height: 55,
+          justifyContent: 'center',
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
+          marginTop: 2,
         },
       })}
     >
@@ -238,12 +251,12 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="QuickOrderEntry"
         component={QuickOrderEntryScreen}
-        options={{ title: '填写核心需求' }}
+        options={{ title: '快速下单' }}
       />
       <RootStack.Screen
         name="ServiceHub"
         component={MarketHubScreen}
-        options={{ title: '服务大厅' }}
+        options={{ title: '服务市场' }}
       />
       <RootStack.Screen
         name="ProgressCenter"
@@ -408,7 +421,7 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="MyDemands"
         component={MyDemandsScreen}
-        options={{ title: '我的任务' }}
+        options={{ title: '我的需求' }}
       />
       <RootStack.Screen
         name="OwnerProfile"

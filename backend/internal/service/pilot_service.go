@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 	"wurenji-backend/internal/repository"
 )
 
@@ -953,12 +954,8 @@ func (s *PilotService) List(page, pageSize int, filters map[string]interface{}) 
 
 // FindNearby 查找附近在线飞手
 func (s *PilotService) FindNearby(lat, lng, radiusKM float64, limit int) ([]model.Pilot, error) {
-	if radiusKM <= 0 {
-		radiusKM = 50
-	}
-	if limit <= 0 {
-		limit = 20
-	}
+	radiusKM = limits.NormalizeRadiusKM(radiusKM, 50)
+	limit = limits.NormalizeLimit(limit, limits.DefaultPageSize, limits.MaxNearbyLimit)
 	return s.pilotRepo.FindNearby(lat, lng, radiusKM, limit)
 }
 

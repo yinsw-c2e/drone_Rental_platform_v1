@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
 )
@@ -61,13 +63,11 @@ func (r *DispatchRepo) UpdateTaskFields(id int64, fields map[string]interface{})
 
 func (r *DispatchRepo) ListPendingTasks(limit int) ([]model.DispatchTask, error) {
 	var tasks []model.DispatchTask
+	limit = limits.NormalizeLimit(limit, limits.DefaultListPreviewSize, limits.MaxMatchingCandidates)
 	query := r.db.Where("status IN ?", []string{"pending", "matching"}).
 		Where("(dispatch_deadline IS NULL OR dispatch_deadline > ?)", time.Now()).
-		Order("priority DESC, created_at ASC")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
+		Order("priority DESC, created_at ASC").
+		Limit(limit)
 
 	err := query.Find(&tasks).Error
 	return tasks, err
@@ -76,6 +76,7 @@ func (r *DispatchRepo) ListPendingTasks(limit int) ([]model.DispatchTask, error)
 func (r *DispatchRepo) ListTasksByClient(clientID int64, page, pageSize int, status string) ([]model.DispatchTask, int64, error) {
 	var tasks []model.DispatchTask
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.DispatchTask{}).Where("client_id = ?", clientID)
 	if status != "" {
@@ -98,6 +99,7 @@ func (r *DispatchRepo) ListTasksByClient(clientID int64, page, pageSize int, sta
 func (r *DispatchRepo) ListTasksByPilot(pilotID int64, page, pageSize int, status string) ([]model.DispatchTask, int64, error) {
 	var tasks []model.DispatchTask
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.DispatchTask{}).Where("assigned_pilot_id = ?", pilotID)
 	if status != "" {
@@ -200,6 +202,8 @@ func (r *DispatchRepo) GetPendingCandidateByPilot(pilotID int64) (*model.Dispatc
 // ListCandidatesByPilot 获取飞手的候选任务列表（含任务信息）
 func (r *DispatchRepo) ListCandidatesByPilot(pilotID int64, page, pageSize int) ([]map[string]interface{}, int64, error) {
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
+
 	if err := r.db.Model(&model.DispatchCandidate{}).Where("pilot_id = ?", pilotID).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
@@ -481,6 +485,7 @@ func (r *DispatchRepo) ListFormalTasksByOrder(orderID int64) ([]model.FormalDisp
 func (r *DispatchRepo) ListFormalTasksByProvider(providerUserID int64, status string, page, pageSize int) ([]model.FormalDispatchTask, int64, error) {
 	var tasks []model.FormalDispatchTask
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.FormalDispatchTask{}).Where("provider_user_id = ?", providerUserID)
 	if status != "" {
@@ -505,6 +510,7 @@ func (r *DispatchRepo) ListFormalTasksByProvider(providerUserID int64, status st
 func (r *DispatchRepo) AdminListFormalTasks(page, pageSize int, filters map[string]interface{}) ([]model.FormalDispatchTask, int64, error) {
 	var tasks []model.FormalDispatchTask
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.FormalDispatchTask{}).
 		Joins("LEFT JOIN orders ON orders.id = dispatch_tasks.order_id")

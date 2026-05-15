@@ -61,7 +61,7 @@ export default function SurfaceItem({ children, style, onPress, isLast = false }
 
 const styles = StyleSheet.create({
   item: {
-    paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
 });

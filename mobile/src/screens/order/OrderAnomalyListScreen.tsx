@@ -53,7 +53,7 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
         role: roleFilter === 'all' ? undefined : roleFilter,
         severity: severity === 'all' ? undefined : severity,
         page: 1,
-        page_size: 100,
+        page_size: 50,
       };
       const [listRes, summaryRes] = await Promise.all([
         orderAnomalyV2Service.list(params),

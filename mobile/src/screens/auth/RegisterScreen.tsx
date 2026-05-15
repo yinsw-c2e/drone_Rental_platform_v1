@@ -61,23 +61,25 @@ export default function RegisterScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>注册新账号</Text>
-        <TextInput style={styles.input} placeholder="手机号" keyboardType="phone-pad" maxLength={11} value={phone} onChangeText={setPhone} />
-        <View style={styles.codeRow}>
-          <TextInput style={[styles.input, {flex: 1, marginRight: 12}]} placeholder="验证码" keyboardType="number-pad" maxLength={6} value={code} onChangeText={setCode} />
-          <TouchableOpacity style={[styles.codeBtn, countdown > 0 && {backgroundColor: theme.textHint}]} onPress={sendCode} disabled={countdown > 0}>
-            <Text style={styles.codeBtnText}>{countdown > 0 ? `${countdown}s` : '发送验证码'}</Text>
+        <View style={styles.formCard}>
+          <TextInput style={styles.input} placeholder="手机号" keyboardType="phone-pad" maxLength={11} value={phone} onChangeText={setPhone} />
+          <View style={styles.codeRow}>
+            <TextInput style={[styles.input, styles.codeInput]} placeholder="验证码" keyboardType="number-pad" maxLength={6} value={code} onChangeText={setCode} />
+            <TouchableOpacity style={[styles.codeBtn, countdown > 0 && styles.codeBtnDisabled]} onPress={sendCode} disabled={countdown > 0}>
+              <Text style={styles.codeBtnText}>{countdown > 0 ? `${countdown}s` : '发送验证码'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput style={styles.input} placeholder="设置密码（至少6位）" secureTextEntry value={password} onChangeText={setPassword} />
+          <TextInput style={styles.input} placeholder="昵称（选填）" value={nickname} onChangeText={setNickname} />
+          <TouchableOpacity style={styles.btn} onPress={handleRegister}>
+            <Text style={styles.btnText}>注册</Text>
           </TouchableOpacity>
         </View>
-        <TextInput style={styles.input} placeholder="设置密码（至少6位）" secureTextEntry value={password} onChangeText={setPassword} />
-        <TextInput style={styles.input} placeholder="昵称（选填）" value={nickname} onChangeText={setNickname} />
-        <TouchableOpacity style={styles.btn} onPress={handleRegister}>
-          <Text style={styles.btnText}>注册</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{marginTop: 16, alignItems: 'center'}} onPress={() => navigation.goBack()}>
-          <Text style={{color: theme.primaryText}}>已有账号？去登录</Text>
+        <TouchableOpacity style={styles.loginLink} onPress={() => navigation.goBack()}>
+          <Text style={styles.loginLinkText}>已有账号？去登录</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -85,13 +87,18 @@ export default function RegisterScreen({navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.card},
-  content: {flex: 1, justifyContent: 'center', padding: 24},
-  title: {fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 32},
-  input: {height: 48, borderWidth: 1, borderColor: theme.divider, borderRadius: 8, paddingHorizontal: 16, fontSize: 16, marginBottom: 16},
+  container: {flex: 1, backgroundColor: theme.bg},
+  content: {flex: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40},
+  title: {fontSize: 24, fontWeight: '800', color: theme.text, textAlign: 'center', marginBottom: 32},
+  formCard: {backgroundColor: theme.card, borderRadius: 16, padding: 20},
+  input: {height: 48, borderWidth: 1, borderColor: theme.cardBorder, borderRadius: 12, paddingHorizontal: 16, fontSize: 15, color: theme.text, backgroundColor: theme.inputBg, marginBottom: 14},
   codeRow: {flexDirection: 'row', alignItems: 'center'},
-  codeBtn: {height: 48, paddingHorizontal: 16, backgroundColor: theme.primary, borderRadius: 8, justifyContent: 'center'},
-  codeBtnText: {color: theme.btnPrimaryText, fontSize: 14},
-  btn: {height: 48, backgroundColor: theme.primary, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: 8},
-  btnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: 'bold'},
+  codeInput: {flex: 1, marginRight: 12},
+  codeBtn: {height: 48, paddingHorizontal: 14, backgroundColor: theme.primary, borderRadius: 12, justifyContent: 'center', marginBottom: 14},
+  codeBtnDisabled: {backgroundColor: theme.primary + '66'},
+  codeBtnText: {color: theme.btnPrimaryText, fontSize: 13, fontWeight: '700'},
+  btn: {height: 50, backgroundColor: theme.primary, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: 8},
+  btnText: {color: theme.btnPrimaryText, fontSize: 17, fontWeight: '700'},
+  loginLink: {marginTop: 20, alignItems: 'center'},
+  loginLinkText: {color: theme.primaryText, fontSize: 13},
 });

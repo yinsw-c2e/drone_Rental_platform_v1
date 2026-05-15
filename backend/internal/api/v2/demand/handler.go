@@ -157,6 +157,29 @@ func (h *Handler) ListMine(c *gin.Context) {
 	response.V2SuccessList(c, items, total)
 }
 
+func (h *Handler) ListMarketplace(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	page, pageSize := middleware.GetPagination(c)
+	demands, total, err := h.clientService.ListMarketplaceDemands(page, pageSize)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	items, err := h.buildDemandSummaries(userID, demands)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2SuccessList(c, items, total)
+}
+
 func (h *Handler) Get(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -262,12 +285,13 @@ func (h *Handler) buildDemandSummaries(userID int64, demands []model.Demand) ([]
 		return nil, err
 	}
 
+	viewerStates, err := h.clientService.GetDemandViewerStates(userID, demandIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	for i := range demands {
-		viewerState, stateErr := h.clientService.GetDemandViewerState(userID, demands[i].ID)
-		if stateErr != nil {
-			return nil, stateErr
-		}
-		items = append(items, buildDemandSummary(&demands[i], stats[demands[i].ID], viewerState))
+		items = append(items, buildDemandSummary(&demands[i], stats[demands[i].ID], viewerStates[demands[i].ID]))
 	}
 	return items, nil
 }

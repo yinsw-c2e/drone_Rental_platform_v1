@@ -3,7 +3,6 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { demandV2Service } from '../../../services/demandV2';
-import { homeService } from '../../../services/home';
 import { RootState } from '../../../store/store';
 import { DemandSummary } from '../../../types';
 import { getDemandSceneLabel, getEffectiveRoleSummary } from '../../../utils';
@@ -59,38 +58,18 @@ export default function DemandListPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  const fetchPublicDemands = async () => {
-    const dashboard: any = await homeService.getDashboard();
-    const demandIds = Array.from(
-      new Set(
-        (dashboard.data?.market_feed || [])
-          .filter((item: any) => item.object_type === 'demand')
-          .map((item: any) => item.object_id),
-      ),
-    );
-    if (demandIds.length === 0) return [];
-    const details = await Promise.all(
-      demandIds.slice(0, PAGE_SIZE).map(async (id: any) => {
-        try {
-          const res: any = await demandV2Service.getById(id);
-          return res.data || res;
-        } catch { return null; }
-      }),
-    );
-    return details.filter(Boolean) as DemandSummary[];
-  };
-
   const fetchDemands = useCallback(async (nextPage = 1, isRefresh = false) => {
     try {
       setLoading(true);
       let items: DemandSummary[] = [];
       let total = 0;
+      const fetchParams = { page: nextPage, page_size: PAGE_SIZE };
 
       if (mode === 'public') {
-        items = await fetchPublicDemands();
-        total = items.length;
+        const res: any = await demandV2Service.listMarketplaceFeed(fetchParams);
+        items = res.data?.items || res.items || [];
+        total = Number(res.data?.total || res.meta?.total || 0);
       } else {
-        const fetchParams = { page: nextPage, page_size: PAGE_SIZE };
         const res: any = mode === 'pilot'
           ? await demandV2Service.listPilotCandidateDemands(fetchParams)
           : await demandV2Service.listMarketplaceDemands(fetchParams);
@@ -103,7 +82,7 @@ export default function DemandListPage() {
       } else {
         setDemands(prev => [...prev, ...items]);
       }
-      setHasMore(mode !== 'public' && nextPage * PAGE_SIZE < total);
+      setHasMore(nextPage * PAGE_SIZE < total);
     } catch (e) {
       console.error('加载失败', e);
     } finally {

@@ -7,7 +7,7 @@ import { RootState } from '../../../store/store';
 import { orderV2Service, confirmReceipt } from '../../../services/orderV2';
 import { V2OrderDetail } from '../../../types';
 import { getObjectStatusMeta } from '../../../utils';
-import heroBgImage from '../../../assets/order-detail/images/order_detail_hero_bg_750x360.png';
+import heroBgImage from '../../../assets/order-detail/images/order_detail_hero_bg_750x360.jpg';
 import calendarIcon from '../../../assets/order-detail/icons/calendar_line.png';
 import chevronIcon from '../../../assets/order-detail/icons/chevron_right.png';
 import locationIcon from '../../../assets/order-detail/icons/location_line.png';

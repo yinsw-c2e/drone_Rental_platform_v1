@@ -59,7 +59,7 @@ export default function NoFlyZoneScreen({route}: any) {
         const data = await findNearbyNoFlyZones(latitude, longitude, 50000);
         setZones(data || []);
       } else {
-        const result = await listNoFlyZones({status: 'active', page_size: 100});
+        const result = await listNoFlyZones({status: 'active', page_size: 50});
         setZones(result.data || []);
       }
     } catch (err: any) {

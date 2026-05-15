@@ -11,6 +11,7 @@ import {apiV2} from './api';
 
 export type SupplyMarketParams = {
   region?: string;
+  keyword?: string;
   cargo_scene?: string;
   service_type?: string;
   min_payload_kg?: number;

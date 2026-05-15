@@ -37,7 +37,7 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
     let mounted = true;
     const fetchDrones = async () => {
       try {
-        const res = await droneService.myDrones({page: 1, page_size: 100});
+        const res = await droneService.myDrones({page: 1, page_size: 50});
         if (!mounted) {
           return;
         }

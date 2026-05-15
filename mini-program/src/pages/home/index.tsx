@@ -15,7 +15,7 @@ import { HomeDashboard, DemandSummary, V2DispatchTaskSummary, V2OrderAnomaly, V2
 import { formatDemandBudget, resolveDemandPrimaryAddress, formatAmountYuan, getObjectStatusMeta } from '../../utils';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { getTonePalette, VisualTone } from '../../components/business/visuals';
-import heroBgImage from '../../assets/workbench/images/workbench_hero_drone_bg_750x310.png';
+import heroBgImage from '../../assets/workbench/images/workbench_hero_drone_bg_750x310.jpg';
 import quickOrderIcon from '../../assets/workbench/icons/paper_plane_blue.png';
 import plusCircleIcon from '../../assets/workbench/icons/plus_circle_white.png';
 import warningIcon from '../../assets/workbench/icons/warning_shield.png';
@@ -239,7 +239,7 @@ export default function HomeScreen() {
 
       await Promise.all(rolesToLoad.map(async (role) => {
         if (role === 'client') {
-          const [demandRes, orderRes] = await Promise.all([demandV2Service.listMyDemands({ page: 1, page_size: 40 }), orderV2Service.list({ role: 'client', page: 1, page_size: 100 })]);
+          const [demandRes, orderRes] = await Promise.all([demandV2Service.listMyDemands({ page: 1, page_size: 40 }), orderV2Service.list({ role: 'client', page: 1, page_size: 50 })]);
           ((demandRes as any).items || []).filter((item: DemandSummary) => ['published', 'quoting'].includes(item.status || '') && Number(item.quote_count || 0) > 0)
             .forEach((item: DemandSummary) => nextItems.push({
               key: `client-demand-${item.id}`, role: 'client', category: 'quote', title: item.title || '待确认方案',
@@ -264,7 +264,7 @@ export default function HomeScreen() {
           });
         }
         if (role === 'owner') {
-          const [demandRes, orderRes] = await Promise.all([demandV2Service.listMarketplaceDemands({ page: 1, page_size: 40 }), orderV2Service.list({ role: 'owner', page: 1, page_size: 100 })]);
+          const [demandRes, orderRes] = await Promise.all([demandV2Service.listMarketplaceDemands({ page: 1, page_size: 40 }), orderV2Service.list({ role: 'owner', page: 1, page_size: 50 })]);
           ((demandRes as any).items || []).forEach((item: DemandSummary) => nextItems.push({
             key: `owner-demand-${item.id}`, role: 'owner', category: 'quote', title: item.title || '待报价任务',
             subtitle: `${resolveDemandPrimaryAddress(item)} · ${formatDemandBudget(item.budget_min, item.budget_max)}`,
@@ -288,7 +288,7 @@ export default function HomeScreen() {
           });
         }
         if (role === 'pilot') {
-          const dispatchRes = await dispatchV2Service.list({ role: 'pilot', page: 1, page_size: 100 });
+          const dispatchRes = await dispatchV2Service.list({ role: 'pilot', page: 1, page_size: 50 });
           ((dispatchRes as any).items || []).forEach((task: V2DispatchTaskSummary) => {
             const ts = String(task.status || '').toLowerCase();
             const os = String(task.order?.status || '').toLowerCase();
@@ -500,10 +500,6 @@ export default function HomeScreen() {
         {/* ── Priority Queue ── */}
         <View className="content-rail">
           <View className="section-wrap">
-            <View className="section-header">
-              <Text className="section-title">今天优先处理</Text>
-              <Text className="section-hint">先处理这些再看其他</Text>
-            </View>
             <View className="priority-board">
               <View className="priority-header-row">
                 <Text className="priority-title">待处理列表</Text>

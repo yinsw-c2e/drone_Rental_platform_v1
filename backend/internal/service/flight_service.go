@@ -13,6 +13,7 @@ import (
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/amap"
+	"wurenji-backend/internal/pkg/limits"
 	"wurenji-backend/internal/repository"
 )
 
@@ -976,11 +977,13 @@ func (s *FlightService) ListUserRoutes(ownerID int64) ([]model.SavedRoute, error
 
 // ListPublicRoutes 获取公开路线
 func (s *FlightService) ListPublicRoutes(limit int) ([]model.SavedRoute, error) {
+	limit = limits.NormalizeLimit(limit, limits.DefaultRouteLimit, limits.MaxRouteLimit)
 	return s.flightRepo.GetPublicRoutes(limit)
 }
 
 // FindNearbyRoutes 查找附近路线
 func (s *FlightService) FindNearbyRoutes(lat, lng, radiusKM float64) ([]model.SavedRoute, error) {
+	radiusKM = limits.NormalizeRadiusKM(radiusKM, 10)
 	return s.flightRepo.FindNearbyRoutes(lat, lng, radiusKM)
 }
 
@@ -1339,6 +1342,7 @@ func (s *FlightService) GetLatestPosition(orderID int64) (*model.FlightPosition,
 
 // GetPositionHistory 获取位置历史
 func (s *FlightService) GetPositionHistory(orderID int64, limit int) ([]model.FlightPosition, error) {
+	limit = limits.NormalizeLimit(limit, limits.DefaultPositionHistoryLimit, limits.MaxPositionHistoryLimit)
 	return s.flightRepo.GetPositionsByOrder(orderID, limit)
 }
 

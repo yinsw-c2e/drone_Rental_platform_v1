@@ -18,9 +18,9 @@ import plusBoxIcon from '../../assets/service-market/icons/plus_box.png';
 import searchIcon from '../../assets/service-market/icons/search.png';
 import serviceHexIcon from '../../assets/service-market/icons/service_hex.png';
 import taskHallIcon from '../../assets/service-market/icons/task_hall.png';
-import serviceDrone1 from '../../assets/service-market/images/service_card_drone_1.png';
-import serviceDrone2 from '../../assets/service-market/images/service_card_drone_2.png';
-import serviceDrone3 from '../../assets/service-market/images/service_card_drone_3.png';
+import serviceDrone1 from '../../assets/service-market/images/service_card_drone_1.jpg';
+import serviceDrone2 from '../../assets/service-market/images/service_card_drone_2.jpg';
+import serviceDrone3 from '../../assets/service-market/images/service_card_drone_3.jpg';
 import './index.scss';
 
 type MarketTab = 'demand' | 'supply';
@@ -288,6 +288,10 @@ export default function MarketPage() {
     Taro.switchTab({ url: '/pages/home/index' });
   }, []);
 
+  const handleQuickOrder = useCallback(() => {
+    Taro.navigateTo({ url: '/pages/publish/quick-order/index' });
+  }, []);
+
   const renderDemandItem = (item: DemandSummary) => (
     <View
       key={item.id}
@@ -387,7 +391,7 @@ export default function MarketPage() {
         <View className="market-content">
           <View className="market-entry-grid">
             <View className="market-entry-row">
-              <View className="market-entry-item market-entry-primary" onClick={() => setActiveTab('supply')}>
+              <View className="market-entry-item market-entry-primary" onClick={handleQuickOrder}>
                 <Image className="market-entry-icon market-entry-icon-white" src={lightningIcon} mode="aspectFit" />
                 <Text className="market-entry-primary-text">快速下单</Text>
               </View>

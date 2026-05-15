@@ -15,7 +15,7 @@ export default function MyOffersPage() {
   const [offers, setOffers] = useState<SupplySummary[]>([]);
   const [activeGroup, setActiveGroup] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const load = () => ownerService.listMySupplies({ page: 1, page_size: 100 }).then(res => setOffers((res as any).items || [])).catch(() => {});
+  const load = () => ownerService.listMySupplies({ page: 1, page_size: 50 }).then(res => setOffers((res as any).items || [])).catch(() => {});
   useDidShow(() => { load(); });
   const filtered = useMemo(() => offers.filter(o => activeGroup === 'all' || o.status === activeGroup), [offers, activeGroup]);
 

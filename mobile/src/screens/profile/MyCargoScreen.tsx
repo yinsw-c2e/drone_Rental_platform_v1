@@ -17,7 +17,7 @@ export default function MyCargoScreen({navigation}: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await demandService.myCargos({page: 1, page_size: 100});
+      const res = await demandService.myCargos({page: 1, page_size: 50});
       setCargos(res.data?.list || []);
     } catch (e) {
       console.warn('获取我的货运失败:', e);

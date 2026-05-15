@@ -29,10 +29,10 @@ export default function SurfaceGroup({ children, style }: Props) {
 
 const styles = StyleSheet.create({
   group: {
-    borderRadius: 22,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 10,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 12,
     elevation: 3,

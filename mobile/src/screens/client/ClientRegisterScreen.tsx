@@ -109,7 +109,7 @@ export default function ClientRegisterScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <ObjectCard style={styles.heroCard}>
           <View style={styles.heroHeader}>
@@ -223,15 +223,17 @@ export default function ClientRegisterScreen({navigation}: any) {
 const getStyles = (theme: AppTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bgSecondary,
+    backgroundColor: theme.bg,
   },
   content: {
-    padding: 16,
+    padding: 12,
     paddingBottom: 32,
-    gap: 14,
+    gap: 12,
   },
   heroCard: {
     backgroundColor: theme.primary,
+    borderRadius: 20,
+    borderWidth: 0,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -239,8 +241,8 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     gap: 12,
   },
   heroTitle: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '700',
     color: theme.btnPrimaryText,
   },
   heroSubtitle: {
@@ -251,10 +253,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   sectionCard: {
     gap: 12,
+    borderRadius: 16,
+    padding: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: theme.text,
   },
   sectionDesc: {
@@ -279,22 +283,22 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.cardBorder,
     borderRadius: 12,
-    backgroundColor: theme.bgSecondary,
+    backgroundColor: theme.inputBg,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
     color: theme.text,
   },
   imageUpload: {
-    minHeight: 180,
+    minHeight: 168,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: theme.cardBorder,
     overflow: 'hidden',
-    backgroundColor: theme.bgSecondary,
+    backgroundColor: theme.inputBg,
   },
   uploadPlaceholder: {
-    minHeight: 180,
+    minHeight: 168,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -315,12 +319,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   footerActions: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 4,
   },
   cancelButton: {
     minWidth: 120,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.divider,
+    borderColor: theme.cardBorder,
     backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',

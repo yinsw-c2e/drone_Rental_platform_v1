@@ -1,10 +1,22 @@
 import Taro from '@tarojs/taro';
 import React, { useMemo, useState } from 'react';
-import { View, Text, Input, Textarea, ScrollView } from '@tarojs/components';
+import { Image, Input, Picker, ScrollView, Text, Textarea, View } from '@tarojs/components';
 import { getClientEligibility } from '../../../services/client';
 import { demandV2Service } from '../../../services/demandV2';
 import { AddressData } from '../../../types';
-import DateTimeField from '../../../components/DateTimeField';
+import backIcon from '../../../assets/publish-task/icons/back.png';
+import calendarIcon from '../../../assets/publish-task/icons/calendar.png';
+import checkCircleIcon from '../../../assets/publish-task/icons/check_circle.png';
+import chevronDownIcon from '../../../assets/publish-task/icons/chevron_down.png';
+import chevronRightIcon from '../../../assets/publish-task/icons/chevron_right.png';
+import clipboardImage from '../../../assets/publish-task/images/clipboard_illustration.png';
+import clockIcon from '../../../assets/publish-task/icons/clock.png';
+import lightbulbIcon from '../../../assets/publish-task/icons/lightbulb.png';
+import lockIcon from '../../../assets/publish-task/icons/lock.png';
+import pinBlueIcon from '../../../assets/publish-task/icons/pin_blue.png';
+import shieldIcon from '../../../assets/publish-task/icons/shield.png';
+import truckImage from '../../../assets/publish-task/images/truck_illustration.png';
+import weightBagIcon from '../../../assets/publish-task/icons/weight_bag.png';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -41,6 +53,11 @@ function parseDateInput(value: string) {
   const d = new Date(value.trim().replace(/-/g, '/'));
   return Number.isNaN(d.getTime()) ? null : d;
 }
+
+const splitDateTimeValue = (value: string) => {
+  const [date = '', time = ''] = String(value || '').split(/\s+/);
+  return { date, time };
+};
 
 const formatAddress = (addr?: AddressData | null) =>
   addr?.address || addr?.name || '';
@@ -80,6 +97,18 @@ export default function PublishDemandPage() {
   const [startTime, setStartTime] = useState(() => formatDateTime(defaultStart));
   const [endTime, setEndTime] = useState(() => formatDateTime(defaultEnd));
 
+  const startParts = splitDateTimeValue(startTime);
+  const endParts = splitDateTimeValue(endTime);
+
+  const handleBack = () => {
+    const pages = Taro.getCurrentPages();
+    if (pages.length > 1) {
+      Taro.navigateBack();
+      return;
+    }
+    Taro.switchTab({ url: '/pages/home/index' });
+  };
+
   const chooseServiceAddress = async () => {
     try {
       const res = await Taro.chooseLocation({});
@@ -93,6 +122,20 @@ export default function PublishDemandPage() {
       }
     } catch {
       // 用户取消选点时不打扰。
+    }
+  };
+
+  const updateSchedulePart = (target: 'start' | 'end', part: 'date' | 'time', value: string) => {
+    const current = splitDateTimeValue(target === 'start' ? startTime : endTime);
+    const fallback = splitDateTimeValue(formatDateTime(target === 'start' ? defaultStart : defaultEnd));
+    const date = part === 'date' ? value : current.date || fallback.date;
+    const time = part === 'time' ? value : current.time || fallback.time;
+    const nextValue = `${date} ${time}`;
+
+    if (target === 'start') {
+      setStartTime(nextValue);
+    } else {
+      setEndTime(nextValue);
     }
   };
 
@@ -225,117 +268,283 @@ export default function PublishDemandPage() {
   };
 
   return (
-    <View className="publish-wrap">
-      <View className="publish-steps">
-        <View className="publish-step-track">
-          <View className="publish-step-dot publish-step-dot-active" />
-          <View className={`publish-step-line ${step >= 2 ? 'publish-step-line-active' : ''}`} />
-          <View className={`publish-step-dot ${step >= 2 ? 'publish-step-dot-active' : ''}`} />
+    <View className="pt-page">
+      <View className="pt-navbar">
+        <View className="pt-nav-left" onClick={handleBack}>
+          <Image className="pt-back-icon" src={backIcon} mode="aspectFit" />
         </View>
-        <View className="publish-step-labels">
-          <Text className="publish-step-label publish-step-label-active">基础信息</Text>
-          <Text className={`publish-step-label ${step >= 2 ? 'publish-step-label-active' : ''}`}>运输细节</Text>
+        <Text className="pt-nav-title">发布任务</Text>
+        <View className="pt-nav-right" />
+      </View>
+
+      <View className="pt-stepper">
+        <View className="pt-step-track">
+          <View className="pt-step-item">
+            <View className={`pt-step-node ${step >= 1 ? 'is-active' : ''}`}>
+              <Text>{step === 1 ? '1' : '✓'}</Text>
+            </View>
+            <Text className={`pt-step-label ${step >= 1 ? 'is-active' : ''}`}>基础信息</Text>
+          </View>
+          <View className={`pt-step-line ${step === 2 ? 'is-complete' : ''}`} />
+          <View className="pt-step-item">
+            <View className={`pt-step-node ${step === 2 ? 'is-active' : ''}`}>
+              <Text>2</Text>
+            </View>
+            <Text className={`pt-step-label ${step === 2 ? 'is-active' : ''}`}>运输细节</Text>
+          </View>
         </View>
       </View>
 
-      <ScrollView scrollY className="publish-scroll">
-        {step === 1 ? (
-          <View className="publish-card">
-            <Text className="section-title">第 1/2 步：基础信息</Text>
+      <ScrollView scrollY className="pt-scroll">
+        <View className="pt-body">
+          {step === 1 ? (
+            <View className="pt-card">
+              <Image className="pt-card-ill" src={clipboardImage} mode="aspectFit" />
+              <Text className="pt-card-title">第 1/2 步：基础信息</Text>
 
-            <Text className="publish-label">需求标题 *</Text>
-            <Input className="publish-input" placeholder="例如：山区电网建设塔材吊运" value={title} onInput={e => setTitle(e.detail.value)} />
-
-            <Text className="publish-label">作业场景 *</Text>
-            <View className="publish-option-row">
-              {SCENE_OPTIONS.map(opt => (
-                <View
-                  key={opt.key}
-                  className={`publish-option-btn ${!customCargoScene.trim() && cargoScene === opt.key ? 'publish-option-active' : ''}`}
-                  onClick={() => {
-                    setCargoScene(opt.key);
-                    setCustomCargoScene('');
-                  }}
-                >
-                  <Text className={`publish-option-text ${!customCargoScene.trim() && cargoScene === opt.key ? 'publish-option-text-active' : ''}`}>{opt.label}</Text>
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">需求标题</Text>
+                  <Text className="pt-required">*</Text>
                 </View>
-              ))}
-            </View>
-            <Input
-              className="publish-input publish-custom-scene-input"
-              placeholder="其他场景，可直接填写"
-              value={customCargoScene}
-              onInput={e => setCustomCargoScene(e.detail.value)}
-            />
-
-            <Text className="publish-label">服务地址 *</Text>
-            <View className="publish-address-field" onClick={chooseServiceAddress}>
-              <Text className={`publish-address-text ${serviceAddress ? '' : 'publish-placeholder'}`}>
-                {formatAddress(serviceAddress) || '点击选择主要作业地址'}
-              </Text>
-              <Text className="publish-address-arrow">›</Text>
-            </View>
-
-            <Text className="publish-label">货物重量 (kg) *</Text>
-            <View className="publish-input-unit-wrap">
-              <Input className="publish-input" type="digit" placeholder="例如：80" value={cargoWeight} onInput={e => setCargoWeight(e.detail.value)} />
-              <Text className="publish-input-unit">kg</Text>
-            </View>
-
-            <Text className="publish-label">货物尺寸（cm，可选）</Text>
-            <View className="publish-dimension-row">
-              <Input className="publish-input publish-dimension-input" type="digit" placeholder="长" value={cargoLength} onInput={e => setCargoLength(e.detail.value)} />
-              <Input className="publish-input publish-dimension-input" type="digit" placeholder="宽" value={cargoWidth} onInput={e => setCargoWidth(e.detail.value)} />
-              <Input className="publish-input publish-dimension-input" type="digit" placeholder="高" value={cargoHeight} onInput={e => setCargoHeight(e.detail.value)} />
-            </View>
-
-            <View className="publish-tip-card">
-              <Text className="publish-tip-title">草稿提示</Text>
-              <Text className="publish-tip-text">可以先保存草稿，之后在“我的需求”里继续补充和发布。</Text>
-            </View>
-
-            <View className="publish-actions">
-              <View className={`publish-btn-secondary ${submitting ? 'publish-btn-disabled' : ''}`} onClick={handleSaveDraft}>
-                <Text className="publish-btn-secondary-text">保存草稿</Text>
+                <Input
+                  className="pt-input"
+                  placeholder="例如：山区电网建设塔材吊运"
+                  placeholderClass="pt-placeholder"
+                  value={title}
+                  onInput={e => setTitle(e.detail.value)}
+                />
               </View>
-              <View className="publish-btn-primary" onClick={handleNextStep}>
-                <Text className="publish-btn-primary-text">下一步</Text>
+
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">作业场景</Text>
+                  <Text className="pt-required">*</Text>
+                </View>
+                <View className="pt-scene-row">
+                  {SCENE_OPTIONS.map(opt => {
+                    const active = !customCargoScene.trim() && cargoScene === opt.key;
+                    return (
+                      <View
+                        key={opt.key}
+                        className={`pt-pill ${active ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setCargoScene(opt.key);
+                          setCustomCargoScene('');
+                        }}
+                      >
+                        <Text>{opt.label}</Text>
+                        {active ? <Image src={checkCircleIcon} className="pt-pill-check" mode="aspectFit" /> : null}
+                      </View>
+                    );
+                  })}
+                </View>
+                <Input
+                  className="pt-input pt-input-other"
+                  placeholder="其他场景，可直接填写"
+                  placeholderClass="pt-placeholder"
+                  value={customCargoScene}
+                  onInput={e => setCustomCargoScene(e.detail.value)}
+                />
+              </View>
+
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">服务地址</Text>
+                  <Text className="pt-required">*</Text>
+                </View>
+                <View className="pt-input pt-input-with-icon" onClick={chooseServiceAddress}>
+                  <View className="pt-input-iconbox">
+                    <Image src={pinBlueIcon} mode="aspectFit" />
+                  </View>
+                  <Text className={`pt-field-value ${serviceAddress ? '' : 'is-placeholder'}`}>
+                    {formatAddress(serviceAddress) || '点击选择主要作业地址'}
+                  </Text>
+                  <Image src={chevronRightIcon} className="pt-input-arrow" mode="aspectFit" />
+                </View>
+              </View>
+
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">货物重量（kg）</Text>
+                  <Text className="pt-required">*</Text>
+                </View>
+                <View className="pt-input pt-input-with-icon">
+                  <View className="pt-input-iconbox">
+                    <Image src={weightBagIcon} mode="aspectFit" />
+                  </View>
+                  <Input
+                    className="pt-inner-input"
+                    type="digit"
+                    placeholder="例如：80"
+                    placeholderClass="pt-placeholder"
+                    value={cargoWeight}
+                    onInput={e => setCargoWeight(e.detail.value)}
+                  />
+                  <Text className="pt-unit">kg</Text>
+                </View>
+              </View>
+
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">货物尺寸（cm，可选）</Text>
+                </View>
+                <View className="pt-size-row">
+                  <View className="pt-size-input">
+                    <Text className="pt-size-prefix">长</Text>
+                    <Input className="pt-size-control" type="digit" placeholder="请输入" placeholderClass="pt-placeholder" value={cargoLength} onInput={e => setCargoLength(e.detail.value)} />
+                    <Text className="pt-unit">cm</Text>
+                  </View>
+                  <View className="pt-size-input">
+                    <Text className="pt-size-prefix">宽</Text>
+                    <Input className="pt-size-control" type="digit" placeholder="请输入" placeholderClass="pt-placeholder" value={cargoWidth} onInput={e => setCargoWidth(e.detail.value)} />
+                    <Text className="pt-unit">cm</Text>
+                  </View>
+                  <View className="pt-size-input">
+                    <Text className="pt-size-prefix">高</Text>
+                    <Input className="pt-size-control" type="digit" placeholder="请输入" placeholderClass="pt-placeholder" value={cargoHeight} onInput={e => setCargoHeight(e.detail.value)} />
+                    <Text className="pt-unit">cm</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View className="pt-tip">
+                <Image src={lightbulbIcon} mode="aspectFit" />
+                <View className="pt-tip-content">
+                  <Text className="pt-tip-title">草稿提示</Text>
+                  <Text className="pt-tip-text">可以先保存草稿，之后在“我的需求”里继续补充和发布。</Text>
+                </View>
+              </View>
+
+              <View className="pt-actions pt-actions-two">
+                <View className={`pt-btn pt-btn-outline ${submitting ? 'is-disabled' : ''}`} onClick={handleSaveDraft}>
+                  <Text>保存草稿</Text>
+                </View>
+                <View className="pt-btn pt-btn-primary" onClick={handleNextStep}>
+                  <Text>下一步</Text>
+                </View>
               </View>
             </View>
-          </View>
-        ) : (
-          <View className="publish-card">
-            <Text className="section-title">第 2/2 步：运输细节与说明</Text>
+          ) : (
+            <View className="pt-card pt-card-step2">
+              <Image className="pt-card-ill pt-card-ill-truck" src={truckImage} mode="aspectFit" />
+              <Text className="pt-card-title">第 2/2 步：运输细节与说明</Text>
 
-            <Text className="publish-label">预计架次</Text>
-            <Input className="publish-input" type="digit" placeholder="默认 1 架次" value={tripCount} onInput={e => setTripCount(e.detail.value)} />
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">预计架次</Text>
+                </View>
+                <View className="pt-input pt-input-select">
+                  <Input
+                    className="pt-inner-input"
+                    type="digit"
+                    placeholder="默认 1 架次"
+                    placeholderClass="pt-placeholder"
+                    value={tripCount}
+                    onInput={e => setTripCount(e.detail.value)}
+                  />
+                  <Image src={chevronDownIcon} className="pt-input-arrow" mode="aspectFit" />
+                </View>
+              </View>
 
-            <DateTimeField label="预约开始时间" value={startTime} onChange={setStartTime} required />
-            <DateTimeField label="预约结束时间" value={endTime} onChange={setEndTime} required />
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">预约开始时间</Text>
+                  <Text className="pt-required">*</Text>
+                </View>
+                <View className="pt-date-row">
+                  <Picker mode="date" value={startParts.date} onChange={e => updateSchedulePart('start', 'date', e.detail.value)}>
+                    <View className="pt-date-input">
+                      <Image src={calendarIcon} mode="aspectFit" />
+                      <Text>{startParts.date}</Text>
+                    </View>
+                  </Picker>
+                  <Picker mode="time" value={startParts.time} onChange={e => updateSchedulePart('start', 'time', e.detail.value)}>
+                    <View className="pt-date-input">
+                      <Image src={clockIcon} mode="aspectFit" />
+                      <Text>{startParts.time}</Text>
+                    </View>
+                  </Picker>
+                </View>
+              </View>
 
-            <Text className="publish-label">预算范围 (元)</Text>
-            <View className="publish-budget-row">
-              <Input className="publish-input publish-flex-input" type="digit" placeholder="最低" value={budgetMin} onInput={e => setBudgetMin(e.detail.value)} />
-              <Text className="publish-split">-</Text>
-              <Input className="publish-input publish-flex-input" type="digit" placeholder="最高" value={budgetMax} onInput={e => setBudgetMax(e.detail.value)} />
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">预约结束时间</Text>
+                  <Text className="pt-required">*</Text>
+                </View>
+                <View className="pt-date-row">
+                  <Picker mode="date" value={endParts.date} onChange={e => updateSchedulePart('end', 'date', e.detail.value)}>
+                    <View className="pt-date-input">
+                      <Image src={calendarIcon} mode="aspectFit" />
+                      <Text>{endParts.date}</Text>
+                    </View>
+                  </Picker>
+                  <Picker mode="time" value={endParts.time} onChange={e => updateSchedulePart('end', 'time', e.detail.value)}>
+                    <View className="pt-date-input">
+                      <Image src={clockIcon} mode="aspectFit" />
+                      <Text>{endParts.time}</Text>
+                    </View>
+                  </Picker>
+                </View>
+              </View>
+
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">预算范围（元）</Text>
+                </View>
+                <View className="pt-budget-row">
+                  <Input className="pt-budget-input" type="digit" placeholder="最低" placeholderClass="pt-placeholder" value={budgetMin} onInput={e => setBudgetMin(e.detail.value)} />
+                  <Text className="pt-budget-dash">-</Text>
+                  <Input className="pt-budget-input" type="digit" placeholder="最高" placeholderClass="pt-placeholder" value={budgetMax} onInput={e => setBudgetMax(e.detail.value)} />
+                </View>
+              </View>
+
+              <View className="pt-field">
+                <View className="pt-label-row">
+                  <Text className="pt-label">需求说明</Text>
+                </View>
+                <View className="pt-textarea-wrap">
+                  <Textarea
+                    className="pt-textarea"
+                    maxlength={500}
+                    placeholder="补充货物类型、现场条件、时效要求等"
+                    placeholderClass="pt-placeholder"
+                    value={description}
+                    onInput={e => setDescription(e.detail.value)}
+                  />
+                  <Text className="pt-count">{description.length}/500</Text>
+                </View>
+              </View>
+
+              <View className="pt-tip">
+                <Image src={shieldIcon} mode="aspectFit" />
+                <View className="pt-tip-content">
+                  <Text className="pt-tip-title">温馨提示</Text>
+                  <Text className="pt-tip-text">请尽量提供详细信息，有助于服务商更精准地为您报价与服务。</Text>
+                </View>
+              </View>
+
+              <View className="pt-actions pt-actions-three">
+                <View className="pt-btn pt-btn-muted" onClick={() => setStep(1)}>
+                  <Text>上一步</Text>
+                </View>
+                <View className={`pt-btn pt-btn-outline ${submitting ? 'is-disabled' : ''}`} onClick={handleSaveDraft}>
+                  <Text>保存草稿</Text>
+                </View>
+                <View className={`pt-btn pt-btn-primary ${submitting ? 'is-disabled' : ''}`} onClick={handlePublish}>
+                  <Text>{submitting ? '发布中...' : '确认发布'}</Text>
+                </View>
+              </View>
+
+              <View className="pt-safe-note">
+                <Image src={lockIcon} mode="aspectFit" />
+                <Text>您的信息将严格保密，仅用于本次任务撮合服务</Text>
+              </View>
             </View>
-
-            <Text className="publish-label">需求说明</Text>
-            <Textarea className="publish-textarea" placeholder="补充货物类型、现场条件、时效要求等" value={description} onInput={e => setDescription(e.detail.value)} />
-
-            <View className="publish-actions publish-actions-multi">
-              <View className="publish-btn-ghost" onClick={() => setStep(1)}>
-                <Text className="publish-btn-ghost-text">上一步</Text>
-              </View>
-              <View className={`publish-btn-secondary ${submitting ? 'publish-btn-disabled' : ''}`} onClick={handleSaveDraft}>
-                <Text className="publish-btn-secondary-text">保存草稿</Text>
-              </View>
-              <View className={`publish-btn-primary ${submitting ? 'publish-btn-disabled' : ''}`} onClick={handlePublish}>
-                <Text className="publish-btn-primary-text">{submitting ? '发布中...' : '确认发布'}</Text>
-              </View>
-            </View>
-          </View>
-        )}
+          )}
+          <View className="pt-bottom-space" />
+        </View>
       </ScrollView>
     </View>
   );

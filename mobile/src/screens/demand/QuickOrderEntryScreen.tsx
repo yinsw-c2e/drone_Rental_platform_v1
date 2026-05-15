@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -20,6 +21,7 @@ import {AddressData, QuickOrderDraft} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {isAirspaceHardBlocked} from '../../utils/airspaceRisk';
+import {quickOrderAssets} from '../../assets/miniProgramAssets';
 
 const sceneOptions = [
   {key: 'power_grid', label: '电网建设'},
@@ -216,10 +218,27 @@ export default function QuickOrderEntryScreen({navigation}: any) {
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ObjectCard>
-          <Text style={styles.sectionTitle}>第 1 步：填写最小信息</Text>
+        <View style={styles.heroCard}>
+          <View style={styles.heroIconWrap}>
+            <Image source={quickOrderAssets.target} style={styles.heroIcon} resizeMode="contain" />
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>快速下单</Text>
+            <Text style={styles.heroTitle}>先填核心需求，再挑选推荐服务</Text>
+            <Text style={styles.heroSub}>系统会根据地址、载重和时间匹配可承接服务。</Text>
+          </View>
+        </View>
 
-          <Text style={styles.label}>起点地址 *</Text>
+        <ObjectCard>
+          <View style={styles.sectionTitleRow}>
+            <Image source={quickOrderAssets.grid} style={styles.sectionIcon} resizeMode="contain" />
+            <Text style={styles.sectionTitle}>第 1 步：填写最小信息</Text>
+          </View>
+
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.pinStart} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>起点地址 *</Text>
+          </View>
           <AddressInputField value={pickupAddress} placeholder="点击选择起点地址" onSelect={setPickupAddress} />
           <AirspaceRiskNotice
             label="起点"
@@ -232,7 +251,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             }
           />
 
-          <Text style={styles.label}>终点地址 *</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.pinEnd} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>终点地址 *</Text>
+          </View>
           <AddressInputField value={deliveryAddress} placeholder="点击选择终点地址" onSelect={setDeliveryAddress} />
           <AirspaceRiskNotice
             label="终点"
@@ -245,7 +267,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             }
           />
 
-          <Text style={styles.label}>货物重量预估 (kg) *</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.weightBag} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>货物重量预估 (kg) *</Text>
+          </View>
           <TextInput
             style={styles.input}
             keyboardType="numeric"
@@ -255,7 +280,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             onChangeText={setCargoWeight}
           />
 
-          <Text style={styles.label}>货物类型</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.cube} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>货物类型</Text>
+          </View>
           <TextInput
             style={styles.input}
             placeholder="例如：塔材、设备箱、海鲜补给"
@@ -264,7 +292,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             onChangeText={setCargoType}
           />
 
-          <Text style={styles.label}>货物尺寸 (cm)</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.ruler} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>货物尺寸 (cm)</Text>
+          </View>
           <View style={styles.dimensionRow}>
             <TextInput
               style={[styles.input, styles.dimensionInput]}
@@ -292,7 +323,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             />
           </View>
 
-          <Text style={styles.label}>作业场景 *</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.grid} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>作业场景 *</Text>
+          </View>
           <View style={styles.optionRow}>
             {sceneOptions.map(option => (
               <TouchableOpacity
@@ -316,7 +350,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             onChangeText={setCustomCargoScene}
           />
 
-          <Text style={styles.label}>期望开始时间 *</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.calendar} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>期望开始时间 *</Text>
+          </View>
           <TouchableOpacity style={styles.input} onPress={() => setShowStartPicker(true)}>
             <Text style={styles.dateText}>{formatDateTime(startDate)}</Text>
           </TouchableOpacity>
@@ -330,7 +367,10 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             />
           ) : null}
 
-          <Text style={styles.label}>期望结束时间 *</Text>
+          <View style={styles.labelRow}>
+            <Image source={quickOrderAssets.clock} style={styles.labelIcon} resizeMode="contain" />
+            <Text style={styles.label}>期望结束时间 *</Text>
+          </View>
           <TouchableOpacity style={styles.input} onPress={() => setShowEndPicker(true)}>
             <Text style={styles.dateText}>{formatDateTime(endDate)}</Text>
           </TouchableOpacity>
@@ -363,29 +403,99 @@ export default function QuickOrderEntryScreen({navigation}: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: {flex: 1, backgroundColor: theme.card},
-    content: {padding: 16, paddingBottom: 40, gap: 12},
+    container: {flex: 1, backgroundColor: theme.bg},
+    content: {padding: 12, paddingBottom: 40, gap: 12},
+    heroCard: {
+      minHeight: 124,
+      borderRadius: 18,
+      padding: 16,
+      backgroundColor: '#E6F4FF',
+      borderWidth: 1,
+      borderColor: '#91CAFF',
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: '#142850',
+      shadowOffset: {width: 0, height: 8},
+      shadowOpacity: theme.isDark ? 0 : 0.06,
+      shadowRadius: 18,
+      elevation: 2,
+    },
+    heroIconWrap: {
+      width: 58,
+      height: 58,
+      borderRadius: 18,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    heroIcon: {
+      width: 36,
+      height: 36,
+    },
+    heroCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    heroEyebrow: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: '800',
+    },
+    heroTitle: {
+      marginTop: 6,
+      fontSize: 19,
+      lineHeight: 24,
+      color: theme.text,
+      fontWeight: '900',
+    },
+    heroSub: {
+      marginTop: 6,
+      fontSize: 12,
+      lineHeight: 18,
+      color: theme.textSub,
+      fontWeight: '600',
+    },
+    sectionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    sectionIcon: {
+      width: 22,
+      height: 22,
+      marginRight: 8,
+    },
     sectionTitle: {
       fontSize: 17,
       fontWeight: '800',
       color: theme.text,
-      marginBottom: 4,
+    },
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      marginTop: 16,
+    },
+    labelIcon: {
+      width: 18,
+      height: 18,
+      marginRight: 8,
     },
     label: {
       fontSize: 14,
       fontWeight: '700',
       color: theme.text,
-      marginBottom: 8,
-      marginTop: 16,
     },
     input: {
       borderWidth: 1,
-      borderColor: theme.cardBorder,
+      borderColor: theme.inputBorder,
       borderRadius: 12,
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 15,
-      backgroundColor: theme.bgSecondary,
+      backgroundColor: theme.inputBg,
+      color: theme.text,
     },
     dateText: {
       fontSize: 15,
@@ -406,16 +516,16 @@ const getStyles = (theme: AppTheme) =>
       borderColor: theme.primary,
       backgroundColor: theme.primary + '22',
     },
-	    optionText: {fontSize: 13, color: theme.textSub},
-	    optionTextActive: {color: theme.primary, fontWeight: '700'},
-	    dimensionRow: {
-	      flexDirection: 'row',
-	      gap: 10,
-	    },
-	    dimensionInput: {
-	      flex: 1,
-	      minWidth: 0,
-	    },
+    optionText: {fontSize: 13, color: theme.textSub},
+    optionTextActive: {color: theme.primary, fontWeight: '700'},
+    dimensionRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    dimensionInput: {
+      flex: 1,
+      minWidth: 0,
+    },
     submitBtn: {
       marginTop: 8,
       height: 50,

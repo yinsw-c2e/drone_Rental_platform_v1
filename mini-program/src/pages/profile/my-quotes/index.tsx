@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default function MyQuotesPage() {
   const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
   const [activeGroup, setActiveGroup] = useState<string>('all');
-  useDidShow(() => { ownerService.listMyQuotes({ page: 1, page_size: 100 }).then(res => setQuotes((res as any).items || [])).catch(() => {}); });
+  useDidShow(() => { ownerService.listMyQuotes({ page: 1, page_size: 50 }).then(res => setQuotes((res as any).items || [])).catch(() => {}); });
   const filtered = useMemo(() => quotes.filter(q => activeGroup === 'all' || q.status === activeGroup), [quotes, activeGroup]);
 
   return (

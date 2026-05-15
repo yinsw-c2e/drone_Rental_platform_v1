@@ -37,7 +37,7 @@ export default function FlightRecordsPage() {
   const [loading, setLoading] = useState(true);
 
   useDidShow(() => {
-    pilotV2Service.listAllFlightRecords({ page_size: 100 }).then(res => {
+    pilotV2Service.listAllFlightRecords({ page_size: 50 }).then(res => {
       setRecords(Array.isArray(res) ? res : []);
     }).catch(() => setRecords([])).finally(() => setLoading(false));
   });

@@ -70,7 +70,7 @@ export default function NoFlyZonePage() {
     try {
       const nextZones = hasLocation
         ? await airspaceService.findNearbyNoFlyZones(latitude, longitude, 50000)
-        : (await airspaceService.listNoFlyZones({ status: 'active', page: 1, page_size: 100 })).data;
+        : (await airspaceService.listNoFlyZones({ status: 'active', page: 1, page_size: 50 })).data;
       setZones(nextZones || []);
     } catch (error: any) {
       const message = getFriendlyErrorMessage(error, '禁飞区加载失败');

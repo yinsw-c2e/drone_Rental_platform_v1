@@ -24,7 +24,7 @@ export default function CargoAcceptScreen({route, navigation}: any) {
 
   const fetchMyDrones = async () => {
     try {
-      const res = await droneService.myDrones({page: 1, page_size: 100});
+      const res = await droneService.myDrones({page: 1, page_size: 50});
       const availableDrones = (res.data?.list || []).filter(
         (d: Drone) => d.availability_status === 'available'
       );

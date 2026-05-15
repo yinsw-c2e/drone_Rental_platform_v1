@@ -42,7 +42,7 @@ export default function MyQuotesScreen({navigation}: any) {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await ownerService.listMyQuotes({page: 1, page_size: 100});
+      const res = await ownerService.listMyQuotes({page: 1, page_size: 50});
       setQuotes(res.data?.items || []);
     } catch (error) {
       console.warn('获取我的报价失败:', error);

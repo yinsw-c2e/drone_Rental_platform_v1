@@ -2,6 +2,7 @@ package repository
 
 import (
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
 )
@@ -52,6 +53,8 @@ func (r *MatchingRepo) FindAvailableOffers(lat, lng, radiusKM float64, demandTyp
 	err := r.db.Preload("Drone").
 		Where("status = ?", "active").
 		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM).
+		Order("created_at DESC").
+		Limit(limits.MaxMatchingCandidates).
 		Find(&offers).Error
 	return offers, err
 }
@@ -63,6 +66,8 @@ func (r *MatchingRepo) FindAvailableDrones(lat, lng, radiusKM float64) ([]model.
 	err := r.db.Where("availability_status = ?", "available").
 		Where("certification_status = ?", "approved").
 		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM).
+		Order("updated_at DESC").
+		Limit(limits.MaxMatchingCandidates).
 		Find(&drones).Error
 	return drones, err
 }

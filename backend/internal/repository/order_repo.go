@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
 )
@@ -261,13 +263,17 @@ func filterUnsupportedOrderOptionalFields(db *gorm.DB, fields map[string]interfa
 func (r *OrderRepo) ListByPilot(pilotID int64, status string, page, pageSize int) ([]model.Order, int64, error) {
 	var orders []model.Order
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
+
 	query := r.db.Model(&model.Order{}).Where("pilot_id = ?", pilotID)
 	if status != "" {
 		query = query.Where("status = ?", status)
 	} else {
 		query = query.Where("status NOT IN (?)", []string{"completed", "cancelled"})
 	}
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&orders).Error
 	return orders, total, err
 }
@@ -275,6 +281,7 @@ func (r *OrderRepo) ListByPilot(pilotID int64, status string, page, pageSize int
 func (r *OrderRepo) ListByUser(userID int64, role string, status string, page, pageSize int) ([]model.Order, int64, error) {
 	var orders []model.Order
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Order{})
 	switch role {
@@ -292,7 +299,9 @@ func (r *OrderRepo) ListByUser(userID int64, role string, status string, page, p
 		query = query.Where("status = ?", status)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Preload("Demand").Preload("Drone").Preload("Owner").Preload("Pilot").Preload("Renter").
 		Offset((page - 1) * pageSize).Limit(pageSize).
 		Order("created_at DESC").Find(&orders).Error
@@ -302,13 +311,16 @@ func (r *OrderRepo) ListByUser(userID int64, role string, status string, page, p
 func (r *OrderRepo) List(page, pageSize int, filters map[string]interface{}) ([]model.Order, int64, error) {
 	var orders []model.Order
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Order{})
 	for k, v := range filters {
 		query = query.Where(k+" = ?", v)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Preload("Drone").Preload("Owner").Preload("Renter").
 		Offset((page - 1) * pageSize).Limit(pageSize).
 		Order("created_at DESC").Find(&orders).Error

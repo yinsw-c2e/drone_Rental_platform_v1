@@ -53,7 +53,7 @@ export default function OwnerPilotBindingsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const res = await ownerService.listPilotBindings({page: 1, page_size: 100, status: activeFilter === 'all' ? undefined : activeFilter});
+      const res = await ownerService.listPilotBindings({page: 1, page_size: 50, status: activeFilter === 'all' ? undefined : activeFilter});
       setBindings(res.data?.items || []);
     } finally {
       setLoading(false);

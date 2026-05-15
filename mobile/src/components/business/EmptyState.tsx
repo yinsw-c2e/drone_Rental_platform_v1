@@ -45,15 +45,15 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 56,
+    paddingVertical: 40,
     paddingHorizontal: 28,
   },
   icon: {
-    fontSize: 44,
+    fontSize: 40,
     marginBottom: 12,
   },
   title: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     marginTop: 18,
-    borderRadius: 999,
+    borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 10,

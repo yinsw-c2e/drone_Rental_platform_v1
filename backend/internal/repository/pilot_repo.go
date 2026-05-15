@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 )
 
 type PilotRepo struct {
@@ -75,6 +76,7 @@ func (r *PilotRepo) UpdateAvailability(id int64, status string) error {
 func (r *PilotRepo) List(page, pageSize int, filters map[string]interface{}) ([]model.Pilot, int64, error) {
 	var pilots []model.Pilot
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Pilot{}).Where("deleted_at IS NULL")
 
@@ -92,7 +94,9 @@ func (r *PilotRepo) List(page, pageSize int, filters map[string]interface{}) ([]
 		}
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Preload("User").Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&pilots).Error
 	return pilots, total, err
 }
@@ -100,6 +104,9 @@ func (r *PilotRepo) List(page, pageSize int, filters map[string]interface{}) ([]
 // FindNearby 查找附近在线飞手
 func (r *PilotRepo) FindNearby(lat, lng, radiusKM float64, limit int) ([]model.Pilot, error) {
 	var pilots []model.Pilot
+	radiusKM = limits.NormalizeRadiusKM(radiusKM, 50)
+	limit = limits.NormalizeLimit(limit, limits.DefaultPageSize, limits.MaxNearbyLimit)
+
 	// 使用 Haversine 公式计算距离
 	err := r.db.Raw(`
 		SELECT p.*,
@@ -122,13 +129,16 @@ func (r *PilotRepo) FindNearby(lat, lng, radiusKM float64, limit int) ([]model.P
 func (r *PilotRepo) FindByLicenseType(licenseType string, page, pageSize int) ([]model.Pilot, int64, error) {
 	var pilots []model.Pilot
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Pilot{}).
 		Where("deleted_at IS NULL").
 		Where("verification_status = 'verified'").
 		Where("caac_license_type = ?", licenseType)
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Preload("User").Offset((page - 1) * pageSize).Limit(pageSize).Order("service_rating DESC").Find(&pilots).Error
 	return pilots, total, err
 }
@@ -191,12 +201,15 @@ func (r *PilotRepo) UpdateCertificationStatus(id int64, status, note string, rev
 func (r *PilotRepo) ListPendingCertifications(page, pageSize int) ([]model.PilotCertification, int64, error) {
 	var certs []model.PilotCertification
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.PilotCertification{}).
 		Where("deleted_at IS NULL").
 		Where("status = 'pending'")
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Preload("Pilot").Preload("Pilot.User").
 		Offset((page - 1) * pageSize).Limit(pageSize).
 		Order("created_at ASC").Find(&certs).Error
@@ -214,9 +227,12 @@ func (r *PilotRepo) CreateFlightLog(log *model.PilotFlightLog) error {
 func (r *PilotRepo) GetFlightLogsByPilotID(pilotID int64, page, pageSize int) ([]model.PilotFlightLog, int64, error) {
 	var logs []model.PilotFlightLog
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.PilotFlightLog{}).Where("pilot_id = ?", pilotID)
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("flight_date DESC").Find(&logs).Error
 	return logs, total, err
 }

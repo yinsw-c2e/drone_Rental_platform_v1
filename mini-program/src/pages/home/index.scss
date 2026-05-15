@@ -247,30 +247,14 @@ $heroPadding: 17;
 }
 
 .section-wrap {
-  margin-top: 17px;
+  margin-top: 12px;
 }
 
-.section-header {
-  margin: 0 0 8px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-title,
 .quick-grid-title {
   color: #0f172a;
   font-size: 15px;
   line-height: 21px;
   font-weight: 900;
-}
-
-.section-hint {
-  color: #94a3b8;
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 600;
 }
 
 .priority-board {

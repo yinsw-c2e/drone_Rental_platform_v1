@@ -189,35 +189,44 @@ $line: #e9eef5;
 .progress-focus-title-wrap {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
-  gap: 14rpx;
-  height: 48rpx;
+  align-items: center;
+  gap: 10rpx;
+  height: 34rpx;
 }
 
 .section-glyph {
   position: relative;
-  width: 40rpx;
-  height: 40rpx;
+  width: 34rpx;
+  height: 34rpx;
   display: block;
-  flex: 0 0 40rpx;
+  flex: 0 0 34rpx;
   color: $primary;
   box-sizing: border-box;
+  transform: translateY(-9rpx);
+}
+
+.section-glyph-progress {
+  transform: translateY(-10rpx);
+}
+
+.section-glyph-task {
+  transform: translateY(-8rpx);
 }
 
 .section-glyph-progress,
 .section-glyph-task {
   overflow: hidden;
-  border-radius: 8rpx;
+  border-radius: 7rpx;
   background: linear-gradient(180deg, #4a91ff 0%, #216dff 100%);
-  box-shadow: 0 4rpx 10rpx rgba(43, 118, 255, 0.22);
+  box-shadow: 0 3rpx 8rpx rgba(43, 118, 255, 0.2);
 }
 
 .section-glyph-clip {
   position: absolute;
-  left: 12rpx;
-  top: 6rpx;
-  width: 16rpx;
-  height: 5rpx;
+  left: 10rpx;
+  top: 5rpx;
+  width: 14rpx;
+  height: 4rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.78);
 }
@@ -226,33 +235,33 @@ $line: #e9eef5;
   position: absolute;
   right: 0;
   top: 0;
-  width: 13rpx;
-  height: 13rpx;
-  border-radius: 0 8rpx 0 5rpx;
+  width: 11rpx;
+  height: 11rpx;
+  border-radius: 0 7rpx 0 4rpx;
   background: rgba(255, 255, 255, 0.58);
 }
 
 .section-glyph-line {
   position: absolute;
-  left: 10rpx;
-  height: 4rpx;
+  left: 9rpx;
+  height: 3rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.86);
 }
 
 .section-glyph-line-a {
-  top: 16rpx;
-  width: 20rpx;
+  top: 13rpx;
+  width: 17rpx;
 }
 
 .section-glyph-line-b {
-  top: 24rpx;
-  width: 18rpx;
+  top: 20rpx;
+  width: 15rpx;
 }
 
 .section-glyph-line-c {
-  top: 32rpx;
-  width: 14rpx;
+  top: 26rpx;
+  width: 12rpx;
   opacity: 0.78;
 }
 
@@ -262,13 +271,13 @@ $line: #e9eef5;
 
 .section-glyph-action-handle {
   position: absolute;
-  left: 12rpx;
+  left: 10rpx;
   top: 3rpx;
-  width: 16rpx;
-  height: 13rpx;
-  border: 4rpx solid $primary;
+  width: 14rpx;
+  height: 11rpx;
+  border: 3rpx solid $primary;
   border-bottom: 0;
-  border-radius: 8rpx 8rpx 0 0;
+  border-radius: 7rpx 7rpx 0 0;
   box-sizing: border-box;
 }
 
@@ -277,16 +286,16 @@ $line: #e9eef5;
   left: 2rpx;
   right: 2rpx;
   bottom: 0;
-  height: 29rpx;
-  border-radius: 7rpx;
+  height: 24rpx;
+  border-radius: 6rpx;
   background: linear-gradient(180deg, #4a91ff 0%, #216dff 100%);
-  box-shadow: 0 4rpx 10rpx rgba(43, 118, 255, 0.22);
+  box-shadow: 0 3rpx 8rpx rgba(43, 118, 255, 0.2);
 }
 
 .section-glyph-action-lock {
   position: absolute;
-  left: 18rpx;
-  top: 20rpx;
+  left: 15rpx;
+  top: 17rpx;
   width: 4rpx;
   height: 4rpx;
   border-radius: 999rpx;
@@ -297,17 +306,16 @@ $line: #e9eef5;
 .section-title {
   display: block;
   color: #111827;
-  font-size: 36rpx;
-  line-height: 48rpx;
-  font-weight: 900;
-  margin-bottom: 12px;
+  font-size: 32rpx;
+  line-height: 40rpx;
+  font-weight: 800;
+  margin-bottom: 10px;
 }
 
 .section-title-inline {
-  display: flex;
-  align-items: center;
-  height: 48rpx;
-  line-height: 48rpx;
+  display: block;
+  height: 34rpx;
+  line-height: 34rpx;
   margin-bottom: 0;
 }
 
@@ -325,7 +333,7 @@ $line: #e9eef5;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .focus-eta-pill {
@@ -358,13 +366,13 @@ $line: #e9eef5;
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 10px;
+  gap: 9px;
 }
 
 .progress-main-icon {
-  width: 23px;
-  height: 23px;
-  margin-top: 3px;
+  width: 21px;
+  height: 21px;
+  margin-top: 2px;
   display: block;
   flex-shrink: 0;
 }
@@ -385,24 +393,24 @@ $line: #e9eef5;
 .focus-title {
   display: block;
   color: $text;
-  font-size: 25px;
-  line-height: 31px;
-  font-weight: 900;
+  font-size: 21px;
+  line-height: 27px;
+  font-weight: 800;
   word-break: break-word;
 }
 
 .focus-desc {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: $textSub;
-  font-size: 14px;
-  line-height: 23px;
+  font-size: 13px;
+  line-height: 21px;
   font-weight: 500;
   word-break: break-word;
 }
 
 .action-card .section-head-left {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .order-action-list {

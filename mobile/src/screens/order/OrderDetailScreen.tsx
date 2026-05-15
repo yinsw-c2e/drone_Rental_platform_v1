@@ -2,6 +2,7 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -31,6 +32,7 @@ import {
 import {formatOrderCancelReason} from '../../utils/orderPresentation';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {orderDetailAssets} from '../../assets/miniProgramAssets';
 
 type ActionButton = {
   label: string;
@@ -672,11 +674,11 @@ function TimelineSection({items, isClient}: {items?: V2OrderTimelineEvent[]; isC
 
   const getEventIcon = (type: string) => {
     switch (type) {
-      case 'payment': return '💰';
-      case 'refund': return '💸';
-      case 'dispatch_task': return '📋';
-      case 'flight_record': return '🚁';
-      default: return '📍';
+      case 'payment': return orderDetailAssets.actionBriefcase;
+      case 'refund': return orderDetailAssets.taskDocument;
+      case 'dispatch_task': return orderDetailAssets.timelineList;
+      case 'flight_record': return orderDetailAssets.timelineClock;
+      default: return orderDetailAssets.locationLine;
     }
   };
 
@@ -693,9 +695,9 @@ function TimelineSection({items, isClient}: {items?: V2OrderTimelineEvent[]; isC
           const description = getTimelineDescription(item, isClient);
           return (
             <View key={`${item.event_id}-${index}`} style={styles.timelineItem}>
-              <View style={styles.timelineAxis}>
-                <View style={styles.timelineIconBg}>
-                  <Text style={styles.timelineIconText}>{getEventIcon(item.source_type)}</Text>
+                <View style={styles.timelineAxis}>
+                  <View style={styles.timelineIconBg}>
+                  <Image source={getEventIcon(item.source_type)} style={styles.timelineIconImage} resizeMode="contain" />
                 </View>
                 {!isLast ? <View style={styles.timelineLine} /> : null}
               </View>
@@ -1116,6 +1118,9 @@ export default function OrderDetailScreen({route, navigation}: any) {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
+          {!theme.isDark ? (
+            <Image source={orderDetailAssets.hero} style={styles.heroBgImage} resizeMode="cover" />
+          ) : null}
           <View style={styles.heroTopRow}>
             <View style={styles.heroTagRow}>
               <SourceTag source={getSourceTag(detail.order_source)} />
@@ -1388,14 +1393,28 @@ const getStyles = (theme: AppTheme) =>
       marginBottom: 16,
     },
     hero: {
-      borderRadius: 24,
-      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : theme.primary,
-      padding: 20,
+      position: 'relative',
+      borderRadius: 18,
+      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : '#0753D8',
+      padding: 18,
       marginBottom: 12,
+      overflow: 'hidden',
       borderWidth: theme.isDark ? 1 : 0,
       borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
+      shadowColor: '#125EDC',
+      shadowOffset: {width: 0, height: 9},
+      shadowOpacity: theme.isDark ? 0 : 0.18,
+      shadowRadius: 24,
+      elevation: 6,
+    },
+    heroBgImage: {
+      ...StyleSheet.absoluteFillObject,
+      width: '100%',
+      height: '100%',
     },
     heroTopRow: {
+      position: 'relative',
+      zIndex: 2,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -1410,19 +1429,25 @@ const getStyles = (theme: AppTheme) =>
       fontWeight: '600',
     },
     heroTitle: {
+      position: 'relative',
+      zIndex: 2,
       marginTop: 14,
-      fontSize: 24,
-      lineHeight: 30,
+      fontSize: 20,
+      lineHeight: 25,
       color: theme.isDark ? theme.text : '#FFFFFF',
-      fontWeight: '800',
+      fontWeight: '900',
     },
     heroRoute: {
+      position: 'relative',
+      zIndex: 2,
       marginTop: 10,
       fontSize: 13,
       lineHeight: 20,
       color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
     },
     heroSummaryRow: {
+      position: 'relative',
+      zIndex: 2,
       flexDirection: 'row',
       marginTop: 18,
       borderTopWidth: 1,
@@ -1638,6 +1663,10 @@ const getStyles = (theme: AppTheme) =>
     },
     timelineIconText: {
       fontSize: 12,
+    },
+    timelineIconImage: {
+      width: 15,
+      height: 15,
     },
     timelineLine: {
       width: 2,

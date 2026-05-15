@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 )
 
 func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, serviceType string, minPayloadKG float64, acceptsDirectOrder *bool, page, pageSize int) ([]model.OwnerSupply, int64, error) {
 	var supplies []model.OwnerSupply
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.OwnerSupply{}).
 		Joins("JOIN drones ON drones.id = owner_supplies.drone_id AND drones.deleted_at IS NULL").
@@ -92,6 +94,7 @@ func (r *OwnerDomainRepo) GetMarketplaceSupplyByID(id int64) (*model.OwnerSupply
 func (r *OwnerDomainRepo) ListSuppliesByOwner(ownerUserID int64, status string, page, pageSize int) ([]model.OwnerSupply, int64, error) {
 	var supplies []model.OwnerSupply
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.OwnerSupply{}).Where("owner_user_id = ?", ownerUserID)
 	if status != "" {
@@ -114,6 +117,7 @@ func (r *OwnerDomainRepo) ListSuppliesByOwner(ownerUserID int64, status string, 
 func (r *OwnerDomainRepo) AdminListSupplies(page, pageSize int, filters map[string]interface{}) ([]model.OwnerSupply, int64, error) {
 	var supplies []model.OwnerSupply
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.OwnerSupply{}).
 		Joins("LEFT JOIN drones ON drones.id = owner_supplies.drone_id AND drones.deleted_at IS NULL").
@@ -186,6 +190,7 @@ func (r *OwnerDomainRepo) UpdateSupplyFields(id int64, fields map[string]interfa
 func (r *OwnerDomainRepo) ListBindingsByOwner(ownerUserID int64, status string, page, pageSize int) ([]model.OwnerPilotBinding, int64, error) {
 	var bindings []model.OwnerPilotBinding
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.OwnerPilotBinding{}).Where("owner_user_id = ?", ownerUserID)
 	if status != "" {
@@ -245,6 +250,7 @@ func (r *OwnerDomainRepo) ListExpiredPendingBindings(cutoff time.Time, limit int
 func (r *DemandDomainRepo) ListRecommendedDemands(page, pageSize int) ([]model.Demand, int64, error) {
 	var demands []model.Demand
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Demand{}).
 		Where("status IN ?", []string{"published", "quoting"}).
@@ -276,6 +282,7 @@ func (r *DemandDomainRepo) GetQuoteByDemandAndOwner(demandID, ownerUserID int64)
 func (r *DemandDomainRepo) ListQuotesByOwner(ownerUserID int64, status string, page, pageSize int) ([]model.DemandQuote, int64, error) {
 	var quotes []model.DemandQuote
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.DemandQuote{}).Where("owner_user_id = ?", ownerUserID)
 	if status != "" {

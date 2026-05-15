@@ -60,7 +60,7 @@ export default function MessagesPage() {
   useDidShow(() => {
     syncCustomTabBar(1);
     Promise.all([
-      notificationV2Service.list({ page: 1, page_size: 100 }),
+      notificationV2Service.list({ page: 1, page_size: 50 }),
       messageService.getConversations()
     ]).then(([nr, cr]) => {
       const ns = (nr as any).items || [];

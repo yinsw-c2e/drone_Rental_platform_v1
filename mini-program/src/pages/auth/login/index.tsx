@@ -4,7 +4,13 @@ import { View, Text, Input, Button, Image } from '@tarojs/components';
 import { useDispatch } from 'react-redux';
 import { authService } from '../../../services/auth';
 import { setCredentials } from '../../../store/slices/authSlice';
+import loginBg from '../../../assets/login/images/login_page_bg.jpg';
+import phoneIcon from '../../../assets/login/icons/phone.png';
+import lockIcon from '../../../assets/login/icons/lock.png';
+import eyeOffIcon from '../../../assets/login/icons/eye_off.png';
 import wechatIcon from '../../../assets/icons/wechat.svg';
+import toolsIcon from '../../../assets/login/icons/tools.png';
+import userIcon from '../../../assets/login/icons/user.png';
 import './index.scss';
 
 const QUICK_ACCOUNTS = [
@@ -17,10 +23,10 @@ const QUICK_ACCOUNTS = [
 ];
 
 const ROLE_CATEGORIES = [
-  { key: 'client', label: '📦 客户', color: '#1677FF' },
-  { key: 'owner', label: '🚁 机主', color: '#52C41A' },
-  { key: 'pilot', label: '✈️ 飞手', color: '#FA8C16' },
-  { key: 'composite', label: '🧩 复合', color: '#F5222D' },
+  { key: 'client', label: '客户', color: '#2A78FF' },
+  { key: 'owner', label: '机主', color: '#19A974' },
+  { key: 'pilot', label: '飞手', color: '#FA8C16' },
+  { key: 'composite', label: '复合', color: '#F5222D' },
 ];
 
 const ROLE_ACCOUNTS: Record<string, typeof QUICK_ACCOUNTS> = {
@@ -36,6 +42,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loginMode, setLoginMode] = useState<'code' | 'password'>('password');
   const [countdown, setCountdown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -119,17 +126,27 @@ export default function LoginPage() {
 
   return (
     <View className="login-root">
+      <Image className="login-bg" src={loginBg} mode="widthFix" />
       <View className="login-scroll">
         <View className="login-scroll-content">
-          <View style={{ height: '40px' }} />
-          <Text className="login-title">无人机服务</Text>
-          <Text className="login-subtitle">重载运输调度平台</Text>
+          <View className="login-hero">
+            <Text className="login-title">无人机服务</Text>
+            <View className="login-subtitle-row">
+              <View className="login-subtitle-line" />
+              <Text className="login-subtitle">重载运输调度平台</Text>
+              <View className="login-subtitle-line" />
+            </View>
+          </View>
 
           <View className="login-form-card">
-            <Input className="login-input" placeholder="手机号" type="number" maxlength={11} value={phone} onInput={e => setPhone(e.detail.value)} />
+            <View className="login-input-row">
+              <Image className="login-input-icon" src={phoneIcon} mode="aspectFit" />
+              <Input className="login-input" placeholderClass="login-placeholder" placeholder="手机号" type="number" maxlength={11} value={phone} onInput={e => setPhone(e.detail.value)} />
+            </View>
             {loginMode === 'code' ? (
-              <View className="login-code-row">
-                <Input className="login-input login-code-input" placeholder="验证码" type="number" maxlength={6} value={code} onInput={e => setCode(e.detail.value)} />
+              <View className="login-input-row login-code-row">
+                <Image className="login-input-icon" src={lockIcon} mode="aspectFit" />
+                <Input className="login-input login-code-input" placeholderClass="login-placeholder" placeholder="验证码" type="number" maxlength={6} value={code} onInput={e => setCode(e.detail.value)} />
                 <View className={`login-code-btn ${countdown > 0 ? 'login-code-btn-disabled' : ''}`} {...bindPress(() => {
                   if (countdown === 0) Taro.showToast({title: '功能暂未开放'});
                 })}>
@@ -137,7 +154,11 @@ export default function LoginPage() {
                 </View>
               </View>
             ) : (
-              <Input className="login-input" placeholder="密码" password value={password} onInput={e => setPassword(e.detail.value)} />
+              <View className="login-input-row">
+                <Image className="login-input-icon" src={lockIcon} mode="aspectFit" />
+                <Input className="login-input" placeholderClass="login-placeholder" placeholder="密码" password={!showPassword} value={password} onInput={e => setPassword(e.detail.value)} />
+                <Image className="login-eye-icon" src={eyeOffIcon} mode="aspectFit" {...bindPress(() => setShowPassword(value => !value))} />
+              </View>
             )}
             <View className={`login-submit-btn ${submitting ? 'login-submit-btn-disabled' : ''}`} {...bindPress(handleLogin)}>
               <Text className="login-submit-btn-text">{submitting ? '登录中...' : '登 录'}</Text>
@@ -170,18 +191,25 @@ export default function LoginPage() {
             </View>
           </View>
 
-          <View className="login-dev-section" style={{ marginTop: '40px', paddingBottom: '100px' }}>
-            <Text className="login-dev-title">🛠️ 开发模式快速登录</Text>
+          <View className="login-dev-section">
+            <View className="login-dev-title-row">
+              <Image className="login-dev-tools-icon" src={toolsIcon} mode="aspectFit" />
+              <Text className="login-dev-title">开发模式快速登录</Text>
+            </View>
+
             {ROLE_CATEGORIES.map(cat => {
               const accounts = ROLE_ACCOUNTS[cat.key] || [];
               return (
                 <View key={cat.key} className="login-dev-group">
-                  <Text className="login-dev-group-title" style={{ color: cat.color }}>{cat.label}</Text>
+                  <View className="login-dev-role-row">
+                    <Image className="login-dev-user-icon" src={userIcon} mode="aspectFit" />
+                    <Text className="login-dev-role" style={{ color: cat.color }}>{cat.label}</Text>
+                  </View>
                   <View className="login-dev-account-list">
                     {accounts.map(account => (
                       <Button
                         key={account.phone}
-                        className="login-dev-account-btn"
+                        className={`login-dev-account-btn ${submitting ? 'login-dev-account-btn-disabled' : ''}`}
                         style={{ borderColor: cat.color, color: cat.color }}
                         plain
                         disabled={submitting}

@@ -5,8 +5,8 @@
   "appid": "touristappid",
   "setting": {
     "urlCheck": false,
-    "es6": true,
-    "enhance": true,
+    "es6": false,
+    "enhance": false,
     "compileWorklet": false,
     "postcss": true,
     "minified": true,
@@ -29,7 +29,7 @@
       "outputPath": ""
     },
     "useIsolateContext": true,
-    "useCompilerModule": true,
+    "useCompilerModule": false,
     "userConfirmedUseCompilerModuleSwitch": false,
     "packNpmManually": false,
     "packNpmRelationList": [],
@@ -42,7 +42,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "3.8.0",
+  "libVersion": "3.7.12",
   "condition": {},
   "simulatorPluginLibVersion": {},
   "packOptions": {

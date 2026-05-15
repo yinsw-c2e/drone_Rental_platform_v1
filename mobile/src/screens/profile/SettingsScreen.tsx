@@ -607,17 +607,15 @@ export default function SettingsScreen({ navigation }: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.bgSecondary },
-    scrollContent: { paddingBottom: 40 },
-    sectionHeader: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
-    sectionTitle: { fontSize: 13, color: theme.textSub, fontWeight: '500' },
+    container: { flex: 1, backgroundColor: theme.bg },
+    scrollContent: { padding: 12, paddingBottom: 40 },
+    sectionHeader: { paddingHorizontal: 4, paddingTop: 8, paddingBottom: 8 },
+    sectionTitle: { fontSize: 15, color: theme.text, fontWeight: '700' },
     section: {
-      marginHorizontal: 12,
-      borderRadius: 14,
+      borderRadius: 16,
       backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
       overflow: 'hidden',
+      marginBottom: 12,
     },
     row: {
       flexDirection: 'row',
@@ -626,7 +624,7 @@ const getStyles = (theme: AppTheme) =>
       paddingHorizontal: 16,
       paddingVertical: 14,
       borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
+      borderBottomColor: theme.cardBorder,
     },
     rowLast: {
       borderBottomWidth: 0,
@@ -648,11 +646,8 @@ const getStyles = (theme: AppTheme) =>
 
     // Diagnostic Section Styles
     diagnosticSection: {
-      marginHorizontal: 12,
-      borderRadius: 14,
+      borderRadius: 16,
       backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.cardBorder,
       overflow: 'hidden',
     },
     diagnosticBanner: {
@@ -661,7 +656,7 @@ const getStyles = (theme: AppTheme) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
+      borderBottomColor: theme.cardBorder,
     },
     statusDot: {
       width: 8,
@@ -763,14 +758,14 @@ const getStyles = (theme: AppTheme) =>
 
     logoutBtn: {
       marginHorizontal: 24,
-      marginTop: 24,
+      marginTop: 12,
       height: 48,
-      backgroundColor: theme.card,
-      borderRadius: 12,
+      backgroundColor: theme.danger + '14',
+      borderRadius: 999,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: theme.danger,
+      borderColor: theme.danger + '33',
     },
-    logoutText: { color: theme.danger, fontSize: 16, fontWeight: '500' },
+    logoutText: { color: theme.danger, fontSize: 16, fontWeight: '600' },
   });

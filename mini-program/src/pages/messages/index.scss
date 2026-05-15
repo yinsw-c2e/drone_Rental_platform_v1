@@ -316,19 +316,19 @@
 .c-swipe-area {
   position: relative;
   width: calc(100% - 46px);
-  height: 88px;
-  margin: 0 23px 11px;
-  border-radius: 12px;
+  height: 74px;
+  margin: 0 23px 9px;
+  border-radius: 11px;
   overflow: hidden;
-  background: linear-gradient(135deg, #ff3045, #f43a43);
-  box-shadow: 0 6px 18px rgba(20, 40, 80, 0.08);
+  background: transparent;
+  box-shadow: 0 4px 14px rgba(20, 40, 80, 0.06);
 }
 
 .c-swipe-view {
   position: relative;
   z-index: 2;
   width: 100%;
-  height: 88px;
+  height: 74px;
   transition: transform 180ms ease;
   will-change: transform;
 }
@@ -343,8 +343,8 @@
   top: 0;
   z-index: 1;
   width: 76px;
-  height: 88px;
-  border-radius: 0 12px 12px 0;
+  height: 74px;
+  border-radius: 0 11px 11px 0;
   background: linear-gradient(135deg, #ff3045, #f43a43);
   display: flex;
   align-items: center;
@@ -353,17 +353,17 @@
 
 .c-delete-text {
   color: #ffffff;
-  font-size: 16px;
-  line-height: 21px;
-  font-weight: 900;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 800;
 }
 
 .c-card {
   width: 100%;
-  height: 88px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
+  height: 74px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: #ffffff;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -377,21 +377,21 @@
 }
 
 .c-avatar {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   background: #eef5ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
+  margin-right: 11px;
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .c-avatar-img {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   display: block;
 }
 
@@ -406,17 +406,17 @@
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-bottom: 5px;
 }
 
 .c-title {
   flex: 1;
   min-width: 0;
   color: #0f172a;
-  font-size: 17px;
-  line-height: 22px;
-  font-weight: 900;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -424,8 +424,8 @@
 
 .c-time {
   color: #64748b;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 17px;
   font-weight: 600;
   margin-left: 10px;
   flex-shrink: 0;
@@ -443,8 +443,8 @@
   min-width: 0;
   margin-right: 12px;
   color: #64748b;
-  font-size: 14px;
-  line-height: 19px;
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;

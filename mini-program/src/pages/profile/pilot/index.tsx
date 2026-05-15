@@ -95,9 +95,9 @@ export default function PilotProfilePage() {
     try {
       const [profileRes, flightRecords, dispatchRes] = await Promise.all([
         pilotV2Service.getProfile().catch(() => null),
-        pilotV2Service.listAllFlightRecords({ page_size: 100 }).catch(() => []),
+        pilotV2Service.listAllFlightRecords({ page_size: 50 }).catch(() => []),
         dispatchV2Service
-          .list({ role: "pilot", page: 1, page_size: 100 })
+          .list({ role: "pilot", page: 1, page_size: 50 })
           .catch(() => null),
       ]);
 

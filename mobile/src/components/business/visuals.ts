@@ -49,13 +49,13 @@ const DARK_TONE_MAP: Record<VisualTone, TonePalette> = {
 };
 
 const LIGHT_TONE_MAP: Record<VisualTone, TonePalette> = {
-  blue:   {bg: '#e6f4ff', border: '#91caff', text: '#0958d9'},
-  green:  {bg: '#f6ffed', border: '#b7eb8f', text: '#389e0d'},
-  orange: {bg: '#fff7e6', border: '#ffd591', text: '#d46b08'},
-  red:    {bg: '#fff1f0', border: '#ffccc7', text: '#cf1322'},
-  gray:   {bg: '#f5f5f5', border: '#d9d9d9', text: '#595959'},
-  teal:   {bg: '#e6fffb', border: '#87e8de', text: '#08979c'},
-  purple: {bg: '#f9f0ff', border: '#d3adf7', text: '#722ed1'},
+  blue:   {bg: '#E6F4FF', border: '#91CAFF', text: '#1677FF'},
+  green:  {bg: '#F6FFED', border: '#B7EB8F', text: '#52C41A'},
+  orange: {bg: '#FFF7E6', border: '#FFD591', text: '#FA8C16'},
+  red:    {bg: '#FFF1F0', border: '#FFCCC7', text: '#F5222D'},
+  gray:   {bg: '#F5F7FA', border: '#E8ECF1', text: '#6B7280'},
+  teal:   {bg: '#E6FFFB', border: '#87E8DE', text: '#13C2C2'},
+  purple: {bg: '#F9F0FF', border: '#D3ADF7', text: '#722ED1'},
 };
 
 export const getTonePalette = (tone: VisualTone, isDark = true): TonePalette =>
@@ -63,9 +63,9 @@ export const getTonePalette = (tone: VisualTone, isDark = true): TonePalette =>
 
 const DEMAND_STATUS: Record<string, BadgeMeta> = {
   draft: {label: '草稿', tone: 'gray'},
-  published: {label: '已发布', tone: 'blue'},
-  quoting: {label: '报价中', tone: 'orange'},
-  selected: {label: '已选方案', tone: 'green'},
+  published: {label: '询价中', tone: 'blue'},
+  quoting: {label: '询价中', tone: 'orange'},
+  selected: {label: '已选定', tone: 'green'},
   converted_to_order: {label: '已转订单', tone: 'green'},
   matched: {label: '已匹配', tone: 'green'},
   cancelled: {label: '已取消', tone: 'gray'},
@@ -91,18 +91,18 @@ const QUOTE_STATUS: Record<string, BadgeMeta> = {
 const ORDER_STATUS: Record<string, BadgeMeta> = {
   created: {label: '待确认', tone: 'orange'},
   accepted: {label: '待支付', tone: 'blue'},
-  pending_provider_confirmation: {label: '待机主确认', tone: 'orange'},
-  provider_rejected: {label: '机主已拒绝', tone: 'red'},
+  pending_provider_confirmation: {label: '待承接', tone: 'orange'},
+  provider_rejected: {label: '已拒绝', tone: 'red'},
   pending_payment: {label: '待支付', tone: 'blue'},
   paid: {label: '已支付', tone: 'green'},
   pending_dispatch: {label: '待派单', tone: 'orange'},
   assigned: {label: '已分配', tone: 'green'},
-  confirmed: {label: '已确认接单', tone: 'green'},
+  confirmed: {label: '已确认', tone: 'green'},
   airspace_applying: {label: '申请空域中', tone: 'blue'},
   airspace_approved: {label: '空域已批准', tone: 'green'},
   loading: {label: '装货中', tone: 'blue'},
   in_transit: {label: '运输中', tone: 'blue'},
-  delivered: {label: '已送达', tone: 'green'},
+  delivered: {label: '待签收', tone: 'green'},
   completed: {label: '已完成', tone: 'green'},
   cancelled: {label: '已取消', tone: 'gray'},
   refunded: {label: '已退款', tone: 'gray'},
@@ -163,7 +163,7 @@ export const getObjectStatusMeta = (
   status?: string | null,
 ): BadgeMeta => {
   const key = String(status || '').toLowerCase();
-  const fallback: BadgeMeta = {label: key || '未知状态', tone: 'gray'};
+  const fallback: BadgeMeta = {label: key ? '状态未知' : '未知状态', tone: 'gray'};
   if (kind === 'demand') return DEMAND_STATUS[key] || fallback;
   if (kind === 'quote') return QUOTE_STATUS[key] || fallback;
   if (kind === 'supply') return SUPPLY_STATUS[key] || fallback;

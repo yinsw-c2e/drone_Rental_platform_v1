@@ -140,7 +140,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
     setLoading(true);
     try {
       const [droneRes, supplyRes] = await Promise.all([
-        droneService.myDrones({page: 1, page_size: 100}),
+        droneService.myDrones({page: 1, page_size: 50}),
         isEditing ? ownerService.getMySupplyById(supplyId) : Promise.resolve(null),
       ]);
 

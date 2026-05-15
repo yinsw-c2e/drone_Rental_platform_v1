@@ -4,11 +4,13 @@ import (
 	"time"
 
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 )
 
 func (r *OwnerDomainRepo) ListBindingsByPilot(pilotUserID int64, status string, page, pageSize int) ([]model.OwnerPilotBinding, int64, error) {
 	var bindings []model.OwnerPilotBinding
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.OwnerPilotBinding{}).Where("pilot_user_id = ?", pilotUserID)
 	if status != "" {
@@ -31,6 +33,7 @@ func (r *OwnerDomainRepo) ListBindingsByPilot(pilotUserID int64, status string, 
 func (r *DemandDomainRepo) ListCandidateDemands(page, pageSize int) ([]model.Demand, int64, error) {
 	var demands []model.Demand
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Demand{}).
 		Where("service_type = ?", "heavy_cargo_lift_transport").
@@ -97,6 +100,7 @@ func (r *DispatchRepo) GetFormalTaskByID(id int64) (*model.FormalDispatchTask, e
 func (r *DispatchRepo) ListFormalTasksByPilot(pilotUserID int64, status string, page, pageSize int) ([]model.FormalDispatchTask, int64, error) {
 	var tasks []model.FormalDispatchTask
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.FormalDispatchTask{}).Where("target_pilot_user_id = ?", pilotUserID)
 	if status != "" {
@@ -127,6 +131,7 @@ func (r *DispatchRepo) UpdateFormalTaskFields(id int64, fields map[string]interf
 func (r *FlightRepo) ListFlightRecordsByPilot(pilotUserID int64, page, pageSize int) ([]model.FlightRecord, int64, error) {
 	var records []model.FlightRecord
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.FlightRecord{}).
 		Where("pilot_user_id = ? AND deleted_at IS NULL", pilotUserID)

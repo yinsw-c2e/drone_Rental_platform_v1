@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"wurenji-backend/internal/pkg/limits"
 )
 
 const (
@@ -23,9 +25,11 @@ func PaginationMiddleware(defaultPage, defaultPageSize, maxPageSize int) gin.Han
 	}
 
 	return func(c *gin.Context) {
-		page := parsePositiveInt(c.Query("page"), defaultPage)
-		pageSize := parsePositiveInt(c.Query("page_size"), defaultPageSize)
-		if pageSize > maxPageSize {
+		page, pageSize := limits.NormalizePagination(
+			parsePositiveInt(c.Query("page"), defaultPage),
+			parsePositiveInt(c.Query("page_size"), defaultPageSize),
+		)
+		if maxPageSize > 0 && pageSize > maxPageSize {
 			pageSize = maxPageSize
 		}
 

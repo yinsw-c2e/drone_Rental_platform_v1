@@ -49,7 +49,7 @@ export default function DispatchListPage() {
     setLoading(true);
     try {
       const role = roleSummary?.has_owner_role ? 'owner' : 'pilot';
-      const res: any = await dispatchV2Service.list({ role, page: 1, page_size: 100 });
+      const res: any = await dispatchV2Service.list({ role, page: 1, page_size: 50 });
       setTasks(res.data?.items || res.items || []);
     } catch (error) {
       console.error('获取派单列表失败:', error);

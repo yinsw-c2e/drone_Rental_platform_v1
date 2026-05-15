@@ -8,14 +8,22 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     resolve: {
-      alias: {
-        'react-native': path.resolve(__dirname, 'src/utils/react-native.web.ts'),
-        'react-native$': path.resolve(__dirname, 'src/utils/react-native.web.ts'),
-        'react-native-config': path.resolve(__dirname, 'src/utils/config.web.ts'),
-        'react-native-linear-gradient': path.resolve(__dirname, 'src/components/LinearGradient.web.tsx'),
-        '@react-navigation/native': path.resolve(__dirname, 'src/utils/navigation.web.ts'),
-        '@react-native-community/datetimepicker': path.resolve(__dirname, 'src/utils/DateTimePicker.web.tsx'),
-      },
+      alias: [
+        {find: /^react-native$/, replacement: path.resolve(__dirname, 'src/utils/react-native.web.ts')},
+        {find: /^react-native-config$/, replacement: path.resolve(__dirname, 'src/utils/config.web.ts')},
+        {find: /^react-native-linear-gradient$/, replacement: path.resolve(__dirname, 'src/components/LinearGradient.web.tsx')},
+        {find: /^(\.{1,2}\/)+assets\/miniProgramAssets$/, replacement: path.resolve(__dirname, 'src/assets/miniProgramAssets.web.ts')},
+        {
+          find: /^react-native\/Libraries\/Utilities\/codegenNativeComponent$/,
+          replacement: path.resolve(__dirname, 'src/utils/codegenNativeComponent.web.tsx'),
+        },
+        {
+          find: /^react-native\/Libraries\/ReactNative\/AppContainer$/,
+          replacement: path.resolve(__dirname, 'src/utils/AppContainer.web.tsx'),
+        },
+        {find: /^@react-navigation\/native$/, replacement: path.resolve(__dirname, 'src/utils/navigation.web.ts')},
+        {find: /^@react-native-community\/datetimepicker$/, replacement: path.resolve(__dirname, 'src/utils/DateTimePicker.web.tsx')},
+      ],
       extensions: ['.web.tsx', '.web.ts', '.web.js', '.tsx', '.ts', '.js'],
     },
     define: {

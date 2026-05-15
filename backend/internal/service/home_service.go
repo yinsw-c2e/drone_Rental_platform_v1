@@ -12,8 +12,8 @@ import (
 
 const (
 	homeDashboardServiceType = "heavy_cargo_lift_transport"
-	homeOrderScanLimit       = 100
-	homeDemandScanLimit      = 100
+	homeOrderScanLimit       = 50
+	homeDemandScanLimit      = 50
 )
 
 var homeInProgressStatuses = map[string]bool{
@@ -314,7 +314,7 @@ func (s *HomeService) buildPilotDashboard(userID int64) (*HomePilotDashboard, er
 	}
 	view.CandidateDemandCount = candidateDemandTotal
 
-	acceptedTasks, _, err := s.pilotService.ListDispatchTasks(userID, "accepted", 1, 100)
+	acceptedTasks, _, err := s.pilotService.ListDispatchTasks(userID, "accepted", 1, homeOrderScanLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (s *HomeService) buildPilotDashboard(userID int64) (*HomePilotDashboard, er
 			activeCount++
 		}
 	}
-	executingTasks, _, err := s.pilotService.ListDispatchTasks(userID, "executing", 1, 100)
+	executingTasks, _, err := s.pilotService.ListDispatchTasks(userID, "executing", 1, homeOrderScanLimit)
 	if err != nil {
 		return nil, err
 	}

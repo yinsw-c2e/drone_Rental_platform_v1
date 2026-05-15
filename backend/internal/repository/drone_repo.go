@@ -2,6 +2,7 @@ package repository
 
 import (
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
 )
@@ -43,9 +44,12 @@ func (r *DroneRepo) Delete(id int64) error {
 func (r *DroneRepo) ListByOwner(ownerID int64, page, pageSize int) ([]model.Drone, int64, error) {
 	var drones []model.Drone
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Drone{}).Where("owner_id = ?", ownerID)
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&drones).Error
 	return drones, total, err
 }
@@ -74,13 +78,16 @@ func (r *DroneRepo) CountMarketplaceEligibleByOwner(ownerID int64) (int64, error
 func (r *DroneRepo) List(page, pageSize int, filters map[string]interface{}) ([]model.Drone, int64, error) {
 	var drones []model.Drone
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.Drone{}) // 暂时移除 .Preload("Owner")
 	for k, v := range filters {
 		query = query.Where(k+" = ?", v)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&drones).Error
 	return drones, total, err
 }
@@ -88,6 +95,8 @@ func (r *DroneRepo) List(page, pageSize int, filters map[string]interface{}) ([]
 func (r *DroneRepo) FindNearby(lat, lng, radiusKM float64, page, pageSize int) ([]model.Drone, int64, error) {
 	var drones []model.Drone
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
+	radiusKM = limits.NormalizeRadiusKM(radiusKM, 50)
 
 	// Haversine formula for distance calculation
 	distanceExpr := `(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))`
@@ -102,7 +111,9 @@ func (r *DroneRepo) FindNearby(lat, lng, radiusKM float64, page, pageSize int) (
 		Where("COALESCE(NULLIF(max_payload_kg, 0), max_load) >= ?", model.HeavyLiftMinPayloadKG).
 		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM)
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.
 		Select("*, "+distanceExpr+" AS distance", lat, lng, lat).
 		Order("distance ASC").
@@ -133,9 +144,12 @@ func (r *DroneRepo) CreateMaintenanceLog(log *model.DroneMaintenanceLog) error {
 func (r *DroneRepo) GetMaintenanceLogs(droneID int64, page, pageSize int) ([]model.DroneMaintenanceLog, int64, error) {
 	var logs []model.DroneMaintenanceLog
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.DroneMaintenanceLog{}).Where("drone_id = ?", droneID)
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("maintenance_date DESC").Find(&logs).Error
 	return logs, total, err
 }
@@ -172,6 +186,8 @@ func (r *DroneRepo) GetActiveInsurance(droneID int64, insuranceType string) (*mo
 func (r *DroneRepo) FindFullyCertifiedDrones(lat, lng, radiusKM float64, page, pageSize int) ([]model.Drone, int64, error) {
 	var drones []model.Drone
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
+	radiusKM = limits.NormalizeRadiusKM(radiusKM, 50)
 
 	distanceExpr := `(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))`
 
@@ -187,7 +203,9 @@ func (r *DroneRepo) FindFullyCertifiedDrones(lat, lng, radiusKM float64, page, p
 		Where("airworthiness_cert_expire > NOW()").
 		Where(distanceExpr+" < ?", lat, lng, lat, radiusKM)
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.
 		Select("*, "+distanceExpr+" AS distance", lat, lng, lat).
 		Order("distance ASC").

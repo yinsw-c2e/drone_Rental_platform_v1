@@ -43,10 +43,10 @@ export default function OwnerProfileScreen({navigation}: any) {
     try {
       const [profileRes, dronesRes, suppliesRes, quotesRes, bindingsRes, workbenchRes] = await Promise.all([
         ownerService.getProfile().catch(() => null),
-        droneService.myDrones({page: 1, page_size: 100}).catch(() => null),
-        ownerService.listMySupplies({page: 1, page_size: 100}).catch(() => null),
-        ownerService.listMyQuotes({page: 1, page_size: 100}).catch(() => null),
-        ownerService.listPilotBindings({status: 'active', page: 1, page_size: 100}).catch(() => null),
+        droneService.myDrones({page: 1, page_size: 50}).catch(() => null),
+        ownerService.listMySupplies({page: 1, page_size: 50}).catch(() => null),
+        ownerService.listMyQuotes({page: 1, page_size: 50}).catch(() => null),
+        ownerService.listPilotBindings({status: 'active', page: 1, page_size: 50}).catch(() => null),
         ownerService.getWorkbench().catch(() => null),
       ]);
 
@@ -343,18 +343,17 @@ export default function OwnerProfileScreen({navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bgSecondary},
+  container: {flex: 1, backgroundColor: theme.bg},
   content: {paddingBottom: 40},
   loadingWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   loadingText: {fontSize: 15, color: theme.textSub},
 
   headerHero: {
-    backgroundColor: theme.primary,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    backgroundColor: '#0F766E',
+    borderRadius: 24,
+    padding: 18,
+    margin: 12,
+    marginBottom: 12,
   },
   headerTop: {
     flexDirection: 'row',
@@ -363,27 +362,28 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   headerGreeting: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   headerSubtitle: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
+    marginTop: 6,
   },
   headerStatusRow: {
     marginTop: 2,
   },
   statsGrid: {
     flexDirection: 'row',
-    marginTop: 24,
+    flexWrap: 'wrap',
+    marginTop: 16,
     gap: 10,
   },
   statsCard: {
-    flex: 1,
+    width: '48%',
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
-    paddingVertical: 14,
+    padding: 12,
     alignItems: 'center',
   },
   statsValue: {
@@ -399,8 +399,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
 
   section: {
-    marginTop: 20,
-    paddingHorizontal: 16,
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 12,
+    marginBottom: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -409,13 +412,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.text,
   },
   sectionLink: {
     fontSize: 13,
-    color: theme.primaryText,
+    color: theme.primary,
     fontWeight: '600',
   },
   sectionSubText: {
@@ -427,16 +430,14 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   workbenchSummaryGrid: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   wbSummaryCard: {
     flex: 1,
-    backgroundColor: theme.card,
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.divider,
   },
   wbSummaryValue: {
     fontSize: 18,
@@ -456,11 +457,9 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   wbPreviewItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.card,
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     padding: 14,
-    borderWidth: 1,
-    borderColor: theme.divider,
   },
   wbItemLeft: {
     flex: 1,
@@ -500,11 +499,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   emptyWb: {
     padding: 24,
     alignItems: 'center',
-    backgroundColor: theme.card,
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: theme.divider,
+    borderColor: theme.cardBorder,
   },
   emptyWbText: {
     fontSize: 13,
@@ -518,12 +517,10 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   },
   quickActionCard: {
     width: '48%',
-    backgroundColor: theme.card,
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.divider,
   },
   quickIconBg: {
     width: 48,

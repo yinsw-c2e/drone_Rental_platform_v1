@@ -76,12 +76,12 @@ export default function PilotTaskListScreen({navigation, route}: any) {
     try {
       const status = entryMode === 'assigned' ? 'pending_response' : (entryMode === 'accepted' ? 'accepted' : undefined);
       const [dispatchRes, profileRes] = await Promise.all([
-        dispatchV2Service.list({role: 'pilot', status, page: 1, page_size: 100}),
+        dispatchV2Service.list({role: 'pilot', status, page: 1, page_size: 50}),
         pilotV2Service.getProfile().catch(() => null),
       ]);
       setTasks(dispatchRes.data?.items || []);
       setPilotProfile(profileRes?.data || null);
-      const anomalyRes = await orderAnomalyV2Service.list({role: 'pilot', page: 1, page_size: 100});
+      const anomalyRes = await orderAnomalyV2Service.list({role: 'pilot', page: 1, page_size: 50});
       setAnomalyLookup(buildOrderAnomalyLookup(anomalyRes.data?.items || []));
     } catch (error) {
       console.error('获取飞手正式派单失败:', error);

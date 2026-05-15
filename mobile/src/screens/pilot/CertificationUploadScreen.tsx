@@ -221,7 +221,7 @@ export default function CertificationUploadScreen({_navigation}: any) {
   }
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bgSecondary}]}>
+    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -428,11 +428,11 @@ export default function CertificationUploadScreen({_navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bgSecondary},
-  scrollContent: {padding: 20, paddingBottom: 40, gap: 20},
+  container: {flex: 1, backgroundColor: theme.bg},
+  scrollContent: {padding: 16, paddingBottom: 40, gap: 16},
   loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   loadingText: {fontSize: 16, color: theme.textSub},
-  addBtn: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary, paddingVertical: 18, paddingHorizontal: 24, borderRadius: 18, shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6},
+  addBtn: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.primary, paddingVertical: 18, paddingHorizontal: 24, borderRadius: 18},
   addBtnIconBox: {width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 12},
   addBtnIcon: {fontSize: 20, color: theme.btnPrimaryText, fontWeight: 'bold'},
   addBtnText: {fontSize: 18, color: theme.btnPrimaryText, fontWeight: '900'},
@@ -440,22 +440,22 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   emptyIcon: {fontSize: 64, marginBottom: 8, opacity: 0.5},
   emptyText: {fontSize: 18, fontWeight: '800', color: theme.textSub},
   emptySubText: {fontSize: 14, color: theme.textHint},
-  certCard: {backgroundColor: theme.card, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: theme.cardBorder, gap: 16},
+  certCard: {backgroundColor: theme.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: theme.cardBorder, gap: 16},
   certHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  certType: {fontSize: 18, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
-  statusBadge: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10},
+  certType: {fontSize: 18, fontWeight: '900', color: theme.text},
+  statusBadge: {paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999},
   statusText: {fontSize: 13, fontWeight: '700'},
-  certBody: {borderTopWidth: 1, borderTopColor: theme.divider, paddingTop: 16, gap: 8},
+  certBody: {borderTopWidth: 1, borderTopColor: theme.cardBorder, paddingTop: 16, gap: 8},
   certRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   certLabel: {fontSize: 14, color: theme.textSub, fontWeight: '600'},
   certValue: {fontSize: 14, color: theme.text, fontWeight: '700'},
   certImage: {width: '100%', height: 180, borderRadius: 14, marginTop: 8},
   modalOverlay: {flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end'},
-  modalContent: {backgroundColor: theme.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%'},
-  modalHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: theme.divider},
-  modalTitle: {fontSize: 20, fontWeight: '900', color: theme.text, letterSpacing: -0.5},
+  modalContent: {backgroundColor: theme.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%'},
+  modalHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: theme.cardBorder},
+  modalTitle: {fontSize: 18, fontWeight: '800', color: theme.text},
   modalClose: {fontSize: 24, color: theme.textSub, fontWeight: '300'},
-  modalBody: {paddingHorizontal: 24},
+  modalBody: {paddingHorizontal: 20},
   modalScrollContent: {paddingBottom: 40},
   modalScrollContentInner: {gap: 24},
   formSection: {marginTop: 20, gap: 12},
@@ -463,21 +463,21 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   formGroup: {gap: 10},
   row: {flexDirection: 'row'},
   label: {fontSize: 14, fontWeight: '800', color: theme.text, opacity: 0.9},
-  input: {borderWidth: 1.5, borderColor: theme.cardBorder, borderRadius: 16, backgroundColor: theme.bgSecondary, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: theme.text},
+  input: {borderWidth: 1.5, borderColor: theme.cardBorder, borderRadius: 14, backgroundColor: theme.inputBg, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: theme.text},
   typeScrollContent: {paddingBottom: 4},
   typeContainer: {flexDirection: 'row', gap: 10},
-  typeOption: {paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.bgSecondary, borderWidth: 1.5, borderColor: theme.cardBorder},
-  typeOptionActive: {backgroundColor: theme.primary + '15', borderColor: theme.primary},
+  typeOption: {paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, backgroundColor: theme.bg, borderWidth: 1.5, borderColor: theme.cardBorder},
+  typeOptionActive: {backgroundColor: theme.primaryBg, borderColor: theme.primary},
   typeOptionText: {fontSize: 14, fontWeight: '700', color: theme.textSub},
   typeOptionTextActive: {color: theme.primary},
   tipCard: {backgroundColor: theme.primary + '10', padding: 16, borderRadius: 14, borderLeftWidth: 4, borderLeftColor: theme.primary},
   tipText: {fontSize: 14, color: theme.textSub, lineHeight: 22, fontWeight: '500'},
-  imageUpload: {minHeight: 180, borderWidth: 2, borderColor: theme.cardBorder, borderStyle: 'dashed', borderRadius: 18, overflow: 'hidden', backgroundColor: theme.bgSecondary},
+  imageUpload: {minHeight: 180, borderWidth: 2, borderColor: theme.cardBorder, borderStyle: 'dashed', borderRadius: 18, overflow: 'hidden', backgroundColor: theme.inputBg},
   uploadPlaceholder: {flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 8},
   uploadIcon: {fontSize: 40, color: theme.textHint, fontWeight: '300'},
   uploadText: {fontSize: 14, color: theme.textSub, fontWeight: '600', textAlign: 'center'},
   uploadedImage: {width: '100%', height: '100%', resizeMode: 'cover'},
-  submitBtn: {height: 56, backgroundColor: theme.primary, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginTop: 32, shadowColor: theme.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6},
+  submitBtn: {height: 48, backgroundColor: theme.primary, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: 24},
   submitBtnDisabled: {opacity: 0.6},
-  submitBtnText: {color: theme.btnPrimaryText, fontSize: 18, fontWeight: '900'},
+  submitBtnText: {color: theme.btnPrimaryText, fontSize: 16, fontWeight: '700'},
 });

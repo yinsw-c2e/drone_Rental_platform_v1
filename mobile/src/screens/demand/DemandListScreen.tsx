@@ -15,7 +15,6 @@ import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta, getTonePalette} from '../../components/business/visuals';
 import {demandV2Service} from '../../services/demandV2';
-import {homeService} from '../../services/home';
 import {RootState} from '../../store/store';
 import {DemandSummary} from '../../types';
 import {getDemandSceneLabel, formatDemandBudget, formatDemandSchedule, resolveDemandPrimaryAddress} from '../../utils/demandMeta';
@@ -82,34 +81,6 @@ export default function DemandListScreen({navigation, route}: any) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  const fetchPublicDemands = useCallback(async (): Promise<DemandSummary[]> => {
-    const dashboard = await homeService.getDashboard();
-    const demandIds = Array.from(
-      new Set(
-        (dashboard.data?.market_feed || [])
-          .filter(item => item.object_type === 'demand')
-          .map(item => item.object_id),
-      ),
-    );
-
-    if (demandIds.length === 0) {
-      return [];
-    }
-
-    const details = await Promise.all(
-      demandIds.slice(0, PAGE_SIZE).map(async demandId => {
-        try {
-          const res = await demandV2Service.getById(demandId);
-          return res.data;
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    return details.filter(Boolean) as DemandSummary[];
-  }, []);
-
   useEffect(() => {
     if (!availableModes.includes(mode)) {
       setMode(availableModes[0] || 'public');
@@ -128,12 +99,13 @@ export default function DemandListScreen({navigation, route}: any) {
     try {
       let items: DemandSummary[] = [];
       let total = 0;
+      const params = {page: nextPage, page_size: PAGE_SIZE};
 
       if (mode === 'public') {
-        items = await fetchPublicDemands();
-        total = items.length;
+        const res = await demandV2Service.listMarketplaceFeed(params);
+        items = res.data?.items || [];
+        total = Number(res.meta?.total || 0);
       } else {
-        const params = {page: nextPage, page_size: PAGE_SIZE};
         const res = mode === 'pilot'
           ? await demandV2Service.listPilotCandidateDemands(params)
           : await demandV2Service.listMarketplaceDemands(params);
@@ -146,14 +118,14 @@ export default function DemandListScreen({navigation, route}: any) {
       } else {
         setDemands(prev => [...prev, ...items]);
       }
-      setHasMore(mode !== 'public' && nextPage * PAGE_SIZE < total);
+      setHasMore(nextPage * PAGE_SIZE < total);
     } catch (error) {
       console.warn('获取需求市场失败:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [fetchPublicDemands, mode]);
+  }, [mode]);
 
   useEffect(() => {
     setLoading(true);

@@ -288,6 +288,19 @@ func (s *ClientService) ListMyDemands(userID int64, status string, page, pageSiz
 	return s.demandDomainRepo.ListDemandsByClientUser(userID, status, page, pageSize)
 }
 
+func (s *ClientService) ListMarketplaceDemands(page, pageSize int) ([]model.Demand, int64, error) {
+	if s.demandDomainRepo == nil {
+		return nil, 0, errors.New("需求域仓储未初始化")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	return s.demandDomainRepo.ListRecommendedDemands(page, pageSize)
+}
+
 func (s *ClientService) GetDemandDetail(userID, demandID int64) (*model.Demand, error) {
 	if s.demandDomainRepo == nil {
 		return nil, errors.New("需求域仓储未初始化")
@@ -341,6 +354,41 @@ func (s *ClientService) GetDemandViewerState(userID, demandID int64) (*DemandVie
 	}
 
 	return state, nil
+}
+
+func (s *ClientService) GetDemandViewerStates(userID int64, demandIDs []int64) (map[int64]*DemandViewerState, error) {
+	result := make(map[int64]*DemandViewerState, len(demandIDs))
+	if len(demandIDs) == 0 {
+		return result, nil
+	}
+
+	for _, demandID := range demandIDs {
+		result[demandID] = &DemandViewerState{}
+	}
+	if s.demandDomainRepo == nil || userID == 0 {
+		return result, nil
+	}
+
+	quotes, err := s.demandDomainRepo.ListLatestQuotesByDemandIDsAndOwner(demandIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	candidates, err := s.demandDomainRepo.ListLatestCandidatesByDemandIDsAndPilot(demandIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for demandID, quote := range quotes {
+		if state, ok := result[demandID]; ok {
+			state.MyQuote = quote
+		}
+	}
+	for demandID, candidate := range candidates {
+		if state, ok := result[demandID]; ok {
+			state.MyCandidate = candidate
+		}
+	}
+	return result, nil
 }
 
 func (s *ClientService) SelectProvider(userID, demandID, quoteID int64) (*SelectProviderResult, error) {

@@ -19,7 +19,7 @@ export default function DemandQuotePage() {
   const [executionPlan, setExecutionPlan] = useState('');
 
   useDidShow(() => {
-    droneService.myDrones({ page: 1, page_size: 100 }).then((res: any) => {
+    droneService.myDrones({ page: 1, page_size: 50 }).then((res: any) => {
       const allDrones = res.data?.list || res.list || [];
       const list = allDrones.filter(
         (d: any) => d.certification_status === 'approved' && d.availability_status === 'available'

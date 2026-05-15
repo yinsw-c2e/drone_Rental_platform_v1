@@ -2,6 +2,7 @@ package repository
 
 import (
 	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
 )
@@ -40,6 +41,7 @@ func (r *DemandRepo) DeleteOffer(id int64) error {
 func (r *DemandRepo) ListOffers(page, pageSize int, filters map[string]interface{}) ([]model.RentalOffer, int64, error) {
 	var offers []model.RentalOffer
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	// 不预加载关联数据，直接返回供给基本信息
 	query := r.db.Model(&model.RentalOffer{})
@@ -47,7 +49,9 @@ func (r *DemandRepo) ListOffers(page, pageSize int, filters map[string]interface
 		query = query.Where(k+" = ?", v)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&offers).Error
 
 	// 手动加载 Owner 信息，避免循环引用
@@ -79,6 +83,7 @@ func (r *DemandRepo) ListOffers(page, pageSize int, filters map[string]interface
 func (r *DemandRepo) ListMarketplaceOffers(page, pageSize int, filters map[string]interface{}) ([]model.RentalOffer, int64, error) {
 	var offers []model.RentalOffer
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.RentalOffer{}).
 		Joins("JOIN drones ON drones.id = rental_offers.drone_id AND drones.deleted_at IS NULL").
@@ -94,7 +99,9 @@ func (r *DemandRepo) ListMarketplaceOffers(page, pageSize int, filters map[strin
 		query = query.Where("rental_offers."+k+" = ?", v)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).
 		Limit(pageSize).
 		Order("rental_offers.created_at DESC").
@@ -150,13 +157,16 @@ func (r *DemandRepo) DeleteDemand(id int64) error {
 func (r *DemandRepo) ListDemands(page, pageSize int, filters map[string]interface{}) ([]model.RentalDemand, int64, error) {
 	var demands []model.RentalDemand
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.RentalDemand{}).Preload("Renter")
 	for k, v := range filters {
 		query = query.Where(k+" = ?", v)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&demands).Error
 	return demands, total, err
 }
@@ -167,7 +177,10 @@ func (r *DemandRepo) ListDemandsByRenter(renterID int64, page, pageSize int) ([]
 
 func (r *DemandRepo) ListActiveDemands() ([]model.RentalDemand, error) {
 	var demands []model.RentalDemand
-	err := r.db.Where("status = ?", "active").Find(&demands).Error
+	err := r.db.Where("status = ?", "active").
+		Order("created_at DESC").
+		Limit(limits.MaxMatchingCandidates).
+		Find(&demands).Error
 	return demands, err
 }
 
@@ -193,13 +206,16 @@ func (r *DemandRepo) DeleteCargo(id int64) error {
 func (r *DemandRepo) ListCargos(page, pageSize int, filters map[string]interface{}) ([]model.CargoDemand, int64, error) {
 	var cargos []model.CargoDemand
 	var total int64
+	page, pageSize = limits.NormalizePagination(page, pageSize)
 
 	query := r.db.Model(&model.CargoDemand{}).Preload("Publisher")
 	for k, v := range filters {
 		query = query.Where(k+" = ?", v)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&cargos).Error
 	return cargos, total, err
 }
@@ -210,6 +226,9 @@ func (r *DemandRepo) ListCargosByPublisher(publisherID int64, page, pageSize int
 
 func (r *DemandRepo) ListActiveCargos() ([]model.CargoDemand, error) {
 	var cargos []model.CargoDemand
-	err := r.db.Where("status = ?", "active").Find(&cargos).Error
+	err := r.db.Where("status = ?", "active").
+		Order("created_at DESC").
+		Limit(limits.MaxMatchingCandidates).
+		Find(&cargos).Error
 	return cargos, err
 }

@@ -113,7 +113,7 @@ export default function OrdersPage() {
 
       const responses = await Promise.all(
         rolesToLoad.map(async role => {
-          const res = await orderV2Service.list({ role, page: 1, page_size: 100 });
+          const res = await orderV2Service.list({ role, page: 1, page_size: 50 });
           return { role, orders: (res as any).items || [] };
         }),
       );
