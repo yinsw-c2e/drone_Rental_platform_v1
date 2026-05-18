@@ -39,17 +39,17 @@ type PricingInput struct {
 
 // PricingResult 定价结果
 type PricingResult struct {
-	BaseFee        int64   `json:"base_fee"`
-	MileageFee     int64   `json:"mileage_fee"`
-	DurationFee    int64   `json:"duration_fee"`
-	WeightFee      int64   `json:"weight_fee"`
-	DifficultyFee  int64   `json:"difficulty_fee"`
-	InsuranceFee   int64   `json:"insurance_fee"`
-	SubTotal       int64   `json:"sub_total"`
-	SurgePricing   int64   `json:"surge_pricing"`
-	TotalAmount    int64   `json:"total_amount"`
+	BaseFee          int64   `json:"base_fee"`
+	MileageFee       int64   `json:"mileage_fee"`
+	DurationFee      int64   `json:"duration_fee"`
+	WeightFee        int64   `json:"weight_fee"`
+	DifficultyFee    int64   `json:"difficulty_fee"`
+	InsuranceFee     int64   `json:"insurance_fee"`
+	SubTotal         int64   `json:"sub_total"`
+	SurgePricing     int64   `json:"surge_pricing"`
+	TotalAmount      int64   `json:"total_amount"`
 	DifficultyFactor float64 `json:"difficulty_factor"`
-	InsuranceRate  float64 `json:"insurance_rate"`
+	InsuranceRate    float64 `json:"insurance_rate"`
 }
 
 // CalculatePrice 计算订单价格
@@ -109,10 +109,18 @@ func (s *SettlementService) calculateMileageFee(distanceKm float64) int64 {
 	rate5_15, _ := s.settlementRepo.GetPricingConfig("mileage_rate_5_15")
 	rate15_50, _ := s.settlementRepo.GetPricingConfig("mileage_rate_15_50")
 	rate50plus, _ := s.settlementRepo.GetPricingConfig("mileage_rate_50_plus")
-	if rate0_5 == 0 { rate0_5 = 1500 }
-	if rate5_15 == 0 { rate5_15 = 1000 }
-	if rate15_50 == 0 { rate15_50 = 800 }
-	if rate50plus == 0 { rate50plus = 500 }
+	if rate0_5 == 0 {
+		rate0_5 = 1500
+	}
+	if rate5_15 == 0 {
+		rate5_15 = 1000
+	}
+	if rate15_50 == 0 {
+		rate15_50 = 800
+	}
+	if rate50plus == 0 {
+		rate50plus = 500
+	}
 
 	if distanceKm <= 5 {
 		fee = distanceKm * rate0_5
@@ -129,8 +137,12 @@ func (s *SettlementService) calculateMileageFee(distanceKm float64) int64 {
 func (s *SettlementService) calculateDurationFee(durationMin float64) int64 {
 	freeMin, _ := s.settlementRepo.GetPricingConfig("duration_free_minutes")
 	rate, _ := s.settlementRepo.GetPricingConfig("duration_rate")
-	if freeMin == 0 { freeMin = 10 }
-	if rate == 0 { rate = 300 }
+	if freeMin == 0 {
+		freeMin = 10
+	}
+	if rate == 0 {
+		rate = 300
+	}
 
 	billableMin := durationMin - freeMin
 	if billableMin <= 0 {
@@ -146,9 +158,15 @@ func (s *SettlementService) calculateWeightFee(weightKg float64) int64 {
 	rate0_5, _ := s.settlementRepo.GetPricingConfig("weight_rate_0_5")
 	rate5_20, _ := s.settlementRepo.GetPricingConfig("weight_rate_5_20")
 	rate20plus, _ := s.settlementRepo.GetPricingConfig("weight_rate_20_plus")
-	if rate0_5 == 0 { rate0_5 = 1000 }
-	if rate5_20 == 0 { rate5_20 = 3000 }
-	if rate20plus == 0 { rate20plus = 5000 }
+	if rate0_5 == 0 {
+		rate0_5 = 1000
+	}
+	if rate5_20 == 0 {
+		rate5_20 = 3000
+	}
+	if rate20plus == 0 {
+		rate20plus = 5000
+	}
 
 	var fee float64
 	unitWeight := weightKg / 10.0 // 每10kg为计费单位
@@ -165,17 +183,23 @@ func (s *SettlementService) calculateWeightFee(weightKg float64) int64 {
 func (s *SettlementService) getDifficultyFactor(taskType string, isNight bool) float64 {
 	if isNight {
 		f, _ := s.settlementRepo.GetPricingConfig("difficulty_night")
-		if f == 0 { f = 2.0 }
+		if f == 0 {
+			f = 2.0
+		}
 		return f
 	}
 	switch taskType {
 	case "emergency":
 		f, _ := s.settlementRepo.GetPricingConfig("difficulty_emergency")
-		if f == 0 { f = 1.8 }
+		if f == 0 {
+			f = 1.8
+		}
 		return f
 	case "inspection":
 		f, _ := s.settlementRepo.GetPricingConfig("difficulty_complex")
-		if f == 0 { f = 1.3 }
+		if f == 0 {
+			f = 1.3
+		}
 		return f
 	default:
 		return 1.0
@@ -186,15 +210,21 @@ func (s *SettlementService) getInsuranceRate(cargoType string) float64 {
 	switch cargoType {
 	case "hazardous":
 		r, _ := s.settlementRepo.GetPricingConfig("insurance_rate_hazardous")
-		if r == 0 { r = 0.03 }
+		if r == 0 {
+			r = 0.03
+		}
 		return r
 	case "fragile":
 		r, _ := s.settlementRepo.GetPricingConfig("insurance_rate_fragile")
-		if r == 0 { r = 0.02 }
+		if r == 0 {
+			r = 0.02
+		}
 		return r
 	default:
 		r, _ := s.settlementRepo.GetPricingConfig("insurance_rate_normal")
-		if r == 0 { r = 0.01 }
+		if r == 0 {
+			r = 0.01
+		}
 		return r
 	}
 }
@@ -202,12 +232,16 @@ func (s *SettlementService) getInsuranceRate(cargoType string) float64 {
 func (s *SettlementService) calculateSurgePricing(subtotal int64, isPeak, isHoliday bool) int64 {
 	if isHoliday {
 		rate, _ := s.settlementRepo.GetPricingConfig("surge_holiday_rate")
-		if rate == 0 { rate = 1.5 }
+		if rate == 0 {
+			rate = 1.5
+		}
 		return int64(float64(subtotal) * (rate - 1.0))
 	}
 	if isPeak {
 		rate, _ := s.settlementRepo.GetPricingConfig("surge_peak_rate")
-		if rate == 0 { rate = 1.3 }
+		if rate == 0 {
+			rate = 1.3
+		}
 		return int64(float64(subtotal) * (rate - 1.0))
 	}
 	// 空闲折扣 - 暂时不主动触发
@@ -485,6 +519,10 @@ func (s *SettlementService) ListUserWithdrawals(userID int64, page, pageSize int
 
 func (s *SettlementService) ListPendingWithdrawals(page, pageSize int) ([]model.WithdrawalRecord, int64, error) {
 	return s.settlementRepo.ListPendingWithdrawals(page, pageSize)
+}
+
+func (s *SettlementService) ListWithdrawals(status string, page, pageSize int) ([]model.WithdrawalRecord, int64, error) {
+	return s.settlementRepo.ListWithdrawals(status, page, pageSize)
 }
 
 func (s *SettlementService) GetAllPricingConfigs() ([]model.PricingConfig, error) {

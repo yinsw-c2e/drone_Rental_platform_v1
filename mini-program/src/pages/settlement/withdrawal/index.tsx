@@ -90,7 +90,7 @@ export default function WithdrawalPage() {
           )}
         </View>
 
-        <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit} disabled={submitting}>
+        <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit}>
           <Text className="btn-text">确认提现</Text>
         </View>
       </ScrollView>

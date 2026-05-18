@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
-API_V1="$BASE_URL/api/v1"
 API_V2="$BASE_URL/api/v2"
 
 REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
@@ -15,7 +14,7 @@ BASELINE_SCRIPT="${BASELINE_SCRIPT:-$SCRIPT_DIR/phase10_role_acceptance.sh}"
 BASELINE_REPORT="${BASELINE_REPORT:-$BACKEND_DIR/docs/phase10_role_acceptance_last_run.json}"
 REPORT_FILE="${REPORT_FILE:-$BACKEND_DIR/docs/v2_core_regression_last_run.json}"
 
-PREPARE_BASELINE="${PREPARE_BASELINE:-0}"
+PREPARE_BASELINE="${PREPARE_BASELINE:-1}"
 PREPARE_DEMO_DATA="${PREPARE_DEMO_DATA:-1}"
 DEVTOKEN_CONFIG_PATH="${DEVTOKEN_CONFIG_PATH:-config.yaml}"
 
@@ -155,7 +154,7 @@ verify_service_health() {
 
 send_code() {
   local phone="$1"
-  curl -sS --max-time 10 -X POST "$API_V1/auth/send-code" \
+  curl -sS --max-time 10 -X POST "$API_V2/auth/send-code" \
     -H "Content-Type: application/json" \
     -d "{\"phone\":\"$phone\"}" >/dev/null
 }
@@ -272,9 +271,9 @@ create_direct_order() {
     '{
       service_type:"heavy_cargo_lift_transport",
       cargo_scene:"power_grid",
-      departure_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
-      destination_address:{text:"广东省佛山市南海区施工吊运点", city:"佛山", district:"南海区"},
-      service_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
+      departure_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区", latitude:23.0109000, longitude:113.1227000},
+      destination_address:{text:"广东省佛山市南海区施工吊运点", city:"佛山", district:"南海区", latitude:23.0374000, longitude:113.1428000},
+      service_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区", latitude:23.0109000, longitude:113.1227000},
       scheduled_start_at:$start,
       scheduled_end_at:$end,
       cargo_weight_kg:55,

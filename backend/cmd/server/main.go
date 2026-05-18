@@ -40,6 +40,26 @@ import (
 	settlementhandler "wurenji-backend/internal/api/v1/settlement"
 	"wurenji-backend/internal/api/v1/user"
 	v2 "wurenji-backend/internal/api/v2"
+	longaddress "wurenji-backend/internal/api/v2/longtail/address"
+	longadmin "wurenji-backend/internal/api/v2/longtail/admin"
+	longairspace "wurenji-backend/internal/api/v2/longtail/airspace"
+	longanalytics "wurenji-backend/internal/api/v2/longtail/analytics"
+	longclient "wurenji-backend/internal/api/v2/longtail/client"
+	longcredit "wurenji-backend/internal/api/v2/longtail/credit"
+	longdemand "wurenji-backend/internal/api/v2/longtail/demand"
+	longdispatch "wurenji-backend/internal/api/v2/longtail/dispatch"
+	longdrone "wurenji-backend/internal/api/v2/longtail/drone"
+	longflight "wurenji-backend/internal/api/v2/longtail/flight"
+	longinsurance "wurenji-backend/internal/api/v2/longtail/insurance"
+	longlocation "wurenji-backend/internal/api/v2/longtail/location"
+	longmessage "wurenji-backend/internal/api/v2/longtail/message"
+	longorder "wurenji-backend/internal/api/v2/longtail/order"
+	longowner "wurenji-backend/internal/api/v2/longtail/owner"
+	longpayment "wurenji-backend/internal/api/v2/longtail/payment"
+	longpilot "wurenji-backend/internal/api/v2/longtail/pilot"
+	longreview "wurenji-backend/internal/api/v2/longtail/review"
+	longsettlement "wurenji-backend/internal/api/v2/longtail/settlement"
+	longuser "wurenji-backend/internal/api/v2/longtail/user"
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/amap"
@@ -247,8 +267,9 @@ func main() {
 	amapService := amap.NewAmapService(cfg.Amap.APIKey, zapLogger)
 	flightService.SetAmapService(amapService)
 
-	// Init handlers
-	handlers := &v1.Handlers{
+	// Keep v1 mounted as a runtime fallback until the full v2 regression suite is
+	// green against the current service process.
+	legacyHandlers := &v1.Handlers{
 		Auth:       auth.NewHandler(authService, wechatOAuth, wechatMiniOAuth, qqOAuth),
 		User:       user.NewHandler(userService, uploadService),
 		Drone:      drone.NewHandler(droneService, uploadService),
@@ -271,7 +292,32 @@ func main() {
 		Insurance:  insurancehandler.NewHandler(insuranceService),
 		Analytics:  analyticshandler.NewHandler(analyticsService),
 	}
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, cfg.Server.Mode, handlers.Admin, handlers.Analytics, handlers.Client)
+
+	// Init v2 handlers. Longtail handlers cover domains that previously only had
+	// old-shaped routes, now also mounted under /api/v2.
+	longtailHandlers := &v2.LongtailHandlers{
+		User:       longuser.NewHandler(userService, uploadService),
+		Drone:      longdrone.NewHandler(droneService, uploadService),
+		Owner:      longowner.NewHandler(ownerService, droneService),
+		Order:      longorder.NewHandler(orderService),
+		Demand:     longdemand.NewHandler(demandService, matchingService),
+		Payment:    longpayment.NewHandler(paymentService),
+		Message:    longmessage.NewHandler(messageService),
+		Review:     longreview.NewHandler(reviewService),
+		Admin:      longadmin.NewHandler(userService, droneService, orderService, operationsService, paymentService, pilotService, clientService, ownerService, dispatchService, flightService, settlementService, airspaceService, creditService, insuranceService, reviewService, contractService),
+		Location:   longlocation.NewHandler(amapService),
+		Address:    longaddress.NewHandler(addressService),
+		Pilot:      longpilot.NewHandler(pilotService, uploadService),
+		Client:     longclient.NewHandler(clientService),
+		Dispatch:   longdispatch.NewHandler(dispatchService, clientService, pilotService, orderRepo, orderArtifactRepo, demandDomainRepo, ownerDomainRepo),
+		Flight:     longflight.NewHandler(flightService, pilotService),
+		Airspace:   longairspace.NewHandler(airspaceService),
+		Settlement: longsettlement.NewHandler(settlementService),
+		Credit:     longcredit.NewHandler(creditService),
+		Insurance:  longinsurance.NewHandler(insuranceService),
+		Analytics:  longanalytics.NewHandler(analyticsService),
+	}
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)
@@ -290,7 +336,7 @@ func main() {
 	registerHealthRoutes(r, sqlDB, rds)
 
 	// Register routes
-	v1.RegisterRoutes(r, handlers, hub, cfg, zapLogger)
+	v1.RegisterRoutes(r, legacyHandlers, hub, cfg, zapLogger)
 	v2.RegisterRoutes(r, v2Handlers)
 
 	// Start server
@@ -432,6 +478,29 @@ func autoMigrate(db *gorm.DB) {
 		&model.RealtimeDashboard{},
 		&model.OrderContract{},
 	)
+}
+
+func registerTopLevelRoutes(r *gin.Engine, hub *ws.Hub, cfg *config.Config, logger *zap.Logger) {
+	r.Static("/uploads", "./uploads")
+
+	r.GET("/.well-known/apple-app-site-association", func(c *gin.Context) {
+		c.Header("Content-Type", "application/json")
+		c.JSON(http.StatusOK, gin.H{
+			"applinks": gin.H{
+				"apps": []string{},
+				"details": []gin.H{
+					{
+						"appIDs": []string{"Y63CMZRDV9.com.yinswc2e.wurenji"},
+						"paths":  []string{"/app/*"},
+					},
+				},
+			},
+		})
+	})
+	r.GET("/app/*path", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
+	r.GET("/ws", ws.HandleWebSocket(hub, cfg, logger))
 }
 
 func registerHealthRoutes(r *gin.Engine, sqlDB *sql.DB, rds *redis.Client) {

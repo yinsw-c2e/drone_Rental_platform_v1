@@ -212,7 +212,7 @@ export default function LoginPage() {
                         className={`login-dev-account-btn ${submitting ? 'login-dev-account-btn-disabled' : ''}`}
                         style={{ borderColor: cat.color, color: cat.color }}
                         plain
-                        disabled={submitting}
+
                         {...bindPress(() => quickLogin(account.phone, account.password))}
                         hoverClass="login-dev-account-btn-hover"
                       >

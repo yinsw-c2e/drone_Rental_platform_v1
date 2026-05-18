@@ -1,4 +1,4 @@
-import api, {apiV2} from './api';
+import {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -168,30 +168,30 @@ export interface BindDroneRequest {
 
 // 注册成为飞手
 export const registerPilot = async (data: RegisterPilotRequest): Promise<Pilot> => {
-  const res: any = await api.post('/pilot/register', data);
+  const res: any = await apiV2.post('/pilot/register', data);
   return res.data;
 };
 
 // 获取飞手档案
 export const getPilotProfile = async (): Promise<Pilot> => {
-  const res: any = await api.get('/pilot/profile');
+  const res: any = await apiV2.get('/pilot/profile');
   return res.data;
 };
 
 // 更新飞手档案
 export const updatePilotProfile = async (data: UpdatePilotRequest): Promise<Pilot> => {
-  const res: any = await api.put('/pilot/profile', data);
+  const res: any = await apiV2.put('/pilot/profile', data);
   return res.data;
 };
 
 // 更新实时位置
 export const updatePilotLocation = async (data: UpdateLocationRequest): Promise<void> => {
-  await api.put('/pilot/location', data);
+  await apiV2.put('/pilot/location', data);
 };
 
 // 更新接单状态
 export const updatePilotAvailability = async (isAvailable: boolean): Promise<void> => {
-  await api.put('/pilot/availability', {status: isAvailable ? 'online' : 'offline'});
+  await apiV2.put('/pilot/availability', {status: isAvailable ? 'online' : 'offline'});
 };
 
 // 获取飞手列表
@@ -200,7 +200,7 @@ export const getPilotList = async (params?: {
   page_size?: number;
   status?: string;
 }): Promise<{data: Pilot[]; total: number}> => {
-  const res: any = await api.get('/pilot/list', {params});
+  const res: any = await apiV2.get('/pilot/list', {params});
   return res;
 };
 
@@ -210,13 +210,13 @@ export const getNearbyPilots = async (params: {
   longitude: number;
   radius_km?: number;
 }): Promise<Pilot[]> => {
-  const res: any = await api.get('/pilot/nearby', {params});
+  const res: any = await apiV2.get('/pilot/nearby', {params});
   return res.data;
 };
 
 // 获取指定飞手信息
 export const getPilotById = async (id: number): Promise<Pilot> => {
-  const res: any = await api.get(`/pilot/${id}`);
+  const res: any = await apiV2.get(`/pilot/${id}`);
   return res.data;
 };
 
@@ -254,7 +254,7 @@ export const getFlightLogs = async (params?: {
   page?: number;
   page_size?: number;
 }): Promise<{data: PilotFlightLog[]; total: number}> => {
-  const res: any = await api.get('/pilot/flight-logs', {params});
+  const res: any = await apiV2.get('/pilot/flight-logs', {params});
   const payload = res?.data || {};
   const list = Array.isArray(payload?.list)
     ? payload.list
@@ -281,13 +281,13 @@ export const addFlightLog = async (data: AddFlightLogRequest): Promise<PilotFlig
     flight_type: data.flight_purpose,
     incident_report: data.notes,
   };
-  const res: any = await api.post('/pilot/flight-log', payload);
+  const res: any = await apiV2.post('/pilot/flight-log', payload);
   return normalizeFlightLog(res?.data || {});
 };
 
 // 获取飞行统计
 export const getFlightStats = async (): Promise<FlightStats> => {
-  const res: any = await api.get('/pilot/flight-stats');
+  const res: any = await apiV2.get('/pilot/flight-stats');
   const data = res?.data || {};
   const totalFlights = Number(data.total_flights || 0);
   const totalHours = Number(data.total_hours ?? data.total_flight_hours ?? 0);
@@ -308,19 +308,19 @@ export const getFlightStats = async (): Promise<FlightStats> => {
 
 // 获取绑定的无人机
 export const getBoundDrones = async (): Promise<PilotDroneBinding[]> => {
-  const res: any = await api.get('/pilot/bound-drones');
+  const res: any = await apiV2.get('/pilot/bound-drones');
   return res.data;
 };
 
 // 绑定无人机
 export const bindDrone = async (data: BindDroneRequest): Promise<PilotDroneBinding> => {
-  const res: any = await api.post('/pilot/bind-drone', data);
+  const res: any = await apiV2.post('/pilot/bind-drone', data);
   return res.data;
 };
 
 // 解绑无人机
 export const unbindDrone = async (bindingId: number): Promise<void> => {
-  await api.delete(`/pilot/unbind/${bindingId}`);
+  await apiV2.delete(`/pilot/unbind/${bindingId}`);
 };
 
 export default {

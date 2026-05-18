@@ -6,7 +6,6 @@ const DEFAULT_API_BASE = 'https://dronerentalplat.cpolar.top/api/v2';
 
 export const API_BASE_URL = BASE || DEFAULT_API_BASE;
 export const API_ROOT_URL = API_BASE_URL.replace(/\/api\/v[12]$/, '');
-export const API_V1_BASE_URL = API_ROOT_URL + '/api/v1';
 export const API_V2_BASE_URL = API_ROOT_URL + '/api/v2';
 export const API_TIMEOUT = 15000;
 

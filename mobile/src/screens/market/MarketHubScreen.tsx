@@ -368,8 +368,25 @@ export default function MarketHubScreen({navigation}: any) {
     };
   }, [activeTab, effectiveRoleSummary, navigation]);
 
+  const handleBack = () => {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs', {screen: 'Home'});
+  };
+
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.navBar}>
+        <View style={styles.navSide}>
+          <TouchableOpacity style={styles.navBack} onPress={handleBack} activeOpacity={0.82}>
+            <Image source={marketAssets.back} style={styles.navBackIcon} resizeMode="contain" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.navTitle}>服务市场</Text>
+        <View style={[styles.navSide, styles.navSideRight]} />
+      </View>
       <View style={styles.header}>
         <View style={styles.entryGrid}>
           {isClientFocused ? (
@@ -555,9 +572,43 @@ export default function MarketHubScreen({navigation}: any) {
 }
 
 const getStyles = (theme: AppTheme) => StyleSheet.create({
-  container: {flex: 1, backgroundColor: theme.bg},
+  container: {flex: 1, backgroundColor: '#F5F7FB'},
+  navBar: {
+    minHeight: 56,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+  },
+  navSide: {
+    width: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navSideRight: {
+    justifyContent: 'flex-end',
+  },
+  navBack: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBackIcon: {
+    width: 18,
+    height: 18,
+  },
+  navTitle: {
+    flex: 1,
+    color: '#111827',
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   header: {
-    backgroundColor: theme.bg,
+    backgroundColor: '#F5F7FB',
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 10,

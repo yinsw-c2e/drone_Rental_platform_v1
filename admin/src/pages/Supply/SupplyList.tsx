@@ -27,8 +27,20 @@ interface SupplyItem {
 const STATUS_MAP: Record<string, { text: string; color: string }> = {
   draft: { text: '草稿', color: 'default' },
   active: { text: '上架中', color: 'green' },
-  paused: { text: '暂停', color: 'orange' },
-  closed: { text: '关闭', color: 'red' },
+  paused: { text: '已暂停', color: 'orange' },
+  closed: { text: '已关闭', color: 'default' },
+};
+
+const summarizeObject = (value: any) => {
+  if (!value) return '-';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.length ? value.join(' / ') : '-';
+  if (value.text || value.address || value.city) return [value.text, value.address, value.city].filter(Boolean).join(' / ');
+  const entries = Object.entries(value)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .slice(0, 5)
+    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join('/') : String(v)}`);
+  return entries.length ? entries.join('；') : '-';
 };
 
 const SupplyList: React.FC = () => {
@@ -126,8 +138,8 @@ const SupplyList: React.FC = () => {
             <Descriptions.Item label="计价单位">{detail.pricing_unit || '-'}</Descriptions.Item>
             <Descriptions.Item label="支持直达下单">{detail.accepts_direct_order ? '是' : '否'}</Descriptions.Item>
             <Descriptions.Item label="设备资质">{detail.drone?.certification_status || '-'}</Descriptions.Item>
-            <Descriptions.Item label="服务区域" span={2}><pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(detail.service_area_snapshot || {}, null, 2)}</pre></Descriptions.Item>
-            <Descriptions.Item label="价格规则" span={2}><pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(detail.pricing_rule || {}, null, 2)}</pre></Descriptions.Item>
+            <Descriptions.Item label="服务区域" span={2}>{summarizeObject(detail.service_area_snapshot)}</Descriptions.Item>
+            <Descriptions.Item label="价格规则" span={2}>{summarizeObject(detail.pricing_rule)}</Descriptions.Item>
           </Descriptions>
         ) : null}
       </Modal>

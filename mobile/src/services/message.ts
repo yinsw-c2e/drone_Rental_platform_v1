@@ -1,4 +1,4 @@
-import api, {apiV2} from './api';
+import {apiV2} from './api';
 import {
   ApiResponse,
   Message,
@@ -20,12 +20,12 @@ export const messageService = {
 
   // Get messages by peer ID (handles inconsistent conversation_id formats)
   getMessagesByPeer: (peerId: number, page?: number, pageSize?: number) =>
-    api.get<any, ApiResponse<PageData<Message>>>(`/message/peer/${peerId}`, {
+    apiV2.get<any, ApiResponse<PageData<Message>>>(`/message/peer/${peerId}`, {
       params: {page, page_size: pageSize},
     }),
 
   send: (receiverId: number, content: string, messageType?: string) =>
-    api.post<any, ApiResponse<Message>>('/message', {
+    apiV2.post<any, ApiResponse<Message>>('/message', {
       receiver_id: receiverId,
       content,
       message_type: messageType || 'text',
@@ -39,8 +39,8 @@ export const messageService = {
 
   // Mark messages from peer as read
   markReadByPeer: (peerId: number) =>
-    api.put<any, ApiResponse>(`/message/peer/${peerId}/read`),
+    apiV2.put<any, ApiResponse>(`/message/peer/${peerId}/read`),
 
   getUnreadCount: () =>
-    api.get<any, ApiResponse<{count: number}>>('/message/unread-count'),
+    apiV2.get<any, ApiResponse<{count: number}>>('/message/unread-count'),
 };

@@ -301,6 +301,20 @@ func (r *SettlementRepo) ListPendingWithdrawals(page, pageSize int) ([]model.Wit
 	return list, total, err
 }
 
+func (r *SettlementRepo) ListWithdrawals(status string, page, pageSize int) ([]model.WithdrawalRecord, int64, error) {
+	var list []model.WithdrawalRecord
+	var total int64
+	query := r.db.Model(&model.WithdrawalRecord{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Preload("User").Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at DESC").Find(&list).Error
+	return list, total, err
+}
+
 // ========== PricingConfig ==========
 
 func (r *SettlementRepo) GetPricingConfig(key string) (float64, error) {

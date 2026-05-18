@@ -1,10 +1,10 @@
-import { apiV1 as api } from './api';
+import { apiV2 } from './api';
 import { formatUnknownEnumLabel } from '../utils';
 
 export const creditService = {
-  getMyCreditScore: () => api.get<any>('/credit/my-score'),
-  getMyViolations: (params?: any) => api.get<any>('/credit/my-violations', params),
-  getMyDeposit: () => api.get<any>('/credit/my-deposit'),
+  getMyCreditScore: () => apiV2.get<any>('/credit/my-score'),
+  getMyViolations: (params?: any) => apiV2.get<any>('/credit/my-violations', params),
+  getMyDeposit: () => apiV2.get<any>('/credit/my-deposit'),
 };
 
 export const getScoreLevelText = (level: string): string => {

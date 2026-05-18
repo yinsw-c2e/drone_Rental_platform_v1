@@ -148,14 +148,14 @@ export default function DispatchDetailPage() {
                 className='dispatch-btn dispatch-btn-primary'
                 onClick={handleAccept}
                 loading={actionLoading}
-                disabled={actionLoading}
+
               >
                 接受派单
               </Button>
               <Button
                 className='dispatch-btn dispatch-btn-danger'
                 onClick={() => setShowRejectSheet(true)}
-                disabled={actionLoading}
+
               >
                 拒绝派单
               </Button>
@@ -185,7 +185,7 @@ export default function DispatchDetailPage() {
                 className='dispatch-btn dispatch-btn-danger'
                 onClick={handleReject}
                 loading={actionLoading}
-                disabled={actionLoading}
+
               >
                 确认拒绝
               </Button>

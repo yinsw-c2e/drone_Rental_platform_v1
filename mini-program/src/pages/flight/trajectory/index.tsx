@@ -82,7 +82,7 @@ export default function TrajectoryPage() {
       title: '保存路线',
       editable: true,
       placeholderText: '请输入路线名称',
-      success: async (res) => {
+      success: async (res: any) => {
         if (res.confirm && res.content) {
           try {
             Taro.showLoading({ title: '保存中' });
@@ -99,7 +99,7 @@ export default function TrajectoryPage() {
           }
         }
       }
-    });
+    } as any);
   };
 
   const renderRecording = () => {

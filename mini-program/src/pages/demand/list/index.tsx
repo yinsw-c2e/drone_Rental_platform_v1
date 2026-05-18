@@ -110,7 +110,7 @@ export default function DemandListPage() {
         </View>
         <View className="dc-tags">
           <Text className="dc-tag">{getDemandSceneLabel((item as any).cargo_scene)}</Text>
-          <Text className="dc-tag">{(item as any).service_address_text || item.departure_address?.city || '地址不限'}</Text>
+          <Text className="dc-tag">{(item as any).service_address_text || (item as any).departure_address?.city || '地址不限'}</Text>
         </View>
         <View className="dc-meta">
           <Text className="dc-meta-text">{formatDemandSchedule((item as any).scheduled_start_at, (item as any).scheduled_end_at)}</Text>

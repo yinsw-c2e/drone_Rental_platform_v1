@@ -191,6 +191,14 @@ export default function QuickOrderEntryScreen({navigation}: any) {
     });
   };
 
+  const handleBack = () => {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs', {screen: 'Home'});
+  };
+
   const onStartDateChange = (event: any, selectedDate?: Date) => {
     setShowStartPicker(Platform.OS === 'ios');
     if (Platform.OS === 'android' && event?.type === 'dismissed') {
@@ -216,7 +224,16 @@ export default function QuickOrderEntryScreen({navigation}: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.navBar}>
+        <View style={styles.navSide}>
+          <TouchableOpacity style={styles.navBack} onPress={handleBack} activeOpacity={0.82}>
+            <Image source={quickOrderAssets.back} style={styles.navBackIcon} resizeMode="contain" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.navTitle}>快速下单</Text>
+        <View style={[styles.navSide, styles.navSideRight]} />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heroCard}>
           <View style={styles.heroIconWrap}>
@@ -239,7 +256,12 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             <Image source={quickOrderAssets.pinStart} style={styles.labelIcon} resizeMode="contain" />
             <Text style={styles.label}>起点地址 *</Text>
           </View>
-          <AddressInputField value={pickupAddress} placeholder="点击选择起点地址" onSelect={setPickupAddress} />
+          <AddressInputField
+            value={pickupAddress}
+            placeholder="点击选择起点地址"
+            onSelect={setPickupAddress}
+            rightIcon={quickOrderAssets.chevronRight}
+          />
           <AirspaceRiskNotice
             label="起点"
             result={pickupAirspace}
@@ -255,7 +277,12 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             <Image source={quickOrderAssets.pinEnd} style={styles.labelIcon} resizeMode="contain" />
             <Text style={styles.label}>终点地址 *</Text>
           </View>
-          <AddressInputField value={deliveryAddress} placeholder="点击选择终点地址" onSelect={setDeliveryAddress} />
+          <AddressInputField
+            value={deliveryAddress}
+            placeholder="点击选择终点地址"
+            onSelect={setDeliveryAddress}
+            rightIcon={quickOrderAssets.chevronRight}
+          />
           <AirspaceRiskNotice
             label="终点"
             result={deliveryAirspace}
@@ -284,13 +311,16 @@ export default function QuickOrderEntryScreen({navigation}: any) {
             <Image source={quickOrderAssets.cube} style={styles.labelIcon} resizeMode="contain" />
             <Text style={styles.label}>货物类型</Text>
           </View>
-          <TextInput
-            style={styles.input}
-            placeholder="例如：塔材、设备箱、海鲜补给"
-            placeholderTextColor={theme.textHint}
-            value={cargoType}
-            onChangeText={setCargoType}
-          />
+          <View style={styles.selectInputRow}>
+            <TextInput
+              style={styles.selectInput}
+              placeholder="例如：塔材、设备箱、海鲜补给"
+              placeholderTextColor={theme.textHint}
+              value={cargoType}
+              onChangeText={setCargoType}
+            />
+            <Image source={quickOrderAssets.chevronDown} style={styles.selectInputIcon} resizeMode="contain" />
+          </View>
 
           <View style={styles.labelRow}>
             <Image source={quickOrderAssets.ruler} style={styles.labelIcon} resizeMode="contain" />
@@ -339,6 +369,9 @@ export default function QuickOrderEntryScreen({navigation}: any) {
                 <Text style={[styles.optionText, !customCargoScene.trim() && cargoScene === option.key && styles.optionTextActive]}>
                   {option.label}
                 </Text>
+                {!customCargoScene.trim() && cargoScene === option.key ? (
+                  <Image source={quickOrderAssets.checkCircle} style={styles.optionCheckIcon} resizeMode="contain" />
+                ) : null}
               </TouchableOpacity>
             ))}
           </View>
@@ -403,7 +436,41 @@ export default function QuickOrderEntryScreen({navigation}: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: {flex: 1, backgroundColor: theme.bg},
+    container: {flex: 1, backgroundColor: '#F5F7FB'},
+    navBar: {
+      minHeight: 56,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#FFFFFF',
+    },
+    navSide: {
+      width: 92,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    navSideRight: {
+      justifyContent: 'flex-end',
+    },
+    navBack: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navBackIcon: {
+      width: 18,
+      height: 18,
+    },
+    navTitle: {
+      flex: 1,
+      color: '#111827',
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
     content: {padding: 12, paddingBottom: 40, gap: 12},
     heroCard: {
       minHeight: 124,
@@ -497,6 +564,31 @@ const getStyles = (theme: AppTheme) =>
       backgroundColor: theme.inputBg,
       color: theme.text,
     },
+    selectInputRow: {
+      minHeight: 46,
+      borderWidth: 1,
+      borderColor: theme.inputBorder,
+      borderRadius: 12,
+      paddingLeft: 14,
+      paddingRight: 12,
+      backgroundColor: theme.inputBg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    selectInput: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 12,
+      paddingHorizontal: 0,
+      fontSize: 15,
+      color: theme.text,
+    },
+    selectInputIcon: {
+      width: 14,
+      height: 14,
+      flexShrink: 0,
+    },
     dateText: {
       fontSize: 15,
       color: theme.text,
@@ -511,6 +603,9 @@ const getStyles = (theme: AppTheme) =>
       marginRight: 8,
       marginBottom: 8,
       backgroundColor: theme.card,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
     },
     optionBtnActive: {
       borderColor: theme.primary,
@@ -518,6 +613,10 @@ const getStyles = (theme: AppTheme) =>
     },
     optionText: {fontSize: 13, color: theme.textSub},
     optionTextActive: {color: theme.primary, fontWeight: '700'},
+    optionCheckIcon: {
+      width: 13,
+      height: 13,
+    },
     dimensionRow: {
       flexDirection: 'row',
       gap: 10,

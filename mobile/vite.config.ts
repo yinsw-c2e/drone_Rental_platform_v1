@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
       alias: [
         {find: /^react-native$/, replacement: path.resolve(__dirname, 'src/utils/react-native.web.ts')},
         {find: /^react-native-config$/, replacement: path.resolve(__dirname, 'src/utils/config.web.ts')},
+        {find: /^react-native-wechat-lib$/, replacement: path.resolve(__dirname, 'src/utils/wechat.web.ts')},
         {find: /^react-native-linear-gradient$/, replacement: path.resolve(__dirname, 'src/components/LinearGradient.web.tsx')},
         {find: /^(\.{1,2}\/)+assets\/miniProgramAssets$/, replacement: path.resolve(__dirname, 'src/assets/miniProgramAssets.web.ts')},
         {
@@ -32,7 +33,7 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-native-web', 'react-redux', '@reduxjs/toolkit'],
-      exclude: ['react-native-config', 'react-native-linear-gradient', 'react-native-image-picker'],
+      exclude: ['react-native-config', 'react-native-linear-gradient', 'react-native-image-picker', 'react-native-wechat-lib'],
     },
     server: {
       port: 3100,

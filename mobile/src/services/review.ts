@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 import {ApiResponse, Review, PageData} from '../types';
 
 export const reviewService = {
@@ -10,11 +10,11 @@ export const reviewService = {
     rating: number;
     content: string;
     images?: string[];
-  }) => api.post<any, ApiResponse<Review>>('/review', data),
+  }) => apiV2.post<any, ApiResponse<Review>>('/review', data),
 
   getByOrder: (orderId: number) =>
-    api.get<any, ApiResponse<Review[]>>(`/review/order/${orderId}`),
+    apiV2.get<any, ApiResponse<Review[]>>(`/review/order/${orderId}`),
 
   listByTarget: (targetType: string, targetId: number, params?: {page?: number; page_size?: number}) =>
-    api.get<any, ApiResponse<PageData<Review>>>(`/review/${targetType}/${targetId}`, {params}),
+    apiV2.get<any, ApiResponse<PageData<Review>>>(`/review/${targetType}/${targetId}`, {params}),
 };

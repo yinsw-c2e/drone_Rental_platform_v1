@@ -483,6 +483,10 @@ func (s *ContractService) GetContractByOrder(orderID int64) (*model.OrderContrac
 	return s.refreshContractHTML(s.contractRepo, contract)
 }
 
+func (s *ContractService) ListContracts(status string, page, pageSize int) ([]model.OrderContract, int64, error) {
+	return s.contractRepo.List(status, page, pageSize)
+}
+
 func validateOrderStatusForManualContractSign(order *model.Order) error {
 	if order == nil {
 		return errors.New("订单不存在")

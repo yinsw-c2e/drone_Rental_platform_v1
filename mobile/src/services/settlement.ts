@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -140,47 +140,47 @@ export interface WithdrawalRequest {
 // ==================== 定价 API ====================
 
 export const calculatePrice = async (data: CalculatePriceRequest): Promise<PricingResult> => {
-  const res: any = await api.post('/settlement/calculate-price', data);
+  const res: any = await apiV2.post('/settlement/calculate-price', data);
   return res.data;
 };
 
 // ==================== 结算 API ====================
 
 export const getSettlement = async (id: number): Promise<OrderSettlement> => {
-  const res: any = await api.get(`/settlement/${id}`);
+  const res: any = await apiV2.get(`/settlement/${id}`);
   return res.data;
 };
 
 export const getSettlementByOrder = async (orderId: number): Promise<OrderSettlement> => {
-  const res: any = await api.get(`/settlement/order/${orderId}`);
+  const res: any = await apiV2.get(`/settlement/order/${orderId}`);
   return res.data;
 };
 
 export const listMySettlements = async (params?: {role?: string; page?: number; page_size?: number}): Promise<{data: OrderSettlement[]; total: number}> => {
-  const res: any = await api.get('/settlement/my', {params});
+  const res: any = await apiV2.get('/settlement/my', {params});
   return {data: res.data, total: res.total};
 };
 
 // ==================== 钱包 API ====================
 
 export const getWallet = async (): Promise<UserWallet> => {
-  const res: any = await api.get('/settlement/wallet');
+  const res: any = await apiV2.get('/settlement/wallet');
   return res.data;
 };
 
 export const getWalletTransactions = async (params?: {type?: string; page?: number; page_size?: number}): Promise<{data: WalletTransaction[]; total: number}> => {
-  const res: any = await api.get('/settlement/wallet/transactions', {params});
+  const res: any = await apiV2.get('/settlement/wallet/transactions', {params});
   return {data: res.data, total: res.total};
 };
 
 // ==================== 提现 API ====================
 
 export const requestWithdrawal = async (data: WithdrawalRequest): Promise<WithdrawalRecord> => {
-  const res: any = await api.post('/settlement/withdrawal', data);
+  const res: any = await apiV2.post('/settlement/withdrawal', data);
   return res.data;
 };
 
 export const listMyWithdrawals = async (page = 1, pageSize = 20): Promise<{data: WithdrawalRecord[]; total: number}> => {
-  const res: any = await api.get('/settlement/withdrawals', {params: {page, page_size: pageSize}});
+  const res: any = await apiV2.get('/settlement/withdrawals', {params: {page, page_size: pageSize}});
   return {data: res.data, total: res.total};
 };

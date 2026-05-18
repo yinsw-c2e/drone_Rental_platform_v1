@@ -1,4 +1,4 @@
-import { apiV1 } from './api';
+import { apiV2 } from './api';
 import { Review } from '../types';
 
 export const reviewService = {
@@ -10,11 +10,11 @@ export const reviewService = {
     rating: number;
     content: string;
     images?: string[];
-  }) => apiV1.post<Review>('/review', data),
+  }) => apiV2.post<Review>('/review', data),
 
   getByOrder: (orderId: number) =>
-    apiV1.get<Review[]>(`/review/order/${orderId}`),
+    apiV2.get<Review[]>(`/review/order/${orderId}`),
 
   listByTarget: (targetType: string, targetId: number, params?: { page?: number; page_size?: number }) =>
-    apiV1.get<{ list: Review[]; total: number }>(`/review/${targetType}/${targetId}`, params),
+    apiV2.get<{ list: Review[]; total: number }>(`/review/${targetType}/${targetId}`, params),
 };

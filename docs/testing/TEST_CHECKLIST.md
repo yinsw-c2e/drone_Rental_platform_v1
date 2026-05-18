@@ -397,7 +397,7 @@ cd admin && npm run dev
 ### 快速测试后端API
 ```bash
 # 1. 发送验证码
-curl -X POST http://localhost:8080/api/v1/auth/send-code \
+curl -X POST http://localhost:8080/api/v2/auth/send-code \
   -H "Content-Type: application/json" \
   -d '{"phone":"13800138001"}'
 
@@ -405,7 +405,7 @@ curl -X POST http://localhost:8080/api/v1/auth/send-code \
 docker exec wurenji-redis redis-cli GET "sms:code:13800138001"
 
 # 3. 登录获取Token
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8080/api/v2/auth/login \
   -H "Content-Type: application/json" \
   -d '{"phone":"13800138001","code":"验证码"}'
 
@@ -413,27 +413,27 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 TOKEN="登录返回的access_token"
 
 # 获取用户信息
-curl http://localhost:8080/api/v1/user/profile \
+curl http://localhost:8080/api/v2/user/profile \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取无人机列表
-curl http://localhost:8080/api/v1/drone \
+curl http://localhost:8080/api/v2/drone \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取我的钱包
-curl http://localhost:8080/api/v1/settlement/wallet \
+curl http://localhost:8080/api/v2/settlement/wallet \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取信用分
-curl http://localhost:8080/api/v1/credit/my-score \
+curl http://localhost:8080/api/v2/credit/my-score \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取保险产品
-curl http://localhost:8080/api/v1/insurance/products \
+curl http://localhost:8080/api/v2/insurance/products \
   -H "Authorization: Bearer $TOKEN"
 
 # 获取数据看板 (需要管理员权限)
-curl http://localhost:8080/api/v1/analytics/dashboard/realtime \
+curl http://localhost:8080/api/v2/analytics/dashboard/realtime \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -457,7 +457,7 @@ curl http://localhost:8080/api/v1/analytics/dashboard/realtime \
 ## 常见问题排查
 
 ### 1. 无法发送验证码
-- 检查后端服务是否启动: `curl http://localhost:8080/api/v1/auth/send-code`
+- 检查后端服务是否启动: `curl http://localhost:8080/api/v2/auth/send-code`
 - 检查Redis是否运行: `docker ps | grep redis`
 
 ### 2. 登录后页面空白

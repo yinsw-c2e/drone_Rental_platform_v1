@@ -1,5 +1,6 @@
 import React from 'react';
-import {Text, TouchableOpacity, StyleSheet, View} from 'react-native';
+import {Image, Text, TouchableOpacity, StyleSheet, View} from 'react-native';
+import type {ImageSourcePropType} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {AddressData} from '../types';
 
@@ -12,6 +13,8 @@ interface AddressInputFieldProps {
   onSelect: (address: AddressData) => void;
   /** 自定义样式 */
   style?: object;
+  /** 右侧箭头图标 */
+  rightIcon?: ImageSourcePropType;
 }
 
 export default function AddressInputField({
@@ -19,6 +22,7 @@ export default function AddressInputField({
   placeholder = '点击选择地址',
   onSelect,
   style,
+  rightIcon,
 }: AddressInputFieldProps) {
   const navigation = useNavigation<any>();
 
@@ -48,7 +52,11 @@ export default function AddressInputField({
       ) : (
         <Text style={styles.placeholder}>{placeholder}</Text>
       )}
-      <Text style={styles.arrow}>&#8250;</Text>
+      {rightIcon ? (
+        <Image source={rightIcon} style={styles.arrowIcon} resizeMode="contain" />
+      ) : (
+        <Text style={styles.arrow}>&#8250;</Text>
+      )}
     </TouchableOpacity>
   );
 }
@@ -65,4 +73,5 @@ const styles = StyleSheet.create({
   subText: {fontSize: 12, color: '#999', marginTop: 2},
   placeholder: {flex: 1, fontSize: 15, color: '#bbb'},
   arrow: {fontSize: 20, color: '#ccc', marginLeft: 8},
+  arrowIcon: {width: 14, height: 14, marginLeft: 8, opacity: 0.75},
 });

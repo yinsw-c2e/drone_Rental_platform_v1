@@ -1,4 +1,4 @@
-import { apiV1, apiV2 } from './api';
+import { apiV2 } from './api';
 import { Message, ConversationSummary, V2ListData } from '../types';
 
 export const messageService = {
@@ -12,10 +12,10 @@ export const messageService = {
     }),
 
   getMessagesByPeer: (peerId: number, page?: number, pageSize?: number) =>
-    apiV1.get<{ list: Message[]; total: number }>(`/message/peer/${peerId}`, { page, page_size: pageSize }),
+    apiV2.get<{ list: Message[]; total: number }>(`/message/peer/${peerId}`, { page, page_size: pageSize }),
 
   send: (receiverId: number, content: string, messageType?: string) =>
-    apiV1.post<Message>('/message', { receiver_id: receiverId, content, message_type: messageType || 'text' }),
+    apiV2.post<Message>('/message', { receiver_id: receiverId, content, message_type: messageType || 'text' }),
 
   markRead: (conversationId: string) =>
     apiV2.post(`/conversations/${encodeURIComponent(conversationId)}/read`),
@@ -24,8 +24,8 @@ export const messageService = {
     apiV2.delete(`/conversations/${encodeURIComponent(conversationId)}`),
 
   markReadByPeer: (peerId: number) =>
-    apiV1.put(`/message/peer/${peerId}/read`),
+    apiV2.put(`/message/peer/${peerId}/read`),
 
   getUnreadCount: () =>
-    apiV1.get<{ count: number }>('/message/unread-count'),
+    apiV2.get<{ count: number }>('/message/unread-count'),
 };

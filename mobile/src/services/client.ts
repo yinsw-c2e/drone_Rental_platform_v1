@@ -1,4 +1,4 @@
-import api, {apiV2} from './api';
+import {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -143,13 +143,13 @@ export interface CreateCargoDeclarationRequest {
 
 // 注册个人客户
 export const registerIndividual = async (): Promise<Client> => {
-  const res: any = await api.post('/client/register/individual');
+  const res: any = await apiV2.post('/client/register/individual');
   return res.data;
 };
 
 // 注册企业客户
 export const registerEnterprise = async (data: RegisterEnterpriseRequest): Promise<Client> => {
-  const res: any = await api.post('/client/register/enterprise', data);
+  const res: any = await apiV2.post('/client/register/enterprise', data);
   return res.data;
 };
 
@@ -173,24 +173,24 @@ export const getClientEligibility = async (): Promise<ClientEligibility> => {
 
 // 发起征信查询
 export const requestCreditCheck = async (): Promise<void> => {
-  await api.post('/client/credit/check');
+  await apiV2.post('/client/credit/check');
 };
 
 // 获取征信历史
 export const getCreditHistory = async (): Promise<CreditCheckRecord[]> => {
-  const res: any = await api.get('/client/credit/history');
+  const res: any = await apiV2.get('/client/credit/history');
   return res.data;
 };
 
 // 检查下单资格
 export const checkOrderEligibility = async (): Promise<{eligible: boolean; reasons?: string[]}> => {
-  const res: any = await api.get('/client/order/eligibility');
+  const res: any = await apiV2.get('/client/order/eligibility');
   return res.data;
 };
 
 // 创建货物申报
 export const createCargoDeclaration = async (data: CreateCargoDeclarationRequest): Promise<CargoDeclaration> => {
-  const res: any = await api.post('/client/cargo/declaration', data);
+  const res: any = await apiV2.post('/client/cargo/declaration', data);
   return res.data;
 };
 
@@ -199,19 +199,19 @@ export const listCargoDeclarations = async (params?: {
   page?: number;
   page_size?: number;
 }): Promise<{list: CargoDeclaration[]; total: number}> => {
-  const res: any = await api.get('/client/cargo/declarations', {params});
+  const res: any = await apiV2.get('/client/cargo/declarations', {params});
   return {list: res.data?.list || [], total: res.data?.total || 0};
 };
 
 // 获取货物申报详情
 export const getCargoDeclaration = async (id: number): Promise<CargoDeclaration> => {
-  const res: any = await api.get(`/client/cargo/declaration/${id}`);
+  const res: any = await apiV2.get(`/client/cargo/declaration/${id}`);
   return res.data;
 };
 
 // 更新货物申报
 export const updateCargoDeclaration = async (id: number, data: Partial<CreateCargoDeclarationRequest>): Promise<CargoDeclaration> => {
-  const res: any = await api.put(`/client/cargo/declaration/${id}`, data);
+  const res: any = await apiV2.put(`/client/cargo/declaration/${id}`, data);
   return res.data;
 };
 

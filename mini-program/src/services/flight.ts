@@ -1,4 +1,4 @@
-import { apiV1 } from './api';
+import { apiV2 } from './api';
 
 // ==================== 类型定义 ====================
 
@@ -140,46 +140,46 @@ export interface CreateMultiPointTaskRequest {
 // ==================== API 服务 ====================
 
 export const reportPosition = async (data: ReportPositionRequest): Promise<void> => {
-  await apiV1.post('/flight/position', data);
+  await apiV2.post('/flight/position', data);
 };
 
 export const getLatestPosition = async (orderId: number): Promise<FlightPosition> => {
-  return apiV1.get<FlightPosition>(`/flight/position/${orderId}/latest`);
+  return apiV2.get<FlightPosition>(`/flight/position/${orderId}/latest`);
 };
 
 export const getPositionHistory = async (orderId: number, params?: {
   start_time?: string;
   end_time?: string;
 }): Promise<FlightPosition[]> => {
-  return apiV1.get<FlightPosition[]>(`/flight/position/${orderId}/history`, params);
+  return apiV2.get<FlightPosition[]>(`/flight/position/${orderId}/history`, params);
 };
 
 export const getAlerts = async (orderId: number): Promise<FlightAlert[]> => {
-  return apiV1.get<FlightAlert[]>(`/flight/alerts/${orderId}`);
+  return apiV2.get<FlightAlert[]>(`/flight/alerts/${orderId}`);
 };
 
 export const getActiveAlerts = async (orderId: number): Promise<FlightAlert[]> => {
-  return apiV1.get<FlightAlert[]>(`/flight/alerts/${orderId}/active`);
+  return apiV2.get<FlightAlert[]>(`/flight/alerts/${orderId}/active`);
 };
 
 export const acknowledgeAlert = async (alertId: number): Promise<void> => {
-  await apiV1.post(`/flight/alert/${alertId}/acknowledge`);
+  await apiV2.post(`/flight/alert/${alertId}/acknowledge`);
 };
 
 export const resolveAlert = async (alertId: number): Promise<void> => {
-  await apiV1.post(`/flight/alert/${alertId}/resolve`);
+  await apiV2.post(`/flight/alert/${alertId}/resolve`);
 };
 
 export const startTrajectory = async (orderId: number): Promise<FlightTrajectory> => {
-  return apiV1.post<FlightTrajectory>(`/flight/trajectory/start/${orderId}`);
+  return apiV2.post<FlightTrajectory>('/flight/trajectory/start', { order_id: orderId });
 };
 
 export const stopTrajectory = async (trajectoryId: number): Promise<FlightTrajectory> => {
-  return apiV1.post<FlightTrajectory>(`/flight/trajectory/stop/${trajectoryId}`);
+  return apiV2.post<FlightTrajectory>('/flight/trajectory/stop', { trajectory_id: trajectoryId });
 };
 
 export const getTrajectory = async (trajectoryId: number): Promise<{ trajectory: FlightTrajectory; waypoints: FlightWaypoint[] }> => {
-  return apiV1.get(`/flight/trajectory/${trajectoryId}`);
+  return apiV2.get(`/flight/trajectory/${trajectoryId}`);
 };
 
 export const createRouteFromTrajectory = async (trajectoryId: number, data: {
@@ -187,11 +187,15 @@ export const createRouteFromTrajectory = async (trajectoryId: number, data: {
   description?: string;
   is_public?: boolean;
 }): Promise<SavedRoute> => {
-  return apiV1.post<SavedRoute>(`/flight/route/from-trajectory/${trajectoryId}`, data);
+  return apiV2.post<SavedRoute>('/flight/route/from-trajectory', {
+    trajectory_id: trajectoryId,
+    ...data,
+    visibility: data.is_public ? 'public' : 'private',
+  });
 };
 
 export const listMyRoutes = async (): Promise<SavedRoute[]> => {
-  return apiV1.get<SavedRoute[]>('/flight/routes/my');
+  return apiV2.get<SavedRoute[]>('/flight/routes/my');
 };
 
 export const listPublicRoutes = async (params?: {
@@ -199,7 +203,7 @@ export const listPublicRoutes = async (params?: {
   longitude?: number;
   radius_km?: number;
 }): Promise<SavedRoute[]> => {
-  return apiV1.get<SavedRoute[]>('/flight/routes/public', params);
+  return apiV2.get<SavedRoute[]>('/flight/routes/public', params);
 };
 
 export const findNearbyRoutes = async (params: {
@@ -207,35 +211,41 @@ export const findNearbyRoutes = async (params: {
   longitude: number;
   radius_km?: number;
 }): Promise<SavedRoute[]> => {
-  return apiV1.get<SavedRoute[]>('/flight/routes/nearby', params);
+  return apiV2.get<SavedRoute[]>('/flight/routes/nearby', params);
 };
 
 export const deleteRoute = async (routeId: number): Promise<void> => {
-  await apiV1.delete(`/flight/route/${routeId}`);
+  await apiV2.delete(`/flight/route/${routeId}`);
 };
 
 export const createMultiPointTask = async (data: CreateMultiPointTaskRequest): Promise<MultiPointTask> => {
-  return apiV1.post<MultiPointTask>('/flight/multi-point/task', data);
+  return apiV2.post<MultiPointTask>('/flight/multipoint-task', data);
 };
 
-export const getMultiPointTask = async (taskId: number): Promise<MultiPointTask> => {
-  return apiV1.get<MultiPointTask>(`/flight/multi-point/task/${taskId}`);
+export const getMultiPointTask = async (orderId: number): Promise<MultiPointTask> => {
+  return apiV2.get<MultiPointTask>(`/flight/multipoint-task/order/${orderId}`);
 };
 
 export const startMultiPointTask = async (taskId: number): Promise<void> => {
-  await apiV1.post(`/flight/multi-point/task/${taskId}/start`);
+  await apiV2.post(`/flight/multipoint-task/${taskId}/start`);
 };
 
-export const arriveAtStop = async (taskId: number): Promise<void> => {
-  await apiV1.post(`/flight/multi-point/task/${taskId}/arrive`);
+export const arriveAtStop = async (
+  taskOrStopId: number,
+  stopId?: number,
+  _position?: { latitude: number; longitude: number },
+): Promise<void> => {
+  await apiV2.post(`/flight/multipoint-task/stop/${stopId ?? taskOrStopId}/arrive`);
 };
 
-export const completeStop = async (taskId: number, notes?: string): Promise<void> => {
-  await apiV1.post(`/flight/multi-point/task/${taskId}/complete-stop`, { notes });
+export const completeStop = async (taskOrStopId: number, stopIdOrNotes?: number | string, notes?: string): Promise<void> => {
+  const stopId = typeof stopIdOrNotes === 'number' ? stopIdOrNotes : taskOrStopId;
+  const resolvedNotes = typeof stopIdOrNotes === 'string' ? stopIdOrNotes : notes;
+  await apiV2.post(`/flight/multipoint-task/stop/${stopId}/complete`, { notes: resolvedNotes });
 };
 
 export const getFlightStats = async (): Promise<any> => {
-  return apiV1.get('/flight/stats');
+  return apiV2.get('/flight/stats');
 };
 
 export const simulateFlight = async (orderId: number): Promise<{
@@ -246,7 +256,7 @@ export const simulateFlight = async (orderId: number): Promise<{
   end_lat: number;
   end_lng: number;
 }> => {
-  return apiV1.post(`/flight/simulate/${orderId}`);
+  return apiV2.post(`/flight/simulate/${orderId}`);
 };
 
 export default {

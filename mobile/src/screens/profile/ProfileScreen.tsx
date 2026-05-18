@@ -661,7 +661,14 @@ export default function ProfileScreen({navigation}: any) {
           onPress={() => setShowAdvanced(!showAdvanced)}
           activeOpacity={0.7}>
           <Text style={styles.foldToggleText}>身份与能力详情</Text>
-          <Text style={styles.foldToggleArrow}>{showAdvanced ? '收起 ▲' : '展开 ▼'}</Text>
+          <View style={styles.foldToggleRight}>
+            <Text style={styles.foldToggleState}>{showAdvanced ? '收起' : '展开'}</Text>
+            <Image
+              source={profileAssets.chevronDown}
+              style={[styles.foldToggleIcon, showAdvanced && styles.foldToggleIconOpen]}
+              resizeMode="contain"
+            />
+          </View>
         </TouchableOpacity>
 
         {showAdvanced && (
@@ -734,6 +741,7 @@ export default function ProfileScreen({navigation}: any) {
               {text: '退出', style: 'destructive', onPress: () => dispatch(logout())},
             ]);
           }}>
+          <Image source={profileAssets.logout} style={styles.logoutIcon} resizeMode="contain" />
           <Text style={styles.logoutText}>退出登录</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -1157,10 +1165,22 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.text,
     fontWeight: '700',
   },
-  foldToggleArrow: {
+  foldToggleRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  foldToggleState: {
     fontSize: 12,
     color: theme.textSub,
     fontWeight: '600',
+  },
+  foldToggleIcon: {
+    width: 14,
+    height: 14,
+  },
+  foldToggleIconOpen: {
+    transform: [{rotate: '180deg'}],
   },
   logoutBtn: {
     marginTop: 4,
@@ -1170,6 +1190,13 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     borderColor: theme.danger + '44',
     paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  logoutIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 7,
   },
   logoutText: {
     fontSize: 14,

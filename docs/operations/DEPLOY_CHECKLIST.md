@@ -105,7 +105,7 @@ PREPARE_DEMO_DATA=1 ./scripts/phase10_role_acceptance.sh
   - `payment.wechat.api_key`: API密钥
   - `payment.wechat.cert_path`: 证书路径（APIv3）
   - `payment.wechat.key_path`: 私钥路径（APIv3）
-  - `payment.wechat.notify_url`: 回调地址（如 `https://api.yourdomain.com/api/v1/payment/wechat/notify`）
+  - `payment.wechat.notify_url`: 回调地址（如 `https://api.yourdomain.com/api/v2/payment/wechat/notify`）
 - **移动端配置**:
   - iOS: 在 Xcode 中配置 URL Scheme 为微信 AppID
   - Android: 在 AndroidManifest.xml 中配置微信相关 Activity

@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -177,78 +177,78 @@ const unwrapAirspaceListPayload = <T>(res: any): {data: T[]; total: number} => {
 // ==================== 空域申请 API ====================
 
 export const createApplication = async (data: CreateApplicationRequest): Promise<AirspaceApplication> => {
-  const res: any = await api.post('/airspace/application', data);
+  const res: any = await apiV2.post('/airspace/application', data);
   return unwrapAirspacePayload<AirspaceApplication>(res);
 };
 
 export const getApplication = async (id: number): Promise<AirspaceApplication> => {
-  const res: any = await api.get(`/airspace/application/${id}`);
+  const res: any = await apiV2.get(`/airspace/application/${id}`);
   return unwrapAirspacePayload<AirspaceApplication>(res);
 };
 
 export const getApplicationByOrder = async (orderId: number): Promise<AirspaceApplication> => {
-  const res: any = await api.get(`/airspace/application/order/${orderId}`);
+  const res: any = await apiV2.get(`/airspace/application/order/${orderId}`);
   return unwrapAirspacePayload<AirspaceApplication>(res);
 };
 
 export const listMyApplications = async (pilotId: number, page = 1, pageSize = 20): Promise<{data: AirspaceApplication[]; total: number}> => {
-  const res: any = await api.get('/airspace/applications', {params: {pilot_id: pilotId, page, page_size: pageSize}});
+  const res: any = await apiV2.get('/airspace/applications', {params: {pilot_id: pilotId, page, page_size: pageSize}});
   return unwrapAirspaceListPayload<AirspaceApplication>(res);
 };
 
 export const submitForReview = async (id: number, pilotId: number): Promise<void> => {
-  await api.post(`/airspace/application/${id}/submit`, {pilot_id: pilotId});
+  await apiV2.post(`/airspace/application/${id}/submit`, {pilot_id: pilotId});
 };
 
 export const cancelApplication = async (id: number, pilotId: number): Promise<void> => {
-  await api.post(`/airspace/application/${id}/cancel`, {pilot_id: pilotId});
+  await apiV2.post(`/airspace/application/${id}/cancel`, {pilot_id: pilotId});
 };
 
 export const submitToUOM = async (id: number): Promise<void> => {
-  await api.post(`/airspace/application/${id}/uom`);
+  await apiV2.post(`/airspace/application/${id}/uom`);
 };
 
 // ==================== 禁飞区 API ====================
 
 export const listNoFlyZones = async (params?: {zone_type?: string; status?: string; page?: number; page_size?: number}): Promise<{data: NoFlyZone[]; total: number}> => {
-  const res: any = await api.get('/airspace/no-fly-zones', {params});
+  const res: any = await apiV2.get('/airspace/no-fly-zones', {params});
   return unwrapAirspaceListPayload<NoFlyZone>(res);
 };
 
 export const getNoFlyZone = async (id: number): Promise<NoFlyZone> => {
-  const res: any = await api.get(`/airspace/no-fly-zone/${id}`);
+  const res: any = await apiV2.get(`/airspace/no-fly-zone/${id}`);
   return unwrapAirspacePayload<NoFlyZone>(res);
 };
 
 export const findNearbyNoFlyZones = async (latitude: number, longitude: number, radius = 50000): Promise<NoFlyZone[]> => {
-  const res: any = await api.get('/airspace/no-fly-zones/nearby', {params: {latitude, longitude, radius}});
+  const res: any = await apiV2.get('/airspace/no-fly-zones/nearby', {params: {latitude, longitude, radius}});
   return unwrapAirspacePayload<NoFlyZone[]>(res);
 };
 
 export const checkAirspaceAvailability = async (latitude: number, longitude: number, altitude = 120): Promise<AirspaceCheckResult> => {
-  const res: any = await api.get('/airspace/check-availability', {params: {latitude, longitude, altitude}});
+  const res: any = await apiV2.get('/airspace/check-availability', {params: {latitude, longitude, altitude}});
   return unwrapAirspacePayload<AirspaceCheckResult>(res);
 };
 
 // ==================== 合规检查 API ====================
 
 export const runComplianceCheck = async (data: RunComplianceCheckRequest): Promise<ComplianceCheck> => {
-  const res: any = await api.post('/airspace/compliance/check', data);
+  const res: any = await apiV2.post('/airspace/compliance/check', data);
   return unwrapAirspacePayload<ComplianceCheck>(res);
 };
 
 export const getComplianceCheck = async (id: number): Promise<ComplianceCheck> => {
-  const res: any = await api.get(`/airspace/compliance/check/${id}`);
+  const res: any = await apiV2.get(`/airspace/compliance/check/${id}`);
   return unwrapAirspacePayload<ComplianceCheck>(res);
 };
 
 export const listComplianceChecks = async (params?: {pilot_id?: number; drone_id?: number; page?: number; page_size?: number}): Promise<{data: ComplianceCheck[]; total: number}> => {
-  const res: any = await api.get('/airspace/compliance/checks', {params});
+  const res: any = await apiV2.get('/airspace/compliance/checks', {params});
   return unwrapAirspaceListPayload<ComplianceCheck>(res);
 };
 
 export const getLatestComplianceCheck = async (pilotId: number, droneId: number): Promise<ComplianceCheck> => {
-  const res: any = await api.get('/airspace/compliance/latest', {params: {pilot_id: pilotId, drone_id: droneId}});
+  const res: any = await apiV2.get('/airspace/compliance/latest', {params: {pilot_id: pilotId, drone_id: droneId}});
   return unwrapAirspacePayload<ComplianceCheck>(res);
 };
 

@@ -61,10 +61,10 @@
 #### 任务 1.2：飞手注册认证流程开发
 - **状态**: [x] 已完成 (2026-03-01)
 - **后端任务**:
-  - [x] 飞手注册API `/api/v1/pilot/register`
-  - [x] CAAC执照上传验证API `/api/v1/pilot/certification`
-  - [x] 无犯罪记录证明上传 `/api/v1/pilot/criminal-check`
-  - [x] 健康体检证明上传 `/api/v1/pilot/health-check`
+  - [x] 飞手注册API `/api/v2/pilot/register`
+  - [x] CAAC执照上传验证API `/api/v2/pilot/certification`
+  - [x] 无犯罪记录证明上传 `/api/v2/pilot/criminal-check`
+  - [x] 健康体检证明上传 `/api/v2/pilot/health-check`
   - [x] 飞手资质审核API (管理端待实现)
 - **完成内容**:
   - [x] pilot_repo.go - 飞手数据访问层
@@ -73,23 +73,23 @@
   - [x] router.go 新增飞手路由组
   - [x] main.go 注册飞手服务
 - **API清单**:
-  - POST `/api/v1/pilot/register` - 注册成为飞手
-  - GET `/api/v1/pilot/profile` - 获取飞手档案
-  - PUT `/api/v1/pilot/profile` - 更新飞手档案
-  - PUT `/api/v1/pilot/location` - 更新实时位置
-  - PUT `/api/v1/pilot/availability` - 更新接单状态
-  - GET `/api/v1/pilot/list` - 获取飞手列表
-  - GET `/api/v1/pilot/nearby` - 查找附近飞手
-  - POST `/api/v1/pilot/certification` - 提交资质证书
-  - GET `/api/v1/pilot/certifications` - 获取证书列表
-  - POST `/api/v1/pilot/criminal-check` - 提交无犯罪记录
-  - POST `/api/v1/pilot/health-check` - 提交健康证明
-  - GET `/api/v1/pilot/flight-logs` - 获取飞行记录
-  - POST `/api/v1/pilot/flight-log` - 添加飞行记录
-  - GET `/api/v1/pilot/flight-stats` - 获取飞行统计
-  - GET `/api/v1/pilot/bound-drones` - 获取绑定的无人机
-  - POST `/api/v1/pilot/bind-drone` - 绑定无人机
-  - DELETE `/api/v1/pilot/unbind/:bindingId` - 解绑无人机
+  - POST `/api/v2/pilot/register` - 注册成为飞手
+  - GET `/api/v2/pilot/profile` - 获取飞手档案
+  - PUT `/api/v2/pilot/profile` - 更新飞手档案
+  - PUT `/api/v2/pilot/location` - 更新实时位置
+  - PUT `/api/v2/pilot/availability` - 更新接单状态
+  - GET `/api/v2/pilot/list` - 获取飞手列表
+  - GET `/api/v2/pilot/nearby` - 查找附近飞手
+  - POST `/api/v2/pilot/certification` - 提交资质证书
+  - GET `/api/v2/pilot/certifications` - 获取证书列表
+  - POST `/api/v2/pilot/criminal-check` - 提交无犯罪记录
+  - POST `/api/v2/pilot/health-check` - 提交健康证明
+  - GET `/api/v2/pilot/flight-logs` - 获取飞行记录
+  - POST `/api/v2/pilot/flight-log` - 添加飞行记录
+  - GET `/api/v2/pilot/flight-stats` - 获取飞行统计
+  - GET `/api/v2/pilot/bound-drones` - 获取绑定的无人机
+  - POST `/api/v2/pilot/bind-drone` - 绑定无人机
+  - DELETE `/api/v2/pilot/unbind/:bindingId` - 解绑无人机
 - **移动端任务**:
   - [ ] 飞手注册页面
   - [ ] 资质上传页面
@@ -130,12 +130,12 @@
   - maintenance_records (JSON: 维护记录)
   ```
 - **API清单**:
-  - POST `/api/v1/drone/:id/uom` - 提交UOM平台登记
-  - POST `/api/v1/drone/:id/insurance` - 提交保险信息
-  - POST `/api/v1/drone/:id/airworthiness` - 提交适航证书
-  - POST `/api/v1/drone/:id/maintenance` - 添加维护记录
-  - GET `/api/v1/drone/:id/maintenance` - 获取维护记录
-  - GET `/api/v1/drone/:id/cert-status` - 获取认证状态
+  - POST `/api/v2/drone/:id/uom` - 提交UOM平台登记
+  - POST `/api/v2/drone/:id/insurance` - 提交保险信息
+  - POST `/api/v2/drone/:id/airworthiness` - 提交适航证书
+  - POST `/api/v2/drone/:id/maintenance` - 添加维护记录
+  - GET `/api/v2/drone/:id/maintenance` - 获取维护记录
+  - GET `/api/v2/drone/:id/cert-status` - 获取认证状态
 
 #### 任务 1.4：业主角色整合与增强
 - **状态**: [x] 已完成 (2026-03-02)
@@ -174,29 +174,29 @@
   - 合规检查流程
   ```
 - **API清单**:
-  - POST `/api/v1/client/register/individual` - 注册个人客户
-  - POST `/api/v1/client/register/enterprise` - 注册企业客户
-  - GET `/api/v1/client/profile` - 获取客户档案
-  - PUT `/api/v1/client/profile` - 更新客户档案
-  - GET `/api/v1/client/list` - 获取客户列表
-  - GET `/api/v1/client/:id` - 获取指定客户
-  - POST `/api/v1/client/credit/check` - 发起征信查询
-  - GET `/api/v1/client/credit/history` - 获取征信历史
-  - POST `/api/v1/client/enterprise/cert` - 提交企业资质
-  - GET `/api/v1/client/enterprise/certs` - 获取企业资质列表
-  - POST `/api/v1/client/cargo/declaration` - 创建货物申报
-  - GET `/api/v1/client/cargo/declaration/:id` - 获取货物申报详情
-  - GET `/api/v1/client/cargo/declarations` - 获取货物申报列表
-  - PUT `/api/v1/client/cargo/declaration/:id` - 更新货物申报
-  - GET `/api/v1/client/order/eligibility` - 检查下单资格
-  - POST `/api/v1/client/admin/approve/:id` - 审批通过客户
-  - POST `/api/v1/client/admin/reject/:id` - 拒绝客户
-  - POST `/api/v1/client/admin/cert/approve/:id` - 审批企业资质
-  - POST `/api/v1/client/admin/cert/reject/:id` - 拒绝企业资质
-  - POST `/api/v1/client/admin/cargo/approve/:id` - 审批货物申报
-  - POST `/api/v1/client/admin/cargo/reject/:id` - 拒绝货物申报
-  - GET `/api/v1/client/admin/pending` - 待审批客户列表
-  - GET `/api/v1/client/admin/cargo/pending` - 待审批货物申报
+  - POST `/api/v2/client/register/individual` - 注册个人客户
+  - POST `/api/v2/client/register/enterprise` - 注册企业客户
+  - GET `/api/v2/client/profile` - 获取客户档案
+  - PUT `/api/v2/client/profile` - 更新客户档案
+  - GET `/api/v2/client/list` - 获取客户列表
+  - GET `/api/v2/client/:id` - 获取指定客户
+  - POST `/api/v2/client/credit/check` - 发起征信查询
+  - GET `/api/v2/client/credit/history` - 获取征信历史
+  - POST `/api/v2/client/enterprise/cert` - 提交企业资质
+  - GET `/api/v2/client/enterprise/certs` - 获取企业资质列表
+  - POST `/api/v2/client/cargo/declaration` - 创建货物申报
+  - GET `/api/v2/client/cargo/declaration/:id` - 获取货物申报详情
+  - GET `/api/v2/client/cargo/declarations` - 获取货物申报列表
+  - PUT `/api/v2/client/cargo/declaration/:id` - 更新货物申报
+  - GET `/api/v2/client/order/eligibility` - 检查下单资格
+  - POST `/api/v2/client/admin/approve/:id` - 审批通过客户
+  - POST `/api/v2/client/admin/reject/:id` - 拒绝客户
+  - POST `/api/v2/client/admin/cert/approve/:id` - 审批企业资质
+  - POST `/api/v2/client/admin/cert/reject/:id` - 拒绝企业资质
+  - POST `/api/v2/client/admin/cargo/approve/:id` - 审批货物申报
+  - POST `/api/v2/client/admin/cargo/reject/:id` - 拒绝货物申报
+  - GET `/api/v2/client/admin/pending` - 待审批客户列表
+  - GET `/api/v2/client/admin/cargo/pending` - 待审批货物申报
 
 ---
 
@@ -272,27 +272,27 @@
   - [x] 特殊需求 (备注字段)
   - [x] 预算范围设定 (最大预算)
   - [x] 资质要求 (最低执照等级、最低信用分)
-- **API处理器**: internal/api/v1/dispatch/handler.go (17个端点)
+- **API处理器**: internal/api/v2/dispatch/handler.go (17个端点)
 - **API清单**:
   - **客户端点**:
-    - POST `/api/v1/dispatch/task` - 创建派单任务
-    - GET `/api/v1/dispatch/task/:id` - 获取任务详情
-    - GET `/api/v1/dispatch/tasks` - 获取客户任务列表
-    - POST `/api/v1/dispatch/task/:id/cancel` - 取消任务
-    - GET `/api/v1/dispatch/task/:id/candidates` - 获取候选人列表
-    - GET `/api/v1/dispatch/task/:id/logs` - 获取任务日志
+    - POST `/api/v2/dispatch/task` - 创建派单任务
+    - GET `/api/v2/dispatch/task/:id` - 获取任务详情
+    - GET `/api/v2/dispatch/tasks` - 获取客户任务列表
+    - POST `/api/v2/dispatch/task/:id/cancel` - 取消任务
+    - GET `/api/v2/dispatch/task/:id/candidates` - 获取候选人列表
+    - GET `/api/v2/dispatch/task/:id/logs` - 获取任务日志
   - **飞手端点**:
-    - GET `/api/v1/dispatch/pilot/tasks` - 获取飞手任务列表
-    - GET `/api/v1/dispatch/pilot/pending` - 获取待接单任务
-    - POST `/api/v1/dispatch/pilot/accept/:taskId` - 接受任务
-    - POST `/api/v1/dispatch/pilot/reject/:taskId` - 拒绝任务
+    - GET `/api/v2/dispatch/pilot/tasks` - 获取飞手任务列表
+    - GET `/api/v2/dispatch/pilot/pending` - 获取待接单任务
+    - POST `/api/v2/dispatch/pilot/accept/:taskId` - 接受任务
+    - POST `/api/v2/dispatch/pilot/reject/:taskId` - 拒绝任务
   - **管理端点**:
-    - POST `/api/v1/dispatch/admin/match/:id` - 手动触发匹配
-    - POST `/api/v1/dispatch/admin/process-pending` - 处理待派单任务
-    - POST `/api/v1/dispatch/admin/handle-expired` - 处理超时任务
+    - POST `/api/v2/dispatch/admin/match/:id` - 手动触发匹配
+    - POST `/api/v2/dispatch/admin/process-pending` - 处理待派单任务
+    - POST `/api/v2/dispatch/admin/handle-expired` - 处理超时任务
   - **配置端点**:
-    - GET `/api/v1/dispatch/config` - 获取派单配置
-    - PUT `/api/v1/dispatch/config` - 更新派单配置
+    - GET `/api/v2/dispatch/config` - 获取派单配置
+    - PUT `/api/v2/dispatch/config` - 更新派单配置
 
 ---
 
@@ -369,7 +369,7 @@
 - **新增文件**:
   - internal/repository/flight_repo.go (50+方法)
   - internal/service/flight_service.go (飞行监控服务)
-  - internal/api/v1/flight/handler.go (30+API端点)
+  - internal/api/v2/flight/handler.go (30+API端点)
 
 #### 任务 3.3：轨迹录制与复用
 - **状态**: [x] 已完成 (2026-03-02)
@@ -411,44 +411,44 @@
   ```
 - **API清单** (30个端点):
   - **位置上报**:
-    - POST `/api/v1/flight/position` - 上报飞行位置
-    - GET `/api/v1/flight/position/:order_id/latest` - 获取最新位置
-    - GET `/api/v1/flight/position/:order_id/history` - 获取位置历史
+    - POST `/api/v2/flight/position` - 上报飞行位置
+    - GET `/api/v2/flight/position/:order_id/latest` - 获取最新位置
+    - GET `/api/v2/flight/position/:order_id/history` - 获取位置历史
   - **告警管理**:
-    - GET `/api/v1/flight/alerts/:order_id` - 获取告警列表
-    - GET `/api/v1/flight/alerts/:order_id/active` - 获取活跃告警
-    - POST `/api/v1/flight/alert/:alert_id/acknowledge` - 确认告警
-    - POST `/api/v1/flight/alert/:alert_id/resolve` - 解决告警
+    - GET `/api/v2/flight/alerts/:order_id` - 获取告警列表
+    - GET `/api/v2/flight/alerts/:order_id/active` - 获取活跃告警
+    - POST `/api/v2/flight/alert/:alert_id/acknowledge` - 确认告警
+    - POST `/api/v2/flight/alert/:alert_id/resolve` - 解决告警
   - **电子围栏**:
-    - GET `/api/v1/flight/geofences` - 围栏列表
-    - GET `/api/v1/flight/geofence/:id` - 获取围栏详情
-    - POST `/api/v1/flight/geofence` - 创建围栏
-    - DELETE `/api/v1/flight/geofence/:id` - 删除围栏
+    - GET `/api/v2/flight/geofences` - 围栏列表
+    - GET `/api/v2/flight/geofence/:id` - 获取围栏详情
+    - POST `/api/v2/flight/geofence` - 创建围栏
+    - DELETE `/api/v2/flight/geofence/:id` - 删除围栏
   - **轨迹录制**:
-    - POST `/api/v1/flight/trajectory/start` - 开始录制
-    - POST `/api/v1/flight/trajectory/stop` - 停止录制
-    - GET `/api/v1/flight/trajectory/:order_id` - 获取轨迹详情
-    - POST `/api/v1/flight/trajectory/:id/template` - 标记为模板
+    - POST `/api/v2/flight/trajectory/start` - 开始录制
+    - POST `/api/v2/flight/trajectory/stop` - 停止录制
+    - GET `/api/v2/flight/trajectory/:order_id` - 获取轨迹详情
+    - POST `/api/v2/flight/trajectory/:id/template` - 标记为模板
   - **路线管理**:
-    - POST `/api/v1/flight/route/from-trajectory` - 从轨迹创建路线
-    - GET `/api/v1/flight/routes/mine` - 我的路线
-    - GET `/api/v1/flight/routes/public` - 公开路线
-    - GET `/api/v1/flight/routes/nearby` - 附近路线
-    - GET `/api/v1/flight/route/:id` - 路线详情
-    - POST `/api/v1/flight/route/:id/use` - 使用路线
-    - POST `/api/v1/flight/route/:id/rate` - 评价路线
-    - DELETE `/api/v1/flight/route/:id` - 删除路线
+    - POST `/api/v2/flight/route/from-trajectory` - 从轨迹创建路线
+    - GET `/api/v2/flight/routes/mine` - 我的路线
+    - GET `/api/v2/flight/routes/public` - 公开路线
+    - GET `/api/v2/flight/routes/nearby` - 附近路线
+    - GET `/api/v2/flight/route/:id` - 路线详情
+    - POST `/api/v2/flight/route/:id/use` - 使用路线
+    - POST `/api/v2/flight/route/:id/rate` - 评价路线
+    - DELETE `/api/v2/flight/route/:id` - 删除路线
   - **多点任务**:
-    - POST `/api/v1/flight/multipoint-task` - 创建多点任务
-    - GET `/api/v1/flight/multipoint-task/:id` - 获取任务详情
-    - GET `/api/v1/flight/multipoint-task/order/:order_id` - 按订单获取
-    - POST `/api/v1/flight/multipoint-task/:id/start` - 开始任务
-    - POST `/api/v1/flight/multipoint-task/:id/next` - 下一站点
-    - POST `/api/v1/flight/multipoint-task/stop/:stop_id/arrive` - 到达站点
-    - POST `/api/v1/flight/multipoint-task/stop/:stop_id/complete` - 完成站点
-    - POST `/api/v1/flight/multipoint-task/stop/:stop_id/skip` - 跳过站点
+    - POST `/api/v2/flight/multipoint-task` - 创建多点任务
+    - GET `/api/v2/flight/multipoint-task/:id` - 获取任务详情
+    - GET `/api/v2/flight/multipoint-task/order/:order_id` - 按订单获取
+    - POST `/api/v2/flight/multipoint-task/:id/start` - 开始任务
+    - POST `/api/v2/flight/multipoint-task/:id/next` - 下一站点
+    - POST `/api/v2/flight/multipoint-task/stop/:stop_id/arrive` - 到达站点
+    - POST `/api/v2/flight/multipoint-task/stop/:stop_id/complete` - 完成站点
+    - POST `/api/v2/flight/multipoint-task/stop/:stop_id/skip` - 跳过站点
   - **飞行统计**:
-    - GET `/api/v1/flight/stats/:order_id` - 获取飞行统计
+    - GET `/api/v2/flight/stats/:order_id` - 获取飞行统计
 
 ---
 
@@ -566,24 +566,24 @@
   - [x] 钱包管理(查询/流水/冻结/解冻)
   - [x] 提现流程(申请/审批/拒绝/手续费)
 - **API端点**:
-  - POST `/api/v1/settlement/calculate-price` - 价格预估
-  - POST `/api/v1/settlement/create` - 创建结算
-  - GET `/api/v1/settlement/:id` - 结算详情
-  - GET `/api/v1/settlement/order/:order_id` - 按订单查结算
-  - POST `/api/v1/settlement/:id/confirm` - 确认结算
-  - GET `/api/v1/settlement/my` - 我的结算列表
-  - GET `/api/v1/settlement/wallet` - 我的钱包
-  - GET `/api/v1/settlement/wallet/transactions` - 钱包流水
-  - POST `/api/v1/settlement/withdrawal` - 申请提现
-  - GET `/api/v1/settlement/withdrawals` - 提现记录
-  - POST `/api/v1/settlement/admin/execute/:id` - 执行结算
-  - GET `/api/v1/settlement/admin/list` - 全部结算
-  - POST `/api/v1/settlement/admin/process-pending` - 批量结算
-  - GET `/api/v1/settlement/admin/withdrawals/pending` - 待审核提现
-  - POST `/api/v1/settlement/admin/withdrawal/:id/approve` - 通过提现
-  - POST `/api/v1/settlement/admin/withdrawal/:id/reject` - 拒绝提现
-  - GET `/api/v1/settlement/admin/pricing-configs` - 定价配置
-  - PUT `/api/v1/settlement/admin/pricing-config` - 更新配置
+  - POST `/api/v2/settlement/calculate-price` - 价格预估
+  - POST `/api/v2/settlement/create` - 创建结算
+  - GET `/api/v2/settlement/:id` - 结算详情
+  - GET `/api/v2/settlement/order/:order_id` - 按订单查结算
+  - POST `/api/v2/settlement/:id/confirm` - 确认结算
+  - GET `/api/v2/settlement/my` - 我的结算列表
+  - GET `/api/v2/settlement/wallet` - 我的钱包
+  - GET `/api/v2/settlement/wallet/transactions` - 钱包流水
+  - POST `/api/v2/settlement/withdrawal` - 申请提现
+  - GET `/api/v2/settlement/withdrawals` - 提现记录
+  - POST `/api/v2/settlement/admin/execute/:id` - 执行结算
+  - GET `/api/v2/settlement/admin/list` - 全部结算
+  - POST `/api/v2/settlement/admin/process-pending` - 批量结算
+  - GET `/api/v2/settlement/admin/withdrawals/pending` - 待审核提现
+  - POST `/api/v2/settlement/admin/withdrawal/:id/approve` - 通过提现
+  - POST `/api/v2/settlement/admin/withdrawal/:id/reject` - 拒绝提现
+  - GET `/api/v2/settlement/admin/pricing-configs` - 定价配置
+  - PUT `/api/v2/settlement/admin/pricing-config` - 更新配置
 - **分账比例** (示例):
   - 平台服务费: 10%
   - 飞手劳务费: 45%
@@ -704,16 +704,16 @@
   - [x] analytics/handler.go API处理器 (25+ 端点)
   - [x] 路由注册
 - **API端点**:
-  - GET `/api/v1/analytics/dashboard/realtime` - 实时看板
-  - POST `/api/v1/analytics/dashboard/refresh` - 刷新缓存
-  - GET `/api/v1/analytics/overview` - 数据概览
-  - GET `/api/v1/analytics/trends` - 趋势数据
-  - GET `/api/v1/analytics/daily` - 每日统计
-  - GET `/api/v1/analytics/daily/range` - 日期范围统计
-  - GET `/api/v1/analytics/hourly` - 小时指标
-  - GET `/api/v1/analytics/heatmap` - 热力图数据
-  - GET `/api/v1/analytics/regions` - 区域统计
-  - GET `/api/v1/analytics/regions/top` - TOP区域
+  - GET `/api/v2/analytics/dashboard/realtime` - 实时看板
+  - POST `/api/v2/analytics/dashboard/refresh` - 刷新缓存
+  - GET `/api/v2/analytics/overview` - 数据概览
+  - GET `/api/v2/analytics/trends` - 趋势数据
+  - GET `/api/v2/analytics/daily` - 每日统计
+  - GET `/api/v2/analytics/daily/range` - 日期范围统计
+  - GET `/api/v2/analytics/hourly` - 小时指标
+  - GET `/api/v2/analytics/heatmap` - 热力图数据
+  - GET `/api/v2/analytics/regions` - 区域统计
+  - GET `/api/v2/analytics/regions/top` - TOP区域
 
 #### 任务 8.2：智能报表
 - **状态**: [x] 已完成 (2026-03-02)
@@ -725,16 +725,16 @@
   - [x] 环比/同比数据预留
   - [x] 定时任务接口 (每日/小时/自动报表)
 - **API端点**:
-  - GET `/api/v1/analytics/reports` - 报表列表
-  - GET `/api/v1/analytics/report/:id` - 报表详情
-  - GET `/api/v1/analytics/report/no/:reportNo` - 按编号查询
-  - GET `/api/v1/analytics/report/latest/:type` - 最新报表
-  - POST `/api/v1/analytics/report/generate` - 生成报表
-  - DELETE `/api/v1/analytics/report/:id` - 删除报表
-  - POST `/api/v1/analytics/admin/daily/generate` - 生成每日统计
-  - POST `/api/v1/analytics/admin/job/daily` - 触发每日任务
-  - POST `/api/v1/analytics/admin/job/hourly` - 触发小时任务
-  - POST `/api/v1/analytics/admin/job/report` - 触发自动报表
+  - GET `/api/v2/analytics/reports` - 报表列表
+  - GET `/api/v2/analytics/report/:id` - 报表详情
+  - GET `/api/v2/analytics/report/no/:reportNo` - 按编号查询
+  - GET `/api/v2/analytics/report/latest/:type` - 最新报表
+  - POST `/api/v2/analytics/report/generate` - 生成报表
+  - DELETE `/api/v2/analytics/report/:id` - 删除报表
+  - POST `/api/v2/analytics/admin/daily/generate` - 生成每日统计
+  - POST `/api/v2/analytics/admin/job/daily` - 触发每日任务
+  - POST `/api/v2/analytics/admin/job/hourly` - 触发小时任务
+  - POST `/api/v2/analytics/admin/job/report` - 触发自动报表
 - **管理后台** (数据看板适合放在Web端，非移动端):
   - [x] admin/src/services/api.ts 新增analytics API方法
   - [x] admin/src/pages/Analytics/AnalyticsDashboard.tsx 运营看板页面
@@ -770,15 +770,15 @@
 - **需新增服务**:
   - [ ] `src/services/pilot.ts` - 飞手API服务
 - **API对接**:
-  - POST `/api/v1/pilot/register` - 注册成为飞手
-  - GET `/api/v1/pilot/profile` - 获取飞手档案
-  - PUT `/api/v1/pilot/profile` - 更新飞手档案
-  - POST `/api/v1/pilot/certification` - 提交资质证书
-  - GET `/api/v1/pilot/certifications` - 获取证书列表
-  - POST `/api/v1/pilot/criminal-check` - 提交无犯罪记录
-  - POST `/api/v1/pilot/health-check` - 提交健康证明
-  - GET `/api/v1/pilot/flight-logs` - 获取飞行记录
-  - POST `/api/v1/pilot/flight-log` - 添加飞行记录
+  - POST `/api/v2/pilot/register` - 注册成为飞手
+  - GET `/api/v2/pilot/profile` - 获取飞手档案
+  - PUT `/api/v2/pilot/profile` - 更新飞手档案
+  - POST `/api/v2/pilot/certification` - 提交资质证书
+  - GET `/api/v2/pilot/certifications` - 获取证书列表
+  - POST `/api/v2/pilot/criminal-check` - 提交无犯罪记录
+  - POST `/api/v2/pilot/health-check` - 提交健康证明
+  - GET `/api/v2/pilot/flight-logs` - 获取飞行记录
+  - POST `/api/v2/pilot/flight-log` - 添加飞行记录
 
 #### 任务 M1.2：飞手无人机绑定管理
 - **状态**: [x] 已完成 (2026-03-02)
@@ -787,9 +787,9 @@
   - [ ] `src/screens/pilot/BoundDronesScreen.tsx` - 已绑定无人机列表
   - [ ] `src/screens/pilot/BindDroneScreen.tsx` - 绑定新无人机
 - **API对接**:
-  - GET `/api/v1/pilot/bound-drones` - 获取绑定的无人机
-  - POST `/api/v1/pilot/bind-drone` - 绑定无人机
-  - DELETE `/api/v1/pilot/unbind/:bindingId` - 解绑无人机
+  - GET `/api/v2/pilot/bound-drones` - 获取绑定的无人机
+  - POST `/api/v2/pilot/bind-drone` - 绑定无人机
+  - DELETE `/api/v2/pilot/unbind/:bindingId` - 解绑无人机
 
 #### 任务 M1.3：机主认证增强页面
 - **状态**: [x] 已完成 (2026-03-02)
@@ -801,12 +801,12 @@
   - [ ] `src/screens/drone/DroneCertificationScreen.tsx` - 无人机认证详情
   - [ ] `src/screens/drone/MaintenanceLogScreen.tsx` - 维护记录页面
 - **API对接**:
-  - POST `/api/v1/drone/:id/uom` - 提交UOM平台登记
-  - POST `/api/v1/drone/:id/insurance` - 提交保险信息
-  - POST `/api/v1/drone/:id/airworthiness` - 提交适航证书
-  - POST `/api/v1/drone/:id/maintenance` - 添加维护记录
-  - GET `/api/v1/drone/:id/maintenance` - 获取维护记录
-  - GET `/api/v1/drone/:id/cert-status` - 获取认证状态
+  - POST `/api/v2/drone/:id/uom` - 提交UOM平台登记
+  - POST `/api/v2/drone/:id/insurance` - 提交保险信息
+  - POST `/api/v2/drone/:id/airworthiness` - 提交适航证书
+  - POST `/api/v2/drone/:id/maintenance` - 添加维护记录
+  - GET `/api/v2/drone/:id/maintenance` - 获取维护记录
+  - GET `/api/v2/drone/:id/cert-status` - 获取认证状态
 
 #### 任务 M1.4：业主/客户角色页面
 - **状态**: [x] 已完成 (2026-03-02)
@@ -819,14 +819,14 @@
 - **需新增服务**:
   - [ ] `src/services/client.ts` - 业主API服务
 - **API对接**:
-  - POST `/api/v1/client/register/individual` - 注册个人客户
-  - POST `/api/v1/client/register/enterprise` - 注册企业客户
-  - GET `/api/v1/client/profile` - 获取客户档案
-  - PUT `/api/v1/client/profile` - 更新客户档案
-  - POST `/api/v1/client/credit/check` - 发起征信查询
-  - POST `/api/v1/client/enterprise/cert` - 提交企业资质
-  - POST `/api/v1/client/cargo/declaration` - 创建货物申报
-  - GET `/api/v1/client/order/eligibility` - 检查下单资格
+  - POST `/api/v2/client/register/individual` - 注册个人客户
+  - POST `/api/v2/client/register/enterprise` - 注册企业客户
+  - GET `/api/v2/client/profile` - 获取客户档案
+  - PUT `/api/v2/client/profile` - 更新客户档案
+  - POST `/api/v2/client/credit/check` - 发起征信查询
+  - POST `/api/v2/client/enterprise/cert` - 提交企业资质
+  - POST `/api/v2/client/cargo/declaration` - 创建货物申报
+  - GET `/api/v2/client/order/eligibility` - 检查下单资格
 
 ---
 
@@ -843,12 +843,12 @@
 - **需新增服务**:
   - [ ] `src/services/dispatch.ts` - 派单API服务
 - **API对接**:
-  - POST `/api/v1/dispatch/task` - 创建派单任务
-  - GET `/api/v1/dispatch/task/:id` - 获取任务详情
-  - GET `/api/v1/dispatch/tasks/client` - 获取业主任务列表
-  - POST `/api/v1/dispatch/task/:id/cancel` - 取消任务
-  - GET `/api/v1/dispatch/task/:id/candidates` - 获取候选人列表
-  - GET `/api/v1/dispatch/task/:id/logs` - 获取任务日志
+  - POST `/api/v2/dispatch/task` - 创建派单任务
+  - GET `/api/v2/dispatch/task/:id` - 获取任务详情
+  - GET `/api/v2/dispatch/tasks/client` - 获取业主任务列表
+  - POST `/api/v2/dispatch/task/:id/cancel` - 取消任务
+  - GET `/api/v2/dispatch/task/:id/candidates` - 获取候选人列表
+  - GET `/api/v2/dispatch/task/:id/logs` - 获取任务日志
 
 #### 任务 M2.2：飞手接单大厅
 - **状态**: [x] 已完成 (2026-03-02)
@@ -861,10 +861,10 @@
   - [ ] `src/components/DispatchTaskCard.tsx` - 派单任务卡片
   - [ ] `src/components/TaskStatusTimeline.tsx` - 任务状态时间线
 - **API对接**:
-  - GET `/api/v1/dispatch/tasks/pilot` - 获取飞手任务列表
-  - GET `/api/v1/dispatch/task/pending` - 获取待接单任务
-  - POST `/api/v1/dispatch/candidate/:id/accept` - 接受任务
-  - POST `/api/v1/dispatch/candidate/:id/reject` - 拒绝任务
+  - GET `/api/v2/dispatch/tasks/pilot` - 获取飞手任务列表
+  - GET `/api/v2/dispatch/task/pending` - 获取待接单任务
+  - POST `/api/v2/dispatch/candidate/:id/accept` - 接受任务
+  - POST `/api/v2/dispatch/candidate/:id/reject` - 拒绝任务
 
 ---
 
@@ -885,12 +885,12 @@
 - **需新增服务**:
   - [ ] `src/services/flight.ts` - 飞行监控API服务
 - **API对接**:
-  - POST `/api/v1/flight/position` - 上报飞行位置
-  - GET `/api/v1/flight/position/:order_id/latest` - 获取最新位置
-  - GET `/api/v1/flight/position/:order_id/history` - 获取位置历史
-  - GET `/api/v1/flight/alerts/:order_id` - 获取告警列表
-  - GET `/api/v1/flight/alerts/:order_id/active` - 获取活跃告警
-  - POST `/api/v1/flight/alert/:alert_id/acknowledge` - 确认告警
+  - POST `/api/v2/flight/position` - 上报飞行位置
+  - GET `/api/v2/flight/position/:order_id/latest` - 获取最新位置
+  - GET `/api/v2/flight/position/:order_id/history` - 获取位置历史
+  - GET `/api/v2/flight/alerts/:order_id` - 获取告警列表
+  - GET `/api/v2/flight/alerts/:order_id/active` - 获取活跃告警
+  - POST `/api/v2/flight/alert/:alert_id/acknowledge` - 确认告警
 
 #### 任务 M3.2：轨迹录制与回放
 - **状态**: [x] 已完成 (2026-03-02)
@@ -904,12 +904,12 @@
   - [ ] `src/components/TrajectoryMap.tsx` - 轨迹地图组件
   - [ ] `src/components/RouteCard.tsx` - 路线卡片
 - **API对接**:
-  - POST `/api/v1/flight/trajectory/start` - 开始录制
-  - POST `/api/v1/flight/trajectory/stop` - 停止录制
-  - GET `/api/v1/flight/trajectory/:order_id` - 获取轨迹详情
-  - POST `/api/v1/flight/route/from-trajectory` - 从轨迹创建路线
-  - GET `/api/v1/flight/routes/mine` - 我的路线
-  - GET `/api/v1/flight/routes/nearby` - 附近路线
+  - POST `/api/v2/flight/trajectory/start` - 开始录制
+  - POST `/api/v2/flight/trajectory/stop` - 停止录制
+  - GET `/api/v2/flight/trajectory/:order_id` - 获取轨迹详情
+  - POST `/api/v2/flight/route/from-trajectory` - 从轨迹创建路线
+  - GET `/api/v2/flight/routes/mine` - 我的路线
+  - GET `/api/v2/flight/routes/nearby` - 附近路线
 
 #### 任务 M3.3：多点任务执行
 - **状态**: [x] 已完成 (2026-03-02)
@@ -921,11 +921,11 @@
   - [ ] `src/components/StopListPanel.tsx` - 站点列表面板
   - [ ] `src/components/StopDetailCard.tsx` - 站点详情卡片
 - **API对接**:
-  - GET `/api/v1/flight/multipoint-task/:id` - 获取多点任务详情
-  - POST `/api/v1/flight/multipoint-task/:id/start` - 开始任务
-  - POST `/api/v1/flight/multipoint-task/:id/next` - 下一站点
-  - POST `/api/v1/flight/multipoint-task/stop/:stop_id/arrive` - 到达站点
-  - POST `/api/v1/flight/multipoint-task/stop/:stop_id/complete` - 完成站点
+  - GET `/api/v2/flight/multipoint-task/:id` - 获取多点任务详情
+  - POST `/api/v2/flight/multipoint-task/:id/start` - 开始任务
+  - POST `/api/v2/flight/multipoint-task/:id/next` - 下一站点
+  - POST `/api/v2/flight/multipoint-task/stop/:stop_id/arrive` - 到达站点
+  - POST `/api/v2/flight/multipoint-task/stop/:stop_id/complete` - 完成站点
 
 ---
 

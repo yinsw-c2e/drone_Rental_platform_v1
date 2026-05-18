@@ -25,6 +25,8 @@ build/
 
 # Local AI / agent tooling
 .ai/
+.qoder/
+wiki/
 AGENTS.md
 GEMINI.md
 .agents/skills/uiux-delegate/SKILL.md

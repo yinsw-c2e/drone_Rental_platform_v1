@@ -56,6 +56,10 @@ func (s *AirspaceService) ListPendingReview(page, pageSize int) ([]model.Airspac
 	return s.airspaceRepo.ListPendingReview(page, pageSize)
 }
 
+func (s *AirspaceService) ListApplications(status string, page, pageSize int) ([]model.AirspaceApplication, int64, error) {
+	return s.airspaceRepo.ListApplications(status, page, pageSize)
+}
+
 // SubmitForReview 提交空域申请进入审核
 func (s *AirspaceService) SubmitForReview(id int64, pilotID int64) error {
 	app, err := s.airspaceRepo.GetApplicationByID(id)
@@ -189,10 +193,10 @@ func (s *AirspaceService) CheckAirspaceAvailability(lat, lng float64, altitude i
 
 	for _, z := range zones {
 		info := NoFlyZoneInfo{
-			ID:               z.ID,
-			Name:             z.Name,
-			ZoneType:         z.ZoneType,
-			RestrictionLevel: z.RestrictionLevel,
+			ID:                z.ID,
+			Name:              z.Name,
+			ZoneType:          z.ZoneType,
+			RestrictionLevel:  z.RestrictionLevel,
 			AllowedWithPermit: z.AllowedWithPermit,
 		}
 		result.Restrictions = append(result.Restrictions, info)
@@ -221,11 +225,11 @@ type AirspaceCheckResult struct {
 }
 
 type NoFlyZoneInfo struct {
-	ID               int64  `json:"id"`
-	Name             string `json:"name"`
-	ZoneType         string `json:"zone_type"`
-	RestrictionLevel string `json:"restriction_level"`
-	AllowedWithPermit bool  `json:"allowed_with_permit"`
+	ID                int64  `json:"id"`
+	Name              string `json:"name"`
+	ZoneType          string `json:"zone_type"`
+	RestrictionLevel  string `json:"restriction_level"`
+	AllowedWithPermit bool   `json:"allowed_with_permit"`
 }
 
 // ========== Compliance Check Engine ==========
@@ -552,7 +556,7 @@ func (s *AirspaceService) checkCargoCompliance(orderID, droneID int64) []model.C
 		Result: result, Severity: "error",
 		ExpectedValue: fmt.Sprintf("≤%.1fkg", drone.MaxLoad),
 		ActualValue:   fmt.Sprintf("%.1fkg", cargoWeight),
-		Message: msg, IsRequired: true, IsBlocking: result == "failed",
+		Message:       msg, IsRequired: true, IsBlocking: result == "failed",
 	})
 
 	return items

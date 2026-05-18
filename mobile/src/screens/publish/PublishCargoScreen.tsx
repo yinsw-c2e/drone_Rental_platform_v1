@@ -449,8 +449,25 @@ export default function PublishCargoScreen({route, navigation}: any) {
     return `草稿已保存${draftSavedAt ? `，最近保存于 ${formatSavedAt(draftSavedAt)}` : ''}`;
   }, [draftId, draftSaveError, draftSaveState, draftSavedAt, quickOrderDraft]);
 
+  const handleBack = () => {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs', {screen: 'Home'});
+  };
+
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.navBar}>
+        <View style={styles.navSide}>
+          <TouchableOpacity style={styles.navBack} onPress={handleBack} activeOpacity={0.82}>
+            <Image source={publishTaskAssets.back} style={styles.navBackIcon} resizeMode="contain" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.navTitle}>发布任务</Text>
+        <View style={[styles.navSide, styles.navSideRight]} />
+      </View>
       <View style={styles.header}>
         <View style={styles.progressHeader}>
           <View style={styles.progressTrack}>
@@ -459,8 +476,8 @@ export default function PublishCargoScreen({route, navigation}: any) {
             <View style={[styles.progressPin, currentStep === 2 && styles.progressPinActive]} />
           </View>
           <View style={styles.progressLabels}>
-            <Text style={[styles.progressLabelText, styles.progressLabelTextActive]}>核心需求</Text>
-            <Text style={[styles.progressLabelText, currentStep === 2 && styles.progressLabelTextActive]}>更多细节</Text>
+            <Text style={[styles.progressLabelText, styles.progressLabelTextActive]}>基础信息</Text>
+            <Text style={[styles.progressLabelText, currentStep === 2 && styles.progressLabelTextActive]}>运输细节</Text>
           </View>
         </View>
 
@@ -474,10 +491,16 @@ export default function PublishCargoScreen({route, navigation}: any) {
         <View style={styles.heroCard}>
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>发布任务</Text>
-            <Text style={styles.heroTitle}>让合适机组主动报价</Text>
+            <Text style={styles.heroTitle}>
+              {currentStep === 1 ? '第 1/2 步：基础信息' : '第 2/2 步：运输细节与说明'}
+            </Text>
             <Text style={styles.heroSub}>填写地址、载重和时间后，可保存草稿或直接发布。</Text>
           </View>
-          <Image source={publishTaskAssets.clipboard} style={styles.heroImage} resizeMode="contain" />
+          <Image
+            source={currentStep === 1 ? publishTaskAssets.clipboard : publishTaskAssets.truck}
+            style={styles.heroImage}
+            resizeMode="contain"
+          />
         </View>
 
         {currentStep === 1 ? (
@@ -524,6 +547,9 @@ export default function PublishCargoScreen({route, navigation}: any) {
                     <Text style={[styles.sceneBtnText, !customCargoScene.trim() && cargoScene === option.key && styles.sceneBtnTextActive]}>
                       {option.label}
                     </Text>
+                    {!customCargoScene.trim() && cargoScene === option.key ? (
+                      <Image source={publishTaskAssets.checkCircle} style={styles.sceneCheckIcon} resizeMode="contain" />
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -542,6 +568,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
                   placeholder="点击选择起点"
                   onSelect={setPickupAddress}
                   style={styles.formAddressInput}
+                  rightIcon={publishTaskAssets.chevronRight}
                 />
                 <AirspaceRiskNotice
                   label="起运地"
@@ -560,6 +587,7 @@ export default function PublishCargoScreen({route, navigation}: any) {
                   placeholder="点击选择终点"
                   onSelect={setDeliveryAddress}
                   style={styles.formAddressInput}
+                  rightIcon={publishTaskAssets.chevronRight}
                 />
                 <AirspaceRiskNotice
                   label="目的地"
@@ -573,7 +601,10 @@ export default function PublishCargoScreen({route, navigation}: any) {
                 />
               </View>
 
-              <Text style={styles.label}>货物重量 (kg)</Text>
+              <View style={styles.labelIconRow}>
+                <Image source={publishTaskAssets.weightBag} style={styles.inlineLabelIcon} resizeMode="contain" />
+                <Text style={[styles.label, styles.labelInIconRow]}>货物重量 (kg)</Text>
+              </View>
               <TextInput
                 style={styles.input}
                 keyboardType="numeric"
@@ -587,15 +618,27 @@ export default function PublishCargoScreen({route, navigation}: any) {
                 <View style={styles.timeCol}>
                   <Text style={styles.label}>期望开始</Text>
                   <TouchableOpacity style={styles.timeBtn} onPress={() => setShowStartPicker(true)}>
-                    <Text style={styles.timeBtnText}>{formatDemandDateTime(startDate).split(' ')[0]}</Text>
-                    <Text style={styles.timeBtnValue}>{formatDemandDateTime(startDate).split(' ')[1]}</Text>
+                    <View style={styles.timeBtnLine}>
+                      <Image source={publishTaskAssets.calendar} style={styles.timeBtnIcon} resizeMode="contain" />
+                      <Text style={styles.timeBtnText}>{formatDemandDateTime(startDate).split(' ')[0]}</Text>
+                    </View>
+                    <View style={styles.timeBtnLine}>
+                      <Image source={publishTaskAssets.clock} style={styles.timeBtnIcon} resizeMode="contain" />
+                      <Text style={styles.timeBtnValue}>{formatDemandDateTime(startDate).split(' ')[1]}</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.timeCol}>
                   <Text style={styles.label}>期望结束</Text>
                   <TouchableOpacity style={styles.timeBtn} onPress={() => setShowEndPicker(true)}>
-                    <Text style={styles.timeBtnText}>{formatDemandDateTime(endDate).split(' ')[0]}</Text>
-                    <Text style={styles.timeBtnValue}>{formatDemandDateTime(endDate).split(' ')[1]}</Text>
+                    <View style={styles.timeBtnLine}>
+                      <Image source={publishTaskAssets.calendar} style={styles.timeBtnIcon} resizeMode="contain" />
+                      <Text style={styles.timeBtnText}>{formatDemandDateTime(endDate).split(' ')[0]}</Text>
+                    </View>
+                    <View style={styles.timeBtnLine}>
+                      <Image source={publishTaskAssets.clock} style={styles.timeBtnIcon} resizeMode="contain" />
+                      <Text style={styles.timeBtnValue}>{formatDemandDateTime(endDate).split(' ')[1]}</Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -610,13 +653,16 @@ export default function PublishCargoScreen({route, navigation}: any) {
 
             <View style={styles.inputCard}>
               <Text style={styles.label}>货物类型</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="如：塔材"
-                placeholderTextColor={theme.textHint}
-                value={cargoType}
-                onChangeText={setCargoType}
-              />
+              <View style={styles.selectInputRow}>
+                <TextInput
+                  style={styles.selectInput}
+                  placeholder="如：塔材"
+                  placeholderTextColor={theme.textHint}
+                  value={cargoType}
+                  onChangeText={setCargoType}
+                />
+                <Image source={publishTaskAssets.chevronDown} style={styles.selectInputIcon} resizeMode="contain" />
+              </View>
 
               <Text style={styles.label}>货物尺寸 (cm)</Text>
               <View style={styles.dimensionRow}>
@@ -649,14 +695,17 @@ export default function PublishCargoScreen({route, navigation}: any) {
               <View style={styles.rowInputs}>
                 <View style={{flex: 1}}>
                   <Text style={styles.label}>预计架次</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="numeric"
-                    placeholder="默认 1"
-                    placeholderTextColor={theme.textHint}
-                    value={tripCount}
-                    onChangeText={setTripCount}
-                  />
+                  <View style={styles.selectInputRow}>
+                    <TextInput
+                      style={styles.selectInput}
+                      keyboardType="numeric"
+                      placeholder="默认 1"
+                      placeholderTextColor={theme.textHint}
+                      value={tripCount}
+                      onChangeText={setTripCount}
+                    />
+                    <Image source={publishTaskAssets.chevronDown} style={styles.selectInputIcon} resizeMode="contain" />
+                  </View>
                 </View>
                 <View style={{flex: 1}}>
                   <Text style={styles.label}>预算上限 (元)</Text>
@@ -692,6 +741,14 @@ export default function PublishCargoScreen({route, navigation}: any) {
                 multiline
                 textAlignVertical="top"
               />
+              <View style={styles.safeNote}>
+                <Image source={publishTaskAssets.shield} style={styles.safeNoteIcon} resizeMode="contain" />
+                <Text style={styles.safeNoteText}>请尽量提供详细信息，有助于服务商更精准地为您报价与服务。</Text>
+              </View>
+              <View style={styles.safeNote}>
+                <Image source={publishTaskAssets.lock} style={styles.safeNoteIcon} resizeMode="contain" />
+                <Text style={styles.safeNoteText}>您的信息将严格保密，仅用于本次任务撮合服务。</Text>
+              </View>
             </View>
           </View>
         )}
@@ -757,11 +814,46 @@ export default function PublishCargoScreen({route, navigation}: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: {flex: 1, backgroundColor: theme.bg},
+    container: {flex: 1, backgroundColor: '#F5F7FB'},
+    navBar: {
+      minHeight: 56,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#FFFFFF',
+    },
+    navSide: {
+      width: 92,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    navSideRight: {
+      justifyContent: 'flex-end',
+    },
+    navBack: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navBackIcon: {
+      width: 24,
+      height: 24,
+    },
+    navTitle: {
+      flex: 1,
+      color: '#111827',
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
     header: {
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      backgroundColor: theme.bg,
+      paddingHorizontal: 54,
+      paddingTop: 12,
+      paddingBottom: 14,
+      backgroundColor: '#FFFFFF',
       borderBottomWidth: 1,
       borderBottomColor: theme.divider,
     },
@@ -915,6 +1007,31 @@ const getStyles = (theme: AppTheme) =>
       fontSize: 15,
       color: theme.text,
     },
+    selectInputRow: {
+      minHeight: 46,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.inputBorder,
+      paddingLeft: 14,
+      paddingRight: 12,
+      backgroundColor: theme.inputBg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    selectInput: {
+      flex: 1,
+      minWidth: 0,
+      paddingVertical: 12,
+      paddingHorizontal: 0,
+      fontSize: 15,
+      color: theme.text,
+    },
+    selectInputIcon: {
+      width: 14,
+      height: 14,
+      flexShrink: 0,
+    },
     titleInputRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -964,6 +1081,9 @@ const getStyles = (theme: AppTheme) =>
       backgroundColor: theme.inputBg,
       borderWidth: 1,
       borderColor: 'transparent',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
     },
     sceneBtnActive: {
       borderColor: theme.primary,
@@ -978,6 +1098,10 @@ const getStyles = (theme: AppTheme) =>
       color: theme.primaryText,
       fontWeight: '700',
     },
+    sceneCheckIcon: {
+      width: 13,
+      height: 13,
+    },
     customSceneInput: {
       marginTop: 8,
     },
@@ -991,6 +1115,21 @@ const getStyles = (theme: AppTheme) =>
     addressSpacer: {
       height: 2,
     },
+    labelIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 16,
+      marginBottom: 8,
+      gap: 7,
+    },
+    inlineLabelIcon: {
+      width: 18,
+      height: 18,
+    },
+    labelInIconRow: {
+      marginTop: 0,
+      marginBottom: 0,
+    },
     timeSection: {
       flexDirection: 'row',
       gap: 12,
@@ -1002,12 +1141,21 @@ const getStyles = (theme: AppTheme) =>
       backgroundColor: theme.inputBg,
       borderRadius: 12,
       padding: 12,
+      gap: 6,
+    },
+    timeBtnLine: {
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    timeBtnIcon: {
+      width: 14,
+      height: 14,
     },
     timeBtnText: {
       fontSize: 11,
       color: theme.textSub,
-      marginBottom: 2,
     },
     timeBtnValue: {
       fontSize: 16,
@@ -1026,9 +1174,34 @@ const getStyles = (theme: AppTheme) =>
 	      flex: 1,
 	      minWidth: 0,
 	    },
-	    textarea: {
+    textarea: {
       minHeight: 100,
       textAlignVertical: 'top',
+    },
+    safeNote: {
+      marginTop: 12,
+      padding: 11,
+      borderRadius: 12,
+      backgroundColor: '#F5F9FF',
+      borderWidth: 1,
+      borderColor: '#DDEBFF',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    safeNoteIcon: {
+      width: 18,
+      height: 18,
+      marginTop: 1,
+      flexShrink: 0,
+    },
+    safeNoteText: {
+      flex: 1,
+      minWidth: 0,
+      color: theme.textSub,
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '600',
     },
     footerActions: {
       padding: 16,

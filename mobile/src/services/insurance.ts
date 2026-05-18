@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 
 // ============================================================
 // 类型定义
@@ -143,45 +143,45 @@ export interface ReportClaimRequest {
 
 // 保险产品
 export const listProducts = (params?: { policy_type?: string; is_mandatory?: boolean }) =>
-  api.get<InsuranceProduct[]>('/insurance/products', { params });
+  apiV2.get<InsuranceProduct[]>('/insurance/products', { params });
 
 export const getMandatoryProducts = () =>
-  api.get<InsuranceProduct[]>('/insurance/products/mandatory');
+  apiV2.get<InsuranceProduct[]>('/insurance/products/mandatory');
 
 // 保险保单
 export const purchaseInsurance = (data: PurchaseInsuranceRequest) =>
-  api.post<InsurancePolicy>('/insurance/purchase', data);
+  apiV2.post<InsurancePolicy>('/insurance/purchase', data);
 
 export const getMyPolicies = (params?: { page?: number; page_size?: number }) =>
-  api.get<{ list: InsurancePolicy[]; total: number }>('/insurance/my-policies', { params });
+  apiV2.get<{ list: InsurancePolicy[]; total: number }>('/insurance/my-policies', { params });
 
 export const getPolicyDetail = (id: number) =>
-  api.get<InsurancePolicy>(`/insurance/policies/${id}`);
+  apiV2.get<InsurancePolicy>(`/insurance/policies/${id}`);
 
 export const activatePolicy = (id: number, paymentId: number) =>
-  api.post(`/insurance/policies/${id}/activate?payment_id=${paymentId}`);
+  apiV2.post(`/insurance/policies/${id}/activate?payment_id=${paymentId}`);
 
 export const checkMandatoryInsurance = () =>
-  api.get<Record<string, boolean>>('/insurance/check-mandatory');
+  apiV2.get<Record<string, boolean>>('/insurance/check-mandatory');
 
 // 理赔
 export const reportClaim = (data: ReportClaimRequest) =>
-  api.post<InsuranceClaim>('/insurance/claims/report', data);
+  apiV2.post<InsuranceClaim>('/insurance/claims/report', data);
 
 export const getMyClaims = (params?: { page?: number; page_size?: number }) =>
-  api.get<{ list: InsuranceClaim[]; total: number }>('/insurance/my-claims', { params });
+  apiV2.get<{ list: InsuranceClaim[]; total: number }>('/insurance/my-claims', { params });
 
 export const getClaimDetail = (id: number) =>
-  api.get<InsuranceClaim>(`/insurance/claims/${id}`);
+  apiV2.get<InsuranceClaim>(`/insurance/claims/${id}`);
 
 export const getClaimTimelines = (id: number) =>
-  api.get<ClaimTimeline[]>(`/insurance/claims/${id}/timelines`);
+  apiV2.get<ClaimTimeline[]>(`/insurance/claims/${id}/timelines`);
 
 export const uploadEvidence = (claimId: number, evidenceType: string, evidenceFiles: string) =>
-  api.post(`/insurance/claims/${claimId}/evidence`, { evidence_type: evidenceType, evidence_files: evidenceFiles });
+  apiV2.post(`/insurance/claims/${claimId}/evidence`, { evidence_type: evidenceType, evidence_files: evidenceFiles });
 
 export const disputeClaim = (claimId: number, reason: string) =>
-  api.post(`/insurance/claims/${claimId}/dispute`, { reason });
+  apiV2.post(`/insurance/claims/${claimId}/dispute`, { reason });
 
 // ============================================================
 // 辅助函数

@@ -1,7 +1,7 @@
 import Taro from '@tarojs/taro';
 import { store } from '../store/store';
 import { setTokens, logout } from '../store/slices/authSlice';
-import { API_V2_BASE_URL, API_V1_BASE_URL, API_TIMEOUT } from '../constants';
+import { API_V2_BASE_URL, API_TIMEOUT } from '../constants';
 import { V2ApiResponse } from '../types';
 
 // ── 请求封装 ──
@@ -13,7 +13,6 @@ interface RequestOptions {
   method?: HttpMethod;
   data?: any;
   params?: Record<string, any>;
-  version?: 'v1' | 'v2';
 }
 
 type ApiEnvelope<T = any> = Partial<V2ApiResponse<T>> & {
@@ -92,7 +91,8 @@ function getResponseMessage(body: any, fallback: string) {
 function unwrapResponseBody<T = any>(body: any): T {
   if (isRecord(body) && hasOwn(body, 'code')) {
     const envelope = body as ApiEnvelope<T>;
-    if (envelope.code === 'OK' || envelope.code === 0) {
+    const code = envelope.code as string | number;
+    if (code === 'OK' || code === 0) {
       if (hasOwn(body, 'data')) {
         const payload = envelope.data;
         if (isRecord(payload) && hasOwn(body, 'meta')) {
@@ -106,12 +106,12 @@ function unwrapResponseBody<T = any>(body: any): T {
     throw createRequestError(envelope.message || envelope.error || '请求失败', numericCode);
   }
 
-  // 兼容部分 v1 老接口：HTTP 2xx 已成功，但响应体没有 code，只包了一层 data。
+  // 兼容部分旧形态响应：HTTP 2xx 已成功，但响应体没有 code，只包了一层 data。
   return (isRecord(body) && hasOwn(body, 'data') ? body.data : body) as T;
 }
 
-function taroRequest<T = any>(options: Taro.request.Option<any, T>) {
-  return new Promise<Taro.request.SuccessCallbackResult<T>>((resolve, reject) => {
+function taroRequest(options: Taro.request.Option<any, any>) {
+  return new Promise<Taro.request.SuccessCallbackResult<any>>((resolve, reject) => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (callback: () => void) => {
@@ -123,7 +123,7 @@ function taroRequest<T = any>(options: Taro.request.Option<any, T>) {
 
     const task = Taro.request({
       ...options,
-      success: (res) => finish(() => resolve(res as Taro.request.SuccessCallbackResult<T>)),
+      success: (res) => finish(() => resolve(res as Taro.request.SuccessCallbackResult<any>)),
       fail: (err) => finish(() => reject(err)),
     });
 
@@ -135,8 +135,8 @@ function taroRequest<T = any>(options: Taro.request.Option<any, T>) {
 }
 
 async function request<T = any>(opts: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, params, version = 'v2' } = opts;
-  const baseURL = version === 'v1' ? API_V1_BASE_URL : API_V2_BASE_URL;
+  const { url, method = 'GET', data, params } = opts;
+  const baseURL = API_V2_BASE_URL;
   const token = store.getState().auth.accessToken;
 
   const header: Record<string, string> = {
@@ -150,7 +150,7 @@ async function request<T = any>(opts: RequestOptions): Promise<T> {
     const fullUrl = buildRequestUrl(baseURL + url, params);
     console.warn('[API]', method, fullUrl);
 
-    const res = await taroRequest<T>({
+    const res = await taroRequest({
       url: fullUrl,
       method,
       data,
@@ -196,7 +196,7 @@ async function request<T = any>(opts: RequestOptions): Promise<T> {
 
       try {
         const refreshRes = await taroRequest({
-          url: (version === 'v1' ? API_V1_BASE_URL : API_V2_BASE_URL) + '/auth/refresh-token',
+          url: `${API_V2_BASE_URL}/auth/refresh-token`,
           method: 'POST',
           data: { refresh_token: refreshToken },
           header: { 'Content-Type': 'application/json' },
@@ -235,42 +235,22 @@ async function request<T = any>(opts: RequestOptions): Promise<T> {
 
 export const apiV2 = {
   get: <T = any>(url: string, params?: Record<string, any>) =>
-    request<T>({ url, method: 'GET', params, version: 'v2' }),
+    request<T>({ url, method: 'GET', params }),
 
   post: <T = any>(url: string, data?: any) =>
-    request<T>({ url, method: 'POST', data, version: 'v2' }),
+    request<T>({ url, method: 'POST', data }),
 
   put: <T = any>(url: string, data?: any) =>
-    request<T>({ url, method: 'PUT', data, version: 'v2' }),
+    request<T>({ url, method: 'PUT', data }),
 
   patch: <T = any>(url: string, data?: any) =>
-    request<T>({ url, method: 'PATCH', data, version: 'v2' }),
+    request<T>({ url, method: 'PATCH', data }),
 
   del: <T = any>(url: string) =>
-    request<T>({ url, method: 'DELETE', version: 'v2' }),
+    request<T>({ url, method: 'DELETE' }),
 
   delete: <T = any>(url: string) =>
-    request<T>({ url, method: 'DELETE', version: 'v2' }),
-};
-
-export const apiV1 = {
-  get: <T = any>(url: string, params?: Record<string, any>) =>
-    request<T>({ url, method: 'GET', params, version: 'v1' }),
-
-  post: <T = any>(url: string, data?: any) =>
-    request<T>({ url, method: 'POST', data, version: 'v1' }),
-
-  put: <T = any>(url: string, data?: any) =>
-    request<T>({ url, method: 'PUT', data, version: 'v1' }),
-
-  patch: <T = any>(url: string, data?: any) =>
-    request<T>({ url, method: 'PATCH', data, version: 'v1' }),
-
-  del: <T = any>(url: string) =>
-    request<T>({ url, method: 'DELETE', version: 'v1' }),
-
-  delete: <T = any>(url: string) =>
-    request<T>({ url, method: 'DELETE', version: 'v1' }),
+    request<T>({ url, method: 'DELETE' }),
 };
 
 export default request;

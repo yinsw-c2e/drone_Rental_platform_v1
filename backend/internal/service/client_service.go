@@ -163,6 +163,13 @@ func (s *ClientService) AdminListDemands(page, pageSize int, filters map[string]
 	return s.demandDomainRepo.AdminListDemands(page, pageSize, filters)
 }
 
+func (s *ClientService) AdminGetDemand(id int64) (*model.Demand, error) {
+	if s.demandDomainRepo == nil {
+		return nil, errors.New("需求域仓储未初始化")
+	}
+	return s.demandDomainRepo.GetDemandByID(id)
+}
+
 func (s *ClientService) ensureDefaultClient(userID int64) (*model.Client, error) {
 	existing, err := s.clientRepo.GetByUserID(userID)
 	if err == nil && existing != nil {

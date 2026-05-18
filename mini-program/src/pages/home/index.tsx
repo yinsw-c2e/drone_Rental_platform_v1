@@ -69,7 +69,8 @@ const getOrderStatusBucket = (status?: string): PriorityQueueCategory | null => 
 };
 
 const getPriorityItemTimestamp = (v?: string | null): number => { if (!v) return 0; const d = new Date(v); return isNaN(d.getTime()) ? 0 : d.getTime(); };
-const getPriorityRoleLabel = (role: RoleView | 'all') => ({ client: '客户', owner: '机主', pilot: '飞手' }[role] || '综合');
+const getPriorityRoleLabel = (role: RoleView | 'all') =>
+  ({ client: '客户', owner: '机主', pilot: '飞手', all: '综合' } as Record<RoleView | 'all', string>)[role];
 
 const getPriorityFilterLabel = (role: RoleView, filter: PriorityQueueFilter) => {
   switch (filter) {

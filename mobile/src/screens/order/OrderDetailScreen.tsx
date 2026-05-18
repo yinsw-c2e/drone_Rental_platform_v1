@@ -513,16 +513,21 @@ function DetailRow({
   label,
   value,
   highlight = false,
+  icon,
 }: {
   label: string;
   value?: string;
   highlight?: boolean;
+  icon?: any;
 }) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   return (
     <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
+      <View style={styles.rowLabelWrap}>
+        {icon ? <Image source={icon} style={styles.detailRowIcon} resizeMode="contain" /> : null}
+        <Text style={styles.rowLabel}>{label}</Text>
+      </View>
       <Text style={[styles.rowValue, highlight && styles.rowValueHighlight]}>{value || '-'}</Text>
     </View>
   );
@@ -556,6 +561,7 @@ function ParticipantCard({
           {isSelf ? ' · 我' : ''}
         </Text>
       </View>
+      <Image source={orderDetailAssets.chevronRight} style={styles.participantChevron} resizeMode="contain" />
     </View>
   );
 }
@@ -575,7 +581,7 @@ function ProgressFocusCard({focus}: {focus: ProgressFocus}) {
   return (
     <View style={[styles.progressFocusContainer, {backgroundColor: theme.card, borderColor: `${accent}40`}]}>
       <View style={styles.progressFocusHeader}>
-        <View style={[styles.focusIndicator, {backgroundColor: accent}]} />
+        <Image source={orderDetailAssets.progressClipboard} style={styles.focusIcon} resizeMode="contain" />
         <Text style={[styles.focusEyebrow, {color: accent}]}>{focus.eyebrow}</Text>
         {focus.eta ? (
           <View style={[styles.focusEtaPill, {backgroundColor: `${accent}15`}]}>
@@ -1121,6 +1127,9 @@ export default function OrderDetailScreen({route, navigation}: any) {
           {!theme.isDark ? (
             <Image source={orderDetailAssets.hero} style={styles.heroBgImage} resizeMode="cover" />
           ) : null}
+          {!theme.isDark ? (
+            <Image source={orderDetailAssets.cubeOverlay} style={styles.heroCubeOverlay} resizeMode="contain" />
+          ) : null}
           <View style={styles.heroTopRow}>
             <View style={styles.heroTagRow}>
               <SourceTag source={getSourceTag(detail.order_source)} />
@@ -1129,10 +1138,13 @@ export default function OrderDetailScreen({route, navigation}: any) {
             <Text style={styles.heroOrderNo}>{detail.order_no}</Text>
           </View>
           <Text style={styles.heroTitle}>{detail.title}</Text>
-          <Text style={styles.heroRoute}>
-            {detail.service_address || '未设置起点'}
-            {detail.dest_address ? ` -> ${detail.dest_address}` : ''}
-          </Text>
+          <View style={styles.heroRouteRow}>
+            <Image source={orderDetailAssets.locationWhite} style={styles.heroRouteIcon} resizeMode="contain" />
+            <Text style={styles.heroRoute}>
+              {detail.service_address || '未设置起点'}
+              {detail.dest_address ? ` -> ${detail.dest_address}` : ''}
+            </Text>
+          </View>
           <View style={styles.heroSummaryRow}>
             <View style={styles.heroMetric}>
               <Text style={styles.heroMetricLabel}>订单金额</Text>
@@ -1152,10 +1164,10 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <Text style={styles.sectionTitle}>任务信息</Text>
           <DetailRow label="成单方式" value={getSourceContextLabel(detail.order_source)} />
           <DetailRow label="来源标题" value={sourceTitle} />
-          <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} />
-          <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} />
-          <DetailRow label="起始地址" value={detail.service_address || '-'} />
-          <DetailRow label="目的地址" value={detail.dest_address || '-'} />
+          <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} icon={orderDetailAssets.calendarLine} />
+          <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} icon={orderDetailAssets.calendarLine} />
+          <DetailRow label="起始地址" value={detail.service_address || '-'} icon={orderDetailAssets.locationLine} />
+          <DetailRow label="目的地址" value={detail.dest_address || '-'} icon={orderDetailAssets.locationLine} />
         </ObjectCard>
 
         {detail.drone ? (
@@ -1323,6 +1335,11 @@ const getStyles = (theme: AppTheme) =>
       borderRadius: 2,
       marginRight: 8,
     },
+    focusIcon: {
+      width: 18,
+      height: 18,
+      marginRight: 8,
+    },
     focusEyebrow: {
       fontSize: 12,
       fontWeight: '800',
@@ -1412,6 +1429,15 @@ const getStyles = (theme: AppTheme) =>
       width: '100%',
       height: '100%',
     },
+    heroCubeOverlay: {
+      position: 'absolute',
+      right: -2,
+      bottom: -4,
+      width: 112,
+      height: 92,
+      opacity: 0.38,
+      zIndex: 1,
+    },
     heroTopRow: {
       position: 'relative',
       zIndex: 2,
@@ -1437,10 +1463,23 @@ const getStyles = (theme: AppTheme) =>
       color: theme.isDark ? theme.text : '#FFFFFF',
       fontWeight: '900',
     },
-    heroRoute: {
+    heroRouteRow: {
       position: 'relative',
       zIndex: 2,
       marginTop: 10,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 7,
+    },
+    heroRouteIcon: {
+      width: 15,
+      height: 15,
+      marginTop: 2,
+      flexShrink: 0,
+    },
+    heroRoute: {
+      flex: 1,
+      minWidth: 0,
       fontSize: 13,
       lineHeight: 20,
       color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
@@ -1480,11 +1519,24 @@ const getStyles = (theme: AppTheme) =>
       paddingVertical: 10,
       borderBottomWidth: 1,
       borderBottomColor: theme.divider,
+      gap: 12,
+    },
+    rowLabelWrap: {
+      width: 108,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    detailRowIcon: {
+      width: 16,
+      height: 16,
+      flexShrink: 0,
     },
     rowLabel: {
       fontSize: 13,
       color: theme.textSub,
-      width: 88,
+      flex: 1,
+      minWidth: 0,
     },
     rowValue: {
       flex: 1,
@@ -1520,6 +1572,12 @@ const getStyles = (theme: AppTheme) =>
     },
     participantContent: {
       flex: 1,
+    },
+    participantChevron: {
+      width: 14,
+      height: 14,
+      marginLeft: 8,
+      opacity: 0.65,
     },
     participantLabel: {
       fontSize: 12,

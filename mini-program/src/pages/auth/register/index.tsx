@@ -68,7 +68,7 @@ export default function RegisterPage() {
         <Button
           style={{ height: '50px', backgroundColor: submitting ? '#91caff' : '#1677ff', borderRadius: '14px', color: '#fff', fontSize: '17px', fontWeight: '700', lineHeight: '50px', border: 'none', marginTop: '8px' }}
           onClick={handleRegister}
-          disabled={submitting}
+
           loading={submitting}
         >
           注册

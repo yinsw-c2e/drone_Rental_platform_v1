@@ -1,11 +1,12 @@
 import React, {
+  useContext,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import {
   ActivityIndicator,
   Image,
@@ -442,7 +443,7 @@ export default function HomeScreen({ navigation }: any) {
     (state: RootState) => state.auth.isAuthenticated,
   );
   const { width: viewportWidth } = useWindowDimensions();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 66;
 
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [anomalySummary, setAnomalySummary] = useState<V2OrderAnomalySummary>(emptyAnomalySummary);
@@ -1410,6 +1411,18 @@ export default function HomeScreen({ navigation }: any) {
                 </Text>
                 <Text style={styles.heroTitle}>{heroConfig.title}</Text>
                 <Text style={styles.heroSubtitle}>{heroConfig.subtitle}</Text>
+                <TouchableOpacity
+                  activeOpacity={0.86}
+                  style={styles.heroAlertRow}
+                  onPress={anomalyAlertCount > 0 ? openAnomalyCenter : undefined}
+                >
+                  <Image source={workbenchAssets.warning} style={styles.heroWarningIcon} resizeMode="contain" />
+                  <Text style={styles.heroAlertText} numberOfLines={1}>
+                    {anomalyAlertCount > 0
+                      ? `${anomalyAlertCount} 个任务出现异常，请及时处理`
+                      : '暂无异常提醒，当前任务运行稳定'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {anomalyAlertCount > 0 ? (
@@ -1487,9 +1500,14 @@ export default function HomeScreen({ navigation }: any) {
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.priorityFilterChevron, {color: theme.textHint}]}>
-                    {priorityFilterExpanded ? '▴' : '▾'}
-                  </Text>
+                  <Image
+                    source={workbenchAssets.dropdownDown}
+                    style={[
+                      styles.priorityFilterChevronImage,
+                      priorityFilterExpanded && styles.priorityFilterChevronImageOpen,
+                    ]}
+                    resizeMode="contain"
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -1630,6 +1648,21 @@ export default function HomeScreen({ navigation }: any) {
                         <Text style={[styles.priorityItemTitle, {color: theme.text}]} numberOfLines={1}>
                           {item.title}
                         </Text>
+                        <View style={styles.priorityItemBottom}>
+                          <Text style={[styles.priorityItemSubtitle, {color: theme.textSub}]} numberOfLines={1}>
+                            {item.subtitle}
+                          </Text>
+                          <View style={styles.priorityItemMetaWrap}>
+                            <Text style={[styles.priorityItemMeta, {color: theme.textHint}]} numberOfLines={1}>
+                              {item.meta}
+                            </Text>
+                            <Image
+                              source={workbenchAssets.chevronRight}
+                              style={styles.priorityItemChevronImage}
+                              resizeMode="contain"
+                            />
+                          </View>
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
@@ -1836,6 +1869,26 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontWeight: '600',
   },
+  heroAlertRow: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: 260,
+  },
+  heroWarningIcon: {
+    width: 17,
+    height: 17,
+    marginRight: 7,
+    flexShrink: 0,
+  },
+  heroAlertText: {
+    flex: 1,
+    minWidth: 0,
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
   alertPill: {
     minWidth: 112,
     height: 28,
@@ -1980,9 +2033,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  priorityFilterChevron: {
-    fontSize: 12,
-    fontWeight: '800',
+  priorityFilterChevronImage: {
+    width: 12,
+    height: 12,
+  },
+  priorityFilterChevronImageOpen: {
+    transform: [{rotate: '180deg'}],
   },
   priorityDropdown: {
     marginTop: 10,
@@ -2103,6 +2159,38 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginTop: 8,
     fontSize: 15,
     fontWeight: '800',
+  },
+  priorityItemBottom: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  priorityItemSubtitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  priorityItemMetaWrap: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: 128,
+  },
+  priorityItemMeta: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '600',
+  },
+  priorityItemChevronImage: {
+    width: 12,
+    height: 12,
+    flexShrink: 0,
   },
   priorityUrgencyText: {
     overflow: 'hidden',

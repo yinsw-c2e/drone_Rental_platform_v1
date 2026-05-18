@@ -11,6 +11,7 @@ import {
 } from 'react-router-dom';
 import { store } from './store/store';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   markMeInitialized,
   setCredentials,
@@ -19,6 +20,7 @@ import {
 } from './store/slices/authSlice';
 import { API_V2_BASE_URL } from './constants';
 import { sessionService } from './services/session';
+import { ThemeProvider } from './theme/ThemeContext';
 
 import TabGlyph from './components/navigation/TabGlyph';
 
@@ -64,6 +66,7 @@ const DemandDetailScreen = React.lazy(() => import('./screens/demand/DemandDetai
 const DemandQuoteComposeScreen = React.lazy(() => import('./screens/demand/DemandQuoteComposeScreen'));
 const OfferListScreen = React.lazy(() => import('./screens/demand/OfferListScreen'));
 const OfferDetailScreen = React.lazy(() => import('./screens/demand/OfferDetailScreen'));
+const QuickOrderEntryScreen = React.lazy(() => import('./screens/demand/QuickOrderEntryScreen'));
 const PublishDemandScreen = React.lazy(() => import('./screens/publish/PublishDemandScreen'));
 const PublishOfferScreen = React.lazy(() => import('./screens/publish/PublishOfferScreen'));
 const PublishCargoScreen = React.lazy(() => import('./screens/publish/PublishCargoScreen'));
@@ -179,6 +182,12 @@ function createRouterNavigation(navigate: any) {
         }
         case 'ConversationList':
           path = '/messages';
+          break;
+        case 'ServiceHub':
+          path = '/market';
+          break;
+        case 'QuickOrderEntry':
+          path = '/quick-order';
           break;
         case 'NearbyDrones':
           path = '/nearby-drones';
@@ -316,6 +325,12 @@ const loadingStyles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+const webInitialSafeAreaMetrics = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 0, right: 0, bottom: 0, left: 0 },
+};
+
 function TabBar({
   activeTab,
   onTabPress,
@@ -401,35 +416,29 @@ const tabStyles = StyleSheet.create({
 
 // Auth screens wrapper
 function AuthView({ onLogin: _onLogin }: { onLogin: () => void }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isRegister = location.pathname === '/register';
+
   return (
     <View style={{ flex: 1 }}>
-      <Routes>
-        <Route
-          path="/register"
-          element={
-            <RegisterScreen
-              navigation={{
-                navigate: () => {},
-                goBack: () => window.history.back(),
-              }}
-            />
-          }
+      {isRegister ? (
+        <RegisterScreen
+          navigation={{
+            navigate: () => {},
+            goBack: () => navigate('/'),
+          }}
         />
-        <Route
-          path="/*"
-          element={
-            <LoginScreen
-              navigation={{
-                navigate: (s: string) => {
-                  if (s === 'Register')
-                    window.history.pushState({}, '', '/register');
-                },
-                goBack: () => {},
-              }}
-            />
-          }
+      ) : (
+        <LoginScreen
+          navigation={{
+            navigate: (screen: string) => {
+              if (screen === 'Register') navigate('/register');
+            },
+            goBack: () => {},
+          }}
         />
-      </Routes>
+      )}
       {/* Quick demo login button */}
       {/* <TouchableOpacity
         style={{
@@ -692,6 +701,10 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('Home');
+  const shouldShowTabBar =
+    location.pathname === '/' ||
+    location.pathname === '/messages' ||
+    location.pathname === '/profile';
 
   const nav = createRouterNavigation(navigate);
 
@@ -704,6 +717,7 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
       path.startsWith('/publish-offer') ||
       path.startsWith('/publish-demand') ||
       path.startsWith('/publish-cargo') ||
+      path.startsWith('/quick-order') ||
       path.startsWith('/my-offers') ||
       path.startsWith('/my-demands') ||
       path.startsWith('/my-cargo')
@@ -935,13 +949,19 @@ function MainView({ onLogout: _onLogout }: { onLogout: () => void }) {
             path="/publish-cargo"
             element={<ScreenWrapper Component={PublishCargoScreen} />}
           />
+          <Route
+            path="/quick-order"
+            element={<ScreenWrapper Component={QuickOrderEntryScreen} />}
+          />
 
           {/* Main tabs - default route */}
           <Route path="/" element={<ScreenWrapper Component={HomeScreen} />} />
           <Route path="*" element={renderTabContent()} />
         </Routes>
       </View>
-      <TabBar activeTab={activeTab} onTabPress={handleTabPress} />
+      {shouldShowTabBar ? (
+        <TabBar activeTab={activeTab} onTabPress={handleTabPress} />
+      ) : null}
     </View>
   );
 }
@@ -1054,7 +1074,11 @@ function WebAppInner() {
 function WebApp() {
   return (
     <Provider store={store}>
-      <WebAppInner />
+      <ThemeProvider>
+        <SafeAreaProvider initialMetrics={webInitialSafeAreaMetrics}>
+          <WebAppInner />
+        </SafeAreaProvider>
+      </ThemeProvider>
     </Provider>
   );
 }

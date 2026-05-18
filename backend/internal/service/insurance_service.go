@@ -1,10 +1,10 @@
 package service
 
 import (
-	"wurenji-backend/internal/model"
-	"wurenji-backend/internal/repository"
 	"errors"
 	"time"
+	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/repository"
 
 	"go.uber.org/zap"
 )
@@ -27,19 +27,19 @@ func NewInsuranceService(insuranceRepo *repository.InsuranceRepository, logger *
 
 // PurchaseInsuranceRequest 购买保险请求
 type PurchaseInsuranceRequest struct {
-	ProductCode   string  `json:"product_code"`
-	HolderID      int64   `json:"holder_id"`
-	HolderType    string  `json:"holder_type"`
-	HolderName    string  `json:"holder_name"`
-	HolderIDCard  string  `json:"holder_id_card"`
-	HolderPhone   string  `json:"holder_phone"`
-	InsuredType   string  `json:"insured_type"`
-	InsuredID     int64   `json:"insured_id"`
-	InsuredName   string  `json:"insured_name"`
-	InsuredValue  int64   `json:"insured_value"`
+	ProductCode    string `json:"product_code"`
+	HolderID       int64  `json:"holder_id"`
+	HolderType     string `json:"holder_type"`
+	HolderName     string `json:"holder_name"`
+	HolderIDCard   string `json:"holder_id_card"`
+	HolderPhone    string `json:"holder_phone"`
+	InsuredType    string `json:"insured_type"`
+	InsuredID      int64  `json:"insured_id"`
+	InsuredName    string `json:"insured_name"`
+	InsuredValue   int64  `json:"insured_value"`
 	CoverageAmount int64  `json:"coverage_amount"`
-	InsuranceDays int     `json:"insurance_days"`
-	SpecialTerms  string  `json:"special_terms"`
+	InsuranceDays  int    `json:"insurance_days"`
+	SpecialTerms   string `json:"special_terms"`
 }
 
 // PurchaseInsurance 购买保险
@@ -120,7 +120,7 @@ func (s *InsuranceService) PurchaseInsurance(req *PurchaseInsuranceRequest) (*mo
 func (s *InsuranceService) CalculatePremium(product *model.InsuranceProduct, insuredValue, coverageAmount int64, days int) int64 {
 	// 基础保费 = 保额 * 费率 * (天数/365)
 	basePremium := float64(coverageAmount) * product.BasePremiumRate * (float64(days) / 365.0)
-	
+
 	// 如果是货物险，按货值计算
 	if product.PolicyType == "cargo" && insuredValue > 0 {
 		basePremium = float64(insuredValue) * product.BasePremiumRate * (float64(days) / 365.0)
@@ -171,6 +171,10 @@ func (s *InsuranceService) GetUserPolicies(userID int64, page, pageSize int) ([]
 	return s.insuranceRepo.GetUserPolicies(userID, page, pageSize)
 }
 
+func (s *InsuranceService) ListPolicies(holderID int64, policyType, status string, page, pageSize int) ([]model.InsurancePolicy, int64, error) {
+	return s.insuranceRepo.ListPolicies(holderID, policyType, status, page, pageSize)
+}
+
 // GetPolicyByID 获取保单详情
 func (s *InsuranceService) GetPolicyByID(policyID int64) (*model.InsurancePolicy, error) {
 	return s.insuranceRepo.GetPolicyByID(policyID)
@@ -179,7 +183,7 @@ func (s *InsuranceService) GetPolicyByID(policyID int64) (*model.InsurancePolicy
 // CheckMandatoryInsurance 检查强制险
 func (s *InsuranceService) CheckMandatoryInsurance(userID int64) (map[string]bool, error) {
 	result := make(map[string]bool)
-	
+
 	// 检查第三者责任险
 	hasLiability, err := s.insuranceRepo.CheckMandatoryInsurance(userID, "liability")
 	if err != nil {
@@ -509,6 +513,10 @@ func (s *InsuranceService) DisputeClaim(claimID int64, reason string, userID int
 // GetUserClaims 获取用户理赔列表
 func (s *InsuranceService) GetUserClaims(userID int64, page, pageSize int) ([]model.InsuranceClaim, int64, error) {
 	return s.insuranceRepo.GetUserClaims(userID, page, pageSize)
+}
+
+func (s *InsuranceService) ListClaims(claimantID int64, policyID int64, status string, page, pageSize int) ([]model.InsuranceClaim, int64, error) {
+	return s.insuranceRepo.ListClaims(claimantID, policyID, status, page, pageSize)
 }
 
 // GetClaimByID 获取理赔详情

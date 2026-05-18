@@ -1452,6 +1452,13 @@ func (s *OrderService) ListDisputesByOrder(orderID int64) ([]model.DisputeRecord
 	return s.orderArtifactRepo.ListDisputesByOrder(orderID)
 }
 
+func (s *OrderService) AdminListDisputes(status string, page, pageSize int) ([]model.DisputeRecord, int64, error) {
+	if s.orderArtifactRepo == nil {
+		return nil, 0, nil
+	}
+	return s.orderArtifactRepo.ListDisputes(status, page, pageSize)
+}
+
 func (s *OrderService) CreateDispute(orderID, userID int64, disputeType, summary string) (*model.DisputeRecord, error) {
 	if s.orderArtifactRepo == nil {
 		return nil, errors.New("争议记录依赖未初始化")

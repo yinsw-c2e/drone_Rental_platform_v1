@@ -56,6 +56,21 @@ func (r *AirspaceRepo) ListPendingReview(page, pageSize int) ([]model.AirspaceAp
 	return apps, total, err
 }
 
+func (r *AirspaceRepo) ListApplications(status string, page, pageSize int) ([]model.AirspaceApplication, int64, error) {
+	var apps []model.AirspaceApplication
+	var total int64
+	query := r.db.Model(&model.AirspaceApplication{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).
+		Preload("Pilot").Preload("Drone").Find(&apps).Error
+	return apps, total, err
+}
+
 func (r *AirspaceRepo) UpdateStatus(id int64, status string, reviewedBy int64, notes string) error {
 	now := time.Now()
 	return r.db.Model(&model.AirspaceApplication{}).Where("id = ?", id).Updates(map[string]interface{}{
@@ -82,7 +97,7 @@ func (r *AirspaceRepo) UpdateUOMResponse(id int64, approvalCode string, approved
 		status = "rejected"
 	}
 	return r.db.Model(&model.AirspaceApplication{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"uom_response_at":  &now,
+		"uom_response_at":   &now,
 		"uom_approval_code": approvalCode,
 		"status":            status,
 	}).Error

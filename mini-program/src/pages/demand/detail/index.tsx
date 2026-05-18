@@ -83,13 +83,13 @@ export default function DemandDetailPage() {
             <View className="btn btn-primary" onClick={() => demandV2Service.publish(demandId).then(() => { loadData(); })}><Text className="btn-text">发布任务</Text></View>
           )}
           {canEdit && (
-            <View className="btn btn-outline" onClick={handleCancel} disabled={submitting}><Text className="btn-text-outline">撤销</Text></View>
+            <View className="btn btn-outline" onClick={handleCancel}><Text className="btn-text-outline">撤销</Text></View>
           )}
           {canQuote && (
             <View className="btn btn-primary" onClick={() => Taro.navigateTo({ url: `/pages/demand/quote/index?demandId=${demandId}&demandTitle=${encodeURIComponent(demand.title)}` })}><Text className="btn-text">{hasOwnQuote ? '更新报价' : '提交报价'}</Text></View>
           )}
           {canCandidate && (
-            <View className={`btn ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-outline' : 'btn-warning'}`} onClick={handleCandidateToggle} disabled={submitting}>
+            <View className={`btn ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-outline' : 'btn-warning'}`} onClick={handleCandidateToggle}>
               <Text className={`btn-text ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-text-outline' : ''}`}>{(demand as any)?.my_candidate?.status === 'active' ? '取消候选' : '报名候选'}</Text>
             </View>
           )}

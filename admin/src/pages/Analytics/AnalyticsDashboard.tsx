@@ -84,6 +84,32 @@ interface TrendData {
   user_growth_trend: TrendItem[];
 }
 
+const emptyDashboard: DashboardData = {
+  today_orders: { new: 0, completed: 0, cancelled: 0, in_progress: 0, completion_rate: 0 },
+  today_revenue: { total: 0, platform_fee: 0, pilot_income: 0, owner_income: 0 },
+  online_capacity: { pilots: 0, drones: 0, active_flights: 0 },
+  active_users: { total: 0, pilots: 0, owners: 0, clients: 0 },
+  alerts_summary: { active: 0, resolved_today: 0, critical: 0 },
+  top_regions: [],
+  system_health: { status: 'healthy', api_latency: 0, db_connections: 0 },
+};
+
+const normalizeDashboard = (value: Partial<DashboardData> | null | undefined): DashboardData => ({
+  today_orders: { ...emptyDashboard.today_orders, ...(value?.today_orders || {}) },
+  today_revenue: { ...emptyDashboard.today_revenue, ...(value?.today_revenue || {}) },
+  online_capacity: { ...emptyDashboard.online_capacity, ...(value?.online_capacity || {}) },
+  active_users: { ...emptyDashboard.active_users, ...(value?.active_users || {}) },
+  alerts_summary: { ...emptyDashboard.alerts_summary, ...(value?.alerts_summary || {}) },
+  top_regions: Array.isArray(value?.top_regions) ? value.top_regions : [],
+  system_health: { ...emptyDashboard.system_health, ...(value?.system_health || {}) },
+});
+
+const normalizeTrend = (value: Partial<TrendData> | null | undefined): TrendData => ({
+  order_trend: Array.isArray(value?.order_trend) ? value.order_trend : [],
+  revenue_trend: Array.isArray(value?.revenue_trend) ? value.revenue_trend : [],
+  user_growth_trend: Array.isArray(value?.user_growth_trend) ? value.user_growth_trend : [],
+});
+
 // 格式化金额
 const formatAmount = (amount: number): string => {
   const yuan = amount / 100;
@@ -106,8 +132,8 @@ const AnalyticsDashboard: React.FC = () => {
         adminApi.getRealtimeDashboard(),
         adminApi.getTrendData(trendDays),
       ]);
-      setDashboard((dashboardRes as any).data);
-      setTrend((trendRes as any).data);
+      setDashboard(normalizeDashboard((dashboardRes as any).data));
+      setTrend(normalizeTrend((trendRes as any).data));
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
       message.error('获取看板数据失败');
@@ -300,7 +326,7 @@ const AnalyticsDashboard: React.FC = () => {
                 <div style={{ fontSize: 24, fontWeight: 'bold', color: '#13c2c2' }}>
                   {dashboard.active_users.clients}
                 </div>
-                <div style={{ color: '#999' }}>业主</div>
+                <div style={{ color: '#999' }}>客户</div>
               </Col>
             </Row>
             <div style={{ textAlign: 'center', marginTop: 16, padding: '8px 0', backgroundColor: '#fafafa', borderRadius: 4 }}>

@@ -117,4 +117,4 @@ go run ./cmd/check_v2_parity -config config.yaml -limit 3
 - 移动端认证、首页、市场、履约、我的主链路默认走 `v2`
 - 管理后台默认 API 前缀切到 `/api/v2`
 - 后端已提供 `/api/v2/admin`、`/api/v2/analytics`、`/api/v2/client/admin/cargo/*` 兼容别名
-- `/api/v1` 核心业务组的写入已冻结，返回明确提示引导改走 `v2`
+- `/api/v2` 核心业务组的写入已冻结，返回明确提示引导改走 `v2`

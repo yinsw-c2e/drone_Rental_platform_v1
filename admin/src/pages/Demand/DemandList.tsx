@@ -35,9 +35,9 @@ interface DemandItem {
 
 const STATUS_MAP: Record<string, { text: string; color: string }> = {
   draft: { text: '草稿', color: 'default' },
-  published: { text: '已发布', color: 'blue' },
-  quoting: { text: '报价中', color: 'processing' },
-  selected: { text: '已选方案', color: 'gold' },
+  published: { text: '询价中', color: 'processing' },
+  quoting: { text: '询价中', color: 'processing' },
+  selected: { text: '已选定', color: 'gold' },
   converted_to_order: { text: '已转订单', color: 'purple' },
   cancelled: { text: '已取消', color: 'red' },
   expired: { text: '已过期', color: 'orange' },

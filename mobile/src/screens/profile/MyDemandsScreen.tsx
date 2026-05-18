@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 
 import EmptyState from '../../components/business/EmptyState';
 import StatusBadge from '../../components/business/StatusBadge';
@@ -97,6 +98,14 @@ export default function MyDemandsScreen({navigation, route}: any) {
     [activeGroup, demands],
   );
 
+  const handleBack = () => {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs', {screen: 'Profile'});
+  };
+
   const renderItem = ({item}: {item: DemandSummary}) => {
     const isDraft = item.status === 'draft';
     const canEdit = ['draft', 'published', 'quoting'].includes(item.status);
@@ -165,7 +174,21 @@ export default function MyDemandsScreen({navigation, route}: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+    <SafeAreaView style={styles.container}>
+      <LinearGradient
+        colors={['#F3F8FF', '#FFFFFF', '#F5F7FB']}
+        locations={[0, 0.42, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.navBar}>
+        <View style={styles.navSide}>
+          <TouchableOpacity style={styles.navBack} onPress={handleBack} activeOpacity={0.82}>
+            <Image source={myDemandsAssets.back} style={styles.navBackIcon} resizeMode="contain" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.navTitle}>我的需求</Text>
+        <View style={[styles.navSide, styles.navSideRight]} />
+      </View>
       <View style={styles.hero}>
         <View style={styles.heroCopy}>
           <View style={styles.heroTitleRow}>
@@ -221,18 +244,52 @@ export default function MyDemandsScreen({navigation, route}: any) {
 
 const getStyles = (theme: AppTheme) =>
   StyleSheet.create({
-    container: {flex: 1, backgroundColor: theme.bg},
+    container: {flex: 1, backgroundColor: '#F5F7FB'},
+    navBar: {
+      minHeight: 56,
+      paddingHorizontal: 10,
+      paddingTop: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: 'rgba(255,255,255,0.38)',
+    },
+    navSide: {
+      width: 92,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    navSideRight: {
+      justifyContent: 'flex-end',
+    },
+    navBack: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navBackIcon: {
+      width: 18,
+      height: 18,
+    },
+    navTitle: {
+      flex: 1,
+      color: '#111827',
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
     hero: {
-      marginHorizontal: 12,
-      marginTop: 12,
-      marginBottom: 10,
-      minHeight: 132,
+      marginBottom: 0,
+      minHeight: 150,
       borderRadius: 0,
-      backgroundColor: '#F3F8FF',
       flexDirection: 'row',
       alignItems: 'center',
       overflow: 'hidden',
-      paddingLeft: 16,
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 18,
     },
     heroCopy: {
       flex: 1,
@@ -268,7 +325,7 @@ const getStyles = (theme: AppTheme) =>
       marginRight: 4,
     },
     filterBar: {
-      backgroundColor: theme.bg,
+      backgroundColor: 'transparent',
     },
     filterScroll: {
       paddingHorizontal: 12,

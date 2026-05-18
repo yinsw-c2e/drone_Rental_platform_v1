@@ -6,7 +6,6 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPORT_FILE="${REPORT_FILE:-$BACKEND_DIR/docs/phase10_role_acceptance_last_run.json}"
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
-API_V1="$BASE_URL/api/v1"
 API_V2="$BASE_URL/api/v2"
 
 REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
@@ -17,6 +16,7 @@ MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASS="${MYSQL_PASS:-root}"
 MYSQL_DB="${MYSQL_DB:-wurenji}"
+MYSQL_CONTAINER="${MYSQL_CONTAINER:-wurenji-mysql}"
 
 PREPARE_DEMO_DATA="${PREPARE_DEMO_DATA:-0}"
 DEVTOKEN_CONFIG_PATH="${DEVTOKEN_CONFIG_PATH:-config.yaml}"
@@ -120,7 +120,7 @@ json_get() {
 
 send_code() {
   local phone="$1"
-  curl -sS --max-time 10 -X POST "$API_V1/auth/send-code" \
+  curl -sS --max-time 10 -X POST "$API_V2/auth/send-code" \
     -H "Content-Type: application/json" \
     -d "{\"phone\":\"$phone\"}" >/dev/null
 }
@@ -128,6 +128,19 @@ send_code() {
 read_code() {
   local phone="$1"
   redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" GET "sms:code:$phone" | tr -d '\r'
+}
+
+mysql_exec() {
+  if command -v mysql >/dev/null 2>&1; then
+    mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" "$@"
+    return
+  fi
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "$MYSQL_CONTAINER"; then
+    docker exec -i "$MYSQL_CONTAINER" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" "$@"
+    return
+  fi
+  echo "missing required binary: mysql or running docker container $MYSQL_CONTAINER" >&2
+  exit 1
 }
 
 mint_dev_token() {
@@ -182,9 +195,7 @@ prepare_demo_data() {
     return
   fi
 
-  require_bin mysql
-
-  mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" <<'SQL'
+  mysql_exec <<'SQL'
 UPDATE dispatch_tasks dt
 JOIN orders o ON o.id = dt.order_id
 SET dt.status = 'cancelled',
@@ -245,6 +256,49 @@ SET availability_status = 'available',
     airworthiness_verified = 'verified',
     city = '佛山'
 WHERE id IN (18, 19, 20, 21, 22);
+
+UPDATE pilots
+SET caac_license_type = COALESCE(NULLIF(caac_license_type, ''), 'BVLOS'),
+    caac_license_no = COALESCE(NULLIF(caac_license_no, ''), CONCAT('CAAC-DEMO-', id)),
+    caac_license_image = COALESCE(NULLIF(caac_license_image, ''), '/uploads/certifications/demo-caac-license.jpg'),
+    verification_status = 'verified',
+    availability_status = 'online',
+    updated_at = NOW()
+WHERE user_id IN (
+  SELECT id FROM users WHERE phone IN ('13900000016', '13800000002')
+);
+
+UPDATE owner_pilot_bindings b
+JOIN users owner_user ON owner_user.id = b.owner_user_id
+JOIN users pilot_user ON pilot_user.id = b.pilot_user_id
+SET b.initiated_by = 'owner',
+    b.status = 'active',
+    b.is_priority = 1,
+    b.note = 'phase10 demo binding for v2 manual dispatch',
+    b.confirmed_at = COALESCE(b.confirmed_at, NOW()),
+    b.dissolved_at = NULL,
+    b.updated_at = NOW()
+WHERE owner_user.phone = '13800000007'
+  AND pilot_user.phone = '13900000016'
+  AND b.deleted_at IS NULL;
+
+INSERT INTO owner_pilot_bindings (
+  owner_user_id, pilot_user_id, initiated_by, status, is_priority,
+  note, confirmed_at, created_at, updated_at
+)
+SELECT owner_user.id, pilot_user.id, 'owner', 'active', 1,
+       'phase10 demo binding for v2 manual dispatch', NOW(), NOW(), NOW()
+FROM users owner_user
+JOIN users pilot_user ON pilot_user.phone = '13900000016'
+WHERE owner_user.phone = '13800000007'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM owner_pilot_bindings b
+    WHERE b.owner_user_id = owner_user.id
+      AND b.pilot_user_id = pilot_user.id
+      AND b.deleted_at IS NULL
+      AND b.status IN ('pending_confirmation', 'active', 'paused')
+  );
 
 UPDATE owner_supplies
 SET cargo_scenes = JSON_ARRAY('power_grid', 'grid_power_material_transport'),
@@ -318,12 +372,11 @@ force_drone_available() {
   if [[ -z "$drone_id" || "$drone_id" == "0" ]]; then
     return
   fi
-  if ! command -v mysql >/dev/null 2>&1; then
-    append_result "PREPARE" "force_drone_available" "skipped" "mysql not found, skipped drone availability patch for drone_id=$drone_id"
+  if ! command -v mysql >/dev/null 2>&1 && ! { command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "$MYSQL_CONTAINER"; }; then
+    append_result "PREPARE" "force_drone_available" "skipped" "mysql/docker mysql unavailable, skipped drone availability patch for drone_id=$drone_id"
     return
   fi
-  mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" \
-    -e "UPDATE drones SET availability_status='available' WHERE id = ${drone_id};" >/dev/null
+  mysql_exec -e "UPDATE drones SET availability_status='available' WHERE id = ${drone_id};" >/dev/null
 }
 
 pick_owner_drone_ids() {
@@ -414,9 +467,9 @@ PY
       service_type:"heavy_cargo_lift_transport",
       cargo_scene:$cargo_scene,
       description:"阶段10 AUTO RUN 客户需求验收样本",
-      departure_address:{text:"广东省佛山市禅城区电力仓储基地", city:"佛山", district:"禅城区"},
-      destination_address:{text:"广东省佛山市南海区电网建设工地", city:"佛山", district:"南海区"},
-      service_address:{text:"广东省佛山市禅城区电力仓储基地", city:"佛山", district:"禅城区"},
+      departure_address:{text:"广东省佛山市禅城区电力仓储基地", city:"佛山", district:"禅城区", latitude:23.0109000, longitude:113.1227000},
+      destination_address:{text:"广东省佛山市南海区电网建设工地", city:"佛山", district:"南海区", latitude:23.0374000, longitude:113.1428000},
+      service_address:{text:"广东省佛山市禅城区电力仓储基地", city:"佛山", district:"禅城区", latitude:23.0109000, longitude:113.1227000},
       scheduled_start_at:$start,
       scheduled_end_at:$end,
       cargo_weight_kg:52,
@@ -473,6 +526,18 @@ mock_pay_order() {
   jq -r '.data.order.status // empty' <<<"$response"
 }
 
+sign_order_contract() {
+  local token="$1"
+  local order_id="$2"
+  local role="$3"
+  local detail sign_response
+
+  detail="$(json_get "$token" "/orders/$order_id/contract")"
+  assert_ok "$detail" "contract_detail:$order_id:$role"
+  sign_response="$(json_post "$token" "/orders/$order_id/contract/sign" '{}')"
+  assert_ok "$sign_response" "contract_sign:$order_id:$role"
+}
+
 apply_candidate() {
   local token="$1"
   local demand_id="$2"
@@ -504,9 +569,9 @@ PY
     '{
       service_type:"heavy_cargo_lift_transport",
       cargo_scene:"power_grid",
-      departure_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
-      destination_address:{text:"广东省佛山市南海区施工吊运点", city:"佛山", district:"南海区"},
-      service_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区"},
+      departure_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区", latitude:23.0109000, longitude:113.1227000},
+      destination_address:{text:"广东省佛山市南海区施工吊运点", city:"佛山", district:"南海区", latitude:23.0374000, longitude:113.1428000},
+      service_address:{text:"广东省佛山市禅城区电网仓库", city:"佛山", district:"禅城区", latitude:23.0109000, longitude:113.1227000},
       scheduled_start_at:$start,
       scheduled_end_at:$end,
       cargo_weight_kg:55,
@@ -644,6 +709,10 @@ main() {
   demand_order_id="$(customer_select_provider "$customer_token" "$demand_id" "$quote_id")"
   append_result "FLOW" "customer_select_provider" "passed" "order id=$demand_order_id"
 
+  sign_order_contract "$customer_token" "$demand_order_id" "client"
+  sign_order_contract "$owner_token" "$demand_order_id" "provider"
+  append_result "FLOW" "demand_order_contract_signed" "passed" "order id=$demand_order_id"
+
   pay_status="$(mock_pay_order "$customer_token" "$demand_order_id")"
   append_result "FLOW" "customer_mock_pay_demand_order" "passed" "status=$pay_status"
 
@@ -657,6 +726,10 @@ main() {
 
   provider_confirm_order "$owner_token" "$direct_order_id"
   append_result "FLOW" "owner_confirm_direct_order" "passed" "order id=$direct_order_id"
+
+  sign_order_contract "$customer_token" "$direct_order_id" "client"
+  sign_order_contract "$owner_token" "$direct_order_id" "provider"
+  append_result "FLOW" "direct_order_contract_signed" "passed" "order id=$direct_order_id"
 
   direct_pay_status="$(mock_pay_order "$customer_token" "$direct_order_id")"
   append_result "FLOW" "customer_mock_pay_direct_order" "passed" "status=$direct_pay_status"

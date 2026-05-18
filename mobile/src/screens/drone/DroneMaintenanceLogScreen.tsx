@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import DateOnlyField from '../../components/DateOnlyField';
-import api from '../../services/api';
+import {apiV2} from '../../services/api';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -59,7 +59,7 @@ export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
 
   const loadData = useCallback(async () => {
     try {
-      const res: any = await api.get(`/drone/${droneId}/maintenance`, {
+      const res: any = await apiV2.get(`/drone/${droneId}/maintenance`, {
         params: {page: 1, page_size: 50},
       });
       setLogs(res.data?.list || []);
@@ -110,7 +110,7 @@ export default function DroneMaintenanceLogScreen({route, _navigation}: any) {
 
     setSubmitting(true);
     try {
-      await api.post(`/drone/${droneId}/maintenance`, {
+      await apiV2.post(`/drone/${droneId}/maintenance`, {
         maintenance_type: maintenanceType,
         description: description.trim(),
         cost: cost ? Math.round(parseFloat(cost) * 100) : 0,

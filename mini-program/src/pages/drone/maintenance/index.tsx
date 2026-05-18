@@ -2,7 +2,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Input } from '@tarojs/components';
 import DateTimeField from '../../../components/DateTimeField';
-import api from '../../../services/api';
+import { apiV2 } from '../../../services/api';
 import './index.scss';
 
 export default function DroneMaintenancePage() {
@@ -23,7 +23,7 @@ export default function DroneMaintenancePage() {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/drone/${droneId}/maintenance`);
+      const res = await apiV2.get(`/drone/${droneId}/maintenance`);
       setLogs((res as any).data?.list || (res as any).data?.items || []);
     } catch (e) {
       Taro.showToast({ title: '加载失败', icon: 'none' });
@@ -40,7 +40,7 @@ export default function DroneMaintenancePage() {
     if (!maintenanceDate || !description) return Taro.showToast({ title: '请填写日期和描述', icon: 'none' });
     setSubmitting(true);
     try {
-      await api.post(`/drone/${droneId}/maintenance`, {
+      await apiV2.post(`/drone/${droneId}/maintenance`, {
         maintenance_date: new Date(maintenanceDate).toISOString(),
         maintenance_type: maintenanceType,
         description,
@@ -76,7 +76,7 @@ export default function DroneMaintenancePage() {
           </View>
           <View className="bottom-bar">
             <View className="btn-outline" onClick={() => setShowAdd(false)}><Text className="btn-outline-text">取消</Text></View>
-            <View className="btn-primary" onClick={submitLog} disabled={submitting}><Text className="btn-primary-text">保存记录</Text></View>
+            <View className="btn-primary" onClick={submitLog}><Text className="btn-primary-text">保存记录</Text></View>
           </View>
         </ScrollView>
       ) : (

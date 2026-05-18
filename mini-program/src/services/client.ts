@@ -1,4 +1,4 @@
-import { apiV1, apiV2 } from './api';
+import { apiV2 } from './api';
 
 // ==================== 类型定义 ====================
 
@@ -142,11 +142,11 @@ export interface CreateCargoDeclarationRequest {
 // ==================== API 服务 ====================
 
 export const registerIndividual = async (): Promise<Client> => {
-  return apiV1.post<Client>('/client/register/individual');
+  return apiV2.post<Client>('/client/register/individual');
 };
 
 export const registerEnterprise = async (data: RegisterEnterpriseRequest): Promise<Client> => {
-  return apiV1.post<Client>('/client/register/enterprise', data);
+  return apiV2.post<Client>('/client/register/enterprise', data);
 };
 
 export const getClientProfile = async (): Promise<Client> => {
@@ -162,34 +162,34 @@ export const getClientEligibility = async (): Promise<ClientEligibility> => {
 };
 
 export const requestCreditCheck = async (): Promise<void> => {
-  await apiV1.post('/client/credit/check');
+  await apiV2.post('/client/credit/check');
 };
 
 export const getCreditHistory = async (): Promise<CreditCheckRecord[]> => {
-  return apiV1.get<CreditCheckRecord[]>('/client/credit/history');
+  return apiV2.get<CreditCheckRecord[]>('/client/credit/history');
 };
 
 export const checkOrderEligibility = async (): Promise<{ eligible: boolean; reasons?: string[] }> => {
-  return apiV1.get('/client/order/eligibility');
+  return apiV2.get('/client/order/eligibility');
 };
 
 export const createCargoDeclaration = async (data: CreateCargoDeclarationRequest): Promise<CargoDeclaration> => {
-  return apiV1.post<CargoDeclaration>('/client/cargo/declaration', data);
+  return apiV2.post<CargoDeclaration>('/client/cargo/declaration', data);
 };
 
 export const listCargoDeclarations = async (params?: {
   page?: number;
   page_size?: number;
 }): Promise<{ list: CargoDeclaration[]; total: number }> => {
-  return apiV1.get('/client/cargo/declarations', params);
+  return apiV2.get('/client/cargo/declarations', params);
 };
 
 export const getCargoDeclaration = async (id: number): Promise<CargoDeclaration> => {
-  return apiV1.get<CargoDeclaration>(`/client/cargo/declaration/${id}`);
+  return apiV2.get<CargoDeclaration>(`/client/cargo/declaration/${id}`);
 };
 
 export const updateCargoDeclaration = async (id: number, data: Partial<CreateCargoDeclarationRequest>): Promise<CargoDeclaration> => {
-  return apiV1.put<CargoDeclaration>(`/client/cargo/declaration/${id}`, data);
+  return apiV2.put<CargoDeclaration>(`/client/cargo/declaration/${id}`, data);
 };
 
 export default {

@@ -93,7 +93,7 @@ export default function DemandQuotePage() {
       </View>
 
       <View style={{ padding: '20px 16px' }}>
-        <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit} disabled={submitting}>
+        <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit}>
           <Text className="btn-text">提交报价</Text>
         </View>
       </View>

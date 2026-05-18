@@ -1,18 +1,18 @@
-import { apiV1 } from './api';
+import { apiV2 } from './api';
 
 export const paymentService = {
   create: (orderId: number, method: string) =>
-    apiV1.post('/payment/create', { order_id: orderId, method }),
+    apiV2.post('/payment/create', { order_id: orderId, method }),
 
   getStatus: (paymentNo: string) =>
-    apiV1.get(`/payment/${paymentNo}/status`),
+    apiV2.get(`/payment/${paymentNo}/status`),
 
   mockCallback: (paymentNo: string) =>
-    apiV1.post('/payment/mock/callback', { payment_no: paymentNo }),
+    apiV2.post('/payment/mock/callback', { payment_no: paymentNo }),
 
   refund: (orderId: number) =>
-    apiV1.post(`/payment/${orderId}/refund`),
+    apiV2.post(`/payment/${orderId}/refund`),
 
   history: (page?: number, pageSize?: number) =>
-    apiV1.get('/payment/history', { page, page_size: pageSize }),
+    apiV2.get('/payment/history', { page, page_size: pageSize }),
 };

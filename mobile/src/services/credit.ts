@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 
 // ============================================================
 // 类型定义
@@ -174,50 +174,50 @@ export interface RiskCheckResult {
 // ============================================================
 
 // 信用分
-export const getMyCreditScore = () => api.get<CreditScore>('/credit/my-score');
+export const getMyCreditScore = () => apiV2.get<CreditScore>('/credit/my-score');
 
 export const getUserCreditScore = (userId: number) => 
-  api.get<CreditScore>(`/credit/user/${userId}`);
+  apiV2.get<CreditScore>(`/credit/user/${userId}`);
 
 export const getMyCreditLogs = (params?: { change_type?: string; page?: number; page_size?: number }) =>
-  api.get<{ list: CreditScoreLog[]; total: number }>('/credit/my-logs', { params });
+  apiV2.get<{ list: CreditScoreLog[]; total: number }>('/credit/my-logs', { params });
 
 export const listCreditScores = (params?: { user_type?: string; score_level?: string; page?: number; page_size?: number }) =>
-  api.get<{ list: CreditScore[]; total: number }>('/credit/scores', { params });
+  apiV2.get<{ list: CreditScore[]; total: number }>('/credit/scores', { params });
 
 // 违规
 export const getMyViolations = (params?: { status?: string; page?: number; page_size?: number }) =>
-  api.get<{ list: Violation[]; total: number }>('/credit/my-violations', { params });
+  apiV2.get<{ list: Violation[]; total: number }>('/credit/my-violations', { params });
 
 export const listViolations = (params?: { user_id?: number; violation_type?: string; violation_level?: string; status?: string; page?: number; page_size?: number }) =>
-  api.get<{ list: Violation[]; total: number }>('/credit/violations', { params });
+  apiV2.get<{ list: Violation[]; total: number }>('/credit/violations', { params });
 
-export const getViolationDetail = (id: number) => api.get<Violation>(`/credit/violations/${id}`);
+export const getViolationDetail = (id: number) => apiV2.get<Violation>(`/credit/violations/${id}`);
 
 export const submitAppeal = (violationId: number, content: string) =>
-  api.post(`/credit/violations/${violationId}/appeal`, { content });
+  apiV2.post(`/credit/violations/${violationId}/appeal`, { content });
 
 // 风控
 export const preOrderRiskCheck = (userId: number, orderId?: number) =>
-  api.get<RiskCheckResult>('/credit/risk-check', { params: { user_id: userId, order_id: orderId } });
+  apiV2.get<RiskCheckResult>('/credit/risk-check', { params: { user_id: userId, order_id: orderId } });
 
 export const listRiskControls = (params?: { user_id?: number; risk_phase?: string; risk_type?: string; status?: string; page?: number; page_size?: number }) =>
-  api.get<{ list: RiskControl[]; total: number }>('/credit/risks', { params });
+  apiV2.get<{ list: RiskControl[]; total: number }>('/credit/risks', { params });
 
-export const getRiskControlDetail = (id: number) => api.get<RiskControl>(`/credit/risks/${id}`);
+export const getRiskControlDetail = (id: number) => apiV2.get<RiskControl>(`/credit/risks/${id}`);
 
 // 黑名单
 export const listBlacklists = (params?: { blacklist_type?: string; is_active?: boolean; page?: number; page_size?: number }) =>
-  api.get<{ list: Blacklist[]; total: number }>('/credit/blacklists', { params });
+  apiV2.get<{ list: Blacklist[]; total: number }>('/credit/blacklists', { params });
 
 // 保证金
-export const getMyDeposit = () => api.get<Deposit>('/credit/my-deposit');
+export const getMyDeposit = () => apiV2.get<Deposit>('/credit/my-deposit');
 
 export const listDeposits = (params?: { user_type?: string; status?: string; page?: number; page_size?: number }) =>
-  api.get<{ list: Deposit[]; total: number }>('/credit/deposits', { params });
+  apiV2.get<{ list: Deposit[]; total: number }>('/credit/deposits', { params });
 
 // 统计
-export const getCreditStatistics = () => api.get<CreditStatistics>('/credit/statistics');
+export const getCreditStatistics = () => apiV2.get<CreditStatistics>('/credit/statistics');
 
 // 辅助函数
 export const getScoreLevelText = (level: string): string => {

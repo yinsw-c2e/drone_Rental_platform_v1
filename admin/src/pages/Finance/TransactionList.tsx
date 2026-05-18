@@ -26,7 +26,7 @@ const TYPE_MAP: Record<string, { text: string; color: string }> = {
 const METHOD_MAP: Record<string, string> = {
   wechat: '微信支付',
   alipay: '支付宝',
-  mock: '模拟支付',
+  mock: '测试通道',
 };
 
 const STATUS_MAP: Record<string, { text: string; color: string }> = {

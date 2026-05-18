@@ -267,6 +267,7 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 	distanceExpr := `(6371 * acos(cos(radians(?)) * cos(radians(` + baseLatExpr + `)) * cos(radians(` + baseLngExpr + `) - radians(?)) + sin(radians(?)) * sin(radians(` + baseLatExpr + `))))`
 
 	query := `
+		SELECT * FROM (
 		SELECT 
 			p.id as pilot_id,
 			p.user_id as pilot_user_id,
@@ -316,7 +317,7 @@ func (r *DispatchRepo) FindAvailablePilotDronePairs(lat, lng, radiusKM float64, 
 		args = append(args, licenseType)
 	}
 
-	query += " HAVING distance < ? AND distance <= pilot_service_radius_km ORDER BY distance ASC LIMIT 50"
+	query += ") available_pairs WHERE distance < ? AND distance <= pilot_service_radius_km ORDER BY distance ASC LIMIT 50"
 	args = append(args, radiusKM)
 
 	var pairs []PilotDronePair

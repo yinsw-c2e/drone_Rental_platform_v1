@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 
 // ==================== 类型定义 ====================
 
@@ -143,12 +143,12 @@ export interface CreateMultiPointTaskRequest {
 
 // 位置上报
 export const reportPosition = async (data: ReportPositionRequest): Promise<void> => {
-  await api.post('/flight/position', data);
+  await apiV2.post('/flight/position', data);
 };
 
 // 获取最新位置
 export const getLatestPosition = async (orderId: number): Promise<FlightPosition> => {
-  const res: any = await api.get(`/flight/position/${orderId}/latest`);
+  const res: any = await apiV2.get(`/flight/position/${orderId}/latest`);
   return res.data;
 };
 
@@ -157,44 +157,44 @@ export const getPositionHistory = async (orderId: number, params?: {
   start_time?: string;
   end_time?: string;
 }): Promise<FlightPosition[]> => {
-  const res: any = await api.get(`/flight/position/${orderId}/history`, {params});
+  const res: any = await apiV2.get(`/flight/position/${orderId}/history`, {params});
   return res.data;
 };
 
 // ==================== 告警 ====================
 
 export const getAlerts = async (orderId: number): Promise<FlightAlert[]> => {
-  const res: any = await api.get(`/flight/alerts/${orderId}`);
+  const res: any = await apiV2.get(`/flight/alerts/${orderId}`);
   return res.data;
 };
 
 export const getActiveAlerts = async (orderId: number): Promise<FlightAlert[]> => {
-  const res: any = await api.get(`/flight/alerts/${orderId}/active`);
+  const res: any = await apiV2.get(`/flight/alerts/${orderId}/active`);
   return res.data;
 };
 
 export const acknowledgeAlert = async (alertId: number): Promise<void> => {
-  await api.post(`/flight/alert/${alertId}/acknowledge`);
+  await apiV2.post(`/flight/alert/${alertId}/acknowledge`);
 };
 
 export const resolveAlert = async (alertId: number): Promise<void> => {
-  await api.post(`/flight/alert/${alertId}/resolve`);
+  await apiV2.post(`/flight/alert/${alertId}/resolve`);
 };
 
 // ==================== 轨迹 ====================
 
 export const startTrajectory = async (orderId: number): Promise<FlightTrajectory> => {
-  const res: any = await api.post(`/flight/trajectory/start/${orderId}`);
+  const res: any = await apiV2.post(`/flight/trajectory/start/${orderId}`);
   return res.data;
 };
 
 export const stopTrajectory = async (trajectoryId: number): Promise<FlightTrajectory> => {
-  const res: any = await api.post(`/flight/trajectory/stop/${trajectoryId}`);
+  const res: any = await apiV2.post(`/flight/trajectory/stop/${trajectoryId}`);
   return res.data;
 };
 
 export const getTrajectory = async (trajectoryId: number): Promise<{trajectory: FlightTrajectory; waypoints: FlightWaypoint[]}> => {
-  const res: any = await api.get(`/flight/trajectory/${trajectoryId}`);
+  const res: any = await apiV2.get(`/flight/trajectory/${trajectoryId}`);
   return res.data;
 };
 
@@ -205,12 +205,12 @@ export const createRouteFromTrajectory = async (trajectoryId: number, data: {
   description?: string;
   is_public?: boolean;
 }): Promise<SavedRoute> => {
-  const res: any = await api.post(`/flight/route/from-trajectory/${trajectoryId}`, data);
+  const res: any = await apiV2.post(`/flight/route/from-trajectory/${trajectoryId}`, data);
   return res.data;
 };
 
 export const listMyRoutes = async (): Promise<SavedRoute[]> => {
-  const res: any = await api.get('/flight/routes/my');
+  const res: any = await apiV2.get('/flight/routes/my');
   return res.data;
 };
 
@@ -219,7 +219,7 @@ export const listPublicRoutes = async (params?: {
   longitude?: number;
   radius_km?: number;
 }): Promise<SavedRoute[]> => {
-  const res: any = await api.get('/flight/routes/public', {params});
+  const res: any = await apiV2.get('/flight/routes/public', {params});
   return res.data;
 };
 
@@ -228,40 +228,40 @@ export const findNearbyRoutes = async (params: {
   longitude: number;
   radius_km?: number;
 }): Promise<SavedRoute[]> => {
-  const res: any = await api.get('/flight/routes/nearby', {params});
+  const res: any = await apiV2.get('/flight/routes/nearby', {params});
   return res.data;
 };
 
 export const deleteRoute = async (routeId: number): Promise<void> => {
-  await api.delete(`/flight/route/${routeId}`);
+  await apiV2.delete(`/flight/route/${routeId}`);
 };
 
 // ==================== 多点任务 ====================
 
 export const createMultiPointTask = async (data: CreateMultiPointTaskRequest): Promise<MultiPointTask> => {
-  const res: any = await api.post('/flight/multi-point/task', data);
+  const res: any = await apiV2.post('/flight/multi-point/task', data);
   return res.data;
 };
 
 export const getMultiPointTask = async (taskId: number): Promise<MultiPointTask> => {
-  const res: any = await api.get(`/flight/multi-point/task/${taskId}`);
+  const res: any = await apiV2.get(`/flight/multi-point/task/${taskId}`);
   return res.data;
 };
 
 export const startMultiPointTask = async (taskId: number): Promise<void> => {
-  await api.post(`/flight/multi-point/task/${taskId}/start`);
+  await apiV2.post(`/flight/multi-point/task/${taskId}/start`);
 };
 
 export const arriveAtStop = async (taskId: number): Promise<void> => {
-  await api.post(`/flight/multi-point/task/${taskId}/arrive`);
+  await apiV2.post(`/flight/multi-point/task/${taskId}/arrive`);
 };
 
 export const completeStop = async (taskId: number, notes?: string): Promise<void> => {
-  await api.post(`/flight/multi-point/task/${taskId}/complete-stop`, {notes});
+  await apiV2.post(`/flight/multi-point/task/${taskId}/complete-stop`, {notes});
 };
 
 export const getFlightStats = async (): Promise<any> => {
-  const res: any = await api.get('/flight/stats');
+  const res: any = await apiV2.get('/flight/stats');
   return res.data;
 };
 
@@ -274,7 +274,7 @@ export const simulateFlight = async (orderId: number): Promise<{
   end_lat: number;
   end_lng: number;
 }> => {
-  const res: any = await api.post(`/flight/simulate/${orderId}`);
+  const res: any = await apiV2.post(`/flight/simulate/${orderId}`);
   return res.data;
 };
 

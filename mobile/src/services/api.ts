@@ -1,5 +1,5 @@
 import axios, {AxiosInstance, InternalAxiosRequestConfig, AxiosError} from 'axios';
-import {API_V1_BASE_URL, API_V2_BASE_URL} from '../constants';
+import {API_V2_BASE_URL} from '../constants';
 import {store} from '../store/store';
 import {setTokens, logout} from '../store/slices/authSlice';
 
@@ -12,7 +12,6 @@ const buildClient = (baseURL: string): AxiosInstance =>
     },
   });
 
-const api = buildClient(API_V1_BASE_URL);
 export const apiV2 = buildClient(API_V2_BASE_URL);
 
 const attachAuthHeader = (client: AxiosInstance) => {
@@ -46,9 +45,7 @@ function onTokenRefreshFailed(error: Error) {
   pendingRequests = [];
 }
 
-const isV1SuccessCode = (code: unknown) => code === 0;
-const isV2SuccessCode = (code: unknown) => code === 'OK';
-const isSuccessCode = (code: unknown) => isV1SuccessCode(code) || isV2SuccessCode(code);
+const isSuccessCode = (code: unknown) => code === 'OK' || code === 0;
 
 const extractRefreshTokenPair = (payload: any) => {
   if (!payload || typeof payload !== 'object') {
@@ -63,12 +60,12 @@ const extractRefreshTokenPair = (payload: any) => {
   return null;
 };
 
-const attachBusinessInterceptor = (client: AxiosInstance, version: 'v1' | 'v2') => {
+const attachBusinessInterceptor = (client: AxiosInstance) => {
   client.interceptors.response.use(
     response => {
       const data = response.data;
       if (data !== null && typeof data === 'object' && 'code' in data) {
-        const success = version === 'v1' ? isV1SuccessCode((data as any).code) : isV2SuccessCode((data as any).code);
+        const success = isSuccessCode((data as any).code);
         if (!success) {
           return Promise.reject(new Error((data as any).message || '请求失败'));
         }
@@ -106,8 +103,7 @@ const attachBusinessInterceptor = (client: AxiosInstance, version: 'v1' | 'v2') 
         isRefreshing = true;
 
         try {
-          const refreshBaseURL = version === 'v2' ? API_V2_BASE_URL : API_V1_BASE_URL;
-          const res = await axios.post(`${refreshBaseURL}/auth/refresh-token`, {
+          const res = await axios.post(`${API_V2_BASE_URL}/auth/refresh-token`, {
             refresh_token: refreshToken,
           });
 
@@ -146,9 +142,7 @@ const attachBusinessInterceptor = (client: AxiosInstance, version: 'v1' | 'v2') 
   );
 };
 
-attachAuthHeader(api);
 attachAuthHeader(apiV2);
-attachBusinessInterceptor(api, 'v1');
-attachBusinessInterceptor(apiV2, 'v2');
+attachBusinessInterceptor(apiV2);
 
-export default api;
+export default apiV2;

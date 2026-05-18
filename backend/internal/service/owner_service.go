@@ -178,6 +178,13 @@ func (s *OwnerService) AdminListSupplies(page, pageSize int, filters map[string]
 	return s.ownerDomainRepo.AdminListSupplies(page, pageSize, filters)
 }
 
+func (s *OwnerService) AdminGetSupply(id int64) (*model.OwnerSupply, error) {
+	if s.ownerDomainRepo == nil {
+		return nil, errors.New("机主供给仓储未初始化")
+	}
+	return s.ownerDomainRepo.GetMarketplaceSupplyByID(id)
+}
+
 func (s *OwnerService) GetOwnedDrone(ownerUserID, droneID int64) (*model.Drone, error) {
 	drone, err := s.droneRepo.GetByID(droneID)
 	if err != nil {

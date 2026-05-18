@@ -416,7 +416,7 @@
   - `backend/internal/service/order_service.go`：状态推进消息保留"正在申请空域许可"/"空域许可已获批"（已正确，无"航线"字眼）
   - `backend/internal/service/airspace_service.go`：检查注释中是否有"航线审批"表述，统一改为"空域报备"
   N4.09-c 后端 SavedRoute/flight route API 评估：
-  - `backend/internal/api/v1/flight/handler.go` 中有完整的 `SavedRoute` CRUD（创建、列表、附近搜索、评分、删除），对应 `/api/v1/flight/route/*` 系列接口
+  - `backend/internal/api/v2/flight/handler.go` 中有完整的 `SavedRoute` CRUD（创建、列表、附近搜索、评分、删除），对应 `/api/v2/flight/route/*` 系列接口
   - `mobile/src/services/flight.ts` 中有对应的前端调用
   - 这套"航路保存"功能属于远程物流场景能力，**本轮不删除不重构**，但在 H1.08 暂缓清单中已标注仅远程物流场景使用
   - 如果当前 UI 中有入口暴露此功能，建议隐藏或标注为"预留功能"
@@ -470,7 +470,7 @@
 
 - [x] N5.02 梳理并减少 v1 依赖残留
 目标：明确哪些页面、接口、后台模块仍依赖 v1，并分批迁移或下线。
-影响范围：`backend/internal/api/v1`、`admin/src/services`、`mobile/src/services`
+影响范围：`backend/internal/api/v2`、`admin/src/services`、`mobile/src/services`
 依赖：N1.01、N1.02、N1.03、N1.04
 验收标准：形成清晰的 v1 残留清单和迁移计划；新增开发默认不再继续挂靠 v1。
 

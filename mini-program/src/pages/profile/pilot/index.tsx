@@ -444,7 +444,7 @@ export default function PilotProfilePage() {
               <Switch
                 checked={isOnline}
                 color="#2563EB"
-                disabled={!canUpdateAvailability}
+
                 onChange={(e) => toggleAvailability(!!e.detail.value)}
               />
             </View>

@@ -236,6 +236,13 @@ func (s *PaymentService) AdminList(page, pageSize int) ([]model.Payment, int64, 
 	return s.paymentRepo.List(page, pageSize)
 }
 
+func (s *PaymentService) AdminListRefunds(status string, page, pageSize int) ([]model.Refund, int64, error) {
+	if s.orderArtifactRepo == nil {
+		return nil, 0, nil
+	}
+	return s.orderArtifactRepo.ListRefunds(status, page, pageSize)
+}
+
 func (s *PaymentService) handlePaymentCallbackWithRepos(
 	paymentNo, thirdPartyNo string,
 	paymentRepo *repository.PaymentRepo,

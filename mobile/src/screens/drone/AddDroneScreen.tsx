@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {droneService} from '../../services/drone';
-import api from '../../services/api';
+import {apiV2} from '../../services/api';
 import {API_ROOT_URL} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -51,7 +51,7 @@ export default function AddDroneScreen({navigation}: any) {
             type: asset.type || 'image/jpeg',
             name: asset.fileName || 'drone.jpg',
           } as any);
-          const res: any = await api.post('/drone/upload', formData, {
+          const res: any = await apiV2.post('/drone/upload', formData, {
             headers: {'Content-Type': 'multipart/form-data'},
           });
           const urls = res.data?.urls;

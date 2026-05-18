@@ -48,15 +48,15 @@ const getApiBaseUrl = (): string => {
   return 'https://api.wurenji.com/api';
 };
 
-const switchApiVersion = (baseUrl: string, version: 'v1' | 'v2'): string => {
+const toApiV2BaseUrl = (baseUrl: string): string => {
   const normalized = (baseUrl || '').replace(/\/+$/, '');
   if (/\/api\/v[12]$/.test(normalized)) {
-    return normalized.replace(/\/api\/v[12]$/, `/api/${version}`);
+    return normalized.replace(/\/api\/v[12]$/, '/api/v2');
   }
   if (/\/api$/.test(normalized)) {
-    return `${normalized}/${version}`;
+    return `${normalized}/v2`;
   }
-  return `${normalized}/api/${version}`;
+  return `${normalized}/api/v2`;
 };
 
 /**
@@ -86,8 +86,7 @@ const getWsBaseUrl = (): string => {
 // 导出配置常量
 export const API_BASE_URL = getApiBaseUrl();
 export const API_ROOT_URL = API_BASE_URL.replace(/\/api(?:\/v[12])?$/, '');
-export const API_V1_BASE_URL = switchApiVersion(API_BASE_URL, 'v1');
-export const API_V2_BASE_URL = switchApiVersion(API_BASE_URL, 'v2');
+export const API_V2_BASE_URL = toApiV2BaseUrl(API_BASE_URL);
 export const WS_BASE_URL = getWsBaseUrl();
 export const API_TIMEOUT = parseInt(getConfig('API_TIMEOUT') || '15000', 10);
 
@@ -96,7 +95,6 @@ logConfig('='.repeat(60));
 logConfig('[Config] APP Configuration Loaded');
 logConfig('API_BASE_URL:', API_BASE_URL);
 logConfig('API_ROOT_URL:', API_ROOT_URL);
-logConfig('API_V1_BASE_URL:', API_V1_BASE_URL);
 logConfig('API_V2_BASE_URL:', API_V2_BASE_URL);
 logConfig('WS_BASE_URL:', WS_BASE_URL);
 logConfig('API_TIMEOUT:', API_TIMEOUT);

@@ -76,9 +76,9 @@
 
 ## 相关接口
 
-- 列表：`GET /api/v1/airspace/no-fly-zones`
-- 附近：`GET /api/v1/airspace/no-fly-zones/nearby?latitude=...&longitude=...`
-- 检测：`GET /api/v1/airspace/check-availability?latitude=...&longitude=...&altitude=120`
+- 列表：`GET /api/v2/airspace/no-fly-zones`
+- 附近：`GET /api/v2/airspace/no-fly-zones/nearby?latitude=...&longitude=...`
+- 检测：`GET /api/v2/airspace/check-availability?latitude=...&longitude=...&altitude=120`
 
 ## 说明
 

@@ -1,5 +1,5 @@
-import api, {apiV2} from './api';
-import {ApiResponse, RoleSummary, TokenPair, User, V2ApiResponse} from '../types';
+import {apiV2} from './api';
+import {RoleSummary, TokenPair, User, V2ApiResponse} from '../types';
 
 type AuthPayload = {
   user: User;
@@ -9,7 +9,7 @@ type AuthPayload = {
 
 export const authService = {
   sendCode: (phone: string) =>
-    api.post<any, ApiResponse>('/auth/send-code', {phone}),
+    apiV2.post<any, V2ApiResponse>('/auth/send-code', {phone}),
 
   register: (phone: string, password: string, code: string, nickname?: string) =>
     apiV2.post<any, V2ApiResponse<AuthPayload>>('/auth/register', {
@@ -34,11 +34,11 @@ export const authService = {
 
   // 微信登录
   wechatLogin: (code: string) =>
-    api.post<any, ApiResponse<{user: User; token: TokenPair}>>('/auth/wechat-login', {code}),
+    apiV2.post<any, V2ApiResponse<{user: User; token: TokenPair}>>('/auth/wechat-login', {code}),
 
   // QQ登录
   qqLogin: (accessToken: string) =>
-    api.post<any, ApiResponse<{user: User; token: TokenPair}>>('/auth/qq-login', {
+    apiV2.post<any, V2ApiResponse<{user: User; token: TokenPair}>>('/auth/qq-login', {
       access_token: accessToken,
     }),
 };

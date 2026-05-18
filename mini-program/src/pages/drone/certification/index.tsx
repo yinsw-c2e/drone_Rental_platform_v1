@@ -2,11 +2,12 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Input, Image } from '@tarojs/components';
 import DateTimeField from '../../../components/DateTimeField';
-import api from '../../../services/api';
-import { API_V1_BASE_URL } from '../../../constants';
+import { apiV2 } from '../../../services/api';
+import { API_ROOT_URL, API_V2_BASE_URL } from '../../../constants';
 import './index.scss';
 
-const IMAGE_BASE_URL = API_V1_BASE_URL;
+const IMAGE_BASE_URL = API_V2_BASE_URL;
+const UPLOAD_ASSET_BASE_URL = API_ROOT_URL;
 
 export default function DroneCertificationPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
@@ -43,7 +44,7 @@ export default function DroneCertificationPage() {
       const data = JSON.parse(uploadRes.data);
       if (data.data?.urls?.[0]) {
         const u = data.data.urls[0];
-        setter(u.startsWith('http') ? u : `${IMAGE_BASE_URL.replace('/api/v1', '')}${u}`);
+        setter(u.startsWith('http') ? u : `${UPLOAD_ASSET_BASE_URL}${u}`);
       }
       Taro.hideLoading();
     } catch (e) {
@@ -56,7 +57,7 @@ export default function DroneCertificationPage() {
     if (!uomRegNo || !uomDoc) return Taro.showToast({ title: '请填写并上传', icon: 'none' });
     setLoading(true);
     try {
-      await api.post(`/drone/${droneId}/uom`, { registration_no: uomRegNo.trim(), registration_doc: uomDoc });
+      await apiV2.post(`/drone/${droneId}/uom`, { registration_no: uomRegNo.trim(), registration_doc: uomDoc });
       Taro.showToast({ title: '提交成功', icon: 'success' });
     } catch (e: any) { Taro.showToast({ title: '提交失败', icon: 'none' }); }
     finally { setLoading(false); }
@@ -66,7 +67,7 @@ export default function DroneCertificationPage() {
     if (!insPolicyNo || !insDoc) return Taro.showToast({ title: '请填写并上传', icon: 'none' });
     setLoading(true);
     try {
-      await api.post(`/drone/${droneId}/insurance`, {
+      await apiV2.post(`/drone/${droneId}/insurance`, {
         policy_no: insPolicyNo.trim(),
         company_name: insCompany.trim(),
         coverage_amount: Number(insCoverage) * 100,
@@ -82,7 +83,7 @@ export default function DroneCertificationPage() {
     if (!airCertNo || !airDoc) return Taro.showToast({ title: '请填写并上传', icon: 'none' });
     setLoading(true);
     try {
-      await api.post(`/drone/${droneId}/airworthiness`, {
+      await apiV2.post(`/drone/${droneId}/airworthiness`, {
         certificate_no: airCertNo.trim(),
         expiry_date: airExpiry ? new Date(airExpiry).toISOString() : null,
         certificate_doc: airDoc
@@ -108,7 +109,7 @@ export default function DroneCertificationPage() {
               <Text className="form-label">登记凭证</Text>
               {uomDoc ? <Image src={uomDoc} className="doc-image" onClick={() => uploadDoc(setUomDoc)} /> : <View className="btn-upload" onClick={() => uploadDoc(setUomDoc)}><Text>上传凭证</Text></View>}
             </View>
-            <View className="btn-primary" onClick={submitUom} disabled={loading}><Text className="btn-text">提交 UOM 实名</Text></View>
+            <View className="btn-primary" onClick={submitUom}><Text className="btn-text">提交 UOM 实名</Text></View>
           </View>
         )}
 
@@ -124,7 +125,7 @@ export default function DroneCertificationPage() {
               <Text className="form-label">保单凭证</Text>
               {insDoc ? <Image src={insDoc} className="doc-image" onClick={() => uploadDoc(setInsDoc)} /> : <View className="btn-upload" onClick={() => uploadDoc(setInsDoc)}><Text>上传凭证</Text></View>}
             </View>
-            <View className="btn-primary" onClick={submitInsurance} disabled={loading}><Text className="btn-text">提交保险信息</Text></View>
+            <View className="btn-primary" onClick={submitInsurance}><Text className="btn-text">提交保险信息</Text></View>
           </View>
         )}
 
@@ -138,7 +139,7 @@ export default function DroneCertificationPage() {
               <Text className="form-label">证明文件</Text>
               {airDoc ? <Image src={airDoc} className="doc-image" onClick={() => uploadDoc(setAirDoc)} /> : <View className="btn-upload" onClick={() => uploadDoc(setAirDoc)}><Text>上传文件</Text></View>}
             </View>
-            <View className="btn-primary" onClick={submitAir} disabled={loading}><Text className="btn-text">提交适航证明</Text></View>
+            <View className="btn-primary" onClick={submitAir}><Text className="btn-text">提交适航证明</Text></View>
           </View>
         )}
       </ScrollView>

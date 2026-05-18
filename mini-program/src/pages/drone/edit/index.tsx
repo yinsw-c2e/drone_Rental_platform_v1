@@ -2,10 +2,11 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, Input, ScrollView, Image } from '@tarojs/components';
 import { droneService } from '../../../services/drone';
-import { API_V1_BASE_URL } from '../../../constants';
+import { API_ROOT_URL, API_V2_BASE_URL } from '../../../constants';
 import './index.scss';
 
-const IMAGE_BASE_URL = API_V1_BASE_URL;
+const IMAGE_BASE_URL = API_V2_BASE_URL;
+const UPLOAD_ASSET_BASE_URL = API_ROOT_URL;
 
 export default function EditDronePage() {
   const params = Taro.getCurrentInstance().router?.params || {};
@@ -75,7 +76,7 @@ export default function EditDronePage() {
           });
           const data = JSON.parse(uploadRes.data);
           if (data.data?.urls) {
-            const urls = data.data.urls.map((u: string) => u.startsWith('http') ? u : `${IMAGE_BASE_URL.replace('/api/v1', '')}${u}`);
+            const urls = data.data.urls.map((u: string) => u.startsWith('http') ? u : `${UPLOAD_ASSET_BASE_URL}${u}`);
             uploadedUrls.push(...urls);
           }
         } catch (e) {
@@ -195,7 +196,7 @@ export default function EditDronePage() {
       </View>
 
       <View className="submit-wrap">
-        <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit} disabled={submitting || uploading}>
+        <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit}>
           <Text className="btn-text">{submitting ? '保存中...' : '保存修改'}</Text>
         </View>
       </View>

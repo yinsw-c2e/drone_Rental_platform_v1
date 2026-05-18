@@ -63,7 +63,7 @@ export const DEV_LOCATION_PRESETS = [
 
 /**
  * 附近无人机模拟数据
- * 数据来源：通过API GET /api/v1/drone/nearby 实际返回的数据
+ * 数据来源：通过API GET /api/v2/drone/nearby 实际返回的数据
  * 使用场景：当后端API不可用时的fallback数据
  */
 export const MOCK_NEARBY_DRONES = [
@@ -187,7 +187,7 @@ export const MOCK_NEARBY_DRONES = [
  * 
  * // 2. API失败时的fallback数据
  * try {
- *   const res = await api.get('/drone/nearby');
+ *   const res = await apiV2.get('/drone/nearby');
  *   setDrones(res.data.list);
  * } catch (error) {
  *   if (__DEV__) {

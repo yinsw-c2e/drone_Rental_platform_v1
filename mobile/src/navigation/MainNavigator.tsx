@@ -191,7 +191,7 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="PublishCargo"
         component={PublishCargoScreen}
-        options={{ title: '发布任务' }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="AddDrone"
@@ -251,12 +251,12 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="QuickOrderEntry"
         component={QuickOrderEntryScreen}
-        options={{ title: '快速下单' }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="ServiceHub"
         component={MarketHubScreen}
-        options={{ title: '服务市场' }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="ProgressCenter"
@@ -421,7 +421,7 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="MyDemands"
         component={MyDemandsScreen}
-        options={{ title: '我的需求' }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="OwnerProfile"

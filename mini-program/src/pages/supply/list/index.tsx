@@ -79,7 +79,7 @@ export default function OfferListPage() {
         <Text className="hero-title">服务大厅</Text>
         <Text className="hero-desc">寻找合适的重载无人机运力服务，可直接快捷下单。</Text>
       </View>
-      <ScrollView scrollX className="filter-scroll" showsHorizontalScrollIndicator={false}>
+      <ScrollView scrollX className="filter-scroll">
         <View className="filter-row">
           {SCENE_FILTERS.map(f => (
             <View key={f.key} className={`filter-chip ${activeScene === f.key ? 'active' : ''}`} onClick={() => handleSceneChange(f.key)}>

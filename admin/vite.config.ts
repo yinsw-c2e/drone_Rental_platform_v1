@@ -47,12 +47,15 @@ export default defineConfig(({ mode }) => {
       // 分包策略
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom'],
-            antd: ['antd', '@ant-design/icons'],
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('@ant-design/icons')) return 'antd-icons';
+            if (id.includes('/antd/')) return 'antd-core';
+            return 'vendor';
           },
         },
       },
+      chunkSizeWarningLimit: 800,
     },
     
     // 定义全局常量

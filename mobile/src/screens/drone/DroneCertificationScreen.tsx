@@ -17,7 +17,7 @@ import {API_ROOT_URL} from '../../constants';
 import {launchImageLibrary} from 'react-native-image-picker';
 import DateOnlyField from '../../components/DateOnlyField';
 import {droneService} from '../../services/drone';
-import api from '../../services/api';
+import {apiV2} from '../../services/api';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -102,7 +102,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
           name: asset.fileName || 'cert.jpg',
         } as any);
 
-        const uploadRes: any = await api.post('/drone/upload', formData, {
+        const uploadRes: any = await apiV2.post('/drone/upload', formData, {
           headers: {'Content-Type': 'multipart/form-data'},
         });
         const urls = uploadRes.data?.urls;
@@ -127,7 +127,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
     if (!uomDoc) return Alert.alert('提示', '请上传登记证明');
     setSubmitting(true);
     try {
-      await api.post(`/drone/${droneId}/uom`, { registration_no: uomRegNo.trim(), registration_doc: uomDoc });
+      await apiV2.post(`/drone/${droneId}/uom`, { registration_no: uomRegNo.trim(), registration_doc: uomDoc });
       Alert.alert('成功', '登记信息已提交存证');
       setShowModal(false);
       loadData();
@@ -144,7 +144,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
     if (!insuranceDoc) return Alert.alert('提示', '请上传保单');
     setSubmitting(true);
     try {
-      await api.post(`/drone/${droneId}/insurance`, {
+      await apiV2.post(`/drone/${droneId}/insurance`, {
         policy_no: insurancePolicyNo.trim(),
         company: insuranceCompany.trim(),
         coverage: Math.round(parseFloat(insuranceCoverage) * 10000 * 100),
@@ -167,7 +167,7 @@ export default function DroneCertificationScreen({route, navigation}: any) {
     if (!airworthinessDoc) return Alert.alert('提示', '请上传证书照片');
     setSubmitting(true);
     try {
-      await api.post(`/drone/${droneId}/airworthiness`, {
+      await apiV2.post(`/drone/${droneId}/airworthiness`, {
         cert_no: airworthinessCertNo.trim(),
         expire_date: airworthinessExpire,
         doc: airworthinessDoc,

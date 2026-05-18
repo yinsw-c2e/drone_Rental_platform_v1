@@ -59,3 +59,7 @@ func (s *ReviewService) ListByTarget(targetType string, targetID int64, page, pa
 func (s *ReviewService) ListByReviewer(reviewerID int64, page, pageSize int) ([]model.Review, int64, error) {
 	return s.reviewRepo.ListByReviewer(reviewerID, page, pageSize)
 }
+
+func (s *ReviewService) ListAll(targetType string, page, pageSize int) ([]model.Review, int64, error) {
+	return s.reviewRepo.ListAll(targetType, page, pageSize)
+}

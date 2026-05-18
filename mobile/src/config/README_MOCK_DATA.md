@@ -38,13 +38,13 @@ LIMIT 10;
 
 ```bash
 # 1. 登录获取Token
-TOKEN=$(curl -s http://localhost:8080/api/v1/auth/login \
+TOKEN=$(curl -s http://localhost:8080/api/v2/auth/login \
   -H "Content-Type: application/json" \
   -d '{"phone":"13800000002","password":"password123"}' \
   | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
 
 # 2. 获取附近无人机数据
-curl -s "http://localhost:8080/api/v1/drone/nearby?lat=39.9088&lng=116.3975&radius=50" \
+curl -s "http://localhost:8080/api/v2/drone/nearby?lat=39.9088&lng=116.3975&radius=50" \
   -H "Authorization: Bearer $TOKEN" \
   | python3 -m json.tool > nearby_drones_response.json
 

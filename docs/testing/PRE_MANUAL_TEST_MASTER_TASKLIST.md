@@ -362,7 +362,7 @@
     - 移动端原生导航与 Web 路由都覆盖首页、市场、履约、我的以及主要详情/动作页
   - 发现的问题：
     - `backend/internal/api/v2/router.go` 仍有 11 个 `NotImplemented` 入口，集中在订单取消/履约推进、飞行记录写入、会话消息查询
-    - `mobile/src/constants/index.ts` 和 `mobile/src/utils/config.web.ts` 仍默认硬编码 `cpolar` 的 `/api/v1` 地址，并启用了 `USE_CPOLAR_FOR_TESTING = true`
+    - `mobile/src/constants/index.ts` 和 `mobile/src/utils/config.web.ts` 仍默认硬编码 `cpolar` 的 `/api/v2` 地址，并启用了 `USE_CPOLAR_FOR_TESTING = true`
     - 移动端仍同时保留 `api`(v1) 与 `apiV2` 客户端，说明旧接口残留风险仍在
   - 修复建议或处理动作：
     - 后续重点验证所有可能命中 `NotImplemented` 的页面入口，避免手工测试时点击即失败
@@ -420,7 +420,7 @@
     - 已执行 `adb install -r app-debug.apk` 并启动 `com.wurenjimobile/.MainActivity`
     - Metro 收到 Android 端真实 `index.js` 打包请求并完成 bundle；`logcat` 未出现 `FATAL EXCEPTION`
     - `uiautomator dump` 与 `dumpsys activity` 确认应用已在 Android 模拟器前台展示登录页，页面标题为“无人机租赁平台 / 登录 / 注册”
-    - 静态扫描再次确认移动端仍保留 v1/v2 双客户端与 `cpolar/api/v1` 默认值
+    - 静态扫描再次确认移动端仍保留 v1/v2 双客户端与 `cpolar/api/v2` 默认值
   - 发现的问题：
     - 移动端与后台构建均出现 `chunk > 500k` 告警，虽不阻塞功能，但说明首屏体积与拆包仍有优化空间
     - `backend/internal/api/v2/router.go` 中 11 个入口仍直接返回 `NotImplemented`
@@ -506,12 +506,12 @@
     - 静态检查确认移动端 `mobile/src/services/api.ts` 里存在并发 401 刷新队列逻辑
   - 发现的问题：
     - `mobile/src/services/api.ts` 中若某次 refresh token 失败，`isRefreshing` 队列中的后续请求只会等待，不会被 reject，属于真实异步/竞态问题
-    - `mobile/src/constants/index.ts` 与 `mobile/src/utils/config.web.ts` 仍把默认接口落到 `cpolar + /api/v1`
+    - `mobile/src/constants/index.ts` 与 `mobile/src/utils/config.web.ts` 仍把默认接口落到 `cpolar + /api/v2`
     - `react-native-amap3d` 的配置告警、v2 未实现端点、自动迁移启动告警都属于手工测试前需要显式预警的残留项
   - 修复建议或处理动作：
     - 已修复 `mobile/src/services/api.ts`，为并发刷新队列补齐失败拒绝路径，避免 refresh 失败时页面请求永久挂起
     - 修复后再次执行 `mobile` 的 `npx tsc --noEmit` 与 `npm run web:build`，均通过
-    - 对 `cpolar/api/v1` 默认值暂未直接改动，避免误改用户当前演示环境，但已将其列为高风险配置项
+    - 对 `cpolar/api/v2` 默认值暂未直接改动，避免误改用户当前演示环境，但已将其列为高风险配置项
   - 复查结果：
     - 错误返回结构已经具备统一性，接口异常可稳定识别
     - 异步刷新已补掉一个明确的竞态挂死问题
@@ -530,11 +530,11 @@
     - 已确认供给市场空列表是履约后的状态结果，不是供给丢失
     - Android 环境补齐后已完成 `doctor -> assembleDebug -> emulator -> install -> MainActivity/Metro bundle` 的整链路验证
   - 发现的问题：
-    - 移动端默认 `cpolar/api/v1` 配置与 v2 主链路目标冲突，若不覆盖环境变量，真机手工测试存在高概率打错地址
+    - 移动端默认 `cpolar/api/v2` 配置与 v2 主链路目标冲突，若不覆盖环境变量，真机手工测试存在高概率打错地址
     - 11 个 `NotImplemented` 端点意味着部分履约推进、飞行记录写入、会话读取动作仍不适合纳入手工主回归
     - `react-native doctor` 仍将 `Android Studio` 记为错误项，但当前命令行构建、安装和模拟器启动已全部通过
   - 修复建议或处理动作：
-    - 手工测试前显式设置本地 `v2` API 地址，避免命中 `cpolar/api/v1` 默认值
+    - 手工测试前显式设置本地 `v2` API 地址，避免命中 `cpolar/api/v2` 默认值
     - Android 侧可直接复用当前模拟器 `Wurenji_API_36_ARM`，或接入真机继续测；若希望在 IDE 中管理模拟器，再额外安装 `Android Studio`
     - 手工测试优先顺序建议为：`iOS 原生 -> Android 原生 -> 后端主链路复核 / 针对性补测`
     - 页面动作上优先走阶段 10 已覆盖链路，暂时回避会命中 `NotImplemented` 的按钮
@@ -552,7 +552,7 @@
 
 ### 7.2 高风险项
 
-- [!] 移动端默认接口仍指向 `cpolar/api/v1`
+- [!] 移动端默认接口仍指向 `cpolar/api/v2`
 影响：iOS/Android 手工测试若未覆盖环境变量，可能直接打到旧地址或旧版本接口。
 定位：`mobile/src/constants/index.ts`、`mobile/src/utils/config.web.ts`
 建议：手工测试前显式设置本地 `v2` 地址。

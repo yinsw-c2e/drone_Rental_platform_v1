@@ -1,4 +1,4 @@
-import { apiV1 } from './api';
+import { apiV2 } from './api';
 
 export interface AirspaceApplication {
   id: number;
@@ -138,13 +138,13 @@ const normalizeList = <T>(res: any): { data: T[]; total: number } => {
 
 export const airspaceService = {
   createApplication: (data: CreateApplicationRequest) =>
-    apiV1.post<AirspaceApplication>('/airspace/application', data),
+    apiV2.post<AirspaceApplication>('/airspace/application', data),
 
   getApplication: (id: number) =>
-    apiV1.get<AirspaceApplication>(`/airspace/application/${id}`),
+    apiV2.get<AirspaceApplication>(`/airspace/application/${id}`),
 
   listMyApplications: async (pilotId: number, page = 1, pageSize = 20) => {
-    const res = await apiV1.get('/airspace/applications', {
+    const res = await apiV2.get('/airspace/applications', {
       pilot_id: pilotId,
       page,
       page_size: pageSize,
@@ -153,10 +153,10 @@ export const airspaceService = {
   },
 
   submitForReview: (id: number, pilotId: number) =>
-    apiV1.post(`/airspace/application/${id}/submit`, { pilot_id: pilotId }),
+    apiV2.post(`/airspace/application/${id}/submit`, { pilot_id: pilotId }),
 
   cancelApplication: (id: number, pilotId: number) =>
-    apiV1.post(`/airspace/application/${id}/cancel`, { pilot_id: pilotId }),
+    apiV2.post(`/airspace/application/${id}/cancel`, { pilot_id: pilotId }),
 
   listNoFlyZones: async (params?: {
     zone_type?: string;
@@ -164,12 +164,12 @@ export const airspaceService = {
     page?: number;
     page_size?: number;
   }) => {
-    const res = await apiV1.get('/airspace/no-fly-zones', params);
+    const res = await apiV2.get('/airspace/no-fly-zones', params);
     return normalizeList<NoFlyZone>(res);
   },
 
   findNearbyNoFlyZones: async (latitude: number, longitude: number, radius = 50000) => {
-    const res = await apiV1.get('/airspace/no-fly-zones/nearby', {
+    const res = await apiV2.get('/airspace/no-fly-zones/nearby', {
       latitude,
       longitude,
       radius,
@@ -178,20 +178,20 @@ export const airspaceService = {
   },
 
   checkAirspaceAvailability: (latitude: number, longitude: number, altitude = 120) =>
-    apiV1.get<AirspaceCheckResult>('/airspace/check-availability', {
+    apiV2.get<AirspaceCheckResult>('/airspace/check-availability', {
       latitude,
       longitude,
       altitude,
     }),
 
   runComplianceCheck: (data: RunComplianceCheckRequest) =>
-    apiV1.post<ComplianceCheck>('/airspace/compliance/check', data),
+    apiV2.post<ComplianceCheck>('/airspace/compliance/check', data),
 
   getComplianceCheck: (id: number) =>
-    apiV1.get<ComplianceCheck>(`/airspace/compliance/check/${id}`),
+    apiV2.get<ComplianceCheck>(`/airspace/compliance/check/${id}`),
 
   getLatestComplianceCheck: (pilotId: number, droneId: number) =>
-    apiV1.get<ComplianceCheck>('/airspace/compliance/latest', {
+    apiV2.get<ComplianceCheck>('/airspace/compliance/latest', {
       pilot_id: pilotId,
       drone_id: droneId,
     }),

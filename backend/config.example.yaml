@@ -187,7 +187,7 @@ payment:
     key_path: ""
     
     # 支付结果回调地址
-    # 格式：https://your-domain.com/api/v1/payment/wechat/callback
+    # 格式：https://your-domain.com/api/v2/payment/wechat/notify
     notify_url: ""
   
   # ========== 支付宝配置 ==========

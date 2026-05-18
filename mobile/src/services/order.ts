@@ -1,4 +1,4 @@
-import api from './api';
+import {apiV2} from './api';
 import {ApiResponse, Order, PageData} from '../types';
 
 export const orderService = {
@@ -13,29 +13,29 @@ export const orderService = {
     latitude?: number;
     longitude?: number;
     address?: string;
-  }) => api.post<any, ApiResponse<Order>>('/order', data),
+  }) => apiV2.post<any, ApiResponse<Order>>('/order', data),
 
   list: (params?: {role?: string; status?: string; page?: number; page_size?: number}) =>
-    api.get<any, ApiResponse<PageData<Order>>>('/order', {params}),
+    apiV2.get<any, ApiResponse<PageData<Order>>>('/order', {params}),
 
   getById: (id: number) =>
-    api.get<any, ApiResponse<Order>>(`/order/${id}`),
+    apiV2.get<any, ApiResponse<Order>>(`/order/${id}`),
 
   accept: (id: number) =>
-    api.put<any, ApiResponse>(`/order/${id}/accept`),
+    apiV2.put<any, ApiResponse>(`/order/${id}/accept`),
 
   reject: (id: number, reason?: string) =>
-    api.put<any, ApiResponse>(`/order/${id}/reject`, {reason}),
+    apiV2.put<any, ApiResponse>(`/order/${id}/reject`, {reason}),
 
   cancel: (id: number, reason?: string) =>
-    api.put<any, ApiResponse>(`/order/${id}/cancel`, {reason}),
+    apiV2.put<any, ApiResponse>(`/order/${id}/cancel`, {reason}),
 
   start: (id: number) =>
-    api.put<any, ApiResponse>(`/order/${id}/start`),
+    apiV2.put<any, ApiResponse>(`/order/${id}/start`),
 
   complete: (id: number) =>
-    api.put<any, ApiResponse>(`/order/${id}/complete`),
+    apiV2.put<any, ApiResponse>(`/order/${id}/complete`),
 
   getTimeline: (id: number) =>
-    api.get<any, ApiResponse>(`/order/${id}/timeline`),
+    apiV2.get<any, ApiResponse>(`/order/${id}/timeline`),
 };

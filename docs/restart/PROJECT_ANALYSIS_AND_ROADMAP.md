@@ -190,7 +190,7 @@ v2 路由中的 `conversations` 接口全部 `NotImplemented`，v1 有完整的 
 #### 3.12 前后端重复代码
 
 - v1 和 v2 路由共存，v1 仍有大量活跃代码（650+ 行路由定义），v2 并未完全替代
-- `admin` 仍依赖 `v1admin.Handler` 和 `v1analytics.Handler`
+- `admin` 运行时已改为 `/api/v2/admin` 与 `/api/v2/analytics`
 - mobile 仍保留 v1 相关的 `PublishOfferScreen`（旧 rental offer 概念）
 
 #### 3.13 缺少性能优化

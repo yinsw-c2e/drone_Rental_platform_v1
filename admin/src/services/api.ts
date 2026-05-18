@@ -9,8 +9,20 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080
 const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v2';
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '15000', 10);
 
-// 开发环境使用代理，生产环境直接请求
-const baseURL = import.meta.env.DEV ? API_PREFIX : `${API_BASE_URL}${API_PREFIX}`;
+const isLocalAdminHost =
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+
+const localDevApiBaseURL = import.meta.env.VITE_LOCAL_API_BASE_URL || 'http://127.0.0.1:8080';
+const resolvedApiBaseURL =
+  import.meta.env.DEV && isLocalAdminHost ? localDevApiBaseURL : API_BASE_URL;
+
+// 本地管理端直接连本地后端，避免 localhost:3000 通过 .env 代理到 cpolar 后出现旧部署 500。
+const baseURL = import.meta.env.DEV && isLocalAdminHost
+  ? `${resolvedApiBaseURL}${API_PREFIX}`
+  : import.meta.env.DEV
+    ? API_PREFIX
+    : `${resolvedApiBaseURL}${API_PREFIX}`;
 
 // 创建Axios实例
 const api = axios.create({
@@ -66,7 +78,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => {
     const data = response.data;
-    if (!isSuccessCode(data?.code)) {
+    if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'code') && !isSuccessCode(data?.code)) {
       return Promise.reject(new Error(data.message || '请求失败'));
     }
     return data;
@@ -132,7 +144,14 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
 
-    return Promise.reject(error);
+    const payload = error.response?.data as any;
+    const message =
+      payload?.message ||
+      payload?.error ||
+      error.message ||
+      '请求失败';
+
+    return Promise.reject(new Error(message));
   }
 );
 
@@ -159,9 +178,6 @@ export const adminApi = {
     keyword?: string;
     status?: string;
   }) => api.get('/admin/users', { params }),
-  
-  getUserDetail: (id: number) =>
-    api.get(`/admin/users/${id}`),
   
   updateUserStatus: (id: number, status: string) =>
     api.put(`/admin/users/${id}/status`, { status }),
@@ -192,9 +208,6 @@ export const adminApi = {
   approveAirworthiness: (id: number, approved: boolean) =>
     api.put(`/admin/drones/${id}/airworthiness`, { approved }),
   
-  updateDroneStatus: (id: number, status: string) =>
-    api.put(`/admin/drones/${id}/status`, { status }),
-
   // ========== 飞手管理 ==========
   getPilots: (params?: {
     page?: number;
@@ -245,7 +258,7 @@ export const adminApi = {
   }) => api.get('/admin/orders', { params }),
   
   getOrderDetail: (id: number) =>
-    api.get(`/admin/orders/${id}`),
+    api.get(`/admin/orders/detail/${id}`),
 
   // ========== 需求管理 ==========
   getDemands: (params?: {
@@ -256,6 +269,9 @@ export const adminApi = {
     keyword?: string;
   }) => api.get('/admin/demands', { params }),
 
+  getDemandDetail: (id: number) =>
+    api.get(`/admin/demands/detail/${id}`),
+
   // ========== 供给管理 ==========
   getSupplies: (params?: {
     page?: number;
@@ -264,6 +280,9 @@ export const adminApi = {
     cargo_scene?: string;
     keyword?: string;
   }) => api.get('/admin/supplies', { params }),
+
+  getSupplyDetail: (id: number) =>
+    api.get(`/admin/supplies/detail/${id}`),
 
   // ========== 正式派单管理 ==========
   getDispatchTasks: (params?: {
@@ -274,6 +293,9 @@ export const adminApi = {
     keyword?: string;
   }) => api.get('/admin/dispatch-tasks', { params }),
 
+  getDispatchTaskDetail: (id: number) =>
+    api.get(`/admin/dispatch-tasks/detail/${id}`),
+
   // ========== 飞行记录管理 ==========
   getFlightRecords: (params?: {
     page?: number;
@@ -281,6 +303,9 @@ export const adminApi = {
     status?: string;
     keyword?: string;
   }) => api.get('/admin/flight-records', { params }),
+
+  getFlightRecordDetail: (id: number) =>
+    api.get(`/admin/flight-records/detail/${id}`),
 
   // ========== 迁移审计与异常订单 ==========
   getMigrationAudits: (params?: {
@@ -315,25 +340,59 @@ export const adminApi = {
     end_date?: string;
   }) => api.get('/admin/payments', { params }),
   
-  getPaymentDetail: (id: number) =>
-    api.get(`/admin/payments/${id}`),
-  
-  processRefund: (id: number, approved: boolean, reason?: string) =>
-    api.post(`/admin/payments/${id}/refund`, { approved, reason }),
+  getRefunds: (params?: Record<string, unknown>) => api.get('/admin/refunds', { params }),
+  getSettlements: (params?: Record<string, unknown>) => api.get('/admin/settlements', { params }),
+  executeSettlement: (id: number, note?: string) => api.post(`/admin/settlements/execute/${id}`, { note }),
+  processPendingSettlements: () => api.post('/admin/settlements/process-pending'),
+  getWithdrawals: (params?: Record<string, unknown>) => api.get('/admin/withdrawals', { params }),
+  approveWithdrawal: (id: number, note?: string) => api.post(`/admin/withdrawals/${id}/approve`, { note }),
+  rejectWithdrawal: (id: number, reason: string) => api.post(`/admin/withdrawals/${id}/reject`, { reason }),
+  getPricingConfigs: () => api.get('/admin/pricing-configs'),
+  updatePricingConfig: (key: string, value: number, note?: string) => api.put(`/admin/pricing-configs/${key}`, { value, note }),
 
-  // ========== 系统配置 ==========
-  getSystemConfig: () =>
-    api.get('/admin/config'),
-  
-  updateSystemConfig: (config: Record<string, unknown>) =>
-    api.put('/admin/config', config),
+  // ========== 空域飞行 ==========
+  getAirspaceApplications: (params?: Record<string, unknown>) => api.get('/admin/airspace-applications', { params }),
+  reviewAirspaceApplication: (id: number, approved: boolean, note?: string) =>
+    api.post(`/admin/airspace-applications/${id}/review`, { approved, note }),
+  submitAirspaceToUOM: (id: number) => api.post(`/admin/airspace-applications/${id}/submit-uom`),
+  getNoFlyZones: (params?: Record<string, unknown>) => api.get('/admin/no-fly-zones', { params }),
+  createNoFlyZone: (payload: Record<string, unknown>) => api.post('/admin/no-fly-zones', payload),
+  deleteNoFlyZone: (id: number) => api.delete(`/admin/no-fly-zones/${id}`),
+  getComplianceChecks: (params?: Record<string, unknown>) => api.get('/admin/compliance-checks', { params }),
 
-  // ========== 统计报表 ==========
-  getStatistics: (params?: {
-    type: 'daily' | 'weekly' | 'monthly';
-    start_date?: string;
-    end_date?: string;
-  }) => api.get('/admin/statistics', { params }),
+  // ========== 风控合规 ==========
+  getCreditScores: (params?: Record<string, unknown>) => api.get('/admin/credit-scores', { params }),
+  getCreditStatistics: () => api.get('/admin/credit/statistics'),
+  getViolations: (params?: Record<string, unknown>) => api.get('/admin/violations', { params }),
+  confirmViolation: (id: number) => api.post(`/admin/violations/${id}/confirm`),
+  reviewViolationAppeal: (id: number, approved: boolean, result: string) =>
+    api.post(`/admin/violations/${id}/review-appeal`, { approved, result }),
+  getRiskControls: (params?: Record<string, unknown>) => api.get('/admin/risk-controls', { params }),
+  reviewRiskControl: (id: number, action: string, notes?: string) =>
+    api.post(`/admin/risk-controls/${id}/review`, { action, notes }),
+  getBlacklists: (params?: Record<string, unknown>) => api.get('/admin/blacklists', { params }),
+  getDeposits: (params?: Record<string, unknown>) => api.get('/admin/deposits', { params }),
+
+  // ========== 保险合同评价 ==========
+  getInsuranceProducts: (params?: Record<string, unknown>) => api.get('/admin/insurance-products', { params }),
+  getInsurancePolicies: (params?: Record<string, unknown>) => api.get('/admin/insurance-policies', { params }),
+  getInsuranceClaims: (params?: Record<string, unknown>) => api.get('/admin/insurance-claims', { params }),
+  getInsuranceClaimTimeline: (id: number) => api.get(`/admin/insurance-claims/${id}/timeline`),
+  startInsuranceInvestigation: (id: number) => api.post(`/admin/insurance-claims/${id}/investigate`),
+  determineInsuranceLiability: (id: number, payload: Record<string, unknown>) =>
+    api.post(`/admin/insurance-claims/${id}/liability`, payload),
+  approveInsuranceClaim: (id: number, approvedAmount: number, note?: string) =>
+    api.post(`/admin/insurance-claims/${id}/approve`, { approved_amount: approvedAmount, note }),
+  rejectInsuranceClaim: (id: number, reason: string) =>
+    api.post(`/admin/insurance-claims/${id}/reject`, { reason }),
+  payInsuranceClaim: (id: number, paidAmount: number) =>
+    api.post(`/admin/insurance-claims/${id}/pay`, { paid_amount: paidAmount }),
+  closeInsuranceClaim: (id: number) => api.post(`/admin/insurance-claims/${id}/close`),
+  getInsuranceStatistics: () => api.get('/admin/insurance/statistics'),
+  getContracts: (params?: Record<string, unknown>) => api.get('/admin/contracts', { params }),
+  getReviews: (params?: Record<string, unknown>) => api.get('/admin/reviews', { params }),
+  getDisputes: (params?: Record<string, unknown>) => api.get('/admin/disputes', { params }),
+  getAdminLogs: (params?: Record<string, unknown>) => api.get('/admin/admin-logs', { params }),
 
   // ========== 数据分析 ==========
   // 实时看板
@@ -386,6 +445,7 @@ export const adminApi = {
 // ============================================================
 export const CONFIG = {
   API_BASE_URL,
+  RESOLVED_API_BASE_URL: resolvedApiBaseURL,
   API_PREFIX,
   API_TIMEOUT,
   // 高德地图配置

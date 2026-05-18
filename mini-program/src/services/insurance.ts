@@ -1,9 +1,9 @@
-import { apiV1 as api } from './api';
+import { apiV2 } from './api';
 import { formatUnknownEnumLabel } from '../utils';
 
 export const insuranceService = {
-  getMyPolicies: (params?: any) => api.get<any>('/insurance/my-policies', params),
-  getMyClaims: (params?: any) => api.get<any>('/insurance/my-claims', params),
+  getMyPolicies: (params?: any) => apiV2.get<any>('/insurance/my-policies', params),
+  getMyClaims: (params?: any) => apiV2.get<any>('/insurance/my-claims', params),
 };
 
 export const getPolicyTypeText = (type: string) => {

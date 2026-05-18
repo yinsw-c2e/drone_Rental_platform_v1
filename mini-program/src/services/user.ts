@@ -1,9 +1,9 @@
 import Taro from '@tarojs/taro';
 
-import { API_V1_BASE_URL, API_V2_BASE_URL } from '../constants';
+import { API_V2_BASE_URL } from '../constants';
 import { store } from '../store/store';
 import { User } from '../types';
-import { apiV1 } from './api';
+import { apiV2 } from './api';
 
 const getAccessToken = () => {
   const token = store.getState().auth.accessToken;
@@ -25,11 +25,10 @@ export const uploadFileToEndpoint = async (
   endpoint: string,
   filePath: string,
   name = 'file',
-  version: 'v1' | 'v2' = 'v1',
 ) => {
   const token = getAccessToken();
   const response = await Taro.uploadFile({
-    url: `${version === 'v2' ? API_V2_BASE_URL : API_V1_BASE_URL}${endpoint}`,
+    url: `${API_V2_BASE_URL}${endpoint}`,
     filePath,
     name,
     header: token ? { Authorization: `Bearer ${token}` } : {},
@@ -44,9 +43,9 @@ export const uploadFileToEndpoint = async (
 };
 
 export const userService = {
-  getProfile: () => apiV1.get<User>('/user/profile'),
+  getProfile: () => apiV2.get<User>('/user/profile'),
 
-  updateProfile: (data: Partial<User>) => apiV1.put<User>('/user/profile', data),
+  updateProfile: (data: Partial<User>) => apiV2.put<User>('/user/profile', data),
 
   uploadAvatar: async (filePath: string) => {
     const result = await uploadFileToEndpoint('/user/avatar', filePath);
@@ -58,17 +57,17 @@ export const userService = {
     id_number: string;
     front_image: string;
     back_image: string;
-  }) => apiV1.post('/user/id-verify', data),
+  }) => apiV2.post('/user/id-verify', data),
 
   getIDVerifyStatus: () =>
-    apiV1.get<{
+    apiV2.get<{
       id_verified?: string;
       real_name?: string;
       id_number?: string;
       reject_reason?: string;
     }>('/user/id-verify/status'),
 
-  getPublicProfile: (id: number) => apiV1.get<User>(`/user/${id}`),
+  getPublicProfile: (id: number) => apiV2.get<User>(`/user/${id}`),
 };
 
 export default userService;

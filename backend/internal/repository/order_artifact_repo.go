@@ -72,6 +72,21 @@ func (r *OrderArtifactRepo) ListRefundsByOrder(orderID int64) ([]model.Refund, e
 	return refunds, err
 }
 
+func (r *OrderArtifactRepo) ListRefunds(status string, page, pageSize int) ([]model.Refund, int64, error) {
+	var refunds []model.Refund
+	var total int64
+	query := r.db.Model(&model.Refund{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Preload("Order").Preload("Payment").
+		Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&refunds).Error
+	return refunds, total, err
+}
+
 func (r *OrderArtifactRepo) ListSnapshotsByOrder(orderID int64) ([]model.OrderSnapshot, error) {
 	var snapshots []model.OrderSnapshot
 	err := r.db.Where("order_id = ?", orderID).Order("snapshot_type ASC").Find(&snapshots).Error
@@ -82,6 +97,21 @@ func (r *OrderArtifactRepo) ListDisputesByOrder(orderID int64) ([]model.DisputeR
 	var disputes []model.DisputeRecord
 	err := r.db.Where("order_id = ? AND deleted_at IS NULL", orderID).Order("created_at DESC").Find(&disputes).Error
 	return disputes, err
+}
+
+func (r *OrderArtifactRepo) ListDisputes(status string, page, pageSize int) ([]model.DisputeRecord, int64, error) {
+	var disputes []model.DisputeRecord
+	var total int64
+	query := r.db.Model(&model.DisputeRecord{}).Where("deleted_at IS NULL")
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Preload("Order").Preload("Initiator").
+		Order("created_at DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&disputes).Error
+	return disputes, total, err
 }
 
 func (r *OrderArtifactRepo) CreateDispute(record *model.DisputeRecord) error {
