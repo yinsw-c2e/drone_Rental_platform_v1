@@ -44,6 +44,10 @@ interface PriorityQueueItem {
 }
 
 const PRIORITY_PAGE_SIZE = 4;
+const ORDER_ANOMALY_LIST_PATH = '/pages/orders/anomaly-list/index';
+
+const buildOrderAnomalyListUrl = (role: RoleView) =>
+  role === 'all' ? ORDER_ANOMALY_LIST_PATH : `${ORDER_ANOMALY_LIST_PATH}?role=${role}`;
 
 const emptyDashboard: HomeDashboard = {
   role_summary: { has_client_role: false, has_owner_role: false, has_pilot_role: false, can_publish_supply: false, can_accept_dispatch: false, can_self_execute: false },
@@ -464,7 +468,7 @@ export default function HomeScreen() {
           <View className="hero" style={{ background: heroTheme.gradient }}>
             <Image className="hero-bg-image" src={heroBgImage} mode="aspectFill" />
             {anomalyAlertCount > 0 && (
-              <View className="alert-pill" onClick={() => Taro.navigateTo({ url: '/pages/after-sale/index' })}>
+              <View className="alert-pill" onClick={() => Taro.navigateTo({ url: buildOrderAnomalyListUrl(activeRole) })}>
                 <Text className="alert-pill-text">{anomalyAlertCount} 个异常提醒</Text>
               </View>
             )}
@@ -476,7 +480,7 @@ export default function HomeScreen() {
                   ? `您有 ${pendingOrderCount} 个订单待处理，${inProgressTaskCount} 个任务进行中`
                   : heroConfig.subtitle}
               </Text>
-              <View className="hero-alert-row" onClick={() => anomalyAlertCount > 0 && Taro.navigateTo({ url: '/pages/after-sale/index' })}>
+              <View className="hero-alert-row" onClick={() => anomalyAlertCount > 0 && Taro.navigateTo({ url: buildOrderAnomalyListUrl(activeRole) })}>
                 <Image className="hero-warning-icon" src={warningIcon} mode="aspectFit" />
                 <Text className="hero-alert-text">
                   {anomalyAlertCount > 0 ? `${anomalyAlertCount} 个任务出现异常，请及时处理` : '暂无异常提醒，当前任务运行稳定'}

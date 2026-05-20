@@ -27,6 +27,7 @@ build/
 .ai/
 .qoder/
 wiki/
+gptimage/
 AGENTS.md
 GEMINI.md
 .agents/skills/uiux-delegate/SKILL.md
