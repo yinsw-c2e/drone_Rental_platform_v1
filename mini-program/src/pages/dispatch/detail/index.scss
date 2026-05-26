@@ -53,6 +53,10 @@ $danger: #F5222D;
   background-color: $primary;
 }
 
+.dispatch-btn-highlight {
+  background-color: #FF6A00;
+}
+
 .dispatch-btn-danger {
   background-color: $danger;
 }
@@ -69,6 +73,30 @@ $danger: #F5222D;
 
 .dispatch-reject-card {
   margin-bottom: 10px;
+}
+
+.dispatch-execution-card {
+  margin-bottom: 10px;
+}
+
+.dispatch-execution-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.dispatch-execution-desc {
+  display: block;
+  font-size: 13px;
+  line-height: 20px;
+  color: #6B7280;
+  margin-bottom: 12px;
+}
+
+.dispatch-execution-btn {
+  width: 100%;
 }
 
 .dispatch-reject-input {

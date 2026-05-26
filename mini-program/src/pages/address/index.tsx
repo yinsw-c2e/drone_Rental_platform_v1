@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { addressHistoryService } from '../../services/addressHistory';
 import { locationService } from '../../services/location';
+import { store } from '../../store/store';
 import { AddressData } from '../../types';
 import './index.scss';
 
@@ -14,6 +15,11 @@ export default function AddressPickerPage() {
   const [locating, setLocating] = useState(false);
 
   const fetchSavedAddresses = async () => {
+    if (!store.getState().auth.isAuthenticated) {
+      setSavedAddresses([]);
+      setLoadingSaved(false);
+      return;
+    }
     setLoadingSaved(true);
     try {
       const res = await locationService.getAddressList();

@@ -11,12 +11,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useSelector} from 'react-redux';
 
 import AddressInputField from '../../components/AddressInputField';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {AddressData, Drone, SupplyDetail} from '../../types';
 import {summarizeFlexibleValue, summarizeServiceArea} from '../../utils/supplyMeta';
+import {RootState} from '../../store/store';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -80,6 +84,13 @@ export default function PublishOfferScreen({route, navigation}: any) {
   const styles = getStyles(theme);
   const supplyId = Number(route?.params?.supplyId || route?.params?.id || 0) || 0;
   const isEditing = supplyId > 0;
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canPublishService = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [title, setTitle] = useState('');
@@ -137,6 +148,11 @@ export default function PublishOfferScreen({route, navigation}: any) {
   }, []);
 
   const fetchBootstrap = useCallback(async () => {
+    if (!canPublishService) {
+      setDrones([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [droneRes, supplyRes] = await Promise.all([
@@ -158,7 +174,7 @@ export default function PublishOfferScreen({route, navigation}: any) {
     } finally {
       setLoading(false);
     }
-  }, [hydrateForm, isEditing, supplyId]);
+  }, [canPublishService, hydrateForm, isEditing, supplyId]);
 
   useEffect(() => {
     fetchBootstrap();
@@ -199,6 +215,10 @@ export default function PublishOfferScreen({route, navigation}: any) {
   });
 
   const handleSubmit = async (status: 'draft' | 'active') => {
+    if (!canPublishService) {
+      Alert.alert('无法发布服务', isAuthenticated ? '服务商设备能力审核通过后才能创建或上架正式服务。' : '请先登录服务商账号。');
+      return;
+    }
     if (!title.trim()) {
       Alert.alert('提示', '请输入供给标题');
       return;
@@ -239,6 +259,19 @@ export default function PublishOfferScreen({route, navigation}: any) {
       setSubmitting(false);
     }
   };
+
+  if (!canPublishService) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商设备能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '设备与关键资质审核通过后，才能创建、编辑或上架正式服务。' : '登录后才能创建服务方案。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (loading) {
     return (

@@ -1,8 +1,12 @@
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
+import { useSelector } from 'react-redux';
+import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { listMyWithdrawals } from '../../../services/settlement';
+import { RootState } from '../../../store/store';
 import { formatUnknownEnumLabel } from '../../../utils';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 const STATUS_MAP: Record<string, { label: string; tone: string }> = {
@@ -20,15 +24,38 @@ const METHOD_MAP: Record<string, string> = {
 };
 
 export default function WithdrawalListPage() {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useDidShow(() => {
+    if (!canUseProviderFinance) {
+      setList([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     listMyWithdrawals(1, 100).then(res => {
       setList(res.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
   });
+
+  if (!canUseProviderFinance) {
+    return (
+      <ProviderAccessNotice
+        title={isAuthenticated ? '服务商财务未开通' : '请先登录服务商账号'}
+        description={isAuthenticated ? '服务商资质审核通过后，才能查看真实提现记录。' : '登录后才能查看服务商提现记录。'}
+        actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+        onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
+      />
+    );
+  }
 
   return (
     <ScrollView scrollY className="page-wrap">

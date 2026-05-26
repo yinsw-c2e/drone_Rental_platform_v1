@@ -28,3 +28,16 @@
 .stat-num { font-size: 24px; font-weight: 700; color: #1677FF; margin-bottom: 4px; }
 .stat-orange { color: #FA8C16; }
 .stat-label { font-size: 12px; color: #9CA3AF; }
+
+.quote-empty { padding: 18px 0; background: #F9FAFB; border-radius: 8px; text-align: center; }
+.quote-empty-text { color: #9CA3AF; font-size: 13px; }
+.quote-card { position: relative; padding: 14px 0; border-bottom: 1px solid #F3F4F6; min-height: 58px; }
+.quote-card:last-child { border-bottom: 0; }
+.quote-main { padding-right: 126px; }
+.quote-title { display: block; color: #1A1D26; font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.quote-desc { display: block; color: #6B7280; font-size: 12px; line-height: 18px; }
+.quote-price { position: absolute; right: 62px; top: 16px; color: #F97316; font-size: 17px; font-weight: 700; }
+.quote-select { position: absolute; right: 0; top: 13px; min-width: 52px; height: 30px; padding: 0 10px; border-radius: 15px; background: #1677FF; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.quote-select.disabled { opacity: 0.6; }
+.quote-select-text { color: #fff; font-size: 13px; font-weight: 600; }
+.quote-status { position: absolute; right: 0; top: 18px; color: #6B7280; font-size: 13px; }

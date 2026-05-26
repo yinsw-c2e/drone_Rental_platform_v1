@@ -6,12 +6,16 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // 从环境变量获取API配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v2';
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '15000', 10);
 
 const isLocalAdminHost =
   typeof window !== 'undefined' &&
   ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+const configuredApiPrefix = import.meta.env.VITE_API_PREFIX || '/api/v2';
+const API_PREFIX =
+  import.meta.env.DEV && isLocalAdminHost && configuredApiPrefix === '/api/v1'
+    ? '/api/v2'
+    : configuredApiPrefix;
 
 const localDevApiBaseURL = import.meta.env.VITE_LOCAL_API_BASE_URL || 'http://127.0.0.1:8080';
 const resolvedApiBaseURL =
@@ -341,12 +345,31 @@ export const adminApi = {
   }) => api.get('/admin/payments', { params }),
   
   getRefunds: (params?: Record<string, unknown>) => api.get('/admin/refunds', { params }),
-  getSettlements: (params?: Record<string, unknown>) => api.get('/admin/settlements', { params }),
-  executeSettlement: (id: number, note?: string) => api.post(`/admin/settlements/execute/${id}`, { note }),
-  processPendingSettlements: () => api.post('/admin/settlements/process-pending'),
-  getWithdrawals: (params?: Record<string, unknown>) => api.get('/admin/withdrawals', { params }),
-  approveWithdrawal: (id: number, note?: string) => api.post(`/admin/withdrawals/${id}/approve`, { note }),
-  rejectWithdrawal: (id: number, reason: string) => api.post(`/admin/withdrawals/${id}/reject`, { reason }),
+  getFinanceOverview: () => api.get('/settlement/admin/overview'),
+  getSettlements: (params?: Record<string, unknown>) => api.get('/settlement/admin/list', { params }),
+  confirmSettlement: (id: number) => api.post(`/settlement/admin/${id}/confirm`),
+  executeSettlement: (id: number, note?: string) => api.post(`/settlement/admin/execute/${id}`, { note }),
+  markSettlementDisputed: (id: number, reason: string) => api.post(`/settlement/admin/${id}/dispute`, { reason }),
+  resolveSettlementDispute: (id: number, payload: {
+    resolution: string;
+    next_status?: string;
+    platform_fee?: number;
+    pilot_fee?: number;
+    owner_fee?: number;
+    insurance_deduction?: number;
+  }) => api.post(`/settlement/admin/${id}/resolve-dispute`, payload),
+  exportSettlementCsv: (params?: Record<string, unknown>) =>
+    api.get('/settlement/admin/export/settlements', { params, responseType: 'blob' }),
+  exportWithdrawalCsv: (params?: Record<string, unknown>) =>
+    api.get('/settlement/admin/export/withdrawals', { params, responseType: 'blob' }),
+  processPendingSettlements: () => api.post('/settlement/admin/process-pending'),
+  getWithdrawals: (params?: Record<string, unknown>) => api.get('/settlement/admin/withdrawals', { params }),
+  approveWithdrawal: (id: number, note?: string) => api.post(`/settlement/admin/withdrawal/${id}/approve`, { note }),
+  rejectWithdrawal: (id: number, reason: string) => api.post(`/settlement/admin/withdrawal/${id}/reject`, { reason }),
+  getFinanceAnomalies: (params?: Record<string, unknown>) => api.get('/settlement/admin/anomalies', { params }),
+  resolveFinanceAnomaly: (id: number, note: string) => api.post(`/settlement/admin/anomalies/${id}/resolve`, { note }),
+  getFinanceManualActions: (params?: Record<string, unknown>) => api.get('/settlement/admin/manual-actions', { params }),
+  rollbackFinanceManualAction: (id: number, note: string) => api.post(`/settlement/admin/manual-actions/${id}/rollback`, { note }),
   getPricingConfigs: () => api.get('/admin/pricing-configs'),
   updatePricingConfig: (key: string, value: number, note?: string) => api.put(`/admin/pricing-configs/${key}`, { value, note }),
 

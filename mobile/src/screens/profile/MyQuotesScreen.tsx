@@ -9,14 +9,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useSelector} from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {ownerService} from '../../services/owner';
 import {DemandQuoteSummary} from '../../types';
+import {RootState} from '../../store/store';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -35,12 +39,25 @@ const formatQuoteAmount = (amount?: number) => `¥${((amount || 0) / 100).toFixe
 export default function MyQuotesScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canViewQuotes = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply);
   const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeGroup, setActiveGroup] = useState<StatusGroupKey>('all');
 
   const fetchData = useCallback(async () => {
+    if (!canViewQuotes) {
+      setQuotes([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const res = await ownerService.listMyQuotes({page: 1, page_size: 50});
       setQuotes(res.data?.items || []);
@@ -50,7 +67,7 @@ export default function MyQuotesScreen({navigation}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [canViewQuotes]);
 
   useEffect(() => {
     fetchData();
@@ -65,6 +82,19 @@ export default function MyQuotesScreen({navigation}: any) {
     () => quotes.filter(item => activeGroup === 'all' || item.status === activeGroup),
     [activeGroup, quotes],
   );
+
+  if (!canViewQuotes) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商报价能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '设备服务能力审核通过后，才能查看和提交正式报价。' : '登录后才能查看服务商报价记录。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const renderItem = ({item}: {item: DemandQuoteSummary}) => {
     const demandId = item.demand?.id || item.demand_id;
@@ -125,7 +155,7 @@ export default function MyQuotesScreen({navigation}: any) {
           <View>
             <View style={styles.hero}>
               <Text style={styles.heroEyebrow}>我的报价</Text>
-              <Text style={styles.heroTitle}>机主报价和需求分开看</Text>
+              <Text style={styles.heroTitle}>服务报价和需求分开看</Text>
               <Text style={styles.heroDesc}>
                 这里专门跟踪自己提交过的报价，快速看是否被选中、是否过期，以及要不要回到需求详情继续调整方案。
               </Text>

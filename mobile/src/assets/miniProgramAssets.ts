@@ -3,12 +3,14 @@ import type {ImageSourcePropType} from 'react-native';
 type AssetSource = ImageSourcePropType;
 
 export const tabbarAssets = {
-  workbenchActive: require('./tabbar/ic_tab_workbench_active.png') as AssetSource,
-  workbenchInactive: require('./tabbar/ic_tab_workbench_inactive.png') as AssetSource,
-  messageActive: require('./tabbar/ic_tab_message_active.png') as AssetSource,
-  messageInactive: require('./tabbar/ic_tab_message_inactive.png') as AssetSource,
-  mineActive: require('./tabbar/ic_tab_mine_active.png') as AssetSource,
-  mineInactive: require('./tabbar/ic_tab_mine_inactive.png') as AssetSource,
+  workbenchActive: require('./haul/customer-home/icon_tab_home_active.png') as AssetSource,
+  workbenchInactive: require('./haul/customer-home/icon_tab_home_inactive.png') as AssetSource,
+  messageActive: require('./haul/customer-home/icon_tab_message_active.png') as AssetSource,
+  messageInactive: require('./haul/customer-home/icon_tab_message_inactive.png') as AssetSource,
+  orderActive: require('./haul/customer-home/icon_tab_order_active.png') as AssetSource,
+  orderInactive: require('./haul/customer-home/icon_tab_order_inactive.png') as AssetSource,
+  mineActive: require('./haul/customer-home/icon_tab_profile_active.png') as AssetSource,
+  mineInactive: require('./haul/customer-home/icon_tab_profile_inactive.png') as AssetSource,
 };
 
 export const loginAssets = {

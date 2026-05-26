@@ -36,24 +36,25 @@ func TestUnsupportedOrderOptionalColumnOmissions(t *testing.T) {
 		}
 	})
 
-	expectedMissing := map[string]bool{
-		"FlightEndTime":          true,
-		"flight_end_time":        true,
-		"LoadingConfirmedAt":     true,
-		"loading_confirmed_at":   true,
-		"LoadingConfirmedBy":     true,
-		"loading_confirmed_by":   true,
-		"UnloadingConfirmedBy":   true,
-		"unloading_confirmed_by": true,
-	}
-
-	if len(omissions) != len(expectedMissing) {
-		t.Fatalf("expected %d omissions, got %d: %#v", len(expectedMissing), len(omissions), omissions)
-	}
-
+	omitted := map[string]bool{}
 	for _, item := range omissions {
-		if !expectedMissing[item] {
-			t.Fatalf("unexpected omission: %s (all=%#v)", item, omissions)
+		omitted[item] = true
+	}
+
+	expectedCount := (len(orderOptionalColumns()) - 2) * 2
+	if len(omissions) != expectedCount {
+		t.Fatalf("expected %d omissions, got %d: %#v", expectedCount, len(omissions), omissions)
+	}
+
+	for _, present := range []string{"FlightStartTime", "flight_start_time", "UnloadingConfirmedAt", "unloading_confirmed_at"} {
+		if omitted[present] {
+			t.Fatalf("did not expect available column to be omitted: %s (all=%#v)", present, omissions)
+		}
+	}
+
+	for _, missing := range []string{"FlightEndTime", "flight_end_time", "OrderMode", "order_mode", "PriceBreakdownJSON", "price_breakdown_json", "LoadingConfirmedBy", "loading_confirmed_by"} {
+		if !omitted[missing] {
+			t.Fatalf("expected missing optional column to be omitted: %s (all=%#v)", missing, omissions)
 		}
 	}
 }

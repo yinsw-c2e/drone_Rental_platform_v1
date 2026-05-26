@@ -10,9 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useSelector} from 'react-redux';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import {droneService} from '../../services/drone';
 import {demandV2Service} from '../../services/demandV2';
+import {RootState} from '../../store/store';
 import {DemandQuoteSummary, Drone} from '../../types';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -22,20 +26,41 @@ const toDisplayAmount = (amount?: number | null) =>
 export default function DemandQuoteComposeScreen({route, navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canQuote = Boolean(
+    isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply,
+  );
   const demandId = Number(route.params?.demandId || route.params?.id || 0);
   const demandTitle = String(route.params?.demandTitle || '需求');
+  const initialPriceYuan = Number(route.params?.priceYuan || route.params?.quickAmount || 0);
+  const isQuickQuote = Boolean(route.params?.quick);
   const existingQuote = (route.params?.existingQuote || null) as DemandQuoteSummary | null;
 
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedDroneId, setSelectedDroneId] = useState<number>(Number(existingQuote?.drone?.id || 0));
-  const [priceText, setPriceText] = useState(toDisplayAmount(existingQuote?.price_amount));
-  const [executionPlan, setExecutionPlan] = useState(existingQuote?.execution_plan || '');
+  const [priceText, setPriceText] = useState(
+    toDisplayAmount(existingQuote?.price_amount) || (initialPriceYuan > 0 ? String(initialPriceYuan) : ''),
+  );
+  const [executionPlan, setExecutionPlan] = useState(
+    existingQuote?.execution_plan ||
+      (isQuickQuote ? '根据需求时间、重量和现场条件安排可用无人机执行，作业前完成安全复核。' : ''),
+  );
 
   useEffect(() => {
     let mounted = true;
     const fetchDrones = async () => {
+      if (!canQuote) {
+        setDrones([]);
+        setLoading(false);
+        return;
+      }
       try {
         const res = await droneService.myDrones({page: 1, page_size: 50});
         if (!mounted) {
@@ -65,7 +90,7 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [canQuote]);
 
   const selectedDrone = useMemo(
     () => drones.find(item => item.id === selectedDroneId) || null,
@@ -73,6 +98,10 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
   );
 
   const handleSubmit = async () => {
+    if (!canQuote) {
+      Alert.alert('无法报价', '服务商设备能力审核通过后才能提交正式报价。');
+      return;
+    }
     if (!demandId) {
       Alert.alert('提交失败', '需求编号无效');
       return;
@@ -116,6 +145,19 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
     );
   }
 
+  if (!canQuote) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商报价能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '设备与关键资质审核通过后，才能给客户需求提交正式报价。' : '登录后才能提交服务商报价。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -123,7 +165,7 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
           <Text style={styles.eyebrow}>{existingQuote ? '更新报价' : '提交报价'}</Text>
           <Text style={styles.title}>{demandTitle}</Text>
           <Text style={styles.desc}>
-            机主报价只针对需求撮合，不会在这里混入订单信息。客户选定你的方案后，才会进入订单与履约。
+            服务商报价只针对需求撮合，不会在这里混入订单信息。客户选定你的方案后，才会进入订单与履约。
           </Text>
         </View>
 
@@ -151,7 +193,7 @@ export default function DemandQuoteComposeScreen({route, navigation}: any) {
                     </View>
                   </View>
                   <Text style={styles.droneMeta}>
-                    载重 {drone.max_load || 0}kg · 航时 {drone.max_flight_time || 0} 分钟 · {drone.city || '未设置城市'}
+                    载重 {drone.max_load || drone.max_payload_kg || 0}kg · 航时 {drone.max_flight_time || 0} 分钟 · {drone.city || '未设置城市'}
                   </Text>
                 </TouchableOpacity>
               );

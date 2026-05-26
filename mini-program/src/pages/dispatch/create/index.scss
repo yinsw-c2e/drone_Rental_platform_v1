@@ -1,4 +1,4 @@
-// 创建派单页面样式
+// 历史履约入口页面样式
 .dc-wrap {
   flex: 1;
   background: #F5F7FA;
@@ -52,6 +52,82 @@
   padding: 12px 14px;
   font-size: 15px;
   background: #F9FAFB;
+}
+
+.dc-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dc-current-status {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dc-binding-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dc-binding-active {
+  border-color: #1677FF;
+  background: #F0F6FF;
+}
+
+.dc-binding-name {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dc-binding-meta {
+  color: #6B7280;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dc-binding-check {
+  min-width: 54px;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  border-radius: 999px;
+  background: #F3F4F6;
+  color: #6B7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dc-binding-check.active {
+  background: #1677FF;
+  color: #FFFFFF;
+}
+
+.dc-bind-entry {
+  margin-top: 12px;
+  height: 40px;
+  border-radius: 20px;
+  border: 1px solid #1677FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dc-bind-entry-text {
+  color: #1677FF;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .dc-hint {

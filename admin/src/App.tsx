@@ -52,8 +52,11 @@ const lazyNamed = (name: string) =>
 
 const PaymentLedgerPage = lazyNamed('PaymentLedgerPage');
 const RefundListPage = lazyNamed('RefundListPage');
+const FinanceOverviewPage = lazyNamed('FinanceOverviewPage');
 const SettlementListPage = lazyNamed('SettlementListPage');
 const WithdrawalListPage = lazyNamed('WithdrawalListPage');
+const FinanceAnomalyPage = lazyNamed('FinanceAnomalyPage');
+const FinanceManualActionPage = lazyNamed('FinanceManualActionPage');
 const PricingConfigPage = lazyNamed('PricingConfigPage');
 const AirspaceApplicationPage = lazyNamed('AirspaceApplicationPage');
 const NoFlyZonePage = lazyNamed('NoFlyZonePage');
@@ -112,10 +115,13 @@ const menuGroups = [
     icon: <DollarOutlined />,
     label: '财务售后',
     children: [
+      { key: '/finance/overview', icon: <DashboardOutlined />, label: '财务概览' },
       { key: '/finance/payments', icon: <DollarOutlined />, label: '支付流水' },
       { key: '/finance/refunds', icon: <WalletOutlined />, label: '退款审核' },
       { key: '/finance/settlements', icon: <BankOutlined />, label: '结算执行' },
       { key: '/finance/withdrawals', icon: <WalletOutlined />, label: '提现审核' },
+      { key: '/finance/anomalies', icon: <AlertOutlined />, label: '财务异常' },
+      { key: '/finance/manual-actions', icon: <AuditOutlined />, label: '人工处理' },
       { key: '/finance/pricing', icon: <AuditOutlined />, label: '定价配置' },
       { key: '/finance/disputes', icon: <MessageOutlined />, label: '争议处理' },
       { key: '/insurance/products', icon: <InsuranceOutlined />, label: '保险产品' },
@@ -224,11 +230,14 @@ function AdminLayout({ onLogout }: { onLogout: () => void }) {
               <Route path="/cargo-declarations" element={<CargoDeclarationList />} />
               <Route path="/dispatch-tasks" element={<DispatchTaskList />} />
               <Route path="/flight-records" element={<FlightRecordList />} />
-              <Route path="/finance" element={<Navigate to="/finance/payments" replace />} />
+              <Route path="/finance" element={<Navigate to="/finance/overview" replace />} />
+              <Route path="/finance/overview" element={<FinanceOverviewPage />} />
               <Route path="/finance/payments" element={<PaymentLedgerPage />} />
               <Route path="/finance/refunds" element={<RefundListPage />} />
               <Route path="/finance/settlements" element={<SettlementListPage />} />
               <Route path="/finance/withdrawals" element={<WithdrawalListPage />} />
+              <Route path="/finance/anomalies" element={<FinanceAnomalyPage />} />
+              <Route path="/finance/manual-actions" element={<FinanceManualActionPage />} />
               <Route path="/finance/pricing" element={<PricingConfigPage />} />
               <Route path="/finance/disputes" element={<DisputePage />} />
               <Route path="/insurance/products" element={<InsuranceProductPage />} />

@@ -1,19 +1,29 @@
 package settlement
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/service"
 )
 
 type Handler struct {
 	settlementService *service.SettlementService
+	opsService        *service.OperationsService
 }
 
-func NewHandler(settlementService *service.SettlementService) *Handler {
-	return &Handler{settlementService: settlementService}
+func NewHandler(settlementService *service.SettlementService, opsService ...*service.OperationsService) *Handler {
+	var ops *service.OperationsService
+	if len(opsService) > 0 {
+		ops = opsService[0]
+	}
+	return &Handler{settlementService: settlementService, opsService: ops}
 }
 
 func getUserID(c *gin.Context) int64 {
@@ -27,6 +37,69 @@ func getUserID(c *gin.Context) int64 {
 		return int64(v)
 	}
 	return 0
+}
+
+func (h *Handler) writeAdminLog(c *gin.Context, action, targetType string, targetID int64, details interface{}) {
+	if h.opsService == nil {
+		return
+	}
+	raw, _ := json.Marshal(details)
+	if len(raw) == 0 {
+		raw = []byte("{}")
+	}
+	_ = h.opsService.CreateAdminLog(&model.AdminLog{
+		AdminID:    getUserID(c),
+		Action:     action,
+		Module:     "finance",
+		TargetType: targetType,
+		TargetID:   targetID,
+		Details:    model.JSON(raw),
+		IPAddress:  c.ClientIP(),
+	})
+}
+
+func settlementAuditDetails(s *model.OrderSettlement, extra gin.H) gin.H {
+	details := gin.H{}
+	for key, value := range extra {
+		details[key] = value
+	}
+	if s == nil {
+		return details
+	}
+	details["settlement_no"] = s.SettlementNo
+	details["order_id"] = s.OrderID
+	details["order_no"] = s.OrderNo
+	details["status"] = s.Status
+	details["final_amount"] = s.FinalAmount
+	details["platform_fee"] = s.PlatformFee
+	details["pilot_fee"] = s.PilotFee
+	details["owner_fee"] = s.OwnerFee
+	details["insurance_deduction"] = s.InsuranceDeduction
+	details["pilot_user_id"] = s.PilotUserID
+	details["owner_user_id"] = s.OwnerUserID
+	details["payer_user_id"] = s.PayerUserID
+	return details
+}
+
+func withdrawalAuditDetails(w *model.WithdrawalRecord, extra gin.H) gin.H {
+	details := gin.H{}
+	for key, value := range extra {
+		details[key] = value
+	}
+	if w == nil {
+		return details
+	}
+	details["withdrawal_no"] = w.WithdrawalNo
+	details["user_id"] = w.UserID
+	details["wallet_id"] = w.WalletID
+	details["amount"] = w.Amount
+	details["service_fee"] = w.ServiceFee
+	details["actual_amount"] = w.ActualAmount
+	details["withdraw_method"] = w.WithdrawMethod
+	details["status"] = w.Status
+	details["third_party_no"] = w.ThirdPartyNo
+	details["review_notes"] = w.ReviewNotes
+	return details
 }
 
 // ========== 定价相关 ==========
@@ -86,6 +159,7 @@ func (h *Handler) CreateSettlement(c *gin.Context) {
 		return
 	}
 
+	h.writeAdminLog(c, "create_settlement", "settlement", settlement.ID, settlementAuditDetails(settlement, gin.H{"order_id": req.OrderID}))
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": settlement})
 }
 
@@ -136,6 +210,8 @@ func (h *Handler) ConfirmSettlement(c *gin.Context) {
 		return
 	}
 
+	settlement, _ := h.settlementService.GetSettlement(id)
+	h.writeAdminLog(c, "confirm_settlement", "settlement", id, settlementAuditDetails(settlement, nil))
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "结算已确认"})
 }
 
@@ -147,27 +223,153 @@ func (h *Handler) ExecuteSettlement(c *gin.Context) {
 		return
 	}
 
-	if err := h.settlementService.ExecuteSettlement(id); err != nil {
+	var req struct {
+		Note string `json:"note"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	settlement, err := h.settlementService.FinalizeSettlement(id)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "结算已执行，资金已入账"})
+	h.writeAdminLog(c, "execute_settlement", "settlement", id, settlementAuditDetails(settlement, gin.H{"note": req.Note}))
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": settlement, "message": "结算已执行，资金已入账"})
+}
+
+// MarkSettlementDisputed 标记异常/争议结算
+func (h *Handler) MarkSettlementDisputed(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "无效的ID"})
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "参数错误"})
+		return
+	}
+
+	settlement, err := h.settlementService.MarkSettlementDisputed(id, getUserID(c), req.Reason)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	h.writeAdminLog(c, "mark_settlement_disputed", "settlement", id, settlementAuditDetails(settlement, gin.H{"reason": req.Reason}))
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": settlement, "message": "结算已标记争议"})
+}
+
+// ResolveSettlementDispute 解除异常/争议结算
+func (h *Handler) ResolveSettlementDispute(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "无效的ID"})
+		return
+	}
+
+	var req struct {
+		Resolution         string `json:"resolution"`
+		NextStatus         string `json:"next_status"`
+		PlatformFee        *int64 `json:"platform_fee"`
+		PilotFee           *int64 `json:"pilot_fee"`
+		OwnerFee           *int64 `json:"owner_fee"`
+		InsuranceDeduction *int64 `json:"insurance_deduction"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "参数错误"})
+		return
+	}
+
+	settlement, err := h.settlementService.ResolveSettlementDispute(id, getUserID(c), service.SettlementDisputeResolution{
+		Resolution:         req.Resolution,
+		NextStatus:         req.NextStatus,
+		PlatformFee:        req.PlatformFee,
+		PilotFee:           req.PilotFee,
+		OwnerFee:           req.OwnerFee,
+		InsuranceDeduction: req.InsuranceDeduction,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	h.writeAdminLog(c, "resolve_settlement_dispute", "settlement", id, settlementAuditDetails(settlement, gin.H{
+		"resolution":          req.Resolution,
+		"next_status":         req.NextStatus,
+		"platform_fee":        req.PlatformFee,
+		"pilot_fee":           req.PilotFee,
+		"owner_fee":           req.OwnerFee,
+		"insurance_deduction": req.InsuranceDeduction,
+	}))
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": settlement, "message": "结算争议已处理"})
 }
 
 // ListSettlements 获取结算列表
 func (h *Handler) ListSettlements(c *gin.Context) {
-	status := c.Query("status")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	list, total, err := h.settlementService.ListSettlements(status, page, pageSize)
+	filter, err := parseReconciliationExportFilter(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	list, total, err := h.settlementService.ListSettlementsFiltered(filter, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list, "total": total, "page": page, "page_size": pageSize})
+}
+
+func (h *Handler) ExportSettlements(c *gin.Context) {
+	filter, err := parseReconciliationExportFilter(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	content, err := h.settlementService.ExportSettlementReconciliationCSV(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	h.writeAdminLog(c, "export_settlements_csv", "settlement", 0, gin.H{
+		"status":     filter.Status,
+		"time_field": filter.TimeField,
+		"start_at":   filter.StartAt,
+		"end_at":     filter.EndAt,
+		"limit":      filter.Limit,
+		"bytes":      len(content),
+	})
+	writeCSV(c, fmt.Sprintf("settlements_%s.csv", time.Now().Format("20060102150405")), content)
+}
+
+func (h *Handler) ExportWithdrawals(c *gin.Context) {
+	filter, err := parseReconciliationExportFilter(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	content, err := h.settlementService.ExportWithdrawalReconciliationCSV(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	h.writeAdminLog(c, "export_withdrawals_csv", "withdrawal", 0, gin.H{
+		"status":     filter.Status,
+		"time_field": filter.TimeField,
+		"start_at":   filter.StartAt,
+		"end_at":     filter.EndAt,
+		"limit":      filter.Limit,
+		"bytes":      len(content),
+	})
+	writeCSV(c, fmt.Sprintf("withdrawals_%s.csv", time.Now().Format("20060102150405")), content)
 }
 
 // ListMySettlements 获取我的结算
@@ -285,6 +487,24 @@ func (h *Handler) AdminListPendingWithdrawals(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list, "total": total, "page": page, "page_size": pageSize})
 }
 
+func (h *Handler) AdminListWithdrawals(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	filter, err := parseReconciliationExportFilter(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+	list, total, err := h.settlementService.ListWithdrawalsFiltered(filter, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list, "total": total, "page": page, "page_size": pageSize})
+}
+
 // AdminApproveWithdrawal 管理员审批通过提现
 func (h *Handler) AdminApproveWithdrawal(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -299,6 +519,8 @@ func (h *Handler) AdminApproveWithdrawal(c *gin.Context) {
 		return
 	}
 
+	record, _ := h.settlementService.GetWithdrawal(id)
+	h.writeAdminLog(c, "approve_withdrawal", "withdrawal", id, withdrawalAuditDetails(record, nil))
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "提现已通过"})
 }
 
@@ -321,6 +543,8 @@ func (h *Handler) AdminRejectWithdrawal(c *gin.Context) {
 		return
 	}
 
+	record, _ := h.settlementService.GetWithdrawal(id)
+	h.writeAdminLog(c, "reject_withdrawal", "withdrawal", id, withdrawalAuditDetails(record, gin.H{"reason": req.Reason}))
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "提现已拒绝"})
 }
 
@@ -332,7 +556,141 @@ func (h *Handler) AdminProcessSettlements(c *gin.Context) {
 		return
 	}
 
+	h.writeAdminLog(c, "process_pending_settlements", "settlement", 0, gin.H{"processed_count": count})
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "处理完成", "data": gin.H{"processed_count": count}})
+}
+
+// AdminFinanceOverview 汇总财务运营待办、异常和今日处理情况
+func (h *Handler) AdminFinanceOverview(c *gin.Context) {
+	overview, err := h.settlementService.GetFinanceOperationsOverview(time.Now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": overview})
+}
+
+// AdminListFinanceAnomalies 管理员查询财务异常记录
+func (h *Handler) AdminListFinanceAnomalies(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	filter := service.FinanceAnomalyFilter{
+		Status:       c.Query("status"),
+		Severity:     c.Query("severity"),
+		AnomalyType:  c.Query("anomaly_type"),
+		Source:       c.Query("source"),
+		TargetType:   c.Query("target_type"),
+		TargetID:     parseQueryInt64(c, "target_id"),
+		OrderID:      parseQueryInt64(c, "order_id"),
+		SettlementID: parseQueryInt64(c, "settlement_id"),
+		WithdrawalID: parseQueryInt64(c, "withdrawal_id"),
+		UserID:       parseQueryInt64(c, "user_id"),
+		Keyword:      c.Query("keyword"),
+	}
+	list, total, err := h.settlementService.ListFinanceAnomalies(filter, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list, "total": total, "page": page, "page_size": pageSize})
+}
+
+// AdminResolveFinanceAnomaly 标记财务异常已处理
+func (h *Handler) AdminResolveFinanceAnomaly(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "无效的ID"})
+		return
+	}
+
+	var req struct {
+		Note string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "参数错误"})
+		return
+	}
+
+	record, err := h.settlementService.ResolveFinanceAnomaly(id, getUserID(c), req.Note)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	h.writeAdminLog(c, "resolve_finance_anomaly", "finance_anomaly", id, gin.H{
+		"anomaly_no":    record.AnomalyNo,
+		"anomaly_type":  record.AnomalyType,
+		"severity":      record.Severity,
+		"target_type":   record.TargetType,
+		"target_id":     record.TargetID,
+		"settlement_id": record.SettlementID,
+		"withdrawal_id": record.WithdrawalID,
+		"note":          req.Note,
+	})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": record, "message": "财务异常已标记处理"})
+}
+
+// AdminListFinanceManualActions 管理员查询财务人工处理记录
+func (h *Handler) AdminListFinanceManualActions(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	filter := service.FinanceManualActionFilter{
+		Status:       c.Query("status"),
+		ActionType:   c.Query("action_type"),
+		TargetType:   c.Query("target_type"),
+		TargetID:     parseQueryInt64(c, "target_id"),
+		SettlementID: parseQueryInt64(c, "settlement_id"),
+		WithdrawalID: parseQueryInt64(c, "withdrawal_id"),
+		AnomalyID:    parseQueryInt64(c, "anomaly_id"),
+		AdminID:      parseQueryInt64(c, "admin_id"),
+		Keyword:      c.Query("keyword"),
+	}
+	list, total, err := h.settlementService.ListFinanceManualActions(filter, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list, "total": total, "page": page, "page_size": pageSize})
+}
+
+// AdminRollbackFinanceManualAction 回滚尚未被后续变更覆盖的人工处理
+func (h *Handler) AdminRollbackFinanceManualAction(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "无效的ID"})
+		return
+	}
+
+	var req struct {
+		Note string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": "参数错误"})
+		return
+	}
+
+	record, err := h.settlementService.RollbackFinanceManualAction(id, getUserID(c), req.Note)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "message": err.Error()})
+		return
+	}
+
+	h.writeAdminLog(c, "rollback_finance_manual_action", "finance_manual_action", id, gin.H{
+		"action_no":     record.ActionNo,
+		"action_type":   record.ActionType,
+		"target_type":   record.TargetType,
+		"target_id":     record.TargetID,
+		"settlement_id": record.SettlementID,
+		"withdrawal_id": record.WithdrawalID,
+		"anomaly_id":    record.AnomalyID,
+		"note":          req.Note,
+	})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": record, "message": "人工处理已回滚"})
 }
 
 // ========== 定价配置 ==========
@@ -364,5 +722,65 @@ func (h *Handler) UpdatePricingConfig(c *gin.Context) {
 		return
 	}
 
+	h.writeAdminLog(c, "update_pricing_config", "pricing_config", 0, gin.H{"key": req.Key, "value": req.Value})
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "配置已更新"})
+}
+
+func parseReconciliationExportFilter(c *gin.Context) (service.ReconciliationExportFilter, error) {
+	startAt, err := parseExportTime(c.Query("start_date"), false)
+	if err != nil {
+		return service.ReconciliationExportFilter{}, fmt.Errorf("开始日期格式错误")
+	}
+	endAt, err := parseExportTime(c.Query("end_date"), true)
+	if err != nil {
+		return service.ReconciliationExportFilter{}, fmt.Errorf("结束日期格式错误")
+	}
+	if startAt != nil && endAt != nil && !startAt.Before(*endAt) {
+		return service.ReconciliationExportFilter{}, fmt.Errorf("开始日期必须早于结束日期")
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5000"))
+	return service.ReconciliationExportFilter{
+		Status:    c.Query("status"),
+		TimeField: c.Query("time_field"),
+		StartAt:   startAt,
+		EndAt:     endAt,
+		Limit:     limit,
+	}, nil
+}
+
+func parseQueryInt64(c *gin.Context, key string) int64 {
+	value := strings.TrimSpace(c.Query(key))
+	if value == "" {
+		return 0
+	}
+	parsed, _ := strconv.ParseInt(value, 10, 64)
+	return parsed
+}
+
+func parseExportTime(value string, endOfDate bool) (*time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	if len(value) == len("2006-01-02") {
+		parsed, err := time.ParseInLocation("2006-01-02", value, time.Local)
+		if err != nil {
+			return nil, err
+		}
+		if endOfDate {
+			parsed = parsed.AddDate(0, 0, 1)
+		}
+		return &parsed, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func writeCSV(c *gin.Context, filename string, content []byte) {
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Data(http.StatusOK, "text/csv; charset=utf-8", content)
 }

@@ -6,6 +6,8 @@ import {
   V2ListData,
   V2OrderSummary,
   V2PageMeta,
+  V2SiteSafetyCheckSummary,
+  V2SiteSafetyChecklistItem,
   V2OrderTimelineResponse,
 } from '../types';
 
@@ -29,6 +31,17 @@ export const orderV2Service = {
   getMonitor: (orderId: number) =>
     apiV2.get<V2OrderMonitor>(`/orders/${orderId}/monitor`),
 
+  confirmSiteSafety: (orderId: number, payload?: { note?: string }) =>
+    apiV2.post<V2OrderSummary>(`/orders/${orderId}/site-safety-check`, payload || {}),
+
+  getLatestSiteSafetyCheck: (orderId: number) =>
+    apiV2.get<V2SiteSafetyCheckSummary | null>(`/orders/${orderId}/site-safety-checks/latest`),
+
+  submitSiteSafetyCheck: (
+    orderId: number,
+    payload: { checklist: V2SiteSafetyChecklistItem[]; photos: string[]; note?: string },
+  ) => apiV2.post<V2SiteSafetyCheckSummary>(`/orders/${orderId}/site-safety-checks`, payload),
+
   providerConfirm: (orderId: number) =>
     apiV2.post<V2OrderSummary>(`/orders/${orderId}/provider-confirm`),
 
@@ -42,6 +55,12 @@ export const orderV2Service = {
     orderId: number,
     payload: { dispatch_mode: string; target_pilot_user_id?: number; reason?: string },
   ) => apiV2.post<V2DispatchActionResult>(`/orders/${orderId}/dispatch`, payload),
+
+  startSelfFulfillment: (orderId: number) =>
+    apiV2.post<V2DispatchActionResult>(`/orders/${orderId}/dispatch`, {
+      dispatch_mode: 'self_execute',
+      reason: '服务商开始履约',
+    }),
 };
 
 export const updateExecutionStatus = async (orderId: number, status: string): Promise<void> => {

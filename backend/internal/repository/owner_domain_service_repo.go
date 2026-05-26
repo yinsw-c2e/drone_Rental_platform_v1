@@ -1,12 +1,23 @@
 package repository
 
 import (
+	"math"
 	"strings"
 	"time"
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/limits"
 )
+
+type SupplyMarketStats struct {
+	TotalOrderCount        int64
+	CompletedOrderCount    int64
+	AverageResponseSeconds int64
+	ResponseSampleCount    int64
+	Rating                 float64
+	RatingCount            int64
+	RatingSource           string
+}
 
 func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, serviceType string, minPayloadKG float64, acceptsDirectOrder *bool, page, pageSize int) ([]model.OwnerSupply, int64, error) {
 	var supplies []model.OwnerSupply
@@ -89,6 +100,137 @@ func (r *OwnerDomainRepo) GetMarketplaceSupplyByID(id int64) (*model.OwnerSupply
 		return nil, err
 	}
 	return &supply, nil
+}
+
+func (r *OwnerDomainRepo) GetMarketplaceSupplyStats(supplies []model.OwnerSupply) (map[int64]SupplyMarketStats, error) {
+	result := make(map[int64]SupplyMarketStats, len(supplies))
+	if len(supplies) == 0 {
+		return result, nil
+	}
+
+	supplyIDs := make([]int64, 0, len(supplies))
+	ownerIDs := make([]int64, 0, len(supplies))
+	droneIDs := make([]int64, 0, len(supplies))
+	ownerBySupply := make(map[int64]int64, len(supplies))
+	droneBySupply := make(map[int64]int64, len(supplies))
+	seenSupply := make(map[int64]struct{}, len(supplies))
+	seenOwner := make(map[int64]struct{}, len(supplies))
+	seenDrone := make(map[int64]struct{}, len(supplies))
+
+	for i := range supplies {
+		supply := supplies[i]
+		if supply.ID <= 0 {
+			continue
+		}
+		if _, ok := seenSupply[supply.ID]; !ok {
+			supplyIDs = append(supplyIDs, supply.ID)
+			seenSupply[supply.ID] = struct{}{}
+			result[supply.ID] = SupplyMarketStats{}
+		}
+		if supply.OwnerUserID > 0 {
+			ownerBySupply[supply.ID] = supply.OwnerUserID
+			if _, ok := seenOwner[supply.OwnerUserID]; !ok {
+				ownerIDs = append(ownerIDs, supply.OwnerUserID)
+				seenOwner[supply.OwnerUserID] = struct{}{}
+			}
+		}
+		if supply.DroneID > 0 {
+			droneBySupply[supply.ID] = supply.DroneID
+			if _, ok := seenDrone[supply.DroneID]; !ok {
+				droneIDs = append(droneIDs, supply.DroneID)
+				seenDrone[supply.DroneID] = struct{}{}
+			}
+		}
+	}
+	if len(supplyIDs) == 0 {
+		return result, nil
+	}
+
+	var orders []model.Order
+	if err := r.db.
+		Select("source_supply_id, status, created_at, provider_confirmed_at").
+		Where("source_supply_id IN ?", supplyIDs).
+		Find(&orders).Error; err != nil {
+		return nil, err
+	}
+	responseTotals := make(map[int64]int64, len(supplyIDs))
+	for i := range orders {
+		order := orders[i]
+		if order.SourceSupplyID <= 0 {
+			continue
+		}
+		stats := result[order.SourceSupplyID]
+		status := strings.TrimSpace(strings.ToLower(order.Status))
+		if status != "cancelled" && status != "refunded" {
+			stats.TotalOrderCount++
+		}
+		if status == "completed" {
+			stats.CompletedOrderCount++
+		}
+		if order.ProviderConfirmedAt != nil && !order.CreatedAt.IsZero() && order.ProviderConfirmedAt.After(order.CreatedAt) {
+			responseTotals[order.SourceSupplyID] += int64(order.ProviderConfirmedAt.Sub(order.CreatedAt).Seconds())
+			stats.ResponseSampleCount++
+		}
+		result[order.SourceSupplyID] = stats
+	}
+	for supplyID, totalSeconds := range responseTotals {
+		stats := result[supplyID]
+		if stats.ResponseSampleCount > 0 {
+			stats.AverageResponseSeconds = int64(math.Round(float64(totalSeconds) / float64(stats.ResponseSampleCount)))
+			result[supplyID] = stats
+		}
+	}
+
+	ownerRatings, err := r.loadSupplyRatings("user", ownerIDs)
+	if err != nil {
+		return nil, err
+	}
+	droneRatings, err := r.loadSupplyRatings("drone", droneIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, supplyID := range supplyIDs {
+		stats := result[supplyID]
+		if ownerRating, ok := ownerRatings[ownerBySupply[supplyID]]; ok && ownerRating.RatingCount > 0 {
+			stats.Rating = ownerRating.Rating
+			stats.RatingCount = ownerRating.RatingCount
+			stats.RatingSource = "provider_reviews"
+		} else if droneRating, ok := droneRatings[droneBySupply[supplyID]]; ok && droneRating.RatingCount > 0 {
+			stats.Rating = droneRating.Rating
+			stats.RatingCount = droneRating.RatingCount
+			stats.RatingSource = "drone_reviews"
+		}
+		result[supplyID] = stats
+	}
+
+	return result, nil
+}
+
+func (r *OwnerDomainRepo) loadSupplyRatings(targetType string, targetIDs []int64) (map[int64]SupplyMarketStats, error) {
+	result := make(map[int64]SupplyMarketStats, len(targetIDs))
+	if len(targetIDs) == 0 {
+		return result, nil
+	}
+
+	var rows []struct {
+		TargetID    int64
+		Rating      float64
+		RatingCount int64
+	}
+	if err := r.db.Model(&model.Review{}).
+		Select("target_id, COALESCE(AVG(rating), 0) AS rating, COUNT(*) AS rating_count").
+		Where("target_type = ? AND target_id IN ? AND rating > 0", targetType, targetIDs).
+		Group("target_id").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.TargetID] = SupplyMarketStats{
+			Rating:      math.Round(row.Rating*10) / 10,
+			RatingCount: row.RatingCount,
+		}
+	}
+	return result, nil
 }
 
 func (r *OwnerDomainRepo) ListSuppliesByOwner(ownerUserID int64, status string, page, pageSize int) ([]model.OwnerSupply, int64, error) {
@@ -247,7 +389,18 @@ func (r *OwnerDomainRepo) ListExpiredPendingBindings(cutoff time.Time, limit int
 	return bindings, err
 }
 
-func (r *DemandDomainRepo) ListRecommendedDemands(page, pageSize int) ([]model.Demand, int64, error) {
+type RecommendedDemandQuery struct {
+	ServiceType string
+	Region      string
+	CargoScene  string
+	MinWeightKG float64
+	MaxWeightKG float64
+	StartFrom   *time.Time
+	StartTo     *time.Time
+	Sort        string
+}
+
+func (r *DemandDomainRepo) ListRecommendedDemands(filter RecommendedDemandQuery, page, pageSize int) ([]model.Demand, int64, error) {
 	var demands []model.Demand
 	var total int64
 	page, pageSize = limits.NormalizePagination(page, pageSize)
@@ -256,12 +409,51 @@ func (r *DemandDomainRepo) ListRecommendedDemands(page, pageSize int) ([]model.D
 		Where("status IN ?", []string{"published", "quoting"}).
 		Where("(expires_at IS NULL OR expires_at > ?)", time.Now())
 
+	if trimmed := strings.TrimSpace(filter.ServiceType); trimmed != "" {
+		query = query.Where("service_type = ?", trimmed)
+	}
+	if trimmed := strings.TrimSpace(filter.Region); trimmed != "" {
+		like := "%" + trimmed + "%"
+		query = query.Where(
+			`(
+				title LIKE ? OR
+				CAST(service_address_snapshot AS CHAR) LIKE ? OR
+				CAST(departure_address_snapshot AS CHAR) LIKE ? OR
+				CAST(destination_address_snapshot AS CHAR) LIKE ?
+			)`,
+			like, like, like, like,
+		)
+	}
+	if trimmed := strings.TrimSpace(filter.CargoScene); trimmed != "" {
+		query = query.Where("cargo_scene = ?", trimmed)
+	}
+	if filter.MinWeightKG > 0 {
+		query = query.Where("cargo_weight_kg >= ?", filter.MinWeightKG)
+	}
+	if filter.MaxWeightKG > 0 {
+		query = query.Where("cargo_weight_kg <= ?", filter.MaxWeightKG)
+	}
+	if filter.StartFrom != nil {
+		query = query.Where("scheduled_start_at >= ?", *filter.StartFrom)
+	}
+	if filter.StartTo != nil {
+		query = query.Where("scheduled_start_at < ?", *filter.StartTo)
+	}
+
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
+	orderBy := "created_at DESC, id DESC"
+	switch strings.TrimSpace(filter.Sort) {
+	case "price":
+		orderBy = "CASE WHEN budget_min > 0 THEN budget_min WHEN budget_max > 0 THEN budget_max ELSE 9223372036854775807 END ASC, created_at DESC, id DESC"
+	case "latest", "created_at", "distance":
+		orderBy = "created_at DESC, id DESC"
+	}
+
 	err := query.
-		Order("created_at DESC").
+		Order(orderBy).
 		Offset((page - 1) * pageSize).
 		Limit(pageSize).
 		Find(&demands).Error

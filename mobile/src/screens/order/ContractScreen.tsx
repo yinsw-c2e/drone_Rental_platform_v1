@@ -104,7 +104,7 @@ export default function ContractScreen({route, navigation}: any) {
   const canSign = !mySignedAt && (isClient || isProvider) && contract.can_sign !== false;
   const plainTextContract = stripHtml(contract.contract_html);
   const contractPreview = plainTextContract ? `${plainTextContract.slice(0, 220)}${plainTextContract.length > 220 ? '...' : ''}` : '';
-  const hasTrustClause = plainTextContract.includes('设备操作责任') || plainTextContract.includes('执行飞手具备合法资质');
+  const hasTrustClause = plainTextContract.includes('设备操作责任') || plainTextContract.includes('执行人员具备合法资质');
   const hasPlatformProtectionClause =
     plainTextContract.includes('绕开平台') ||
     plainTextContract.includes('线下转移支付') ||
@@ -188,7 +188,7 @@ export default function ContractScreen({route, navigation}: any) {
             <View style={styles.trustCard}>
               <Text style={styles.trustTitle}>设备操作责任条款</Text>
               <Text style={styles.trustText}>
-                当机主与执行飞手不是同一人时，合同已写入“执行飞手需具备合法资质并确认设备操作责任，服务方对外先承担责任”的保障条款。
+                当服务商与执行人员不是同一人时，合同已写入“执行人员需具备合法资质并确认设备操作责任，服务方对外先承担责任”的保障条款。
               </Text>
             </View>
           ) : null}

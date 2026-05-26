@@ -1,3 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '任务大厅',
+  navigationStyle: 'custom',
+  navigationBarTextStyle: 'white',
+  backgroundColor: '#F6F8FC',
 });

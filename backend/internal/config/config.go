@@ -248,6 +248,7 @@ func (s *SMSConfig) Validate() error {
 // PaymentConfig 支付配置
 type PaymentConfig struct {
 	CommissionRate int          `mapstructure:"commission_rate"` // 平台佣金比例（百分比）
+	AllowMock      bool         `mapstructure:"allow_mock"`      // 是否允许模拟支付自动回写成功
 	WeChat         WeChatConfig `mapstructure:"wechat"`          // 微信支付配置
 	Alipay         AlipayConfig `mapstructure:"alipay"`          // 支付宝配置
 }
@@ -484,6 +485,10 @@ func (c *Config) ValidateForProduction() error {
 	// 生产环境不能使用mock短信
 	if c.SMS.Provider == "mock" {
 		return errors.New("production must not use mock sms provider")
+	}
+
+	if c.Payment.AllowMock {
+		return errors.New("production must not allow mock payments")
 	}
 
 	// 生产环境必须配置支付

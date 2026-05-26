@@ -1,7 +1,9 @@
 export default defineAppConfig({
   pages: [
+    'pages/auth/mode-selection/index',
     'pages/auth/login/index','pages/auth/register/index',
     'pages/home/index',
+    'pages/provider/onboarding/index',
     'pages/messages/index','pages/chat/index',
     'pages/profile/index',
     'pages/profile/my-demands/index','pages/profile/my-offers/index','pages/profile/my-quotes/index',
@@ -26,6 +28,7 @@ export default defineAppConfig({
     'pages/credit/score/index','pages/credit/deposit/index','pages/credit/violation/index',
     'pages/insurance/policy/index','pages/insurance/claim/index',
     'pages/fulfillment/hub/index',
+    'pages/fulfillment/safety-check/index',
     'pages/cargo/list/index','pages/cargo/detail/index','pages/cargo/accept/index',
     'pages/airspace/index','pages/airspace/no-fly/index','pages/compliance/index',
     'pages/client/profile/index','pages/client/register/index',
@@ -43,12 +46,13 @@ export default defineAppConfig({
     'pages/settlement/withdrawal/index',
     'pages/settlement/withdrawal-list/index',
   ],
-  window: { backgroundTextStyle: 'light', navigationBarBackgroundColor: '#fff', navigationBarTitleText: '无人机吊运', navigationBarTextStyle: 'black' },
+  window: { backgroundTextStyle: 'light', navigationBarBackgroundColor: '#fff', navigationBarTitleText: '重载吊运', navigationBarTextStyle: 'black' },
   tabBar: {
     custom: true,
     color: '#999999', selectedColor: '#1677ff', backgroundColor: '#ffffff', borderStyle: 'black',
     list: [
-      { pagePath: 'pages/home/index', text: '工作台' },
+      { pagePath: 'pages/home/index', text: '首页' },
+      { pagePath: 'pages/orders/index', text: '订单' },
       { pagePath: 'pages/messages/index', text: '消息' },
       { pagePath: 'pages/profile/index', text: '我的' },
     ],

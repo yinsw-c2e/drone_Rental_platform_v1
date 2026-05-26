@@ -28,7 +28,7 @@ import {droneService} from '../../services/drone';
 import {orderV2Service} from '../../services/orderV2';
 import {ownerService} from '../../services/owner';
 import {pilotV2Service} from '../../services/pilotV2';
-import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {profileAssets} from '../../assets/miniProgramAssets';
@@ -104,39 +104,39 @@ const identityCatalog: IdentityItem[] = [
   },
   {
     key: 'owner',
-    label: '机主身份',
+    label: '服务商能力',
     heldText: '已拥有',
     missingText: '待建立',
     screen: 'OwnerProfile',
-    actionLabel: '机主档案',
+    actionLabel: '服务商资料',
   },
   {
     key: 'pilot',
-    label: '飞手身份',
+    label: '执行人员能力',
     heldText: '已认证',
     missingText: '去认证',
     screen: 'PilotProfile',
     fallbackScreen: 'PilotRegister',
-    actionLabel: '飞手中心',
-    fallbackActionLabel: '飞手认证',
+    actionLabel: '执行人员中心',
+    fallbackActionLabel: '执行人员认证',
   },
 ] as const;
 
 const capabilityCatalog = [
   {
     key: 'publish',
-    label: '可发布供给',
+    label: '可发布服务',
     desc: '满足重载准入和关键资质后，可把供给展示到市场。',
   },
   {
     key: 'dispatch',
-    label: '可接派单',
-    desc: '通过飞手认证并开启接单后，可响应正式派单。',
+    label: '可接执行任务',
+    desc: '通过执行人员认证并开启接单后，可响应正式派单。',
   },
   {
     key: 'selfExecute',
     label: '可自执行',
-    desc: '同时具备机主与飞手能力后，机主可选择自执行。',
+    desc: '同时具备服务商与执行人员能力后，可选择自执行。',
   },
 ] as const;
 
@@ -179,9 +179,11 @@ export default function ProfileScreen({navigation}: any) {
   const styles = getStyles(theme);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
   const dispatch = useDispatch();
   const userRef = useRef(user);
   const roleSummaryRef = useRef(roleSummary);
+  const selectedModeRef = useRef(selectedMode);
   const loadingRef = useRef(false);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -190,6 +192,11 @@ export default function ProfileScreen({navigation}: any) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(effectiveRoleSummary),
+    [effectiveRoleSummary],
+  );
+  const isProviderMode = selectedMode === 'provider';
   const verifyInfo = VERIFY_STATUS_MAP[user?.id_verified || 'unverified'] || VERIFY_STATUS_MAP.unverified;
 
   useEffect(() => {
@@ -200,6 +207,10 @@ export default function ProfileScreen({navigation}: any) {
     roleSummaryRef.current = roleSummary;
   }, [roleSummary]);
 
+  useEffect(() => {
+    selectedModeRef.current = selectedMode;
+  }, [selectedMode]);
+
   const loadData = useCallback(async () => {
     if (loadingRef.current) {
       setRefreshing(false);
@@ -208,6 +219,17 @@ export default function ProfileScreen({navigation}: any) {
 
     loadingRef.current = true;
     const summary = getEffectiveRoleSummary(roleSummaryRef.current, userRef.current);
+    const capabilities = resolveProviderCapabilities(summary);
+    const isProviderContext = selectedModeRef.current === 'provider';
+    const canUseWorkbench = capabilities.canUseWorkbench;
+    const shouldLoadProviderAssets =
+      isProviderContext ||
+      capabilities.hasProviderApplication ||
+      capabilities.canManageAssets;
+    const shouldLoadProviderBusiness =
+      canUseWorkbench &&
+      (capabilities.canPublishSupply || capabilities.canArrangeDispatch || capabilities.hasAssetProviderRole);
+    const shouldLoadExecutorBusiness = canUseWorkbench && capabilities.hasExecutorRole;
     try {
       const [profileRes, meRes, orderRes, demandRes, supplyRes, quoteRes, droneRes, bindingRes, dispatchRes, flightRes] = await Promise.all([
         userService.getProfile().catch(() => null),
@@ -216,22 +238,22 @@ export default function ProfileScreen({navigation}: any) {
         summary.has_client_role
           ? demandV2Service.listMyDemands({page: 1, page_size: 1}).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        shouldLoadProviderBusiness
           ? ownerService.listMySupplies({page: 1, page_size: 1}).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        shouldLoadProviderBusiness
           ? ownerService.listMyQuotes({page: 1, page_size: 1}).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        shouldLoadProviderAssets
           ? droneService.myDrones().catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        shouldLoadProviderBusiness
           ? ownerService.listPilotBindings({status: 'active', page: 1, page_size: 1}).catch(() => null)
           : Promise.resolve(null),
-        summary.has_pilot_role
+        shouldLoadExecutorBusiness
           ? dispatchV2Service.list({role: 'pilot', status: 'pending_response', page: 1, page_size: 1}).catch(() => null)
           : Promise.resolve(null),
-        summary.has_pilot_role
+        shouldLoadExecutorBusiness
           ? pilotV2Service.listFlightRecords({page: 1, page_size: 1}).catch(() => null)
           : Promise.resolve(null),
       ]);
@@ -344,14 +366,39 @@ export default function ProfileScreen({navigation}: any) {
     ImagePicker.launchImageLibrary?.(options, callback);
   };
 
-  const accountHighlights = useMemo(
-    () => [
+  const providerStatusText = useMemo(() => {
+    if (providerCapabilities.canUseWorkbench) return '已开通';
+    if (providerCapabilities.providerStatus === 'pending_review') return '审核中';
+    if (providerCapabilities.providerStatus === 'rejected') return '未通过';
+    if (providerCapabilities.providerStatus === 'suspended') return '已暂停';
+    return '未入驻';
+  }, [providerCapabilities.canUseWorkbench, providerCapabilities.providerStatus]);
+
+  const accountHighlights = useMemo(() => {
+    const thirdItem = isProviderMode
+      ? {
+          label: providerCapabilities.canUseWorkbench ? '服务' : '资质',
+          value: providerCapabilities.canUseWorkbench ? stats.supplies : providerCapabilities.hasProviderApplication ? 1 : 0,
+          screen: providerCapabilities.canUseWorkbench ? 'OwnerProfile' : 'ProviderOnboarding',
+        }
+      : {
+          label: '资质',
+          value: providerCapabilities.hasProviderApplication ? 1 : 0,
+          screen: providerCapabilities.canUseWorkbench ? 'OwnerProfile' : 'ProviderOnboarding',
+        };
+    return [
       {label: '订单', value: stats.orders, screen: 'MyOrders'},
       {label: '任务', value: stats.demands, screen: 'MyDemands'},
-      {label: '服务', value: stats.supplies, screen: 'MyOffers'},
-    ],
-    [stats.demands, stats.orders, stats.supplies],
-  );
+      thirdItem,
+    ];
+  }, [
+    isProviderMode,
+    providerCapabilities.canUseWorkbench,
+    providerCapabilities.hasProviderApplication,
+    stats.demands,
+    stats.orders,
+    stats.supplies,
+  ]);
 
   const identityCards = useMemo(() => {
     const summary = effectiveRoleSummary;
@@ -360,10 +407,12 @@ export default function ProfileScreen({navigation}: any) {
         item.key === 'client'
           ? summary.has_client_role
           : item.key === 'owner'
-            ? summary.has_owner_role
-            : summary.has_pilot_role;
+            ? providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench
+            : providerCapabilities.hasExecutorRole || providerCapabilities.executorStatus !== 'none';
 
-      const screen = hasRole ? item.screen : item.fallbackScreen || item.screen;
+      const screen = item.key === 'owner' && !providerCapabilities.canUseWorkbench
+        ? 'ProviderOnboarding'
+        : hasRole ? item.screen : item.fallbackScreen || item.screen;
       const actionLabel = hasRole ? item.actionLabel : item.fallbackActionLabel || item.actionLabel;
 
       let lines: string[] = [];
@@ -376,14 +425,14 @@ export default function ProfileScreen({navigation}: any) {
       } else if (item.key === 'owner') {
         lines = [
           `可用无人机 ${stats.drones}`,
-          `生效中服务 ${stats.supplies}`,
-          `绑定飞手 ${stats.bindings}`,
+          providerCapabilities.canUseWorkbench ? `生效中服务 ${stats.supplies}` : `服务商状态 ${providerStatusText}`,
+          providerCapabilities.canUseWorkbench ? `绑定执行人员 ${stats.bindings}` : '审核通过后才能进入正式工作台。',
         ];
       } else {
         lines = [
           `待响应派单 ${stats.pendingDispatches}`,
           `真实飞行记录 ${stats.flightRecords}`,
-          hasRole ? '飞手认证已建立，可继续管理接单能力。' : '完成飞手认证后才能响应正式派单。',
+          hasRole ? '执行人员认证已建立，可继续管理接单能力。' : '完成执行人员认证后才能响应正式派单。',
         ];
       }
 
@@ -392,29 +441,54 @@ export default function ProfileScreen({navigation}: any) {
         hasRole,
         screen,
         actionLabel,
-        statusLabel: hasRole ? item.heldText : item.missingText,
-        statusTone: hasRole ? ('green' as const) : item.key === 'client' ? ('orange' as const) : ('gray' as const),
+        statusLabel: item.key === 'owner' ? providerStatusText : hasRole ? item.heldText : item.missingText,
+        statusTone:
+          item.key === 'owner'
+            ? providerCapabilities.canUseWorkbench
+              ? ('green' as const)
+              : providerCapabilities.hasProviderApplication
+                ? ('orange' as const)
+                : ('gray' as const)
+            : hasRole
+              ? ('green' as const)
+              : item.key === 'client'
+                ? ('orange' as const)
+                : ('gray' as const),
         lines,
       };
     });
-  }, [effectiveRoleSummary, stats.bindings, stats.demands, stats.drones, stats.flightRecords, stats.orders, stats.pendingDispatches, stats.supplies]);
+  }, [
+    effectiveRoleSummary,
+    providerCapabilities.canUseWorkbench,
+    providerCapabilities.executorStatus,
+    providerCapabilities.hasExecutorRole,
+    providerCapabilities.hasProviderApplication,
+    providerStatusText,
+    stats.bindings,
+    stats.demands,
+    stats.drones,
+    stats.flightRecords,
+    stats.orders,
+    stats.pendingDispatches,
+    stats.supplies,
+  ]);
 
   const capabilityItems = useMemo(
     () => [
       {
         ...capabilityCatalog[0],
-        enabled: effectiveRoleSummary.can_publish_supply,
+        enabled: providerCapabilities.canPublishSupply,
       },
       {
         ...capabilityCatalog[1],
-        enabled: effectiveRoleSummary.can_accept_dispatch,
+        enabled: providerCapabilities.canAcceptDispatch,
       },
       {
         ...capabilityCatalog[2],
-        enabled: effectiveRoleSummary.can_self_execute,
+        enabled: providerCapabilities.canSelfExecute,
       },
     ],
-    [effectiveRoleSummary],
+    [providerCapabilities.canAcceptDispatch, providerCapabilities.canPublishSupply, providerCapabilities.canSelfExecute],
   );
 
   const profileMenuGroups = useMemo<ShortcutGroup[]>(() => {
@@ -440,7 +514,7 @@ export default function ProfileScreen({navigation}: any) {
       });
     }
 
-    if (effectiveRoleSummary.has_owner_role) {
+    if (providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply) {
       orderItems.push({
         key: 'quotes',
         title: '我的报价',
@@ -470,48 +544,48 @@ export default function ProfileScreen({navigation}: any) {
       },
     ];
 
-    if (effectiveRoleSummary.has_owner_role) {
+    if (isProviderMode || providerCapabilities.hasProviderApplication || providerCapabilities.canManageAssets) {
       identityItems.push({
         key: 'owner-profile',
-        title: '机主档案',
-        desc: '资产、服务与能力资料',
+        title: providerCapabilities.canUseWorkbench ? '服务商资料' : '服务商入驻',
+        desc: providerCapabilities.canUseWorkbench ? '资产、服务与能力资料' : '资料、设备资质和审核进度',
         icon: '🧭',
-        screen: 'OwnerProfile',
-        rightText: '已建立',
+        screen: providerCapabilities.canUseWorkbench ? 'OwnerProfile' : 'ProviderOnboarding',
+        rightText: providerStatusText,
       });
     }
 
     identityItems.push({
-      key: effectiveRoleSummary.has_pilot_role ? 'pilot' : 'pilot-register',
-      title: effectiveRoleSummary.has_pilot_role ? '飞手中心' : '飞手认证',
-      desc: effectiveRoleSummary.has_pilot_role
+      key: providerCapabilities.hasExecutorRole ? 'pilot' : 'pilot-register',
+      title: providerCapabilities.hasExecutorRole ? '执行人员中心' : '执行人员认证',
+      desc: providerCapabilities.hasExecutorRole
         ? '接单状态、飞行统计'
-        : '申请后才能接正式派单',
-      icon: effectiveRoleSummary.has_pilot_role ? '🎮' : '🪪',
-      screen: effectiveRoleSummary.has_pilot_role ? 'PilotProfile' : 'PilotRegister',
-      rightText: effectiveRoleSummary.has_pilot_role ? '已认证' : '去认证',
+        : '认证后才能接正式派单',
+      icon: providerCapabilities.hasExecutorRole ? '🎮' : '🪪',
+      screen: providerCapabilities.hasExecutorRole ? 'PilotProfile' : 'PilotRegister',
+      rightText: providerCapabilities.hasExecutorRole ? '已认证' : '去认证',
     });
 
     const assetItems: ShortcutItem[] = [];
-    if (effectiveRoleSummary.has_owner_role) {
-      assetItems.push(
-        {
-          key: 'offers',
-          title: '我的服务',
-          desc: '上架、暂停和关闭中的服务',
-          icon: '📦',
-          screen: 'MyOffers',
-          rightText: `${stats.supplies} 个`,
-        },
-        {
-          key: 'drones',
-          title: '我的无人机',
-          desc: '设备、资质和可用状态',
-          icon: '🛩️',
-          screen: 'MyDrones',
-          rightText: `${stats.drones} 架`,
-        },
-      );
+    if (providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply) {
+      assetItems.push({
+        key: 'offers',
+        title: '我的服务',
+        desc: '上架、暂停和关闭中的服务',
+        icon: '📦',
+        screen: 'MyOffers',
+        rightText: `${stats.supplies} 个`,
+      });
+    }
+    if (isProviderMode || providerCapabilities.canManageAssets || providerCapabilities.hasProviderApplication) {
+      assetItems.push({
+        key: 'drones',
+        title: '我的无人机',
+        desc: providerCapabilities.canUseWorkbench ? '设备、资质和可用状态' : '补充设备和资质用于服务商审核',
+        icon: '🛩️',
+        screen: 'MyDrones',
+        rightText: `${stats.drones} 架`,
+      });
     }
 
     const settingItems: ShortcutItem[] = [
@@ -539,6 +613,13 @@ export default function ProfileScreen({navigation}: any) {
     ].filter(group => group.items.length > 0);
   }, [
     effectiveRoleSummary,
+    isProviderMode,
+    providerCapabilities.canManageAssets,
+    providerCapabilities.canPublishSupply,
+    providerCapabilities.canUseWorkbench,
+    providerCapabilities.hasExecutorRole,
+    providerCapabilities.hasProviderApplication,
+    providerStatusText,
     stats.demands,
     stats.drones,
     stats.orders,
@@ -551,12 +632,18 @@ export default function ProfileScreen({navigation}: any) {
     const summary = effectiveRoleSummary;
     const items: Array<{label: string; tone: 'green' | 'gray' | 'orange'}> = [];
     items.push({label: summary.has_client_role ? '客户已持有' : '客户待补齐', tone: summary.has_client_role ? 'green' : 'orange'});
-    items.push({label: summary.has_owner_role ? '机主已持有' : '机主未建立', tone: summary.has_owner_role ? 'green' : 'gray'});
-    items.push({label: summary.has_pilot_role ? '飞手已认证' : '飞手未认证', tone: summary.has_pilot_role ? 'green' : 'gray'});
+    items.push({
+      label: `服务商${providerStatusText}`,
+      tone: providerCapabilities.canUseWorkbench ? 'green' : providerCapabilities.hasProviderApplication ? 'orange' : 'gray',
+    });
+    items.push({
+      label: providerCapabilities.hasExecutorRole ? '执行人员已认证' : '执行人员未认证',
+      tone: providerCapabilities.hasExecutorRole ? 'green' : 'gray',
+    });
     return items;
-  }, [effectiveRoleSummary]);
+  }, [effectiveRoleSummary, providerCapabilities.canUseWorkbench, providerCapabilities.hasExecutorRole, providerCapabilities.hasProviderApplication, providerStatusText]);
 
-  const canApplySelfExecute = effectiveRoleSummary.can_publish_supply && effectiveRoleSummary.can_accept_dispatch;
+  const canApplySelfExecute = providerCapabilities.canPublishSupply && providerCapabilities.canAcceptDispatch;
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -725,8 +812,8 @@ export default function ProfileScreen({navigation}: any) {
               <View style={styles.capabilityNotice}>
                 <Text style={styles.capabilityNoticeText}>
                   {canApplySelfExecute
-                    ? '当前账号已经具备机主与飞手双能力，后续订单可走自执行链路。'
-                  : '要实现机主自执行，需要同时具备发布供给和接正式派单两种能力。'}
+                    ? '当前账号已经具备服务商与执行人员双能力，后续订单可走自执行链路。'
+                  : '要实现自执行，需要同时具备发布服务和接正式派单两种能力。'}
                 </Text>
               </View>
             </View>

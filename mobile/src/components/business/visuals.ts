@@ -154,7 +154,7 @@ const SOURCE_META: Record<BusinessSourceKind, BadgeMeta> = {
   dispatch_task: {label: '执行安排', tone: 'green'},
   airspace_application: {label: '空域报备', tone: 'blue'},
   flight_record: {label: '飞行记录', tone: 'purple'},
-  pilot_task: {label: '飞手任务', tone: 'orange'},
+  pilot_task: {label: '执行任务', tone: 'orange'},
   client_task: {label: '执行任务', tone: 'green'},
 };
 

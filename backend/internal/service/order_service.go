@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -22,14 +23,23 @@ type OrderService struct {
 	demandRepo        *repository.DemandRepo
 	paymentRepo       *repository.PaymentRepo
 	clientRepo        *repository.ClientRepo
+	pricingService    *PricingService
+	broadcastService  *BroadcastService
 	demandDomainRepo  *repository.DemandDomainRepo
 	ownerDomainRepo   *repository.OwnerDomainRepo
 	orderArtifactRepo *repository.OrderArtifactRepo
 	eventService      *EventService
 	contractService   *ContractService
+	settlementService *SettlementService
 	cfg               *config.Config
 	logger            *zap.Logger
 }
+
+const (
+	OrderModeNegotiated  = "negotiated"
+	OrderModeInstant     = "instant"
+	OrderModeReservation = "reservation"
+)
 
 func NewOrderService(
 	orderRepo *repository.OrderRepo,
@@ -65,6 +75,18 @@ func (s *OrderService) SetEventService(eventService *EventService) {
 
 func (s *OrderService) SetContractService(contractService *ContractService) {
 	s.contractService = contractService
+}
+
+func (s *OrderService) SetSettlementService(settlementService *SettlementService) {
+	s.settlementService = settlementService
+}
+
+func (s *OrderService) SetPricingService(pricingService *PricingService) {
+	s.pricingService = pricingService
+}
+
+func (s *OrderService) SetBroadcastService(broadcastService *BroadcastService) {
+	s.broadcastService = broadcastService
 }
 
 func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error) {
@@ -122,7 +144,7 @@ func (s *OrderService) createOrderWithRepos(
 		renterID = cargo.PublisherID
 		req.ClientID = cargo.ClientID
 
-		// 幂等性检查：同一飞手不能重复接同一个货运订单
+		// 幂等性检查：同一服务商不能重复接同一个货运订单
 		existingOrders, _, _ := orderRepo.List(1, 1, map[string]interface{}{
 			"order_type": "cargo",
 			"related_id": req.RelatedID,
@@ -144,7 +166,7 @@ func (s *OrderService) createOrderWithRepos(
 		}
 	}
 
-	commissionRate := float64(s.cfg.Payment.CommissionRate)
+	commissionRate := s.paymentCommissionRate()
 	commission := int64(float64(req.TotalAmount) * commissionRate / 100)
 	ownerAmount := req.TotalAmount - commission
 	orderSource, demandID, sourceSupplyID := s.resolveOrderSourceWithRepo(req, drone.OwnerID, req.DroneID, demandDomainRepo, ownerDomainRepo)
@@ -158,13 +180,14 @@ func (s *OrderService) createOrderWithRepos(
 	clientUserID := s.resolveClientUserID(req.ClientID, renterID)
 	address := firstNonEmpty(req.ServiceAddress, req.Address)
 	executionMode, needsDispatch, pilotID, executorPilotUserID := s.resolveOrderExecutionWithRepo(drone.OwnerID, pilotRepo)
+	orderMode := OrderModeNegotiated
 	initialStatus := "created"
 	initialTimelineStatus := "created"
 	initialTimelineNote := "订单已创建"
-	if orderSource == "supply_direct" {
+	if shouldEnterProviderConfirmation(orderSource, orderMode) {
 		initialStatus = "pending_provider_confirmation"
 		initialTimelineStatus = "pending_provider_confirmation"
-		initialTimelineNote = "直达订单已创建，待机主确认"
+		initialTimelineNote = "直达订单已创建，待服务商确认"
 	}
 
 	order := &model.Order{
@@ -172,6 +195,7 @@ func (s *OrderService) createOrderWithRepos(
 		OrderType:              req.OrderType,
 		RelatedID:              req.RelatedID,
 		OrderSource:            orderSource,
+		OrderMode:              orderMode,
 		DemandID:               demandID,
 		SourceSupplyID:         sourceSupplyID,
 		DroneID:                req.DroneID,
@@ -232,7 +256,7 @@ func (s *OrderService) createOrderWithRepos(
 		if err := orderRepo.AddTimeline(&model.OrderTimeline{
 			OrderID:      order.ID,
 			Status:       "accepted",
-			Note:         "飞手已接单",
+			Note:         "服务商已接单",
 			OperatorID:   drone.OwnerID,
 			OperatorType: "owner",
 		}); err != nil {
@@ -270,7 +294,7 @@ func (s *OrderService) createDemandMarketOrderWithRepos(
 		return nil, errors.New("报价设备不存在")
 	}
 	if drone.OwnerID != quote.OwnerUserID {
-		return nil, errors.New("报价机主与设备归属不一致")
+		return nil, errors.New("报价服务商与设备归属不一致")
 	}
 	if !drone.EligibleForMarketplace() {
 		return nil, errors.New("报价设备当前不满足平台准入条件")
@@ -283,7 +307,7 @@ func (s *OrderService) createDemandMarketOrderWithRepos(
 	destAddr, destLat, destLng := resolveDemandDestinationAddress(demand)
 	startAt, endAt := resolveDemandSchedule(demand)
 
-	commissionRate := float64(s.cfg.Payment.CommissionRate)
+	commissionRate := s.paymentCommissionRate()
 	commission := int64(float64(quote.PriceAmount) * commissionRate / 100)
 	ownerAmount := quote.PriceAmount - commission
 	sourceSupplyID := s.resolveSourceSupplyIDWithRepo(quote.OwnerUserID, quote.DroneID, ownerDomainRepo)
@@ -295,6 +319,7 @@ func (s *OrderService) createDemandMarketOrderWithRepos(
 		OrderType:              "cargo",
 		RelatedID:              0,
 		OrderSource:            "demand_market",
+		OrderMode:              OrderModeNegotiated,
 		DemandID:               demand.ID,
 		SourceSupplyID:         sourceSupplyID,
 		DroneID:                quote.DroneID,
@@ -339,7 +364,7 @@ func (s *OrderService) createDemandMarketOrderWithRepos(
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      order.ID,
 		Status:       "pending_payment",
-		Note:         "客户已选择机主报价，订单待支付",
+		Note:         "客户已选择服务商报价，订单待支付",
 		OperatorID:   demand.ClientUserID,
 		OperatorType: "renter",
 	}); err != nil {
@@ -380,6 +405,204 @@ type DirectOrderResult struct {
 	TotalAmount        int64  `json:"total_amount"`
 	PlatformCommission int64  `json:"platform_commission"`
 	OwnerAmount        int64  `json:"owner_amount"`
+}
+
+type PlatformPricedOrderInput struct {
+	Origin           PricingPoint `json:"origin"`
+	Destination      PricingPoint `json:"destination"`
+	CargoWeightKG    float64      `json:"cargo_weight_kg"`
+	ScheduledStartAt time.Time    `json:"scheduled_start_at"`
+	ServiceClassCode string       `json:"service_class_code"`
+	CargoScene       string       `json:"cargo_scene"`
+	Note             string       `json:"note"`
+	Description      string       `json:"description"`
+}
+
+type PlatformPricedOrderResult struct {
+	Order    *model.Order     `json:"order"`
+	Estimate *PricingEstimate `json:"estimate"`
+}
+
+func (s *OrderService) CreateInstantOrder(clientUserID int64, input *PlatformPricedOrderInput) (*PlatformPricedOrderResult, error) {
+	return s.createPlatformPricedOrder(clientUserID, OrderModeInstant, input)
+}
+
+func (s *OrderService) CreateReservationOrder(clientUserID int64, input *PlatformPricedOrderInput) (*PlatformPricedOrderResult, error) {
+	return s.createPlatformPricedOrder(clientUserID, OrderModeReservation, input)
+}
+
+func (s *OrderService) createPlatformPricedOrder(clientUserID int64, mode string, input *PlatformPricedOrderInput) (*PlatformPricedOrderResult, error) {
+	if s == nil || s.orderRepo == nil {
+		return nil, errors.New("订单服务未初始化")
+	}
+	mode = normalizeOrderMode(mode)
+	if mode != OrderModeInstant && mode != OrderModeReservation {
+		return nil, errors.New("订单模式不支持")
+	}
+	if clientUserID <= 0 {
+		return nil, errors.New("客户账号无效")
+	}
+	if input == nil {
+		return nil, errors.New("下单参数不能为空")
+	}
+	if input.ScheduledStartAt.IsZero() {
+		input.ScheduledStartAt = time.Now()
+	}
+	if mode == OrderModeReservation && !input.ScheduledStartAt.After(time.Now()) {
+		return nil, errors.New("预约时间必须晚于当前时间")
+	}
+	if s.pricingService == nil {
+		return nil, errors.New("计价服务未初始化")
+	}
+
+	estimate, err := s.pricingService.Estimate(PricingEstimateInput{
+		Origin:           input.Origin,
+		Destination:      input.Destination,
+		CargoWeightKG:    input.CargoWeightKG,
+		ScheduledStartAt: input.ScheduledStartAt,
+		ServiceClassCode: strings.TrimSpace(input.ServiceClassCode),
+		CargoScene:       strings.TrimSpace(input.CargoScene),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	db := s.orderRepo.DB()
+	if db == nil {
+		broadcastRepo := (*repository.OrderBroadcastRepo)(nil)
+		if s.broadcastService != nil {
+			broadcastRepo = s.broadcastService.broadcastRepo
+		}
+		order, err := s.createPlatformPricedOrderWithRepos(clientUserID, mode, input, estimate, s.orderRepo, s.clientRepo, s.orderArtifactRepo, broadcastRepo)
+		if err != nil {
+			return nil, err
+		}
+		return &PlatformPricedOrderResult{Order: order, Estimate: estimate}, nil
+	}
+
+	var created *model.Order
+	err = db.Transaction(func(tx *gorm.DB) error {
+		order, txErr := s.createPlatformPricedOrderWithRepos(
+			clientUserID,
+			mode,
+			input,
+			estimate,
+			repository.NewOrderRepo(tx),
+			repository.NewClientRepo(tx),
+			repository.NewOrderArtifactRepo(tx),
+			repository.NewOrderBroadcastRepo(tx),
+		)
+		if txErr != nil {
+			return txErr
+		}
+		created = order
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PlatformPricedOrderResult{Order: created, Estimate: estimate}, nil
+}
+
+func (s *OrderService) createPlatformPricedOrderWithRepos(
+	clientUserID int64,
+	mode string,
+	input *PlatformPricedOrderInput,
+	estimate *PricingEstimate,
+	orderRepo *repository.OrderRepo,
+	clientRepo *repository.ClientRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+	broadcastRepo *repository.OrderBroadcastRepo,
+) (*model.Order, error) {
+	if orderRepo == nil {
+		return nil, errors.New("订单依赖未初始化")
+	}
+	if estimate == nil {
+		return nil, errors.New("计价结果不能为空")
+	}
+
+	client, err := ensureClientForOrder(clientUserID, clientRepo)
+	if err != nil {
+		return nil, err
+	}
+
+	startAt := input.ScheduledStartAt
+	endAt := startAt.Add(time.Duration(estimate.EstimatedDurationMin) * time.Minute)
+	status := initialOrderStatus(mode, mode)
+	commissionRate := s.paymentCommissionRate()
+	commission := int64(float64(estimate.TotalEstimatedCents) * commissionRate / 100)
+	ownerAmount := estimate.TotalEstimatedCents - commission
+	serviceAddr := firstNonEmpty(input.Origin.Address, "起运点")
+	destAddr := firstNonEmpty(input.Destination.Address, "送达点")
+	reservedStartAt := (*time.Time)(nil)
+	if mode == OrderModeReservation {
+		reservedStartAt = &startAt
+	}
+
+	order := &model.Order{
+		OrderNo:                generateOrderNo(),
+		OrderType:              "cargo",
+		RelatedID:              0,
+		OrderSource:            mode,
+		OrderMode:              mode,
+		ServiceClassCode:       estimate.ServiceClassCode,
+		DemandID:               0,
+		SourceSupplyID:         0,
+		DroneID:                0,
+		OwnerID:                0,
+		PilotID:                0,
+		RenterID:               clientUserID,
+		ClientID:               client.ID,
+		ClientUserID:           clientUserID,
+		ProviderUserID:         0,
+		DroneOwnerUserID:       0,
+		ExecutorPilotUserID:    0,
+		NeedsDispatch:          false,
+		ExecutionMode:          "self_execute",
+		Title:                  buildPlatformPricedOrderTitle(mode, input),
+		ServiceType:            defaultDemandServiceType,
+		CargoWeightKG:          estimate.CargoWeightKG,
+		StartTime:              startAt,
+		EndTime:                endAt,
+		ServiceLatitude:        input.Origin.Latitude,
+		ServiceLongitude:       input.Origin.Longitude,
+		ServiceAddress:         serviceAddr,
+		DestLatitude:           &input.Destination.Latitude,
+		DestLongitude:          &input.Destination.Longitude,
+		DestAddress:            destAddr,
+		EstimatedDistanceM:     estimate.DistanceM,
+		EstimatedDurationMin:   estimate.EstimatedDurationMin,
+		PriceBreakdownJSON:     estimate.PriceBreakdownJSON,
+		ReservedStartAt:        reservedStartAt,
+		TotalAmount:            estimate.TotalEstimatedCents,
+		PlatformCommissionRate: commissionRate,
+		PlatformCommission:     commission,
+		OwnerAmount:            ownerAmount,
+		Status:                 status,
+	}
+
+	if err := orderRepo.Create(order); err != nil {
+		return nil, err
+	}
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      order.ID,
+		Status:       status,
+		Note:         buildPlatformPricedOrderTimelineNote(mode, input),
+		OperatorID:   clientUserID,
+		OperatorType: "renter",
+	}); err != nil {
+		return nil, err
+	}
+	if err := s.syncOrderSnapshots(order, artifactRepo, nil, nil); err != nil {
+		return nil, err
+	}
+	if mode == OrderModeInstant && s.broadcastService != nil {
+		if _, err := s.broadcastService.createForOrderWithRepos(order, orderRepo, broadcastRepo, artifactRepo, time.Now()); err != nil {
+			return nil, err
+		}
+	}
+
+	return order, nil
 }
 
 func (s *OrderService) CreateDirectSupplyOrder(renterUserID int64, client *model.Client, supplyID int64, input *DirectOrderInput) (*model.Order, error) {
@@ -476,7 +699,7 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 	serviceAddr, serviceLat, serviceLng := resolveDirectOrderPrimaryAddress(input)
 	destAddr, destLat, destLng := resolveDirectOrderDestination(input)
 	executionMode, needsDispatch, pilotID, executorPilotUserID := s.resolveOrderExecutionWithRepo(supply.OwnerUserID, pilotRepo)
-	commissionRate := float64(s.cfg.Payment.CommissionRate)
+	commissionRate := s.paymentCommissionRate()
 	commission := int64(float64(totalAmount) * commissionRate / 100)
 	ownerAmount := totalAmount - commission
 	clientUserID := renterUserID
@@ -491,6 +714,7 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 		OrderType:              "cargo",
 		RelatedID:              0,
 		OrderSource:            "supply_direct",
+		OrderMode:              OrderModeNegotiated,
 		DemandID:               0,
 		SourceSupplyID:         supply.ID,
 		DroneID:                supply.DroneID,
@@ -524,7 +748,7 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 		PlatformCommission:     commission,
 		OwnerAmount:            ownerAmount,
 		DepositAmount:          drone.Deposit,
-		Status:                 "pending_provider_confirmation",
+		Status:                 initialOrderStatus("supply_direct", OrderModeNegotiated),
 	}
 
 	existingOrder, err := orderRepo.FindReusableDirectSupplyOrder(repository.DirectOrderReuseLookup{
@@ -551,7 +775,7 @@ func (s *OrderService) createDirectSupplyOrderWithRepos(
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      order.ID,
 		Status:       "pending_provider_confirmation",
-		Note:         "直达订单已创建，待机主确认",
+		Note:         "直达订单已创建，待服务商确认",
 		OperatorID:   renterUserID,
 		OperatorType: "renter",
 	}); err != nil {
@@ -608,7 +832,7 @@ func (s *OrderService) ProviderConfirmOrder(orderID, ownerID int64) error {
 		); txErr != nil {
 			return txErr
 		}
-		// 机主确认订单时自动签署合同
+		// 服务商确认订单时自动签署合同
 		if s.contractService != nil {
 			_ = s.contractService.ProviderAutoSign(tx, orderID, ownerID)
 		}
@@ -642,8 +866,8 @@ func (s *OrderService) providerConfirmOrderWithRepos(
 	if order.ProviderUserID == 0 && order.OwnerID != ownerID {
 		return errors.New("无权操作此订单")
 	}
-	if order.OrderSource != "supply_direct" || order.Status != "pending_provider_confirmation" {
-		return errors.New("当前订单不允许机主确认")
+	if order.OrderSource != "supply_direct" || !isNegotiatedOrder(order) || order.Status != "pending_provider_confirmation" {
+		return errors.New("当前订单不允许服务商确认")
 	}
 
 	executionMode, needsDispatch, pilotID, executorPilotUserID := s.resolveOrderExecutionWithRepo(order.ProviderUserID, pilotRepo)
@@ -678,7 +902,7 @@ func (s *OrderService) providerConfirmOrderWithRepos(
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      orderID,
 		Status:       "pending_payment",
-		Note:         "机主已确认直达订单，请先完成合同签署后再支付",
+		Note:         "服务商已确认直达订单，请先完成合同签署后再支付",
 		OperatorID:   ownerID,
 		OperatorType: "owner",
 	}); err != nil {
@@ -741,8 +965,8 @@ func (s *OrderService) providerRejectOrderWithRepos(
 	if order.ProviderUserID == 0 && order.OwnerID != ownerID {
 		return errors.New("无权操作此订单")
 	}
-	if order.OrderSource != "supply_direct" || order.Status != "pending_provider_confirmation" {
-		return errors.New("当前订单不允许机主拒绝")
+	if order.OrderSource != "supply_direct" || !isNegotiatedOrder(order) || order.Status != "pending_provider_confirmation" {
+		return errors.New("当前订单不允许服务商拒绝")
 	}
 
 	now := time.Now()
@@ -758,7 +982,7 @@ func (s *OrderService) providerRejectOrderWithRepos(
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      orderID,
 		Status:       "provider_rejected",
-		Note:         "机主已拒绝直达订单: " + firstNonEmpty(reason, "未提供原因"),
+		Note:         "服务商已拒绝直达订单: " + firstNonEmpty(reason, "未提供原因"),
 		OperatorID:   ownerID,
 		OperatorType: "owner",
 	}); err != nil {
@@ -804,7 +1028,7 @@ func (s *OrderService) acceptOrderWithRepos(
 	if order.OwnerID != ownerID {
 		return errors.New("无权操作此订单")
 	}
-	if order.OrderSource == "supply_direct" && order.Status == "pending_provider_confirmation" {
+	if order.OrderSource == "supply_direct" && isNegotiatedOrder(order) && order.Status == "pending_provider_confirmation" {
 		return s.providerConfirmOrderWithRepos(orderID, ownerID, orderRepo, pilotRepo, artifactRepo, demandDomainRepo, ownerDomainRepo)
 	}
 	if order.Status != "created" {
@@ -875,7 +1099,7 @@ func (s *OrderService) rejectOrderWithRepos(
 	if order.OwnerID != ownerID {
 		return errors.New("无权操作此订单")
 	}
-	if order.OrderSource == "supply_direct" && order.Status == "pending_provider_confirmation" {
+	if order.OrderSource == "supply_direct" && isNegotiatedOrder(order) && order.Status == "pending_provider_confirmation" {
 		return s.providerRejectOrderWithRepos(orderID, ownerID, reason, orderRepo, artifactRepo, demandDomainRepo, ownerDomainRepo)
 	}
 	if order.Status != "created" {
@@ -1082,6 +1306,103 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeOrderMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case OrderModeInstant:
+		return OrderModeInstant
+	case OrderModeReservation:
+		return OrderModeReservation
+	case "", OrderModeNegotiated:
+		return OrderModeNegotiated
+	default:
+		return OrderModeNegotiated
+	}
+}
+
+func isNegotiatedOrder(order *model.Order) bool {
+	if order == nil {
+		return false
+	}
+	return normalizeOrderMode(order.OrderMode) == OrderModeNegotiated
+}
+
+func shouldEnterProviderConfirmation(orderSource, orderMode string) bool {
+	return orderSource == "supply_direct" && normalizeOrderMode(orderMode) == OrderModeNegotiated
+}
+
+func initialOrderStatus(orderSource, orderMode string) string {
+	switch normalizeOrderMode(orderMode) {
+	case OrderModeInstant:
+		return "pending_dispatch"
+	case OrderModeReservation:
+		return "scheduled"
+	default:
+		if shouldEnterProviderConfirmation(orderSource, orderMode) {
+			return "pending_provider_confirmation"
+		}
+		return "created"
+	}
+}
+
+func (s *OrderService) paymentCommissionRate() float64 {
+	if s == nil || s.cfg == nil {
+		return 0
+	}
+	return float64(s.cfg.Payment.CommissionRate)
+}
+
+func ensureClientForOrder(userID int64, clientRepo *repository.ClientRepo) (*model.Client, error) {
+	if userID <= 0 {
+		return nil, errors.New("客户账号无效")
+	}
+	if clientRepo == nil {
+		return &model.Client{UserID: userID}, nil
+	}
+
+	client, err := clientRepo.GetByUserID(userID)
+	if err == nil {
+		return client, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	client = &model.Client{
+		UserID:             userID,
+		ClientType:         "individual",
+		VerificationStatus: "pending",
+		Status:             "active",
+	}
+	if err := clientRepo.Create(client); err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func buildPlatformPricedOrderTitle(mode string, input *PlatformPricedOrderInput) string {
+	if input != nil {
+		if title := strings.TrimSpace(input.Description); title != "" {
+			return title
+		}
+	}
+	if normalizeOrderMode(mode) == OrderModeReservation {
+		return "预约无人机吊运"
+	}
+	return "即时无人机吊运"
+}
+
+func buildPlatformPricedOrderTimelineNote(mode string, input *PlatformPricedOrderInput) string {
+	if input != nil {
+		if note := strings.TrimSpace(input.Note); note != "" {
+			return note
+		}
+	}
+	if normalizeOrderMode(mode) == OrderModeReservation {
+		return "预约单已创建，待到时进入接单池"
+	}
+	return "即时单已创建，等待服务商接单"
 }
 
 func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) error {
@@ -1487,6 +1808,277 @@ func (s *OrderService) CreateDispute(orderID, userID int64, disputeType, summary
 	return record, nil
 }
 
+func (s *OrderService) ConfirmSiteSafetyCheck(orderID, userID int64, note string) error {
+	db := s.orderRepo.DB()
+	if db == nil {
+		if err := s.confirmSiteSafetyCheckWithRepos(orderID, userID, note, s.orderRepo); err != nil {
+			return err
+		}
+		if s.eventService != nil {
+			if order, err := s.orderRepo.GetByID(orderID); err == nil && order != nil {
+				s.eventService.NotifyOrderStatusChanged(order, "order_site_safety_checked", "现场复核已完成", fmt.Sprintf("订单“%s”已完成现场安全复核。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
+			}
+		}
+		return nil
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return s.confirmSiteSafetyCheckWithRepos(orderID, userID, note, repository.NewOrderRepo(tx))
+	}); err != nil {
+		return err
+	}
+	if s.eventService != nil {
+		if order, err := s.orderRepo.GetByID(orderID); err == nil && order != nil {
+			s.eventService.NotifyOrderStatusChanged(order, "order_site_safety_checked", "现场复核已完成", fmt.Sprintf("订单“%s”已完成现场安全复核。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
+		}
+	}
+	return nil
+}
+
+type SiteSafetyChecklistItem struct {
+	Key     string `json:"key"`
+	Label   string `json:"label"`
+	Checked bool   `json:"checked"`
+	Note    string `json:"note,omitempty"`
+}
+
+type SubmitSiteSafetyCheckInput struct {
+	Checklist []SiteSafetyChecklistItem `json:"checklist"`
+	Photos    []string                  `json:"photos"`
+	Note      string                    `json:"note"`
+}
+
+func (s *OrderService) SubmitSiteSafetyCheck(orderID, userID int64, input SubmitSiteSafetyCheckInput) (*model.OrderSiteSafetyCheck, error) {
+	input = normalizeSiteSafetyCheckInput(input)
+	if err := validateSiteSafetyEvidence(input); err != nil {
+		return nil, err
+	}
+
+	var record *model.OrderSiteSafetyCheck
+	db := s.orderRepo.DB()
+	if db == nil {
+		var err error
+		record, err = s.submitSiteSafetyCheckWithRepos(orderID, userID, input, s.orderRepo)
+		if err != nil {
+			return nil, err
+		}
+		s.notifySiteSafetyChecked(orderID)
+		return record, nil
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		record, err = s.submitSiteSafetyCheckWithRepos(orderID, userID, input, repository.NewOrderRepo(tx))
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	s.notifySiteSafetyChecked(orderID)
+	return record, nil
+}
+
+func (s *OrderService) GetLatestSiteSafetyCheck(orderID, userID int64) (*model.OrderSiteSafetyCheck, error) {
+	if _, err := s.GetAuthorizedOrder(orderID, userID, ""); err != nil {
+		return nil, err
+	}
+	return s.GetLatestSiteSafetyCheckByOrder(orderID)
+}
+
+func (s *OrderService) GetLatestSiteSafetyCheckByOrder(orderID int64) (*model.OrderSiteSafetyCheck, error) {
+	record, err := s.orderRepo.GetLatestSiteSafetyCheck(orderID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return record, err
+}
+
+func (s *OrderService) confirmSiteSafetyCheckWithRepos(orderID, userID int64, note string, orderRepo *repository.OrderRepo) error {
+	order, err := orderRepo.GetByID(orderID)
+	if err != nil {
+		return errors.New("订单不存在")
+	}
+
+	operatorType, err := s.resolveSiteSafetyOperator(order, userID)
+	if err != nil {
+		return err
+	}
+	if err := validateSiteSafetyOrderStatus(order.Status); err != nil {
+		return err
+	}
+
+	normalizedAirspace := strings.ToLower(strings.TrimSpace(order.AirspaceStatus))
+	if normalizedAirspace == "approved" || normalizedAirspace == "airspace_approved" {
+		return nil
+	}
+
+	now := time.Now()
+	if err := orderRepo.UpdateFields(orderID, map[string]interface{}{
+		"airspace_status": "approved",
+		"updated_at":      now,
+	}); err != nil {
+		return err
+	}
+
+	timelineNote := strings.TrimSpace(note)
+	if timelineNote == "" {
+		timelineNote = "现场安全复核已完成"
+	}
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       "airspace_approved",
+		Note:         timelineNote,
+		OperatorID:   userID,
+		OperatorType: operatorType,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *OrderService) submitSiteSafetyCheckWithRepos(orderID, userID int64, input SubmitSiteSafetyCheckInput, orderRepo *repository.OrderRepo) (*model.OrderSiteSafetyCheck, error) {
+	order, err := orderRepo.GetByID(orderID)
+	if err != nil {
+		return nil, errors.New("订单不存在")
+	}
+
+	operatorType, err := s.resolveSiteSafetyOperator(order, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateSiteSafetyOrderStatus(order.Status); err != nil {
+		return nil, err
+	}
+
+	checklistJSON, err := json.Marshal(input.Checklist)
+	if err != nil {
+		return nil, err
+	}
+	photosJSON, err := json.Marshal(input.Photos)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	record := &model.OrderSiteSafetyCheck{
+		OrderID:        orderID,
+		OperatorUserID: userID,
+		OperatorRole:   operatorType,
+		Status:         "completed",
+		Checklist:      model.JSON(checklistJSON),
+		Photos:         model.JSON(photosJSON),
+		Note:           input.Note,
+		CheckedAt:      now,
+	}
+	if err := orderRepo.CreateSiteSafetyCheck(record); err != nil {
+		return nil, err
+	}
+
+	if err := orderRepo.UpdateFields(orderID, map[string]interface{}{
+		"airspace_status": "approved",
+		"updated_at":      now,
+	}); err != nil {
+		return nil, err
+	}
+
+	timelineNote := strings.TrimSpace(input.Note)
+	if timelineNote == "" {
+		timelineNote = fmt.Sprintf("现场安全复核已完成，已上传 %d 张照片", len(input.Photos))
+	}
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       "airspace_approved",
+		Note:         timelineNote,
+		OperatorID:   userID,
+		OperatorType: operatorType,
+	}); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func (s *OrderService) resolveSiteSafetyOperator(order *model.Order, userID int64) (string, error) {
+	if s.CanAccessOrder(order, userID, "owner") {
+		return "owner", nil
+	}
+	if s.CanAccessOrder(order, userID, "pilot") {
+		return "pilot", nil
+	}
+	return "", errors.New("无权确认现场复核")
+}
+
+func validateSiteSafetyOrderStatus(status string) error {
+	switch normalizeExecutionStatus(status) {
+	case "pending_dispatch", "assigned", "confirmed", "airspace_applying", "airspace_approved", "preparing", "in_transit":
+		return nil
+	case "pending_provider_confirmation", "pending_payment", "accepted":
+		return errors.New("订单尚未进入可复核阶段")
+	case "delivered", "completed":
+		return errors.New("订单已结束，不能重复现场复核")
+	case "cancelled", "provider_rejected", "refunded":
+		return errors.New("订单已取消，不能现场复核")
+	default:
+		return fmt.Errorf("订单当前状态为 %s，不能现场复核", status)
+	}
+}
+
+func normalizeSiteSafetyCheckInput(input SubmitSiteSafetyCheckInput) SubmitSiteSafetyCheckInput {
+	items := make([]SiteSafetyChecklistItem, 0, len(input.Checklist))
+	for _, item := range input.Checklist {
+		key := strings.TrimSpace(item.Key)
+		label := strings.TrimSpace(item.Label)
+		if key == "" && label == "" {
+			continue
+		}
+		items = append(items, SiteSafetyChecklistItem{
+			Key:     key,
+			Label:   label,
+			Checked: item.Checked,
+			Note:    strings.TrimSpace(item.Note),
+		})
+	}
+	photos := make([]string, 0, len(input.Photos))
+	seen := map[string]bool{}
+	for _, raw := range input.Photos {
+		photo := strings.TrimSpace(raw)
+		if photo == "" || seen[photo] {
+			continue
+		}
+		seen[photo] = true
+		photos = append(photos, photo)
+	}
+	input.Checklist = items
+	input.Photos = photos
+	input.Note = strings.TrimSpace(input.Note)
+	return input
+}
+
+func validateSiteSafetyEvidence(input SubmitSiteSafetyCheckInput) error {
+	if len(input.Checklist) == 0 {
+		return errors.New("请至少提交一项现场复核清单")
+	}
+	for _, item := range input.Checklist {
+		if item.Label == "" {
+			return errors.New("现场复核清单名称不能为空")
+		}
+		if !item.Checked {
+			return fmt.Errorf("请确认%s", item.Label)
+		}
+	}
+	if len(input.Photos) == 0 {
+		return errors.New("请至少上传一张现场复核照片")
+	}
+	return nil
+}
+
+func (s *OrderService) notifySiteSafetyChecked(orderID int64) {
+	if s.eventService == nil {
+		return
+	}
+	if order, err := s.orderRepo.GetByID(orderID); err == nil && order != nil {
+		s.eventService.NotifyOrderStatusChanged(order, "order_site_safety_checked", "现场复核已完成", fmt.Sprintf("订单“%s”已完成现场安全复核。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
+	}
+}
+
 func (s *OrderService) AdminListOrders(page, pageSize int, filters map[string]interface{}) ([]model.Order, int64, error) {
 	return s.orderRepo.List(page, pageSize, filters)
 }
@@ -1585,7 +2177,7 @@ func (s *OrderService) resolveOrderExecutionWithRepo(providerUserID int64, pilot
 	}
 	pilot, err := pilotRepo.GetByUserID(providerUserID)
 	if err != nil || pilot == nil || pilot.VerificationStatus != "verified" {
-		return "dispatch_pool", true, 0, 0
+		return "self_execute", false, 0, providerUserID
 	}
 	return "self_execute", false, pilot.ID, providerUserID
 }
@@ -1782,10 +2374,10 @@ func executionStatusTransitions() map[string]map[string]bool {
 
 func executionStatusLabels() map[string]string {
 	return map[string]string{
-		"confirmed":         "飞手已确认接单",
+		"confirmed":         "服务商已确认接单",
 		"airspace_applying": "正在申请空域许可",
 		"airspace_approved": "空域许可已获批",
-		"preparing":         "执行人已开始准备",
+		"preparing":         "服务商已开始准备",
 		"in_transit":        "无人机已起飞，订单执行中",
 		"delivered":         "已到达目的地，完成投送",
 	}
@@ -1912,12 +2504,19 @@ func (s *OrderService) updateExecutionStatusWithRepos(userID int64, orderID int6
 		Status:       rawStatus,
 		Note:         executionStatusLabels()[targetStatus],
 		OperatorID:   userID,
-		OperatorType: "pilot",
+		OperatorType: executionOperatorType(order, userID),
 	}); err != nil {
 		return "", err
 	}
 
 	return targetStatus, nil
+}
+
+func executionOperatorType(order *model.Order, userID int64) string {
+	if order != nil && order.ExecutionMode == "self_execute" && order.ProviderUserID == userID {
+		return "provider"
+	}
+	return "pilot"
 }
 
 func (s *OrderService) UpdateExecutionStatus(userID int64, orderID int64, status string) error {
@@ -2007,7 +2606,41 @@ func (s *OrderService) ConfirmReceipt(userID int64, orderID int64) error {
 		s.eventService.NotifyOrderStatusChanged(order, "order_completed", "订单已完成", fmt.Sprintf("订单\u201c%s\u201d已完成。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
 	}
 
+	s.finalizeSettlementAfterCompletion(order)
+
 	return nil
+}
+
+func (s *OrderService) finalizeSettlementAfterCompletion(order *model.Order) {
+	if s.settlementService == nil {
+		return
+	}
+	if order == nil {
+		return
+	}
+	orderID := order.ID
+	settlement, err := s.settlementService.FinalizeOrderSettlement(orderID)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Warn("Failed to finalize order settlement", zap.Int64("order_id", orderID), zap.Error(err))
+		}
+		_ = s.orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      orderID,
+			Status:       "settlement_failed",
+			Note:         "结算入账失败，等待平台处理",
+			OperatorType: "system",
+		})
+		return
+	}
+	_ = s.orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      orderID,
+		Status:       "settled",
+		Note:         fmt.Sprintf("结算已入账：履约服务%s，设备服务%s", formatAmountFen(settlement.PilotFee), formatAmountFen(settlement.OwnerFee)),
+		OperatorType: "system",
+	})
+	if s.eventService != nil {
+		s.eventService.NotifySettlementSettled(order, settlement)
+	}
 }
 
 func (s *OrderService) syncFormalDispatchCompletion(orderID, userID int64, now time.Time) {
@@ -2045,4 +2678,8 @@ func (s *OrderService) syncFormalDispatchCompletion(orderID, userID int64, now t
 		OperatorUserID: userID,
 		Note:           "客户已确认签收，正式派单自动归档完成",
 	})
+}
+
+func formatAmountFen(amount int64) string {
+	return fmt.Sprintf("¥%.2f", float64(amount)/100)
 }

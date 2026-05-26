@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import { markMeInitialized, setMeSummary } from '../store/slices/authSlice';
+import {
+  HAUL_ROLE_MODE_STORAGE_KEY,
+  hydrateHaulRoleMode,
+} from '../store/slices/roleSlice';
 import { pushService } from '../services/pushFacade';
 import { sessionService } from '../services/session';
 import { wsService } from '../services/websocket';
@@ -42,6 +47,20 @@ export default function AppNavigator() {
       console.warn('[AppNavigator] Push init failed', error);
     });
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(HAUL_ROLE_MODE_STORAGE_KEY)
+      .then(value => {
+        if (active) {
+          dispatch(hydrateHaulRoleMode(value));
+        }
+      })
+      .catch(() => null);
+    return () => {
+      active = false;
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     if (isAuthenticated) {

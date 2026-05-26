@@ -12,8 +12,14 @@
         <view wx:if="{{item.badge}}" class="tabbar-badge">
           <text class="tabbar-badge-text">{{item.badge}}</text>
         </view>
+        <view wx:elif="{{item.badgeDot}}" class="tabbar-badge-dot"></view>
 
-        <image class="tabbar-icon-img" src="{{selected == index ? item.selectedIconPath : item.iconPath}}" mode="aspectFit"></image>
+        <image
+          class="tabbar-icon-img tabbar-icon-{{item.key}}"
+          src="{{selected == index ? item.selectedIconPath : item.iconPath}}"
+          style="width: {{selected == index ? (item.selectedIconWidth || item.iconWidth) : item.iconWidth}}rpx; height: {{selected == index ? (item.selectedIconHeight || item.iconHeight) : item.iconHeight}}rpx;"
+          mode="aspectFit"
+        ></image>
       </view>
 
       <text class="tabbar-label">{{item.text}}</text>

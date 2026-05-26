@@ -17,6 +17,21 @@ export interface User {
   created_at?: string;
 }
 
+export type ProviderReviewStatus = "none" | "pending_review" | "approved" | "rejected" | "suspended";
+export type ProviderNextAction = "start_onboarding" | "wait_review" | "fix_rejected" | "open_workbench";
+
+export interface ProviderRoleSummary {
+  status: ProviderReviewStatus;
+  asset_status: ProviderReviewStatus;
+  executor_status: ProviderReviewStatus;
+  can_use_workbench: boolean;
+  can_quote: boolean;
+  can_arrange_dispatch: boolean;
+  can_accept_dispatch: boolean;
+  can_self_execute: boolean;
+  next_action: ProviderNextAction;
+}
+
 export interface RoleSummary {
   has_client_role: boolean;
   has_owner_role: boolean;
@@ -24,6 +39,7 @@ export interface RoleSummary {
   can_publish_supply: boolean;
   can_accept_dispatch: boolean;
   can_self_execute: boolean;
+  provider?: ProviderRoleSummary | null;
 }
 
 export interface MeSummary {
@@ -303,6 +319,12 @@ export interface V2NotificationSummary {
     order_no?: string;
     dispatch_task_id?: number;
     dispatch_no?: string;
+    settlement_id?: number;
+    settlement_no?: string;
+    settlement_type?: string;
+    income_amount?: number;
+    next_action?: string;
+    role?: string;
     binding_id?: number;
     drone_id?: number;
     status?: string;
@@ -365,7 +387,29 @@ export interface SupplyDroneSummary {
   serial_number: string;
   mtow_kg: number;
   max_payload_kg: number;
+  max_distance?: number;
+  max_flight_time?: number;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
   city?: string;
+  availability_status?: string;
+  certification_status?: string;
+  uom_verified?: string;
+  insurance_verified?: string;
+  airworthiness_verified?: string;
+  insurance_expire_date?: string | null;
+  airworthiness_cert_expire?: string | null;
+}
+
+export interface SupplyMarketStats {
+  total_order_count?: number;
+  completed_order_count?: number;
+  average_response_seconds?: number;
+  response_sample_count?: number;
+  rating?: number;
+  rating_count?: number;
+  rating_source?: string;
 }
 
 export interface SupplySummary {
@@ -383,7 +427,11 @@ export interface SupplySummary {
   accepts_direct_order: boolean;
   status: string;
   updated_at?: string;
+  service_area_snapshot?: any;
+  max_range_km?: number;
+  owner?: SupplyOwnerSummary;
   drone?: SupplyDroneSummary;
+  stats?: SupplyMarketStats;
 }
 
 export interface SupplyDetail extends SupplySummary {
@@ -496,9 +544,19 @@ export interface DemandSummary {
   status: string;
   service_type: string;
   cargo_scene?: string;
+  departure_address?: AddressSnapshot | null;
+  destination_address?: AddressSnapshot | null;
+  service_address?: AddressSnapshot | null;
   service_address_text?: string;
   scheduled_start_at?: string;
   scheduled_end_at?: string;
+  cargo_weight_kg?: number;
+  cargo_volume_m3?: number;
+  cargo_length_cm?: number;
+  cargo_width_cm?: number;
+  cargo_height_cm?: number;
+  cargo_type?: string;
+  cargo_special_requirements?: string;
   budget_min?: number;
   budget_max?: number;
   allows_pilot_candidate: boolean;
@@ -506,6 +564,17 @@ export interface DemandSummary {
   candidate_pilot_count: number;
   my_quote?: DemandQuoteSummary;
   my_candidate?: DemandCandidateSummary;
+  distance_km?: number;
+  service_range_km?: number;
+  service_coverage_status?: 'in_range' | 'out_of_range' | 'unknown' | string;
+  estimated_arrival_minutes?: number;
+  arrival_estimate_source?: string;
+  quote_response_seconds?: number;
+  matched_supply_id?: number;
+  matched_drone_id?: number;
+  matched_supply_title?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DemandDetail extends DemandSummary {
@@ -691,6 +760,7 @@ export interface V2OrderSummary {
   demand_id?: number | null;
   source_supply_id?: number | null;
   status: string;
+  airspace_status?: string;
   needs_dispatch: boolean;
   execution_mode?: string;
   provider_user_id?: number | null;
@@ -705,6 +775,14 @@ export interface V2OrderSummary {
     mtow_kg?: number;
     max_payload_kg?: number;
     availability_status?: string;
+    insurance_policy_no?: string;
+    insurance_company?: string;
+    insurance_coverage?: number;
+    insurance_expire_date?: string | null;
+    insurance_verified?: string;
+    insurance_reviewed_at?: string | null;
+    insurance_reviewed_by?: number;
+    insurance_reject_reason?: string;
   } | null;
   service_type?: string;
   service_address?: string;
@@ -969,11 +1047,12 @@ export interface V2CreateOrderPaymentResult {
   payment_flow?: {
     method: string;
     capability?: string;
-    status?: string;
-    auto_completed?: boolean;
-    recommended_method?: string;
-    notice?: string;
-  } | null;
+	    status?: string;
+	    auto_completed?: boolean;
+	    mock_enabled?: boolean;
+	    recommended_method?: string;
+	    notice?: string;
+	  } | null;
   order?: {
     id: number;
     order_no?: string;
@@ -1050,6 +1129,27 @@ export interface V2OrderFinancialSummary {
   provider_reject_reason?: string;
 }
 
+export interface V2SiteSafetyChecklistItem {
+  key: string;
+  label: string;
+  checked: boolean;
+  note?: string;
+}
+
+export interface V2SiteSafetyCheckSummary {
+  id: number;
+  order_id: number;
+  operator_user_id: number;
+  operator_role?: string;
+  status: string;
+  checklist: V2SiteSafetyChecklistItem[];
+  photos: string[];
+  note?: string;
+  checked_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface V2OrderDetail extends V2OrderSummary {
   source_info?: {
     order_source?: string;
@@ -1070,6 +1170,7 @@ export interface V2OrderDetail extends V2OrderSummary {
   disputes?: V2DisputeSummary[];
   dispute_count?: number;
   timeline?: V2OrderTimelineItem[];
+  site_safety_check?: V2SiteSafetyCheckSummary | null;
 }
 
 export interface POIItem {

@@ -139,7 +139,7 @@ export default function MyDemandsScreen({navigation, route}: any) {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={[styles.statValue, styles.statValueOrange]}>{item.candidate_pilot_count}</Text>
-            <Text style={styles.statLabel}>候选飞手</Text>
+            <Text style={styles.statLabel}>候选执行人员</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>

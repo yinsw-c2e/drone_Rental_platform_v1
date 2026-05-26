@@ -52,14 +52,14 @@ export default function DroneDetailScreen({route, navigation}: any) {
 
   const handleContact = () => {
     if (!drone?.owner_id) {
-      Alert.alert('提示', '无法获取机主信息');
+      Alert.alert('提示', '无法获取服务商信息');
       return;
     }
     navigation.navigate('Messages', {
       screen: 'Chat',
       params: {
         peerId: drone.owner_id,
-        peerName: drone.owner?.nickname || '机主',
+        peerName: drone.owner?.nickname || '服务商',
         peerAvatar: drone.owner?.avatar_url || '',
       },
     });
@@ -254,9 +254,9 @@ export default function DroneDetailScreen({route, navigation}: any) {
         {/* Detailed Info */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>设备说明</Text>
-          <Text style={styles.longDesc}>{drone.description || '机主未提供详细文字描述。'}</Text>
+          <Text style={styles.longDesc}>{drone.description || '服务商未提供详细文字描述。'}</Text>
           <View style={styles.infoList}>
-            <InfoItem label="目前位置" value={drone.address || '机主未公开'} theme={theme} />
+            <InfoItem label="目前位置" value={drone.address || '服务商未公开'} theme={theme} />
             <InfoItem label="日常维护" value={drone.availability_status === 'maintenance' ? '维护中' : '正常'} theme={theme} />
           </View>
         </View>
@@ -264,7 +264,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
         {/* Owner context if not owner */}
         {drone.owner && !isOwner && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>所属机主</Text>
+            <Text style={styles.cardTitle}>所属服务商</Text>
             <View style={styles.ownerBrief}>
               <View style={styles.ownerAvatar}>
                 <Text style={styles.ownerInitial}>{drone.owner.nickname?.charAt(0) || 'U'}</Text>
@@ -286,7 +286,7 @@ export default function DroneDetailScreen({route, navigation}: any) {
       {!isOwner && (
         <View style={styles.footerBar}>
           <TouchableOpacity style={styles.footerGhostBtn} onPress={handleContact}>
-            <Text style={styles.footerGhostText}>咨询机主</Text>
+            <Text style={styles.footerGhostText}>咨询服务商</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.footerMainBtn, drone.availability_status !== 'available' && styles.footerDisabledBtn]}

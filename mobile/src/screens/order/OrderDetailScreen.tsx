@@ -1,1817 +1,677 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
-  SafeAreaView,
+  ImageSourcePropType,
+  Linking,
   ScrollView,
+  StatusBar,
+  StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   TouchableOpacity,
   View,
-  Platform,
+  ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
-import {useSelector} from 'react-redux';
+import LinearGradient from 'react-native-linear-gradient';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import ObjectCard from '../../components/business/ObjectCard';
-import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
-import SourceTag from '../../components/business/SourceTag';
-import StatusBadge from '../../components/business/StatusBadge';
-import {getObjectStatusMeta} from '../../components/business/visuals';
-import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
+import {orderProgressAssets} from '../../assets/haul/orderProgress';
+import {orderFinanceV2Service} from '../../services/orderFinanceV2';
 import {confirmReceipt, orderV2Service} from '../../services/orderV2';
-import {RootState} from '../../store/store';
-import {
-  OrderPartySummary,
-  V2OrderAnomaly,
-  V2OrderDetail,
-  V2OrderTimelineEvent,
-  V2OrderTimelineItem,
-} from '../../types';
-import {formatOrderCancelReason} from '../../utils/orderPresentation';
-import {useTheme} from '../../theme/ThemeContext';
-import type {AppTheme} from '../../theme/index';
-import {orderDetailAssets} from '../../assets/miniProgramAssets';
+import {store} from '../../store/store';
+import {V2SettlementSummary} from '../../types';
 
-type ActionButton = {
+const DESIGN_WIDTH = 941;
+const DESIGN_HEIGHT = 1672;
+
+type DesignTextProps = React.PropsWithChildren<{
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+}>;
+
+type SummaryRow = {
+  key: string;
+  icon: ImageSourcePropType;
   label: string;
-  tone: 'primary' | 'danger' | 'ghost';
-  onPress: () => void;
+  value: string;
+  clickable?: boolean;
 };
 
-type ProgressFocus = {
-  eyebrow: string;
-  title: string;
-  desc: string;
-  eta?: string;
-  actionHint?: string;
-  tone: 'primary' | 'success' | 'warning' | 'muted';
-};
+const DesignText = ({style, numberOfLines, children}: DesignTextProps) => (
+  <Text allowFontScaling={false} numberOfLines={numberOfLines} style={style}>
+    {children}
+  </Text>
+);
 
-const ACTIVE_EXECUTION_STATUSES = [
-  'assigned',
-  'confirmed',
-  'airspace_applying',
-  'airspace_approved',
-  'loading',
-  'preparing',
-  'in_transit',
-  'delivered',
-  'completed',
-];
-
-const formatMoney = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) {
-    return '-';
-  }
+const formatFullDateTime = (value?: string | null) => {
+  if (!value) return '--';
   const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${minute}`;
+  if (Number.isNaN(date.getTime())) return String(value).replace('T', ' ').slice(0, 16);
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  const h = `${date.getHours()}`.padStart(2, '0');
+  const min = `${date.getMinutes()}`.padStart(2, '0');
+  return `${y}-${m}-${d} ${h}:${min}`;
 };
 
-const getSourceTag = (orderSource?: string) =>
-  orderSource === 'supply_direct' ? 'supply' : 'demand';
+const providerNameOf = (detail: any) =>
+  detail?.participants?.provider?.nickname ||
+  detail?.provider?.nickname ||
+  detail?.provider_nickname ||
+  '服务商待确认';
 
-const getSourceLabel = (orderSource?: string) => {
-  if (orderSource === 'supply_direct') {
-    return '快速下单';
-  }
-  if (orderSource === 'demand_market') {
-    return '任务转单';
-  }
-  return '订单';
+const providerPhoneOf = (detail: any) =>
+  detail?.participants?.provider?.phone ||
+  detail?.provider?.phone ||
+  detail?.provider_phone ||
+  '';
+
+const sourceSupplyIdOf = (detail: any) =>
+  Number(detail?.source_info?.source_supply_id || detail?.source_supply_id || detail?.supply_id || 0);
+
+const cargoWeightTextOf = (detail: any) => {
+  const value = detail?.cargo_weight_kg || detail?.cargo_weight || detail?.payload_weight_kg || detail?.current_dispatch?.cargo_weight;
+  return value ? `${value}kg` : '--';
 };
 
-const getSourceContextLabel = (orderSource?: string) => {
-  if (orderSource === 'supply_direct') {
-    return '服务直达成交';
-  }
-  if (orderSource === 'demand_market') {
-    return '任务撮合成交';
-  }
-  return '订单';
+const serviceLevelOf = (detail: any) => {
+  const weight = Number(String(cargoWeightTextOf(detail)).replace(/[^\d.]/g, '')) || 0;
+  if (detail?.estimated_service) return detail.estimated_service;
+  if (!weight) return '--';
+  if (weight <= 50) return '50kg 级服务';
+  if (weight <= 100) return '100kg 级服务';
+  if (weight <= 300) return '300kg 级服务';
+  return '300kg+ 级服务';
 };
 
-const getExecutionModeLabel = (executionMode?: string) => {
-  switch (String(executionMode || '').toLowerCase()) {
-    case 'self_execute':
-      return '机主直接执行';
-    case 'dispatch_bound_pilot':
-      return '合作飞手执行';
-    case 'dispatch_candidate_pool':
-      return '优先安排执行方';
-    case 'dispatch_pool':
-      return '平台协调执行';
-    default:
-      return '待系统确认';
-  }
+const getStepState = (detail: any) => {
+  const status = detail?.status || '';
+  if (status === 'completed') return 6;
+  if (status === 'delivered' || status === 'in_transit') return 5;
+  if (['preparing', 'assigned', 'pending_dispatch'].includes(status)) return 3;
+  if (['pending_payment', 'paid'].includes(status)) return 2;
+  return 1;
 };
 
-const getDispatchSourceLabel = (source?: string) => {
-  switch (String(source || '').toLowerCase()) {
-    case 'bound_pilot':
-      return '合作飞手';
-    case 'candidate_pool':
-      return '优先候选';
-    case 'general_pool':
-      return '平台协调';
-    case 'self_execute':
-      return '机主自执行';
-    default:
-      return source || '系统安排';
-  }
+const statusTitleOf = (status: string) => {
+  if (status === 'completed') return '订单已完成';
+  if (status === 'delivered') return '等待客户确认';
+  if (status === 'cancelled') return '订单已取消';
+  if (status === 'pending_provider_confirmation') return '等待服务商接单';
+  if (status === 'pending_payment') return '等待支付';
+  if (status === 'pending_dispatch') return '等待派单';
+  if (['loading', 'in_transit'].includes(status)) return '吊运进行中';
+  if (!status) return '订单状态未知';
+  return '服务商已接单';
 };
 
-const summarizeParty = (party?: OrderPartySummary | null, fallback = '-') => {
-  if (!party) {
-    return fallback;
-  }
-  if (party.nickname) {
-    return party.nickname;
-  }
-  if (party.user_id) {
-    return `${fallback} #${party.user_id}`;
-  }
-  return fallback;
+const statusDescOf = (status: string) => {
+  if (status === 'completed') return '本次吊运服务已完成';
+  if (status === 'delivered') return '货物已送达，请确认完成';
+  if (status === 'cancelled') return '订单已结束';
+  if (status === 'pending_provider_confirmation') return '服务商正在确认方案，请耐心等待';
+  if (status === 'pending_payment') return '请完成支付后继续履约流程';
+  if (status === 'pending_dispatch') return '服务商正在安排执行团队';
+  if (['loading', 'in_transit'].includes(status)) return '吊运作业正在进行';
+  if (!status) return '正在等待订单状态同步';
+  return '服务商正在安排准备，请耐心等待';
 };
 
-const getPartyInitial = (party?: OrderPartySummary | null, fallback = 'U') => {
-  const value = party?.nickname || '';
-  return value ? value.charAt(0).toUpperCase() : fallback;
+const statusLabelOf = (status?: string) => {
+  if (status === 'pending_provider_confirmation') return '待服务商确认';
+  if (status === 'pending_payment') return '待支付';
+  if (status === 'pending_dispatch') return '待派单';
+  if (status === 'assigned') return '已派单';
+  if (status === 'preparing') return '准备中';
+  if (status === 'loading') return '装载中';
+  if (status === 'in_transit') return '吊运中';
+  if (status === 'delivered') return '待确认收货';
+  if (status === 'completed') return '已完成';
+  if (status === 'cancelled') return '已取消';
+  return status || '状态已更新';
 };
 
-const getSourceTitle = (detail?: V2OrderDetail | null) => {
-  if (!detail?.source_info?.snapshots) {
-    return '-';
-  }
-  const snapshots = detail.source_info.snapshots as Record<string, any>;
-  return snapshots?.demand?.title || snapshots?.supply?.title || snapshots?.client?.title || '-';
+const formatMoney = (amount?: number | null) => {
+  const value = Number(amount || 0) / 100;
+  return `¥${value.toLocaleString('zh-CN', {maximumFractionDigits: 0})}`;
 };
 
-const buildFallbackTimeline = (items?: V2OrderTimelineItem[]): V2OrderTimelineEvent[] =>
-  (items || []).map(item => ({
-    event_id: `legacy-${item.id}`,
-    source_type: 'order_timeline',
-    source_id: item.id,
-    event_type: 'order_status_changed',
-    title: item.note || getObjectStatusMeta('order', item.status).label,
-    description: item.status,
-    status: item.status,
-    occurred_at: item.created_at,
-    operator_id: item.operator_id,
-    operator_type: item.operator_type,
-    payload: {
-      id: item.id,
-      note: item.note,
-      status: item.status,
-    },
-  }));
-
-const getTimelineTitle = (item: V2OrderTimelineEvent, isClient: boolean) => {
-  if (item.source_type === 'dispatch_task' && isClient) {
-    switch (item.event_type) {
-      case 'dispatch_sent':
-        return '平台正在安排执行方';
-      case 'dispatch_accepted':
-        return '执行方已确认';
-      case 'dispatch_rejected':
-        return '执行方重新安排中';
-      case 'dispatch_expired':
-        return '执行安排超时，正在重试';
-      case 'dispatch_cancelled':
-        return '执行安排已调整';
-      default:
-        return '执行安排已更新';
-    }
-  }
-  return item.title;
+const settlementStatusLabelOf = (status?: string) => {
+  if (status === 'pending') return '待计算';
+  if (status === 'calculated') return '已计算';
+  if (status === 'confirmed') return '已确认';
+  if (status === 'settled') return '已入账';
+  if (status === 'disputed') return '争议中';
+  return '待生成';
 };
-
-const getTimelineDescription = (item: V2OrderTimelineEvent, isClient: boolean) => {
-  const payload = item.payload || {};
-  if (item.source_type === 'payment') {
-    const amount = typeof payload.amount === 'number' ? formatMoney(payload.amount) : '';
-    const method = payload.payment_method ? `通过 ${payload.payment_method}` : '支付单';
-    if (item.event_type === 'payment_paid') {
-      return `${method} 已完成${amount ? `，金额 ${amount}` : ''}`;
-    }
-    return `${method}${amount ? `，金额 ${amount}` : ''}`;
-  }
-  if (item.source_type === 'refund') {
-    const amount = typeof payload.amount === 'number' ? formatMoney(payload.amount) : '';
-    const reason = payload.reason || item.description;
-    return [amount ? `退款金额 ${amount}` : '', reason].filter(Boolean).join(' · ') || '退款状态已更新';
-  }
-  if (item.source_type === 'dispatch_task') {
-    const targetPilot = summarizeParty(payload.target_pilot, '待确认飞手');
-    const dispatchSource = getDispatchSourceLabel(payload.dispatch_source);
-    if (isClient) {
-      if (item.event_type === 'dispatch_sent') {
-        return `系统已开始联系执行团队，当前安排方式：${dispatchSource}`;
-      }
-      if (item.event_type === 'dispatch_accepted') {
-        return `${targetPilot} 已确认接单，后续会继续推进准备与飞行。`;
-      }
-      if (item.event_type === 'dispatch_rejected') {
-        return `${targetPilot} 未接受本次安排，系统会继续寻找合适执行方。`;
-      }
-      return item.description || '执行安排状态已更新';
-    }
-    return [dispatchSource, targetPilot, item.description].filter(Boolean).join(' · ');
-  }
-  if (item.source_type === 'flight_record') {
-    return item.description || '飞行节点已更新';
-  }
-  if (item.source_type === 'order_timeline') {
-    return item.description && item.description !== item.status ? item.description : '';
-  }
-  return item.description || '';
-};
-
-const getDispatchArrangementSummary = (detail?: V2OrderDetail | null) => {
-  if (!detail) {
-    return '-';
-  }
-  if (detail.execution_mode === 'self_execute' || detail.needs_dispatch === false) {
-    return '机主直接执行';
-  }
-  const task = detail.current_dispatch;
-  if (!task) {
-    if ((detail.dispatch_history?.length || 0) > 0) {
-      return '执行安排调整中';
-    }
-    return '待系统安排执行方';
-  }
-  switch (String(task.status || '').toLowerCase()) {
-    case 'accepted':
-      return '执行团队已确定';
-    case 'pending_response':
-      return '等待飞手确认';
-    case 'rejected':
-    case 'expired':
-    case 'cancelled':
-    case 'exception':
-      return '重新安排执行方';
-    default:
-      return '执行安排处理中';
-  }
-};
-
-const getContractProgressState = (
-  detail?: V2OrderDetail | null,
-  options?: {isClient: boolean; isProvider: boolean},
-) => {
-  const contract = detail?.contract;
-  const paymentReady = detail?.payment_ready !== false && (!contract || contract.payment_ready !== false);
-  const clientSigned = Boolean(contract?.client_signed_at);
-  const providerSigned = Boolean(contract?.provider_signed_at);
-  const mySigned = options?.isClient ? clientSigned : options?.isProvider ? providerSigned : false;
-  const counterpartSigned = options?.isClient ? providerSigned : options?.isProvider ? clientSigned : false;
-  return {contract, paymentReady, clientSigned, providerSigned, mySigned, counterpartSigned};
-};
-
-const getProgressFocus = (
-  detail: V2OrderDetail,
-  options: {isClient: boolean; isProvider: boolean; isExecutor: boolean; isDispatchTargetPilot: boolean},
-): ProgressFocus => {
-  const status = String(detail.status || '').toLowerCase();
-  const contractState = getContractProgressState(detail, options);
-  const executorName = summarizeParty(
-    detail.participants?.executor || detail.executor,
-    detail.execution_mode === 'self_execute' ? '机主' : '执行团队',
-  );
-
-  switch (status) {
-    case 'pending_provider_confirmation':
-      return options.isProvider
-        ? {
-            eyebrow: '当前在等你',
-            title: '请确认是否承接这笔订单',
-            desc: '确认承接后会先进入合同确认阶段，双方完成签署后客户才能继续支付；若不合适，可直接拒绝并说明原因。',
-            eta: '建议 2 小时内处理',
-            actionHint: '确认承接',
-            tone: 'warning',
-          }
-        : {
-            eyebrow: '当前在等机主',
-            title: '机主正在确认是否承接',
-            desc: '机主确认后会先完成合同确认，再进入支付阶段；若不承接会在这里直接看到结果。',
-            eta: '通常 2 小时内回复',
-            actionHint: '查看合同',
-            tone: 'warning',
-          };
-    case 'pending_payment':
-      if (!contractState.paymentReady && contractState.contract) {
-        if (!options.isClient && !options.isProvider) {
-          return {
-            eyebrow: '合同确认中',
-            title: '订单还在等待双方确认合同',
-            desc: '当前合同尚未完成双方签署，支付和后续执行会在合同确认完成后继续推进。',
-            eta: '签署完成后自动更新',
-            actionHint: '查看合同',
-            tone: 'muted',
-          };
-        }
-        if (!contractState.mySigned) {
-          return options.isClient
-            ? {
-                eyebrow: '当前在等你',
-                title: '请先签署合同',
-                desc: '订单已确认承接，但还不能直接支付。请先完成你的合同签署，系统会继续等待另一方确认。',
-                eta: '签署后实时同步',
-                actionHint: '签署合同',
-                tone: 'warning',
-              }
-            : {
-                eyebrow: '当前在等你',
-                title: '请先签署合同',
-                desc: '客户已经进入下单流程，但需要你先确认合同，后续客户才能继续支付。',
-                eta: '建议尽快完成',
-                actionHint: '签署合同',
-                tone: 'warning',
-              };
-        }
-        return options.isClient
-          ? {
-              eyebrow: '当前在等服务方',
-              title: '等待服务方签署合同',
-              desc: '你已经完成签署，等服务方也确认后，订单才会进入可支付状态。',
-              eta: '签署完成后立即通知你',
-              actionHint: '查看合同',
-              tone: 'muted',
-            }
-          : {
-              eyebrow: '当前在等客户',
-              title: '等待客户签署合同',
-              desc: '你已完成合同确认，等客户签署后，订单才会进入支付阶段。',
-              eta: '签署完成后立即推进',
-              actionHint: '查看合同',
-              tone: 'muted',
-            };
-      }
-      return options.isClient
-        ? {
-            eyebrow: '下一步是支付',
-            title: '合同已完成确认，请尽快支付',
-            desc: '双方合同已确认完成，支付成功后平台会继续推进执行安排。',
-            eta: '支付成功后立即推进',
-            actionHint: '去支付',
-            tone: 'primary',
-          }
-        : {
-            eyebrow: '当前在等客户',
-            title: '合同已完成确认，等待客户支付',
-            desc: '双方合同已确认完成，支付成功后订单会自动进入下一步执行安排。',
-            eta: '通常会尽快完成',
-            actionHint: '查看合同',
-            tone: 'muted',
-          };
-    case 'pending_dispatch':
-      if (options.isDispatchTargetPilot) {
-        return {
-          eyebrow: '当前在等你',
-          title: '请确认是否执行这笔订单',
-          desc: '这笔任务已经正式发到你名下。确认后就能继续进入准备、飞行和签收流程。',
-          eta: '建议 15 分钟内响应',
-          actionHint: '去响应派单',
-          tone: 'warning',
-        };
-      }
-      return options.isProvider
-        ? {
-            eyebrow: '当前在等你',
-            title: '请尽快安排执行方',
-            desc: '确认飞手或让系统匹配后，客户就能在订单页看到明确的执行安排。',
-            eta: '建议 1 小时内完成安排',
-            actionHint: '安排执行',
-            tone: 'primary',
-          }
-        : {
-            eyebrow: '当前在等平台',
-            title: '平台正在安排执行团队',
-            desc: '你无需理解派单过程，只要关注订单进度即可，安排完成后会自动通知你。',
-            eta: '通常 1 小时内完成安排',
-            actionHint: '查看订单时间线',
-            tone: 'muted',
-          };
-    case 'assigned':
-      return options.isExecutor || options.isDispatchTargetPilot
-        ? {
-            eyebrow: '当前在等你',
-            title: '请开始执行准备',
-            desc: '确认设备、路线和现场条件后，进入准备阶段，订单页会同步更新给客户。',
-            eta: '建议 30 分钟内推进',
-            actionHint: '开始准备',
-            tone: 'primary',
-          }
-        : {
-            eyebrow: '执行团队已就位',
-            title: `${executorName} 已准备接单`,
-            desc: '执行方已经确认，本单将很快进入准备阶段。',
-            eta: '通常 30 分钟内有新进展',
-            actionHint: '查看订单时间线',
-            tone: 'success',
-          };
-    case 'preparing':
-    case 'loading':
-    case 'airspace_applying':
-    case 'airspace_approved':
-      return {
-        eyebrow: '执行准备中',
-        title: '现场与设备正在准备',
-        desc: '当前会继续处理装载、空域报备和起飞前检查，完成后会自动进入飞行阶段。',
-        eta: '通常 30 分钟内更新',
-        actionHint: '查看飞行监控',
-        tone: 'warning',
-      };
-    case 'in_transit':
-      return {
-        eyebrow: '运输执行中',
-        title: '无人机正在执行运输',
-        desc: '当前订单已经进入飞行或运输阶段，后续会在抵达后更新投送结果。',
-        eta: '请按计划到达时间留意消息',
-        actionHint: '查看飞行监控',
-        tone: 'primary',
-      };
-    case 'delivered':
-      return options.isClient
-        ? {
-            eyebrow: '当前在等你',
-            title: '请确认签收',
-            desc: '确认收到货物后，订单会完成并进入结算。若暂时无法操作，系统会在 24 小时后自动确认。',
-            eta: '24 小时内自动确认',
-            actionHint: '确认签收',
-            tone: 'success',
-          }
-        : {
-            eyebrow: '当前在等客户',
-            title: '等待客户确认签收',
-            desc: '客户签收后，订单会自动完成并进入后续结算流程。',
-            eta: '通常 24 小时内完成',
-            actionHint: '查看售后',
-            tone: 'muted',
-          };
-    case 'completed':
-      return {
-        eyebrow: '订单已完成',
-        title: '本次运输已经闭环完成',
-        desc: '合同、支付、执行留痕和评价都会继续保留在当前订单里，后续无需再切换对象查看。',
-        eta: '可随时查看归档记录',
-        actionHint: '订单评价',
-        tone: 'success',
-      };
-    case 'cancelled': {
-      const hasRefund = (detail.financial_summary?.refunded_amount || 0) > 0 || (detail.refunds?.length || 0) > 0;
-      return {
-        eyebrow: '订单已取消',
-        title: hasRefund ? '退款记录正在处理中' : '本单已结束，不会继续推进',
-        desc: hasRefund
-          ? '若已发生支付，退款记录已经生成，你可以在本页查看退款状态和金额。'
-          : '当前没有执行中的后续动作，保留记录仅用于追踪本次取消原因。',
-        eta: hasRefund ? '预计 1-3 个工作日原路退回' : '无需额外操作',
-        actionHint: '查看退款状态',
-        tone: 'muted',
-      };
-    }
-    default:
-      return {
-        eyebrow: '订单进度',
-        title: getObjectStatusMeta('order', detail.status).label,
-        desc: '当前订单正在推进中，后续重要动作都会汇总在下方时间线里。',
-        eta: '请留意下一次状态更新',
-        actionHint: '查看订单时间线',
-        tone: 'muted',
-      };
-  }
-};
-
-const getCancelByLabel = (value?: string) => {
-  switch (String(value || '').toLowerCase()) {
-    case 'client':
-      return '客户';
-    case 'owner':
-      return '机主';
-    case 'pilot':
-      return '飞手';
-    case 'system':
-      return '系统';
-    default:
-      return value ? '系统' : '-';
-  }
-};
-
-function DetailRow({
-  label,
-  value,
-  highlight = false,
-  icon,
-}: {
-  label: string;
-  value?: string;
-  highlight?: boolean;
-  icon?: any;
-}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  return (
-    <View style={styles.row}>
-      <View style={styles.rowLabelWrap}>
-        {icon ? <Image source={icon} style={styles.detailRowIcon} resizeMode="contain" /> : null}
-        <Text style={styles.rowLabel}>{label}</Text>
-      </View>
-      <Text style={[styles.rowValue, highlight && styles.rowValueHighlight]}>{value || '-'}</Text>
-    </View>
-  );
-}
-
-function ParticipantCard({
-  label,
-  party,
-  accent,
-  isSelf,
-  fallback,
-}: {
-  label: string;
-  party?: OrderPartySummary | null;
-  accent: string;
-  isSelf?: boolean;
-  fallback: string;
-}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  return (
-    <View style={styles.participantCard}>
-      <View style={[styles.participantAvatar, {backgroundColor: accent}]}>
-        <Text style={styles.participantAvatarText}>{getPartyInitial(party, label.charAt(0))}</Text>
-      </View>
-      <View style={styles.participantContent}>
-        <Text style={styles.participantLabel}>{label}</Text>
-        <Text style={styles.participantName}>{summarizeParty(party, fallback)}</Text>
-        <Text style={styles.participantMeta}>
-          {party?.phone || (isSelf ? '当前账号' : '等待补充联系方式')}
-          {isSelf ? ' · 我' : ''}
-        </Text>
-      </View>
-      <Image source={orderDetailAssets.chevronRight} style={styles.participantChevron} resizeMode="contain" />
-    </View>
-  );
-}
-
-function ProgressFocusCard({focus}: {focus: ProgressFocus}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  const accent =
-    focus.tone === 'success'
-      ? theme.success
-      : focus.tone === 'warning'
-        ? theme.warning
-        : focus.tone === 'primary'
-          ? theme.primary
-          : theme.textSub;
-
-  return (
-    <View style={[styles.progressFocusContainer, {backgroundColor: theme.card, borderColor: `${accent}40`}]}>
-      <View style={styles.progressFocusHeader}>
-        <Image source={orderDetailAssets.progressClipboard} style={styles.focusIcon} resizeMode="contain" />
-        <Text style={[styles.focusEyebrow, {color: accent}]}>{focus.eyebrow}</Text>
-        {focus.eta ? (
-          <View style={[styles.focusEtaPill, {backgroundColor: `${accent}15`}]}>
-            <Text style={[styles.focusEtaText, {color: accent}]}>{focus.eta}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <Text style={styles.focusTitle}>{focus.title}</Text>
-      <Text style={styles.focusDesc}>{focus.desc}</Text>
-
-      {focus.actionHint ? (
-        <View style={styles.focusActionHintRow}>
-          <Text style={styles.focusActionHintLabel}>下一步指引：</Text>
-          <Text style={[styles.focusActionHintValue, {color: theme.primaryText}]}>{focus.actionHint}</Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function ExecutionArrangementCard({
-  detail,
-  isClient,
-}: {
-  detail?: V2OrderDetail | null;
-  isClient: boolean;
-}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  if (!detail) {
-    return null;
-  }
-
-  if (detail.execution_mode === 'self_execute' || detail.needs_dispatch === false) {
-    return (
-      <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>🛡️ 机主直接承运保证</Text>
-        <Text style={styles.noticeDesc}>
-          本单由机主团队直接执行。平台已核实机主具备合法飞行资质，且已签署设备安全操作责任书。
-        </Text>
-      </View>
-    );
-  }
-
-  const task = detail.current_dispatch;
-  if (!task) {
-    return (
-      <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>执行团队匹配中</Text>
-        <Text style={styles.noticeDesc}>
-          {isClient
-            ? '系统正在从合格飞手库中筛选最佳执行方。所有备选飞手均已通过民航资质认证与实名核验。'
-            : '当前还没有生效的正式执行安排。您可以从下方主动作继续安排飞手，或者等待新的响应。'}
-        </Text>
-      </View>
-    );
-  }
-
-  const pilotLabel = summarizeParty(task.target_pilot, '待确认飞手');
-  const taskStatus = getObjectStatusMeta('dispatch_task', task.status);
-
-  return (
-    <View style={styles.dispatchBox}>
-      <View style={styles.dispatchHeader}>
-        <Text style={styles.dispatchNo}>{isClient ? '当前执行团队' : task.dispatch_no}</Text>
-        <StatusBadge label="" meta={taskStatus} />
-      </View>
-      <View style={styles.trustRow}>
-        <Text style={styles.trustIcon}>✅</Text>
-        <Text style={styles.trustText}>飞手资质已核验 (民航执照)</Text>
-      </View>
-      <View style={styles.trustRow}>
-        <Text style={styles.trustIcon}>✅</Text>
-        <Text style={styles.trustText}>责任声明已签署 (设备操作权)</Text>
-      </View>
-      <View style={styles.dispatchDivider} />
-      <DetailRow label="当前执行方" value={pilotLabel} />
-      <DetailRow label="安排方式" value={getDispatchSourceLabel(task.dispatch_source)} />
-      {task.reason ? <DetailRow label="执行说明" value={task.reason} /> : null}
-    </View>
-  );
-}
-
-function TimelineSection({items, isClient}: {items?: V2OrderTimelineEvent[]; isClient: boolean}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  if (!items || items.length === 0) {
-    return (
-      <ObjectCard style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>订单动态汇总</Text>
-        <Text style={styles.sectionHint}>当前还没有可展示的时间线记录。</Text>
-      </ObjectCard>
-    );
-  }
-
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case 'payment': return orderDetailAssets.actionBriefcase;
-      case 'refund': return orderDetailAssets.taskDocument;
-      case 'dispatch_task': return orderDetailAssets.timelineList;
-      case 'flight_record': return orderDetailAssets.timelineClock;
-      default: return orderDetailAssets.locationLine;
-    }
-  };
-
-  return (
-    <ObjectCard style={styles.sectionCard}>
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>订单动态汇总</Text>
-        <Text style={styles.sectionSubtitle}>{items.length} 条记录</Text>
-      </View>
-      <Text style={styles.sectionHint}>支付、执行安排、飞行和退款都会按时间汇总到这里。</Text>
-      <View style={styles.timelineList}>
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          const description = getTimelineDescription(item, isClient);
-          return (
-            <View key={`${item.event_id}-${index}`} style={styles.timelineItem}>
-                <View style={styles.timelineAxis}>
-                  <View style={styles.timelineIconBg}>
-                  <Image source={getEventIcon(item.source_type)} style={styles.timelineIconImage} resizeMode="contain" />
-                </View>
-                {!isLast ? <View style={styles.timelineLine} /> : null}
-              </View>
-              <View style={styles.timelineContent}>
-                <View style={styles.timelineHeaderRow}>
-                  <Text style={styles.timelineTitle}>{getTimelineTitle(item, isClient)}</Text>
-                  <Text style={styles.timelineTime}>{formatDateTime(item.occurred_at)}</Text>
-                </View>
-                {description ? <Text style={styles.timelineDesc}>{description}</Text> : null}
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </ObjectCard>
-  );
-}
 
 export default function OrderDetailScreen({route, navigation}: any) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  const user = useSelector((state: RootState) => state.auth.user);
-  const orderId = Number(route?.params?.orderId || route?.params?.id || 0);
-  const [detail, setDetail] = useState<V2OrderDetail | null>(null);
-  const [anomaly, setAnomaly] = useState<V2OrderAnomaly | null>(null);
-  const [timelineItems, setTimelineItems] = useState<V2OrderTimelineEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
+  const {width, height} = useWindowDimensions();
+  const screenWidth = width || 390;
+  const screenHeight = height || 844;
+  const scaleX = screenWidth / DESIGN_WIDTH;
+  const scaleY = screenHeight / DESIGN_HEIGHT;
+  const [remoteDetail, setRemoteDetail] = useState<any | null>(null);
+  const [remoteTimeline, setRemoteTimeline] = useState<any[]>([]);
+  const [loading, setLoading] = useState(Boolean(route?.params?.orderId || route?.params?.id));
+  const [errorText, setErrorText] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [settlement, setSettlement] = useState<V2SettlementSummary | null>(null);
+  const [settlementLoading, setSettlementLoading] = useState(false);
+  const orderId = Number(route?.params?.orderId || route?.params?.id || 0);
 
-  const fetchDetail = useCallback(async () => {
+  const x = (value: number) => Number((value * scaleX).toFixed(2));
+  const y = (value: number) => Number((value * scaleY).toFixed(2));
+  const frame = (left: number, top: number, w: number, h: number): ViewStyle => ({
+    position: 'absolute',
+    left: x(left),
+    top: y(top),
+    width: x(w),
+    height: y(h),
+  });
+  const type = (
+    fontSize: number,
+    lineHeight: number,
+    fontWeight: TextStyle['fontWeight'],
+    color: string,
+  ): TextStyle => ({
+    color,
+    fontSize: x(fontSize),
+    lineHeight: y(lineHeight),
+    fontWeight,
+  });
+
+  const load = useCallback(async () => {
     if (!orderId) {
-      setDetail(null);
-      setTimelineItems([]);
+      setRemoteDetail(null);
+      setRemoteTimeline([]);
+      setSettlement(null);
+      setErrorText('缺少订单ID，无法展示订单进度');
+      setLoading(false);
+      return;
+    }
+    if (!store.getState().auth.accessToken) {
+      setRemoteDetail(null);
+      setRemoteTimeline([]);
+      setSettlement(null);
+      setErrorText('请先登录后查看订单进度');
       setLoading(false);
       return;
     }
     setLoading(true);
+    setErrorText('');
+    setSettlement(null);
     try {
-      const [detailRes, timelineRes] = await Promise.all([
-        orderV2Service.get(orderId),
-        orderV2Service.getTimeline(orderId).catch(() => null),
-      ]);
-      const nextDetail = detailRes.data || null;
-      setDetail(nextDetail);
-      const anomalyRes = await orderAnomalyV2Service.list({order_id: orderId, page: 1, page_size: 20});
-      setAnomaly((anomalyRes.data?.items || [])[0] || null);
-      setTimelineItems(
-        timelineRes?.data?.items?.length
-          ? timelineRes.data.items
-          : buildFallbackTimeline(nextDetail?.timeline),
-      );
-    } catch (error) {
-      console.error('获取订单详情失败:', error);
-      setDetail(null);
-      setAnomaly(null);
-      setTimelineItems([]);
+      const res = await orderV2Service.get(orderId);
+      const nextDetail = (res as any)?.data || res;
+      if (!nextDetail?.id) {
+        setRemoteDetail(null);
+        setRemoteTimeline([]);
+        setSettlement(null);
+        setErrorText('订单不存在或当前账号无权查看');
+        return;
+      }
+      setRemoteDetail(nextDetail);
+      if (String(nextDetail.status) === 'completed') {
+        setSettlementLoading(true);
+        try {
+          const settlementRes = await orderFinanceV2Service.getSettlement(orderId);
+          setSettlement(((settlementRes as any)?.data || settlementRes) as V2SettlementSummary);
+        } catch {
+          setSettlement(null);
+        } finally {
+          setSettlementLoading(false);
+        }
+      }
+      try {
+        const timelineRes = await orderV2Service.getTimeline(orderId);
+        const timelineData = (timelineRes as any)?.data || timelineRes;
+        setRemoteTimeline(Array.isArray(timelineData?.items) ? timelineData.items : []);
+      } catch {
+        setRemoteTimeline(Array.isArray(nextDetail?.timeline) ? nextDetail.timeline : []);
+      }
+    } catch (error: any) {
+      setRemoteDetail(null);
+      setRemoteTimeline([]);
+      setSettlement(null);
+      setErrorText(error?.message || '订单加载失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   }, [orderId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchDetail();
-    }, [fetchDetail]),
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const currentUserId = Number(user?.id || 0);
-  const participants = detail?.participants;
-  const client = participants?.client || detail?.client;
-  const provider = participants?.provider || detail?.provider;
-  const executor = participants?.executor || detail?.executor;
-  const isClient = currentUserId > 0 && currentUserId === Number(client?.user_id || 0);
-  const isProvider = currentUserId > 0 && currentUserId === Number(provider?.user_id || 0);
-  const isExecutor = currentUserId > 0 && currentUserId === Number(executor?.user_id || 0);
-  const isDispatchTargetPilot =
-    currentUserId > 0 && currentUserId === Number(detail?.current_dispatch?.target_pilot_user_id || 0);
-  const canOpenFlightMonitor = ACTIVE_EXECUTION_STATUSES.includes(String(detail?.status || '').toLowerCase());
-  const canOpenReview =
-    String(detail?.status || '').toLowerCase() === 'completed' && (isClient || isProvider || isExecutor);
-  const canOpenAfterSale =
-    !!detail &&
-    ((detail.refunds?.length || 0) > 0 ||
-      (detail.disputes?.length || 0) > 0 ||
-      !['pending_provider_confirmation', 'provider_rejected', 'pending_payment'].includes(
-        String(detail.status || '').toLowerCase(),
-      ));
-  const canCancelOrder = Boolean(
-    detail &&
-      (isClient || isProvider) &&
-      !['completed', 'cancelled', 'provider_rejected', 'in_transit', 'delivered'].includes(
-        String(detail.status || '').toLowerCase(),
-      ),
-  );
-  const canOpenDispatchDetail = Boolean(detail?.current_dispatch?.id && (isProvider || isExecutor || isDispatchTargetPilot));
-  const canRespondCurrentDispatch = Boolean(
-    detail?.current_dispatch?.id &&
-      isDispatchTargetPilot &&
-      String(detail.current_dispatch?.status || '').toLowerCase() === 'pending_response',
-  );
-  const canEnterExecutionWorkspace = Boolean(
-    detail?.current_dispatch?.id &&
-      (isExecutor || isDispatchTargetPilot) &&
-      String(detail.current_dispatch?.status || '').toLowerCase() === 'accepted' &&
-      !['cancelled'].includes(String(detail?.status || '').toLowerCase()),
-  );
-  const latestTimelineTitle = timelineItems[0]?.title;
+  const detail = useMemo(() => remoteDetail, [remoteDetail]);
+  const orderNo = detail?.order_no || '';
+  const createdAt = formatFullDateTime(detail?.created_at);
+  const providerConfirmedAt = detail?.provider_confirmed_at ? formatFullDateTime(detail?.provider_confirmed_at) : '等待确认';
+  const teamArrangedAt = detail?.current_dispatch?.created_at ? formatFullDateTime(detail?.current_dispatch?.created_at) : '待安排';
+  const stepState = detail ? getStepState(detail) : 0;
+  const canConfirm = detail?.status === 'delivered';
+  const canPay = detail?.status === 'pending_payment';
+  const canReview = detail?.status === 'completed';
+  const needsContractSign = canPay && !(detail?.payment_ready || detail?.contract?.payment_ready);
+  const supplyId = detail ? sourceSupplyIdOf(detail) : 0;
+  const demandId = Number(detail?.source_info?.demand_id || detail?.demand_id || 0);
+  const providerPhone = detail ? providerPhoneOf(detail) : '';
 
-  const progressFocus = useMemo(
-    () =>
-      detail
-        ? getProgressFocus(detail, {
-            isClient,
-            isProvider,
-            isExecutor,
-            isDispatchTargetPilot,
-          })
-        : null,
-    [detail, isClient, isDispatchTargetPilot, isExecutor, isProvider],
-  );
+  const openService = () => {
+    navigation.navigate('MainTabs', {screen: 'Messages'});
+  };
 
-  const actionButtons = useMemo<ActionButton[]>(() => {
-    if (!detail || actionLoading) {
-      return [];
+  const goBack = () => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('MainTabs', {screen: 'Orders'});
+  };
+
+  const viewPlan = () => {
+    if (supplyId) {
+      navigation.navigate('OfferDetail', {id: supplyId});
+      return;
     }
-
-    const buttons: ActionButton[] = [];
-    const contractState = getContractProgressState(detail, {isClient, isProvider});
-
-    if (canRespondCurrentDispatch) {
-      buttons.push({
-        label: '去响应派单',
-        tone: 'primary',
-        onPress: () =>
-          navigation.navigate('DispatchTaskDetail', {
-            id: detail.current_dispatch?.id,
-            dispatchId: detail.current_dispatch?.id,
-          }),
-      });
+    if (demandId) {
+      navigation.navigate('DemandDetail', {id: demandId, demandId});
+      return;
     }
+    Alert.alert('暂无方案详情', '当前订单没有可打开的服务方案。');
+  };
 
-    if (canEnterExecutionWorkspace) {
-      buttons.push({
-        label: '进入执行工作台',
-        tone: 'primary',
-        onPress: () =>
-          navigation.navigate('PilotOrderExecution', {
-            taskId: detail.current_dispatch?.id,
-          }),
-      });
+  const copyOrderNo = () => {
+    if (!orderNo) return;
+    Alert.alert('订单号', `${orderNo}\n\n已复制入口待接入系统剪贴板能力。`);
+  };
+
+  const contactProvider = async () => {
+    if (providerPhone) {
+      const url = `tel:${providerPhone}`;
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        Linking.openURL(url);
+        return;
+      }
     }
+    Alert.alert('联系服务商', '当前服务商暂无电话，可先通过消息联系客服。', [
+      {text: '取消', style: 'cancel'},
+      {text: '去消息', onPress: openService},
+    ]);
+  };
 
-    if (detail.status === 'pending_provider_confirmation' && isProvider) {
-      buttons.push({
-        label: '确认承接',
-        tone: 'primary',
-        onPress: () => {
-          Alert.alert('确认承接', '确认承接这笔订单吗？', [
-            {text: '取消', style: 'cancel'},
-            {
-              text: '确认',
-              onPress: async () => {
-                setActionLoading(true);
-                try {
-                  await orderV2Service.providerConfirm(detail.id);
-                  await fetchDetail();
-                  Alert.alert('已确认', '订单已确认，请继续按合同签署状态推进下一步。');
-                } catch (error: any) {
-                  Alert.alert('操作失败', error?.response?.data?.message || '请稍后重试');
-                } finally {
-                  setActionLoading(false);
-                }
-              },
-            },
-          ]);
+  const submitConfirm = () => {
+    if (canPay) {
+      navigation.navigate(needsContractSign ? 'Contract' : 'Payment', {orderId, id: orderId});
+      return;
+    }
+    if (canReview) {
+      navigation.navigate('Review', {orderId, id: orderId});
+      return;
+    }
+    if (!canConfirm) return;
+    Alert.alert('确认完成', '确认货物已完成吊运并签收？', [
+      {text: '取消', style: 'cancel'},
+      {
+        text: '确认',
+        onPress: async () => {
+          if (!orderId) return;
+          setActionLoading(true);
+          try {
+            await confirmReceipt(orderId);
+            Alert.alert('已确认', '订单已完成确认。');
+            load();
+          } catch (error: any) {
+            Alert.alert('操作失败', error?.message || '请稍后重试');
+          } finally {
+            setActionLoading(false);
+          }
         },
-      });
-      buttons.push({
-        label: '拒绝订单',
-        tone: 'danger',
-        onPress: () => {
-          Alert.alert('拒绝订单', '确认拒绝这笔订单吗？', [
-            {text: '取消', style: 'cancel'},
-            {
-              text: '确认拒绝',
-              style: 'destructive',
-              onPress: async () => {
-                setActionLoading(true);
-                try {
-                  await orderV2Service.providerReject(detail.id, '机主拒绝订单');
-                  await fetchDetail();
-                  Alert.alert('已拒绝', '客户会在订单详情里看到拒绝结果。');
-                } catch (error: any) {
-                  Alert.alert('操作失败', error?.response?.data?.message || '请稍后重试');
-                } finally {
-                  setActionLoading(false);
-                }
-              },
-            },
-          ]);
-        },
-      });
-    }
+      },
+    ]);
+  };
 
-    if (detail.status === 'pending_payment' && detail.contract && !contractState.paymentReady && !contractState.mySigned && (isClient || isProvider)) {
-      buttons.push({
-        label: '签署合同',
-        tone: 'primary',
-        onPress: () => navigation.navigate('Contract', {orderId: detail.id}),
-      });
-    }
+  const summaryRows: SummaryRow[] = detail ? [
+    {key: 'provider', icon: orderProgressAssets.providerAnyi, label: '服务商', value: providerNameOf(detail), clickable: true},
+    {key: 'weight', icon: orderProgressAssets.summaryWeightGray, label: '货物重量', value: cargoWeightTextOf(detail)},
+    {key: 'pickup', icon: orderProgressAssets.pickupPinGreen, label: '起吊点', value: detail?.service_address || '-'},
+    {key: 'dropoff', icon: orderProgressAssets.dropoffPinOrange, label: '落放点', value: detail?.dest_address || '-'},
+    {key: 'service', icon: orderProgressAssets.droneServiceBlue, label: '预计服务', value: serviceLevelOf(detail)},
+    {key: 'team', icon: orderProgressAssets.teamBlue, label: '服务团队', value: stepState >= 3 ? '服务团队已安排' : '等待服务团队安排'},
+  ] : [];
 
-    if (detail.status === 'pending_payment' && isClient && contractState.paymentReady) {
-      buttons.push({
-        label: '去支付',
-        tone: 'primary',
-        onPress: () => navigation.navigate('Payment', {orderId: detail.id, id: detail.id}),
-      });
-    }
+  const timeline = detail ? [
+    {idx: 1, title: '已提交吊运需求', time: createdAt, desc: '您已提交吊运需求', icon: orderProgressAssets.timelineCheck, done: stepState >= 1},
+    {idx: 2, title: '服务商已确认方案', time: providerConfirmedAt, desc: '服务商已确认并提交方案', icon: orderProgressAssets.timelineCheck, done: stepState >= 2},
+    {idx: 3, title: '服务团队已安排', time: teamArrangedAt, desc: '服务团队已安排完毕', icon: orderProgressAssets.timelineActive3, active: stepState === 3, done: stepState >= 3},
+    {idx: 4, title: '到场安全评估', time: '服务团队到达现场后进行', desc: '待开始', icon: orderProgressAssets.timelinePending4, done: stepState >= 4},
+    {idx: 5, title: '开始吊运', time: '吊运作业进行中', desc: '待开始', icon: orderProgressAssets.timelinePending5, done: stepState >= 5},
+    {
+      idx: 6,
+      title: '已完成，等待确认',
+      time: '作业完成，请您确认',
+      desc: settlement?.id ? `结算${settlementStatusLabelOf(settlement.status)}` : stepState >= 6 ? '已完成' : '待完成',
+      icon: orderProgressAssets.timelinePending6,
+      done: stepState >= 6,
+    },
+  ] : [];
+  const timelineRows = remoteTimeline.length > 0
+    ? remoteTimeline.slice(0, 6).map((event, index) => {
+        const status = event?.status || event?.payload?.status || '';
+        const desc = event?.description && event.description !== status
+          ? event.description
+          : statusLabelOf(status);
+        return {
+          idx: index + 1,
+          title: event?.title || statusLabelOf(status),
+          time: formatFullDateTime(event?.occurred_at || event?.created_at),
+          desc,
+          icon: index < 2
+            ? orderProgressAssets.timelineCheck
+            : index === 2
+              ? orderProgressAssets.timelineActive3
+              : [orderProgressAssets.timelinePending4, orderProgressAssets.timelinePending5, orderProgressAssets.timelinePending6][Math.min(index - 3, 2)],
+          done: true,
+        };
+      })
+    : timeline;
+  const primaryActionText = needsContractSign
+    ? '签署合同'
+    : canPay
+      ? '去支付'
+      : canConfirm
+        ? (actionLoading ? '确认中...' : '确认完成')
+        : canReview
+          ? '评价订单'
+          : '完成后可确认';
+  const statusDescription = loading ? '正在同步订单信息...' : statusDescOf(detail?.status || '');
+  const settlementHint = settlement?.id
+    ? `结算${settlementStatusLabelOf(settlement.status)} · 实付${formatMoney(settlement.final_amount || settlement.total_amount)}`
+    : settlementLoading
+      ? '正在同步结算明细...'
+      : '';
 
-    if (detail.status === 'pending_dispatch' && isProvider && !detail.current_dispatch?.id) {
-      buttons.push({
-        label: '安排执行',
-        tone: 'primary',
-        onPress: () =>
-          navigation.navigate('CreateDispatchTask', {
-            orderId: detail.id,
-            id: detail.id,
-          }),
-      });
-    }
+  const renderImage = (
+    source: ImageSourcePropType,
+    left: number,
+    top: number,
+    w: number,
+    h: number,
+    extra?: StyleProp<any>,
+  ) => <Image source={source} resizeMode="contain" style={[frame(left, top, w, h) as any, extra] as any} />;
 
-    if (detail.status === 'delivered' && isClient) {
-      buttons.push({
-        label: '确认签收',
-        tone: 'primary',
-        onPress: () => {
-          Alert.alert('确认签收', '确认已收到货物并完成签收？', [
-            {text: '取消', style: 'cancel'},
-            {
-              text: '确认',
-              onPress: async () => {
-                setActionLoading(true);
-                try {
-                  await confirmReceipt(detail.id);
-                  await fetchDetail();
-                  Alert.alert('签收成功', '订单已完成，感谢你的使用。');
-                } catch (error: any) {
-                  Alert.alert('操作失败', error?.response?.data?.message || '请稍后重试');
-                } finally {
-                  setActionLoading(false);
-                }
-              },
-            },
-          ]);
-        },
-      });
-    }
-
-    if (canCancelOrder) {
-      buttons.push({
-        label: '取消订单',
-        tone: 'danger',
-        onPress: () => {
-          const paidAmount = detail.financial_summary?.paid_amount || 0;
-          const refundNotice =
-            paidAmount > 0
-              ? '系统会自动创建退款记录，预计 1-3 个工作日内原路退回。'
-              : '当前尚未产生扣款，取消后不会发生退款。';
-          Alert.alert(
-            '确认取消订单',
-            `${paidAmount > 0 ? '取消后不会继续执行本单。' : '这笔订单会立刻结束。'}${refundNotice}`,
-            [
-              {text: '再想想', style: 'cancel'},
-              {
-                text: '确认取消',
-                style: 'destructive',
-                onPress: async () => {
-                  setActionLoading(true);
-                  try {
-                    await orderV2Service.cancel(
-                      detail.id,
-                      `${isClient ? '客户' : '机主'}主动取消订单`,
-                    );
-                    await fetchDetail();
-                    Alert.alert(
-                      '订单已取消',
-                      paidAmount > 0
-                        ? '订单和退款记录都已生成，可在本页继续查看退款进度。'
-                        : '订单已取消，不会再继续推进执行流程。',
-                    );
-                  } catch (error: any) {
-                    Alert.alert('取消失败', error?.response?.data?.message || '请稍后重试');
-                  } finally {
-                    setActionLoading(false);
-                  }
-                },
-              },
-            ],
-          );
-        },
-      });
-    }
-
-    if (canOpenDispatchDetail) {
-      buttons.push({
-        label: '查看执行安排',
-        tone: 'ghost',
-        onPress: () =>
-          navigation.navigate('DispatchTaskDetail', {
-            id: detail.current_dispatch?.id,
-            dispatchId: detail.current_dispatch?.id,
-          }),
-      });
-    }
-
-    if (canOpenFlightMonitor) {
-      buttons.push({
-        label: '飞行监控',
-        tone: 'ghost',
-        onPress: () =>
-          navigation.navigate('FlightMonitoring', {
-            orderId: detail.id,
-            dispatchId: detail.current_dispatch?.id,
-          }),
-      });
-    }
-
-    if (canOpenReview) {
-      buttons.push({
-        label: '订单评价',
-        tone: 'ghost',
-        onPress: () => navigation.navigate('Review', {orderId: detail.id, id: detail.id}),
-      });
-    }
-
-    if (canOpenAfterSale) {
-      buttons.push({
-        label: '售后处理',
-        tone: 'ghost',
-        onPress: () => navigation.navigate('OrderAfterSale', {orderId: detail.id, id: detail.id}),
-      });
-    }
-
-    buttons.push({
-      label: '查看合同',
-      tone: 'ghost',
-      onPress: () => navigation.navigate('Contract', {orderId: detail.id}),
-    });
-
-    return buttons;
-  }, [
-    actionLoading,
-    canCancelOrder,
-    canOpenAfterSale,
-    canOpenDispatchDetail,
-    canEnterExecutionWorkspace,
-    canOpenFlightMonitor,
-    canOpenReview,
-    canRespondCurrentDispatch,
-    detail,
-    fetchDetail,
-    isClient,
-    isProvider,
-    navigation,
-  ]);
-
-  if (loading) {
+  const renderSummaryRow = (row: SummaryRow, index: number) => {
+    const rowTop = 434 + index * 64.8;
+    const imageFrame =
+      row.key === 'provider'
+        ? [60, rowTop + 18, 52, 49]
+        : row.key === 'weight'
+          ? [70, rowTop + 18, 29, 29]
+          : row.key === 'pickup' || row.key === 'dropoff'
+          ? [70, rowTop + 16, 30, 33]
+            : [65, rowTop + 16, 41, 38];
     return (
-      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>{'<'} 返回</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>订单详情</Text>
-          <View style={styles.headerRight} />
-        </View>
-        <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
-      </SafeAreaView>
+      <React.Fragment key={row.key}>
+        {index < summaryRows.length - 1 ? <View style={[styles.line, frame(49, rowTop + 64.8, 843, 1)]} /> : null}
+        {renderImage(row.icon, imageFrame[0], imageFrame[1], imageFrame[2], imageFrame[3])}
+        <DesignText style={[frame(128, rowTop + 18, 220, 32), type(24, 32, '500', '#0B1836')]}>{row.label}</DesignText>
+        <DesignText numberOfLines={1} style={[frame(420, rowTop + 18, 380, 32), type(24, 32, '400', '#0B1836')]}>{row.value}</DesignText>
+        {row.clickable ? renderImage(orderProgressAssets.summaryChevronRight, 858, rowTop + 22, 15, 26) : null}
+        {row.clickable ? (
+          <TouchableOpacity activeOpacity={0.75} onPress={viewPlan} style={frame(49, rowTop, 843, 64.8)} />
+        ) : null}
+      </React.Fragment>
     );
-  }
-
-  if (!detail) {
-    return (
-      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>{'<'} 返回</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>订单详情</Text>
-          <View style={styles.headerRight} />
-        </View>
-        <View style={styles.centerState}>
-          <Text style={styles.emptyText}>订单不存在或当前账号没有查看权限。</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const sourceTitle = getSourceTitle(detail);
-  const financial = detail.financial_summary;
-  const currentExecutorLabel = summarizeParty(
-    executor,
-    detail.execution_mode === 'self_execute' ? '机主直接执行' : '安排中',
-  );
+  };
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>{'<'} 返回</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>订单详情</Text>
-        <View style={styles.headerRight} />
-      </View>
+    <View style={styles.root}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <LinearGradient
+        colors={['#00407C', '#004A87', '#003D78']}
+        locations={[0, 0.42, 1]}
+        style={frame(0, 0, DESIGN_WIDTH, 225)}
+      />
+      <View style={[styles.blueCurve, {top: y(183), height: y(84)}]} />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          {!theme.isDark ? (
-            <Image source={orderDetailAssets.hero} style={styles.heroBgImage} resizeMode="cover" />
-          ) : null}
-          {!theme.isDark ? (
-            <Image source={orderDetailAssets.cubeOverlay} style={styles.heroCubeOverlay} resizeMode="contain" />
-          ) : null}
-          <View style={styles.heroTopRow}>
-            <View style={styles.heroTagRow}>
-              <SourceTag source={getSourceTag(detail.order_source)} />
-              <StatusBadge label="" meta={getObjectStatusMeta('order', detail.status)} />
+      {renderImage(orderProgressAssets.navBack, 31, 86, 27, 38)}
+      <TouchableOpacity activeOpacity={0.75} onPress={goBack} style={frame(12, 72, 72, 72)} />
+      <DesignText style={[frame(0, 84, DESIGN_WIDTH, 40), type(31, 39, '700', '#FFFFFF'), styles.centerText]}>
+        订单进度
+      </DesignText>
+      {renderImage(orderProgressAssets.navServiceHeadset, 852, 70, 50, 38)}
+      <DesignText style={[frame(870, 107, 50, 28), type(21, 28, '500', '#FFFFFF')]}>客服</DesignText>
+      <TouchableOpacity activeOpacity={0.75} onPress={openService} style={frame(835, 65, 88, 78)} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={{height: screenHeight + Math.max(insets.bottom, 0)}}
+      >
+        <View style={{width: screenWidth, height: screenHeight + Math.max(insets.bottom, 0)}}>
+          {!detail ? (
+            <View style={[styles.card, frame(24, 142, 893, 240), {borderRadius: x(22)}]}>
+              {loading ? <ActivityIndicator color="#003B93" size="large" style={frame(430, 42, 80, 80)} /> : null}
+              <DesignText style={[frame(60, loading ? 126 : 62, 820, 42), type(30, 40, '700', '#0B1836'), styles.centerText]}>
+                {loading ? '正在同步订单信息' : '无法展示订单进度'}
+              </DesignText>
+              <DesignText style={[frame(96, loading ? 182 : 124, 748, 64), type(23, 32, '400', '#5D6B85'), styles.centerText]}>
+                {loading ? '请稍候，正在读取真实订单数据。' : errorText || '订单不存在或当前账号无权查看。'}
+              </DesignText>
             </View>
-            <Text style={styles.heroOrderNo}>{detail.order_no}</Text>
-          </View>
-          <Text style={styles.heroTitle}>{detail.title}</Text>
-          <View style={styles.heroRouteRow}>
-            <Image source={orderDetailAssets.locationWhite} style={styles.heroRouteIcon} resizeMode="contain" />
-            <Text style={styles.heroRoute}>
-              {detail.service_address || '未设置起点'}
-              {detail.dest_address ? ` -> ${detail.dest_address}` : ''}
-            </Text>
-          </View>
-          <View style={styles.heroSummaryRow}>
-            <View style={styles.heroMetric}>
-              <Text style={styles.heroMetricLabel}>订单金额</Text>
-              <Text style={styles.heroMetricValue}>{formatMoney(detail.total_amount)}</Text>
-            </View>
-            <View style={styles.heroMetric}>
-              <Text style={styles.heroMetricLabel}>当前路径</Text>
-              <Text style={styles.heroMetricSecondary}>{getSourceLabel(detail.order_source)}</Text>
-            </View>
-          </View>
+          ) : (
+            <>
+          <View style={[styles.card, frame(24, 142, 893, 210), {borderRadius: x(22)}]} />
+          {renderImage(orderProgressAssets.statusAcceptedGreen, 49, 164, 62, 62)}
+          <DesignText style={[frame(129, 166, 360, 40), type(32, 40, '700', '#0B1836')]}>
+            {statusTitleOf(detail?.status)}
+          </DesignText>
+          <DesignText numberOfLines={1} style={[frame(129, 207, 520, 28), type(21, 28, '400', '#5D6B85')]}>
+            {settlementHint || statusDescription}
+          </DesignText>
+          <TouchableOpacity activeOpacity={0.76} onPress={viewPlan} style={[frame(758, 166, 130, 48), styles.planButton, {borderRadius: x(11)}]}>
+            <DesignText style={type(23, 30, '700', '#003B93')}>查看方案</DesignText>
+          </TouchableOpacity>
+          <View style={[styles.line, frame(49, 245, 839, 1)]} />
+          <DesignText style={[frame(50, 265, 88, 32), type(24, 32, '500', '#0B1836')]}>订单号</DesignText>
+          <DesignText style={[frame(138, 265, 210, 32), type(24, 32, '400', '#0B1836')]}>{orderNo}</DesignText>
+          <TouchableOpacity activeOpacity={0.76} onPress={copyOrderNo} style={[frame(354, 260, 61, 36), styles.copyButton, {borderRadius: x(6)}]}>
+            <DesignText style={type(21, 28, '500', '#5D6B85')}>复制</DesignText>
+          </TouchableOpacity>
+          <DesignText style={[frame(50, 307, 380, 32), type(24, 32, '400', '#5D6B85')]}>下单时间：{createdAt}</DesignText>
+
+          <View style={[styles.card, frame(24, 366, 893, 476), {borderRadius: x(18)}]} />
+          <DesignText style={[frame(50, 390, 180, 36), type(28, 36, '700', '#0B1836')]}>订单摘要</DesignText>
+          <View style={[frame(49, 434, 843, 389), styles.summaryTable, {borderRadius: x(6)}]} />
+          {summaryRows.map(renderSummaryRow)}
+
+          <View style={[styles.card, frame(24, 859, 893, 586), {borderRadius: x(18)}]} />
+          <DesignText style={[frame(50, 883, 180, 36), type(28, 36, '700', '#0B1836')]}>订单进度</DesignText>
+          {stepState === 3 ? <View style={[frame(50, 1098, 842, 76), styles.activeStep, {borderRadius: x(8)}]} /> : null}
+          <View style={[frame(74, 958, 4, 418), styles.timelineLine]} />
+          {timelineRows.map((item, index) => {
+            const rowTop = [929, 1016, 1098, 1190, 1278, 1366][index];
+            const iconTop = [929, 1016, 1102, 1190, 1278, 1366][index];
+            return (
+              <React.Fragment key={item.idx}>
+                {renderImage(item.icon, 56, iconTop, 40, 40)}
+                <DesignText style={[frame(122, rowTop + 6, 360, 31), type(24, 31, '700', '#0B1836')]}>
+                  {item.title}
+                </DesignText>
+                <DesignText style={[frame(122, rowTop + 37, 380, 29), type(22, 29, '400', '#5D6B85')]}>
+                  {item.time}
+                </DesignText>
+                <DesignText
+                  numberOfLines={1}
+                  style={[frame(650, rowTop + 18, 230, 29), type(22, 29, '400', item.done ? '#004CAA' : '#5D6B85'), styles.rightText]}
+                >
+                  {item.desc}
+                </DesignText>
+              </React.Fragment>
+            );
+          })}
+            </>
+          )}
         </View>
-
-        {progressFocus ? <ProgressFocusCard focus={progressFocus} /> : null}
-        {anomaly ? <OrderAnomalyBanner anomaly={anomaly} onPress={() => navigation.navigate('OrderAnomalyList')} /> : null}
-
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>任务信息</Text>
-          <DetailRow label="成单方式" value={getSourceContextLabel(detail.order_source)} />
-          <DetailRow label="来源标题" value={sourceTitle} />
-          <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} icon={orderDetailAssets.calendarLine} />
-          <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} icon={orderDetailAssets.calendarLine} />
-          <DetailRow label="起始地址" value={detail.service_address || '-'} icon={orderDetailAssets.locationLine} />
-          <DetailRow label="目的地址" value={detail.dest_address || '-'} icon={orderDetailAssets.locationLine} />
-        </ObjectCard>
-
-        {detail.drone ? (
-          <ObjectCard style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>执行设备</Text>
-            <DetailRow label="品牌型号" value={`${detail.drone.brand} ${detail.drone.model}`} />
-            <DetailRow label="起飞重量" value={detail.drone.mtow_kg != null ? `${detail.drone.mtow_kg} kg` : '-'} />
-            <DetailRow label="最大载重" value={detail.drone.max_payload_kg != null ? `${detail.drone.max_payload_kg} kg` : '-'} />
-          </ObjectCard>
-        ) : null}
-
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>参与方</Text>
-          <ParticipantCard label="客户" party={client} accent="#114178" isSelf={isClient} fallback="客户" />
-          <ParticipantCard label="承接方" party={provider} accent="#389e0d" isSelf={isProvider} fallback="待确认机主" />
-          <ParticipantCard label="执行方" party={executor} accent="#d46b08" fallback={currentExecutorLabel} />
-        </ObjectCard>
-
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>执行进度</Text>
-          <DetailRow label="执行安排" value={getDispatchArrangementSummary(detail)} />
-          <DetailRow label="执行模式" value={getExecutionModeLabel(detail.execution_mode)} />
-          {latestTimelineTitle ? <DetailRow label="最近进展" value={latestTimelineTitle} /> : null}
-          <View style={styles.dispatchSection}>
-            <Text style={styles.subsectionTitle}>{isClient ? '当前执行安排' : isDispatchTargetPilot || isExecutor ? '我的执行安排' : '执行安排详情'}</Text>
-            <ExecutionArrangementCard detail={detail} isClient={isClient} />
-          </View>
-        </ObjectCard>
-
-        <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>费用与结算明细</Text>
-          <View style={styles.costGrid}>
-            <View style={styles.costItem}>
-              <Text style={styles.costLabel}>运输服务费</Text>
-              <Text style={styles.costValue}>{formatMoney(detail.total_amount)}</Text>
-            </View>
-            <View style={styles.costItem}>
-              <Text style={styles.costLabel}>履约保证金</Text>
-              <Text style={styles.costValue}>{formatMoney(detail.financial_summary?.deposit_amount || 0)}</Text>
-            </View>
-            <View style={styles.costDivider} />
-            <View style={[styles.costItem, {marginTop: 4}]}>
-              <Text style={styles.costLabelTotal}>总计金额</Text>
-              <Text style={styles.costValueTotal}>{formatMoney(Number(detail.total_amount || 0) + Number(detail.financial_summary?.deposit_amount || 0))}</Text>
-            </View>
-          </View>
-          <View style={styles.paymentStatusRow}>
-            <DetailRow label="已支付总额" value={formatMoney(financial?.paid_amount)} highlight />
-            <DetailRow label="已退款金额" value={formatMoney(financial?.refunded_amount)} />
-          </View>
-          {financial?.provider_reject_reason ? <DetailRow label="拒绝原因" value={financial.provider_reject_reason} /> : null}
-        </ObjectCard>
-
-        {String(detail.status || '').toLowerCase() === 'cancelled' ? (
-          <ObjectCard style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>取消与退款</Text>
-            <DetailRow label="取消发起方" value={getCancelByLabel(detail.cancel_by)} />
-            <DetailRow label="取消原因" value={formatOrderCancelReason(detail.cancel_reason)} />
-            <DetailRow label="退款状态" value={(detail.refunds?.length || 0) > 0 ? '已生成退款记录' : '未产生退款'} />
-            <DetailRow label="预计到账" value={(detail.refunds?.length || 0) > 0 ? '预计 1-3 个工作日原路退回' : '无需退款'} />
-          </ObjectCard>
-        ) : null}
-
-        <TimelineSection items={timelineItems} isClient={isClient} />
       </ScrollView>
 
-      {actionButtons.length > 0 ? (
-        <View style={styles.actionBar}>
-          {actionLoading ? <ActivityIndicator color={theme.primary} style={styles.actionSpinner} /> : null}
-          {actionButtons.map(button => (
-            <TouchableOpacity
-              key={button.label}
-              style={[
-                styles.actionButton,
-                button.tone === 'primary' && styles.actionButtonPrimary,
-                button.tone === 'danger' && styles.actionButtonDanger,
-                button.tone === 'ghost' && styles.actionButtonGhost,
-              ]}
-              disabled={actionLoading}
-              onPress={button.onPress}>
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  button.tone === 'primary' && styles.actionButtonTextPrimary,
-                  button.tone === 'danger' && styles.actionButtonTextDanger,
-                  button.tone === 'ghost' && styles.actionButtonTextGhost,
-                ]}>
-                {button.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {detail ? <View style={[frame(0, 1454, DESIGN_WIDTH, 95), styles.actionbar]} /> : null}
+      {detail ? (
+        <>
+      <TouchableOpacity activeOpacity={0.78} onPress={contactProvider} style={[frame(37, 1458, 416, 69), styles.contactButton, {borderRadius: x(6)}]}>
+        <Image source={orderProgressAssets.phoneOutline} resizeMode="contain" style={{width: x(26), height: x(27), marginRight: x(16)}} />
+        <DesignText style={type(26, 34, '700', '#003B93')}>联系服务商</DesignText>
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={(canPay || canConfirm || canReview) ? 0.78 : 1}
+        onPress={submitConfirm}
+        style={[
+          frame(484, 1458, 418, 69),
+          styles.confirmButton,
+          (canPay || canConfirm || canReview) ? styles.confirmButtonEnabled : styles.confirmButtonDisabled,
+          {borderRadius: x(6)},
+        ]}
+      >
+        <DesignText style={type(26, 34, '700', '#FFFFFF')}>
+          {primaryActionText}
+        </DesignText>
+      </TouchableOpacity>
+        </>
       ) : null}
-    </SafeAreaView>
+
+      <View style={[frame(0, 1549, DESIGN_WIDTH, 123), styles.tabbar, {paddingBottom: insets.bottom}]} />
+      {[
+        {label: '首页', icon: orderProgressAssets.tabHomeInactive, screen: 'Home'},
+        {label: '订单', icon: orderProgressAssets.tabOrderActive, screen: 'Orders', active: true},
+        {label: '消息', icon: orderProgressAssets.tabMessageInactive, screen: 'Messages', badge: true},
+        {label: '我的', icon: orderProgressAssets.tabProfileInactive, screen: 'Profile'},
+      ].map((item, index) => (
+        <TouchableOpacity
+          key={item.label}
+          activeOpacity={0.75}
+          onPress={() => navigation.navigate('MainTabs', {screen: item.screen})}
+          style={[frame((DESIGN_WIDTH / 4) * index, 1549, DESIGN_WIDTH / 4, 123), styles.tabItem]}
+        >
+          <Image source={item.icon} resizeMode="contain" style={{width: x(42), height: x(44)}} />
+          {item.badge ? (
+            <Image source={orderProgressAssets.badgeMessageRed3} resizeMode="contain" style={[styles.badge, {width: x(28), height: x(28), top: y(-2), right: x(72)}]} />
+          ) : null}
+          <DesignText style={[type(22, 27, item.active ? '700' : '400', item.active ? '#003B93' : '#5D6B85'), {marginTop: y(8)}]}>
+            {item.label}
+          </DesignText>
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 }
 
-const getStyles = (theme: AppTheme) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.bgSecondary,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: theme.card,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
-    },
-    backBtn: {
-      width: 64,
-    },
-    backText: {
-      fontSize: 16,
-      color: theme.primaryText,
-      fontWeight: '600',
-    },
-    headerTitle: {
-      fontSize: 18,
-      color: theme.text,
-      fontWeight: '700',
-    },
-    headerRight: {
-      width: 64,
-    },
-    centerState: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
-    },
-    emptyText: {
-      fontSize: 14,
-      color: theme.textSub,
-      textAlign: 'center',
-      lineHeight: 22,
-    },
-    content: {
-      padding: 14,
-      paddingBottom: 120,
-    },
-    progressFocusContainer: {
-      marginBottom: 16,
-      borderRadius: 24,
-      padding: 20,
-      borderWidth: 1,
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 4},
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
-      elevation: 3,
-    },
-    progressFocusHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    focusIndicator: {
-      width: 4,
-      height: 14,
-      borderRadius: 2,
-      marginRight: 8,
-    },
-    focusIcon: {
-      width: 18,
-      height: 18,
-      marginRight: 8,
-    },
-    focusEyebrow: {
-      fontSize: 12,
-      fontWeight: '800',
-      textTransform: 'uppercase',
-      flex: 1,
-    },
-    focusEtaPill: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 999,
-    },
-    focusEtaText: {
-      fontSize: 11,
-      fontWeight: '700',
-    },
-    focusTitle: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: theme.text,
-      lineHeight: 26,
-    },
-    focusDesc: {
-      fontSize: 13,
-      color: theme.textSub,
-      marginTop: 8,
-      lineHeight: 20,
-    },
-    focusActionHintRow: {
-      marginTop: 16,
-      paddingTop: 12,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.divider,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    focusActionHintLabel: {
-      fontSize: 12,
-      color: theme.textHint,
-      fontWeight: '600',
-    },
-    focusActionHintValue: {
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    sectionCard: {
-      marginBottom: 12,
-    },
-    sectionHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    sectionTitle: {
-      fontSize: 16,
-      color: theme.text,
-      fontWeight: '800',
-    },
-    sectionSubtitle: {
-      fontSize: 12,
-      color: theme.textHint,
-      fontWeight: '600',
-    },
-    sectionHint: {
-      fontSize: 13,
-      color: theme.textSub,
-      lineHeight: 20,
-      marginBottom: 16,
-    },
-    hero: {
-      position: 'relative',
-      borderRadius: 18,
-      backgroundColor: theme.isDark ? 'rgba(0,212,255,0.08)' : '#0753D8',
-      padding: 18,
-      marginBottom: 12,
-      overflow: 'hidden',
-      borderWidth: theme.isDark ? 1 : 0,
-      borderColor: theme.isDark ? theme.primaryBorder : 'transparent',
-      shadowColor: '#125EDC',
-      shadowOffset: {width: 0, height: 9},
-      shadowOpacity: theme.isDark ? 0 : 0.18,
-      shadowRadius: 24,
-      elevation: 6,
-    },
-    heroBgImage: {
-      ...StyleSheet.absoluteFillObject,
-      width: '100%',
-      height: '100%',
-    },
-    heroCubeOverlay: {
-      position: 'absolute',
-      right: -2,
-      bottom: -4,
-      width: 112,
-      height: 92,
-      opacity: 0.38,
-      zIndex: 1,
-    },
-    heroTopRow: {
-      position: 'relative',
-      zIndex: 2,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    heroTagRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    heroOrderNo: {
-      fontSize: 12,
-      color: theme.isDark ? theme.primaryText : 'rgba(255,255,255,0.7)',
-      fontWeight: '600',
-    },
-    heroTitle: {
-      position: 'relative',
-      zIndex: 2,
-      marginTop: 14,
-      fontSize: 20,
-      lineHeight: 25,
-      color: theme.isDark ? theme.text : '#FFFFFF',
-      fontWeight: '900',
-    },
-    heroRouteRow: {
-      position: 'relative',
-      zIndex: 2,
-      marginTop: 10,
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 7,
-    },
-    heroRouteIcon: {
-      width: 15,
-      height: 15,
-      marginTop: 2,
-      flexShrink: 0,
-    },
-    heroRoute: {
-      flex: 1,
-      minWidth: 0,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.85)',
-    },
-    heroSummaryRow: {
-      position: 'relative',
-      zIndex: 2,
-      flexDirection: 'row',
-      marginTop: 18,
-      borderTopWidth: 1,
-      borderTopColor: theme.isDark ? theme.primaryBorder : 'rgba(255,255,255,0.12)',
-      paddingTop: 16,
-    },
-    heroMetric: {
-      flex: 1,
-    },
-    heroMetricLabel: {
-      fontSize: 12,
-      color: theme.isDark ? theme.textSub : 'rgba(255,255,255,0.7)',
-    },
-    heroMetricValue: {
-      marginTop: 6,
-      fontSize: 24,
-      color: theme.isDark ? theme.primary : '#FFFFFF',
-      fontWeight: '800',
-    },
-    heroMetricSecondary: {
-      marginTop: 8,
-      fontSize: 14,
-      color: theme.isDark ? theme.text : '#FFFFFF',
-      fontWeight: '700',
-    },
-    row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
-      gap: 12,
-    },
-    rowLabelWrap: {
-      width: 108,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    detailRowIcon: {
-      width: 16,
-      height: 16,
-      flexShrink: 0,
-    },
-    rowLabel: {
-      fontSize: 13,
-      color: theme.textSub,
-      flex: 1,
-      minWidth: 0,
-    },
-    rowValue: {
-      flex: 1,
-      textAlign: 'right',
-      fontSize: 14,
-      lineHeight: 20,
-      color: theme.text,
-      fontWeight: '600',
-    },
-    rowValueHighlight: {
-      color: theme.danger,
-      fontWeight: '800',
-    },
-    participantCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
-    },
-    participantAvatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    participantAvatarText: {
-      color: '#FFFFFF',
-      fontSize: 15,
-      fontWeight: '800',
-    },
-    participantContent: {
-      flex: 1,
-    },
-    participantChevron: {
-      width: 14,
-      height: 14,
-      marginLeft: 8,
-      opacity: 0.65,
-    },
-    participantLabel: {
-      fontSize: 12,
-      color: theme.textSub,
-      fontWeight: '700',
-    },
-    participantName: {
-      marginTop: 4,
-      fontSize: 16,
-      color: theme.text,
-      fontWeight: '700',
-    },
-    participantMeta: {
-      marginTop: 4,
-      fontSize: 12,
-      color: theme.textSub,
-    },
-    dispatchSection: {
-      marginTop: 14,
-    },
-    subsectionTitle: {
-      fontSize: 13,
-      color: theme.textSub,
-      fontWeight: '700',
-      marginBottom: 10,
-    },
-    noticeBox: {
-      borderRadius: 16,
-      backgroundColor: theme.bgSecondary,
-      padding: 14,
-      borderWidth: 1,
-      borderColor: theme.primaryBg,
-    },
-    noticeTitle: {
-      fontSize: 14,
-      color: theme.primaryText,
-      fontWeight: '700',
-    },
-    noticeDesc: {
-      marginTop: 6,
-      fontSize: 12,
-      lineHeight: 18,
-      color: theme.textSub,
-    },
-    dispatchBox: {
-      borderRadius: 16,
-      backgroundColor: theme.bgSecondary,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: theme.divider,
-    },
-    dispatchHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    trustRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 6,
-    },
-    trustIcon: {
-      fontSize: 12,
-    },
-    trustText: {
-      fontSize: 12,
-      color: theme.success,
-      fontWeight: '600',
-    },
-    dispatchDivider: {
-      height: 1,
-      backgroundColor: theme.divider,
-      marginVertical: 12,
-    },
-    dispatchNo: {
-      fontSize: 13,
-      color: theme.textSub,
-      fontWeight: '700',
-    },
-    costGrid: {
-      backgroundColor: theme.bgSecondary,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
-    },
-    costItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-    },
-    costLabel: {
-      fontSize: 12,
-      color: theme.textHint,
-    },
-    costValue: {
-      fontSize: 13,
-      color: theme.text,
-      fontWeight: '600',
-    },
-    costDivider: {
-      height: 1,
-      backgroundColor: theme.divider,
-      marginVertical: 8,
-    },
-    costLabelTotal: {
-      fontSize: 14,
-      fontWeight: '800',
-      color: theme.text,
-    },
-    costValueTotal: {
-      fontSize: 16,
-      fontWeight: '900',
-      color: theme.primaryText,
-    },
-    paymentStatusRow: {
-      marginTop: 4,
-    },
-    timelineList: {
-      marginTop: 4,
-    },
-    timelineItem: {
-      flexDirection: 'row',
-      minHeight: 58,
-    },
-    timelineAxis: {
-      width: 32,
-      alignItems: 'center',
-    },
-    timelineIconBg: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: theme.bgSecondary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 2,
-      marginTop: 4,
-    },
-    timelineIconText: {
-      fontSize: 12,
-    },
-    timelineIconImage: {
-      width: 15,
-      height: 15,
-    },
-    timelineLine: {
-      width: 2,
-      flex: 1,
-      backgroundColor: theme.divider,
-      marginVertical: 4,
-    },
-    timelineContent: {
-      flex: 1,
-      paddingLeft: 10,
-      paddingBottom: 24,
-    },
-    timelineHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      gap: 10,
-    },
-    timelineTitle: {
-      flex: 1,
-      fontSize: 14,
-      color: theme.text,
-      fontWeight: '700',
-    },
-    timelineTime: {
-      fontSize: 11,
-      color: theme.textHint,
-      fontWeight: '600',
-    },
-    timelineDesc: {
-      marginTop: 6,
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.textSub,
-    },
-    actionBar: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      backgroundColor: theme.card,
-      borderTopWidth: 1,
-      borderTopColor: theme.divider,
-      paddingHorizontal: 14,
-      paddingTop: 12,
-      paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    },
-    actionSpinner: {
-      marginRight: 12,
-    },
-    actionButton: {
-      minWidth: 96,
-      borderRadius: 999,
-      paddingHorizontal: 16,
-      paddingVertical: 11,
-      marginLeft: 10,
-      marginTop: 8,
-      borderWidth: 1,
-      alignItems: 'center',
-    },
-    actionButtonPrimary: {
-      backgroundColor: theme.primary,
-      borderColor: theme.primary,
-    },
-    actionButtonDanger: {
-      backgroundColor: theme.danger + '22',
-      borderColor: theme.danger + '44',
-    },
-    actionButtonGhost: {
-      backgroundColor: theme.card,
-      borderColor: theme.divider,
-    },
-    actionButtonText: {
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    actionButtonTextPrimary: {
-      color: '#FFFFFF',
-    },
-    actionButtonTextDanger: {
-      color: theme.danger,
-    },
-    actionButtonTextGhost: {
-      color: theme.primaryText,
-    },
-  });
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#F6F8FC',
+    overflow: 'hidden',
+  },
+  blueCurve: {
+    position: 'absolute',
+    left: -30,
+    right: -30,
+    backgroundColor: '#F6F8FC',
+    borderBottomLeftRadius: 500,
+    borderBottomRightRadius: 500,
+    zIndex: 0,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0B2850',
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    shadowOffset: {width: 0, height: 6},
+    elevation: 4,
+  },
+  centerText: {
+    textAlign: 'center',
+  },
+  rightText: {
+    textAlign: 'right',
+  },
+  planButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#003B93',
+    backgroundColor: '#FFFFFF',
+  },
+  copyButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C7CED9',
+    backgroundColor: '#F8FAFC',
+  },
+  line: {
+    position: 'absolute',
+    backgroundColor: '#E4EAF2',
+  },
+  summaryTable: {
+    position: 'absolute',
+    backgroundColor: '#FEFFFF',
+    borderWidth: 1,
+    borderColor: '#E4EAF2',
+  },
+  timelineLine: {
+    position: 'absolute',
+    backgroundColor: '#9FB7D6',
+    zIndex: 2,
+  },
+  activeStep: {
+    backgroundColor: '#F7FBFF',
+    zIndex: 1,
+  },
+  actionbar: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E8EEF5',
+  },
+  contactButton: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#003B93',
+    backgroundColor: '#FFFFFF',
+  },
+  confirmButton: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonEnabled: {
+    backgroundColor: '#FF5A12',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#BFC4CC',
+  },
+  tabbar: {
+    position: 'absolute',
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E8EEF5',
+  },
+  tabItem: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 10,
+  },
+  badge: {
+    position: 'absolute',
+  },
+});

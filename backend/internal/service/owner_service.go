@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +25,52 @@ type OwnerService struct {
 	orderService     *OrderService
 	matchingService  *MatchingService
 	eventService     *EventService
+}
+
+type RecommendedDemandQuery struct {
+	ServiceType string
+	Region      string
+	CargoScene  string
+	MinWeightKG float64
+	MaxWeightKG float64
+	StartFrom   *time.Time
+	StartTo     *time.Time
+	Sort        string
+}
+
+type RecommendedDemandMetric struct {
+	DistanceKM            *float64
+	ServiceRangeKM        *float64
+	ServiceCoverageStatus string
+	EstimatedArrivalMin   *int
+	MatchedSupplyID       int64
+	MatchedDroneID        int64
+	MatchedSupplyTitle    string
+}
+
+func (q RecommendedDemandQuery) IsZero() bool {
+	serviceType := strings.TrimSpace(q.ServiceType)
+	return (serviceType == "" || serviceType == defaultDemandServiceType) &&
+		strings.TrimSpace(q.Region) == "" &&
+		strings.TrimSpace(q.CargoScene) == "" &&
+		q.MinWeightKG <= 0 &&
+		q.MaxWeightKG <= 0 &&
+		q.StartFrom == nil &&
+		q.StartTo == nil &&
+		strings.TrimSpace(q.Sort) == ""
+}
+
+func (q RecommendedDemandQuery) repoQuery() repository.RecommendedDemandQuery {
+	return repository.RecommendedDemandQuery{
+		ServiceType: strings.TrimSpace(q.ServiceType),
+		Region:      strings.TrimSpace(q.Region),
+		CargoScene:  strings.TrimSpace(q.CargoScene),
+		MinWeightKG: q.MinWeightKG,
+		MaxWeightKG: q.MaxWeightKG,
+		StartFrom:   q.StartFrom,
+		StartTo:     q.StartTo,
+		Sort:        strings.TrimSpace(q.Sort),
+	}
 }
 
 type OwnerProfileInput struct {
@@ -144,6 +192,91 @@ func NewOwnerService(
 	}
 }
 
+func (s *OwnerService) providerRoleSummary(userID int64) (ProviderRoleSummary, error) {
+	if s.userRepo == nil {
+		return ProviderRoleSummary{}, errors.New("用户仓储未初始化")
+	}
+	if _, err := s.userRepo.GetByID(userID); err != nil {
+		return ProviderRoleSummary{}, err
+	}
+
+	assetStatus := providerStatusNone
+	executorStatus := providerStatusNone
+	executorOnline := false
+
+	if s.roleProfileRepo != nil {
+		if ownerProfile, err := s.roleProfileRepo.GetOwnerProfileByUserID(userID); err == nil {
+			assetStatus = combineProviderCapabilityStatus(assetStatus, ownerProfileStatus(ownerProfile))
+		} else if err != nil && !isOptionalProviderLookupError(err) {
+			return ProviderRoleSummary{}, err
+		}
+
+		if pilotProfile, err := s.roleProfileRepo.GetPilotProfileByUserID(userID); err == nil {
+			executorStatus = combineProviderCapabilityStatus(executorStatus, statusFromVerification(pilotProfile.VerificationStatus))
+		} else if err != nil && !isOptionalProviderLookupError(err) {
+			return ProviderRoleSummary{}, err
+		}
+	}
+
+	if s.droneRepo != nil {
+		if total, err := s.droneRepo.CountByOwner(userID); err != nil {
+			return ProviderRoleSummary{}, err
+		} else if total > 0 {
+			assetStatus = combineProviderCapabilityStatus(assetStatus, providerStatusPendingReview)
+		}
+
+		if total, err := s.droneRepo.CountMarketplaceEligibleByOwner(userID); err != nil {
+			return ProviderRoleSummary{}, err
+		} else if total > 0 {
+			assetStatus = providerStatusApproved
+		}
+	}
+
+	if s.pilotRepo != nil {
+		pilot, err := s.pilotRepo.GetByUserID(userID)
+		if err == nil && pilot != nil {
+			executorStatus = combineProviderCapabilityStatus(executorStatus, statusFromVerification(pilot.VerificationStatus))
+			executorOnline = strings.EqualFold(strings.TrimSpace(pilot.AvailabilityStatus), "online")
+		} else if err != nil && !isOptionalProviderLookupError(err) {
+			return ProviderRoleSummary{}, err
+		}
+	}
+
+	return buildProviderRoleSummary(assetStatus, executorStatus, executorOnline), nil
+}
+
+func isOptionalProviderLookupError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "no such table")
+}
+
+func (s *OwnerService) ensureProviderQuoteAccess(userID int64) error {
+	provider, err := s.providerRoleSummary(userID)
+	if err != nil {
+		return err
+	}
+	if !provider.CanQuote {
+		return errors.New("无权进入服务商接单工作台，请先完成设备能力审核")
+	}
+	return nil
+}
+
+func (s *OwnerService) ensureProviderDispatchAccess(userID int64) error {
+	provider, err := s.providerRoleSummary(userID)
+	if err != nil {
+		return err
+	}
+	if !provider.CanArrangeDispatch {
+		return errors.New("无权管理协作执行人员，请先完成设备能力审核")
+	}
+	return nil
+}
+
 func (s *OwnerService) GetProfile(userID int64) (*model.OwnerProfile, error) {
 	return s.ensureOwnerProfile(userID)
 }
@@ -154,7 +287,7 @@ func (s *OwnerService) UpdateProfile(userID int64, input *OwnerProfileInput) (*m
 		return nil, err
 	}
 	if s.roleProfileRepo == nil || s.roleProfileRepo.DB() == nil {
-		return nil, errors.New("机主档案仓储未初始化")
+		return nil, errors.New("服务商档案仓储未初始化")
 	}
 
 	if err := s.roleProfileRepo.DB().Model(&model.OwnerProfile{}).Where("id = ?", profile.ID).Updates(map[string]interface{}{
@@ -173,14 +306,14 @@ func (s *OwnerService) ListMyDrones(ownerUserID int64, page, pageSize int) ([]mo
 
 func (s *OwnerService) AdminListSupplies(page, pageSize int, filters map[string]interface{}) ([]model.OwnerSupply, int64, error) {
 	if s.ownerDomainRepo == nil {
-		return nil, 0, errors.New("机主供给仓储未初始化")
+		return nil, 0, errors.New("服务商供给仓储未初始化")
 	}
 	return s.ownerDomainRepo.AdminListSupplies(page, pageSize, filters)
 }
 
 func (s *OwnerService) AdminGetSupply(id int64) (*model.OwnerSupply, error) {
 	if s.ownerDomainRepo == nil {
-		return nil, errors.New("机主供给仓储未初始化")
+		return nil, errors.New("服务商供给仓储未初始化")
 	}
 	return s.ownerDomainRepo.GetMarketplaceSupplyByID(id)
 }
@@ -198,7 +331,10 @@ func (s *OwnerService) GetOwnedDrone(ownerUserID, droneID int64) (*model.Drone, 
 
 func (s *OwnerService) CreateSupply(ownerUserID int64, input *OwnerSupplyInput) (*model.OwnerSupply, error) {
 	if s.ownerDomainRepo == nil || s.droneRepo == nil {
-		return nil, errors.New("机主供给依赖未初始化")
+		return nil, errors.New("服务商供给依赖未初始化")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, err
 	}
 	if input == nil {
 		return nil, errors.New("供给参数不能为空")
@@ -223,7 +359,10 @@ func (s *OwnerService) CreateSupply(ownerUserID int64, input *OwnerSupplyInput) 
 
 func (s *OwnerService) ListMySupplies(ownerUserID int64, status string, page, pageSize int) ([]model.OwnerSupply, int64, error) {
 	if s.ownerDomainRepo == nil {
-		return nil, 0, errors.New("机主供给仓储未初始化")
+		return nil, 0, errors.New("服务商供给仓储未初始化")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, 0, err
 	}
 	if page <= 0 {
 		page = 1
@@ -236,7 +375,10 @@ func (s *OwnerService) ListMySupplies(ownerUserID int64, status string, page, pa
 
 func (s *OwnerService) GetSupply(ownerUserID, supplyID int64) (*model.OwnerSupply, error) {
 	if s.ownerDomainRepo == nil {
-		return nil, errors.New("机主供给仓储未初始化")
+		return nil, errors.New("服务商供给仓储未初始化")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, err
 	}
 	supply, err := s.ownerDomainRepo.GetSupplyByIDAndOwner(supplyID, ownerUserID)
 	if err != nil {
@@ -247,7 +389,10 @@ func (s *OwnerService) GetSupply(ownerUserID, supplyID int64) (*model.OwnerSuppl
 
 func (s *OwnerService) UpdateSupply(ownerUserID, supplyID int64, input *OwnerSupplyInput) (*model.OwnerSupply, error) {
 	if s.ownerDomainRepo == nil || s.droneRepo == nil {
-		return nil, errors.New("机主供给依赖未初始化")
+		return nil, errors.New("服务商供给依赖未初始化")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, err
 	}
 	if input == nil {
 		return nil, errors.New("供给参数不能为空")
@@ -304,7 +449,10 @@ func (s *OwnerService) UpdateSupply(ownerUserID, supplyID int64, input *OwnerSup
 
 func (s *OwnerService) UpdateSupplyStatus(ownerUserID, supplyID int64, status string) (*model.OwnerSupply, error) {
 	if s.ownerDomainRepo == nil {
-		return nil, errors.New("机主供给仓储未初始化")
+		return nil, errors.New("服务商供给仓储未初始化")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, err
 	}
 	valid := map[string]bool{"draft": true, "active": true, "paused": true, "closed": true}
 	if !valid[status] {
@@ -334,9 +482,12 @@ func (s *OwnerService) UpdateSupplyStatus(ownerUserID, supplyID int64, status st
 	return s.ownerDomainRepo.GetSupplyByIDAndOwner(supplyID, ownerUserID)
 }
 
-func (s *OwnerService) ListRecommendedDemands(ownerUserID int64, page, pageSize int) ([]model.Demand, int64, error) {
+func (s *OwnerService) ListRecommendedDemands(ownerUserID int64, page, pageSize int, query RecommendedDemandQuery) ([]model.Demand, int64, error) {
 	if s.demandDomainRepo == nil {
 		return nil, 0, errors.New("需求域仓储未初始化")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, 0, err
 	}
 	if page <= 0 {
 		page = 1
@@ -344,13 +495,286 @@ func (s *OwnerService) ListRecommendedDemands(ownerUserID int64, page, pageSize 
 	if pageSize <= 0 {
 		pageSize = 20
 	}
-	if s.matchingService != nil {
+	if s.matchingService != nil && query.IsZero() {
 		return s.matchingService.RecommendDemandsForOwner(ownerUserID, page, pageSize)
 	}
-	return s.demandDomainRepo.ListRecommendedDemands(page, pageSize)
+	if strings.TrimSpace(query.Sort) == "distance" {
+		return s.listRecommendedDemandsByDistance(ownerUserID, page, pageSize, query)
+	}
+	return s.demandDomainRepo.ListRecommendedDemands(query.repoQuery(), page, pageSize)
+}
+
+func (s *OwnerService) listRecommendedDemandsByDistance(ownerUserID int64, page, pageSize int, query RecommendedDemandQuery) ([]model.Demand, int64, error) {
+	scanSize := page * pageSize
+	if scanSize < 200 {
+		scanSize = 200
+	}
+	if scanSize > 1000 {
+		scanSize = 1000
+	}
+
+	repoQuery := query
+	repoQuery.Sort = "latest"
+	demands, total, err := s.demandDomainRepo.ListRecommendedDemands(repoQuery.repoQuery(), 1, scanSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	if total > int64(scanSize) && total <= 1000 {
+		demands, total, err = s.demandDomainRepo.ListRecommendedDemands(repoQuery.repoQuery(), 1, int(total))
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	metrics, err := s.GetRecommendedDemandMetrics(ownerUserID, demands)
+	if err != nil {
+		return nil, 0, err
+	}
+	sort.SliceStable(demands, func(i, j int) bool {
+		left, leftOK := recommendedMetricDistance(metrics[demands[i].ID])
+		right, rightOK := recommendedMetricDistance(metrics[demands[j].ID])
+		if leftOK != rightOK {
+			return leftOK
+		}
+		if leftOK && math.Abs(left-right) > 0.001 {
+			return left < right
+		}
+		return demands[i].CreatedAt.After(demands[j].CreatedAt)
+	})
+
+	start := (page - 1) * pageSize
+	if start >= len(demands) {
+		return []model.Demand{}, total, nil
+	}
+	end := start + pageSize
+	if end > len(demands) {
+		end = len(demands)
+	}
+	return demands[start:end], total, nil
+}
+
+func recommendedMetricDistance(metric RecommendedDemandMetric) (float64, bool) {
+	if metric.DistanceKM == nil || *metric.DistanceKM <= 0 {
+		return 0, false
+	}
+	return *metric.DistanceKM, true
+}
+
+func (s *OwnerService) GetRecommendedDemandMetrics(ownerUserID int64, demands []model.Demand) (map[int64]RecommendedDemandMetric, error) {
+	result := make(map[int64]RecommendedDemandMetric, len(demands))
+	if len(demands) == 0 || s.ownerDomainRepo == nil {
+		return result, nil
+	}
+	supplies, err := s.ownerDomainRepo.ListActiveSuppliesByOwner(ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	if len(supplies) == 0 {
+		return result, nil
+	}
+
+	for i := range demands {
+		demandPoint, ok := ownerDemandPoint(&demands[i])
+		if !ok {
+			continue
+		}
+		var best RecommendedDemandMetric
+		for j := range supplies {
+			supplyPoint, ok := ownerSupplyPoint(&supplies[j])
+			if !ok {
+				continue
+			}
+			distance := ownerHaversineKM(demandPoint.lat, demandPoint.lng, supplyPoint.lat, supplyPoint.lng)
+			if distance <= 0 {
+				continue
+			}
+			serviceRange, hasRange := ownerSupplyRangeKM(&supplies[j])
+			coverageStatus := ownerCoverageStatus(distance, serviceRange, hasRange)
+			if shouldReplaceRecommendedMetric(best, distance, coverageStatus) {
+				value := math.Round(distance*10) / 10
+				best = RecommendedDemandMetric{
+					DistanceKM:            &value,
+					ServiceCoverageStatus: coverageStatus,
+					MatchedSupplyID:       supplies[j].ID,
+					MatchedSupplyTitle:    supplies[j].Title,
+				}
+				if coverageStatus != "out_of_range" && supplies[j].Drone != nil {
+					if minutes, ok := ownerEstimatedArrivalMinutes(distance, supplies[j].Drone); ok {
+						best.EstimatedArrivalMin = &minutes
+					}
+				}
+				if hasRange {
+					rangeValue := math.Round(serviceRange*10) / 10
+					best.ServiceRangeKM = &rangeValue
+				}
+				if supplies[j].Drone != nil {
+					best.MatchedDroneID = supplies[j].Drone.ID
+				}
+			}
+		}
+		if best.DistanceKM != nil {
+			result[demands[i].ID] = best
+		}
+	}
+	return result, nil
+}
+
+func (s *OwnerService) ListLatestQuotesByDemandIDsAndOwner(demandIDs []int64, ownerUserID int64) (map[int64]*model.DemandQuote, error) {
+	if s.demandDomainRepo == nil || len(demandIDs) == 0 || ownerUserID == 0 {
+		return map[int64]*model.DemandQuote{}, nil
+	}
+	return s.demandDomainRepo.ListLatestQuotesByDemandIDsAndOwner(demandIDs, ownerUserID)
+}
+
+func shouldReplaceRecommendedMetric(current RecommendedDemandMetric, candidateDistance float64, candidateCoverage string) bool {
+	if current.DistanceKM == nil {
+		return true
+	}
+	currentPriority := ownerCoveragePriority(current.ServiceCoverageStatus)
+	candidatePriority := ownerCoveragePriority(candidateCoverage)
+	if candidatePriority != currentPriority {
+		return candidatePriority < currentPriority
+	}
+	return candidateDistance < *current.DistanceKM
+}
+
+func ownerCoveragePriority(status string) int {
+	switch status {
+	case "in_range":
+		return 0
+	case "unknown":
+		return 1
+	case "out_of_range":
+		return 2
+	default:
+		return 3
+	}
+}
+
+func ownerCoverageStatus(distanceKM, serviceRangeKM float64, hasRange bool) string {
+	if !hasRange || serviceRangeKM <= 0 {
+		return "unknown"
+	}
+	if distanceKM <= serviceRangeKM {
+		return "in_range"
+	}
+	return "out_of_range"
+}
+
+func ownerSupplyRangeKM(supply *model.OwnerSupply) (float64, bool) {
+	if supply == nil {
+		return 0, false
+	}
+	values := make([]float64, 0, 2)
+	if supply.MaxRangeKM > 0 {
+		values = append(values, supply.MaxRangeKM)
+	}
+	if supply.Drone != nil && supply.Drone.MaxDistance > 0 {
+		values = append(values, supply.Drone.MaxDistance)
+	}
+	if len(values) == 0 {
+		return 0, false
+	}
+	min := values[0]
+	for _, value := range values[1:] {
+		if value < min {
+			min = value
+		}
+	}
+	return min, true
+}
+
+func ownerEstimatedArrivalMinutes(distanceKM float64, drone *model.Drone) (int, bool) {
+	if distanceKM <= 0 || drone == nil || drone.MaxDistance <= 0 || drone.MaxFlightTime <= 0 {
+		return 0, false
+	}
+	minutes := int(math.Ceil(distanceKM / drone.MaxDistance * float64(drone.MaxFlightTime)))
+	if minutes <= 0 {
+		minutes = 1
+	}
+	return minutes, true
+}
+
+type ownerGeoPoint struct {
+	lat float64
+	lng float64
+}
+
+func ownerDemandPoint(demand *model.Demand) (ownerGeoPoint, bool) {
+	if demand == nil {
+		return ownerGeoPoint{}, false
+	}
+	for _, raw := range []model.JSON{
+		demand.DepartureAddressSnapshot,
+		demand.ServiceAddressSnapshot,
+		demand.DestinationAddressSnapshot,
+	} {
+		if point, ok := ownerJSONPoint(raw); ok {
+			return point, true
+		}
+	}
+	return ownerGeoPoint{}, false
+}
+
+func ownerSupplyPoint(supply *model.OwnerSupply) (ownerGeoPoint, bool) {
+	if supply == nil {
+		return ownerGeoPoint{}, false
+	}
+	if supply.Drone != nil && ownerValidCoordinate(supply.Drone.Latitude, supply.Drone.Longitude) {
+		return ownerGeoPoint{lat: supply.Drone.Latitude, lng: supply.Drone.Longitude}, true
+	}
+	return ownerJSONPoint(supply.ServiceAreaSnapshot)
+}
+
+func ownerJSONPoint(raw model.JSON) (ownerGeoPoint, bool) {
+	if len(raw) == 0 {
+		return ownerGeoPoint{}, false
+	}
+	var payload struct {
+		Latitude  *float64 `json:"latitude"`
+		Longitude *float64 `json:"longitude"`
+		Lat       *float64 `json:"lat"`
+		Lng       *float64 `json:"lng"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ownerGeoPoint{}, false
+	}
+	lat := payload.Latitude
+	if lat == nil {
+		lat = payload.Lat
+	}
+	lng := payload.Longitude
+	if lng == nil {
+		lng = payload.Lng
+	}
+	if lat == nil || lng == nil || !ownerValidCoordinate(*lat, *lng) {
+		return ownerGeoPoint{}, false
+	}
+	return ownerGeoPoint{lat: *lat, lng: *lng}, true
+}
+
+func ownerValidCoordinate(lat, lng float64) bool {
+	if lat == 0 && lng == 0 {
+		return false
+	}
+	return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+}
+
+func ownerHaversineKM(lat1, lng1, lat2, lng2 float64) float64 {
+	const earthRadiusKM = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLng := (lng2 - lng1) * math.Pi / 180
+	lat1Rad := lat1 * math.Pi / 180
+	lat2Rad := lat2 * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(dLng/2)*math.Sin(dLng/2)
+	return 2 * earthRadiusKM * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
 
 func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, error) {
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, err
+	}
 	if _, err := s.ensureOwnerProfile(ownerUserID); err != nil {
 		return nil, err
 	}
@@ -358,7 +782,7 @@ func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, err
 		return nil, errors.New("订单服务未初始化")
 	}
 
-	recommendedDemands, recommendedTotal, err := s.ListRecommendedDemands(ownerUserID, 1, 5)
+	recommendedDemands, recommendedTotal, err := s.ListRecommendedDemands(ownerUserID, 1, 5, RecommendedDemandQuery{})
 	if err != nil {
 		return nil, err
 	}
@@ -468,6 +892,9 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 	}
 	if input.PriceAmount <= 0 {
 		return nil, errors.New("报价金额无效")
+	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, err
 	}
 	if _, err := s.ensureOwnerProfile(ownerUserID); err != nil {
 		return nil, err
@@ -580,6 +1007,9 @@ func (s *OwnerService) ListMyQuotes(ownerUserID int64, status string, page, page
 	if s.demandDomainRepo == nil {
 		return nil, 0, errors.New("需求域仓储未初始化")
 	}
+	if err := s.ensureProviderQuoteAccess(ownerUserID); err != nil {
+		return nil, 0, err
+	}
 	if page <= 0 {
 		page = 1
 	}
@@ -592,6 +1022,9 @@ func (s *OwnerService) ListMyQuotes(ownerUserID int64, status string, page, page
 func (s *OwnerService) ListPilotBindings(ownerUserID int64, status string, page, pageSize int) ([]model.OwnerPilotBinding, int64, error) {
 	if s.ownerDomainRepo == nil {
 		return nil, 0, errors.New("绑定仓储未初始化")
+	}
+	if err := s.ensureProviderDispatchAccess(ownerUserID); err != nil {
+		return nil, 0, err
 	}
 	if page <= 0 {
 		page = 1
@@ -606,24 +1039,27 @@ func (s *OwnerService) InvitePilotBinding(ownerUserID, pilotUserID int64, isPrio
 	if s.ownerDomainRepo == nil {
 		return nil, errors.New("绑定仓储未初始化")
 	}
+	if err := s.ensureProviderDispatchAccess(ownerUserID); err != nil {
+		return nil, err
+	}
 	if ownerUserID == pilotUserID {
-		return nil, errors.New("不能邀请自己成为绑定飞手")
+		return nil, errors.New("不能邀请自己成为绑定执行人员")
 	}
 	if _, err := s.ensureOwnerProfile(ownerUserID); err != nil {
 		return nil, err
 	}
 	if _, err := s.userRepo.GetByID(pilotUserID); err != nil {
-		return nil, errors.New("飞手用户不存在")
+		return nil, errors.New("执行人员用户不存在")
 	}
 	if _, err := s.pilotRepo.GetByUserID(pilotUserID); err != nil {
-		return nil, errors.New("对方尚未注册飞手身份")
+		return nil, errors.New("对方尚未完成执行人员认证")
 	}
 
 	latest, err := s.ownerDomainRepo.GetLatestBindableRecord(ownerUserID, pilotUserID)
 	if err == nil && latest != nil {
 		switch latest.Status {
 		case "active", "paused":
-			return nil, errors.New("该飞手已存在合作关系，请直接调整绑定状态")
+			return nil, errors.New("该执行人员已存在合作关系，请直接调整绑定状态")
 		case "pending_confirmation":
 			return nil, errors.New("已存在待确认绑定关系")
 		}
@@ -649,16 +1085,25 @@ func (s *OwnerService) InvitePilotBinding(ownerUserID, pilotUserID int64, isPrio
 }
 
 func (s *OwnerService) ConfirmPilotBinding(ownerUserID, bindingID int64) (*model.OwnerPilotBinding, error) {
+	if err := s.ensureProviderDispatchAccess(ownerUserID); err != nil {
+		return nil, err
+	}
 	return s.handlePendingPilotBinding(ownerUserID, bindingID, true)
 }
 
 func (s *OwnerService) RejectPilotBinding(ownerUserID, bindingID int64) (*model.OwnerPilotBinding, error) {
+	if err := s.ensureProviderDispatchAccess(ownerUserID); err != nil {
+		return nil, err
+	}
 	return s.handlePendingPilotBinding(ownerUserID, bindingID, false)
 }
 
 func (s *OwnerService) UpdatePilotBindingStatus(ownerUserID, bindingID int64, status string) (*model.OwnerPilotBinding, error) {
 	if s.ownerDomainRepo == nil {
 		return nil, errors.New("绑定仓储未初始化")
+	}
+	if err := s.ensureProviderDispatchAccess(ownerUserID); err != nil {
+		return nil, err
 	}
 	valid := map[string]bool{"active": true, "paused": true, "dissolved": true}
 	if !valid[status] {
@@ -770,7 +1215,7 @@ func (s *OwnerService) ExpirePendingBindings(limit int) (int, error) {
 
 func (s *OwnerService) ensureOwnerProfile(userID int64) (*model.OwnerProfile, error) {
 	if s.roleProfileRepo == nil {
-		return nil, errors.New("机主档案仓储未初始化")
+		return nil, errors.New("服务商档案仓储未初始化")
 	}
 
 	profile, err := s.roleProfileRepo.GetOwnerProfileByUserID(userID)

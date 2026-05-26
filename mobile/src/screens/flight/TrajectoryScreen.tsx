@@ -468,7 +468,7 @@ export default function TrajectoryScreen({route}: any) {
                 thumbColor="#fff"
               />
             </View>
-            <Text style={styles.switchHint}>公开路线可被其他飞手搜索和使用</Text>
+            <Text style={styles.switchHint}>公开路线可被其他执行人员搜索和使用</Text>
 
             <View style={styles.modalActions}>
               <TouchableOpacity

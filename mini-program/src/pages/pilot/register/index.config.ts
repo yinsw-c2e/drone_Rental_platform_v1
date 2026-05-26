@@ -1,3 +1,3 @@
 export default definePageConfig({
-  navigationBarTitleText: '飞手认证',
+  navigationBarTitleText: '履约资质认证',
 });

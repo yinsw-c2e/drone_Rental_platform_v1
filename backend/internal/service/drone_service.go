@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -261,22 +262,37 @@ func (s *DroneService) SubmitInsurance(userID, droneID int64, req *SubmitInsuran
 	}
 
 	return s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
-		"insurance_policy_no":   req.PolicyNo,
-		"insurance_company":     req.InsuranceCompany,
-		"insurance_coverage":    req.CoverageAmount,
-		"insurance_expire_date": req.ExpireDate,
-		"insurance_doc":         req.InsuranceDoc,
-		"insurance_verified":    "pending",
+		"insurance_policy_no":     req.PolicyNo,
+		"insurance_company":       req.InsuranceCompany,
+		"insurance_coverage":      req.CoverageAmount,
+		"insurance_expire_date":   req.ExpireDate,
+		"insurance_doc":           req.InsuranceDoc,
+		"insurance_verified":      "pending",
+		"insurance_reviewed_at":   nil,
+		"insurance_reviewed_by":   0,
+		"insurance_reject_reason": "",
 	})
 }
 
 // ApproveInsurance 审核保险信息 (管理端)
-func (s *DroneService) ApproveInsurance(droneID int64, approved bool) error {
+func (s *DroneService) ApproveInsurance(droneID, reviewerID int64, approved bool, reason string) error {
+	reason = strings.TrimSpace(reason)
 	status := "verified"
+	fields := map[string]interface{}{
+		"insurance_verified":      status,
+		"insurance_reviewed_at":   time.Now(),
+		"insurance_reviewed_by":   reviewerID,
+		"insurance_reject_reason": "",
+	}
 	if !approved {
 		status = "rejected"
+		if reason == "" {
+			return errors.New("驳回保险资料时必须填写原因")
+		}
+		fields["insurance_verified"] = status
+		fields["insurance_reject_reason"] = reason
 	}
-	if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{"insurance_verified": status}); err != nil {
+	if err := s.updateCertificationDrivenSupplyStatus(droneID, fields); err != nil {
 		return err
 	}
 	s.notifyDroneQualificationResult(droneID, "drone_insurance_reviewed", "保险审核结果", approved, "无人机保险审核已通过。", "无人机保险审核未通过，请检查后重新提交。")

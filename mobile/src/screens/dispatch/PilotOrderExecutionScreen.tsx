@@ -53,7 +53,7 @@ const EXEC_STEPS = [
   {
     status: 'loading',
     label: '装货中',
-    desc: '飞手到达装货点，确认装货',
+    desc: '执行人员到达装货点，确认装货',
     icon: '📦',
   },
   {

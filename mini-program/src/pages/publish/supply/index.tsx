@@ -1,7 +1,11 @@
 import Taro from '@tarojs/taro';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Input, Textarea, ScrollView } from '@tarojs/components';
+import { useSelector } from 'react-redux';
+import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { ownerService } from '../../../services/owner';
+import { RootState } from '../../../store/store';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -20,6 +24,15 @@ const PRICING_OPTIONS = [
 ];
 
 export default function PublishSupplyPage() {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canPublishSupply = Boolean(
+    isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply,
+  );
   const [step, setStep] = useState<1 | 2>(1);
   const [submitting, setSubmitting] = useState(false);
 
@@ -40,6 +53,10 @@ export default function PublishSupplyPage() {
   };
 
   const handleSubmit = async () => {
+    if (!canPublishSupply) {
+      Taro.showToast({ title: '服务商设备能力审核通过后才能上架服务', icon: 'none' });
+      return;
+    }
     if (!title.trim()) { Taro.showToast({ title: '请输入服务标题', icon: 'none' }); return; }
     if (!droneId) { Taro.showToast({ title: '请输入无人机ID', icon: 'none' }); return; }
     if (!price || Number(price) <= 0) { Taro.showToast({ title: '请输入有效价格', icon: 'none' }); return; }
@@ -68,6 +85,19 @@ export default function PublishSupplyPage() {
     } catch (e: any) { Taro.showToast({ title: e.message || '上架失败', icon: 'none' }); }
     finally { setSubmitting(false); }
   };
+
+  if (!canPublishSupply) {
+    return (
+      <View className="publish-wrap">
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商设备能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '无人机、保险、适航和 UOM 等关键资质审核通过后，才能上架正式服务。' : '登录后才能上架服务商供给。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="publish-wrap">

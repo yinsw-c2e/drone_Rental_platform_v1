@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider, useSelector, useDispatch } from 'react-redux';
 import {
@@ -18,7 +18,8 @@ import {
   setMeSummary,
   logout,
 } from './store/slices/authSlice';
-import { API_V2_BASE_URL } from './constants';
+import { API_V2_BASE_URL, APP_CONFIG } from './constants';
+import { authService } from './services/auth';
 import { sessionService } from './services/session';
 import { ThemeProvider } from './theme/ThemeContext';
 
@@ -70,6 +71,13 @@ const QuickOrderEntryScreen = React.lazy(() => import('./screens/demand/QuickOrd
 const PublishDemandScreen = React.lazy(() => import('./screens/publish/PublishDemandScreen'));
 const PublishOfferScreen = React.lazy(() => import('./screens/publish/PublishOfferScreen'));
 const PublishCargoScreen = React.lazy(() => import('./screens/publish/PublishCargoScreen'));
+
+const DEV_AUTH_ACCOUNTS: Record<string, {phone: string; password: string}> = {
+  customer: {phone: '13800000004', password: 'password123'},
+  provider: {phone: '13800000007', password: 'password123'},
+  executor: {phone: '13900000016', password: 'password123'},
+  composite: {phone: '13800000002', password: 'password123'},
+};
 
 // Create React Router compatible navigation wrapper
 function createRouterNavigation(navigate: any) {
@@ -972,9 +980,44 @@ function WebAppInner() {
   const meInitialized = useSelector((state: any) => state.auth.meInitialized);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
+  const devAuthStartedRef = useRef(false);
 
   // 根据 Redux 中的 token 判断是否已登录
   const isLoggedIn = !!authToken;
+
+  useEffect(() => {
+    if (!APP_CONFIG.devToolsEnabled || isLoggedIn || devAuthStartedRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const account = DEV_AUTH_ACCOUNTS[params.get('devAuth') || ''];
+    if (!account) {
+      return;
+    }
+
+    devAuthStartedRef.current = true;
+    setIsLoading(true);
+    authService
+      .login(account.phone, account.password)
+      .then(response => {
+        if (response.code === 'OK' && response.data) {
+          store.dispatch(
+            setCredentials({
+              user: response.data.user,
+              token: response.data.token,
+              roleSummary: response.data.role_summary || null,
+            }),
+          );
+          return;
+        }
+        console.warn('Dev auth login failed:', response.message || '未知错误');
+      })
+      .catch(error => {
+        console.error('Dev auth login error:', error);
+      })
+      .finally(() => setIsLoading(false));
+  }, [isLoggedIn]);
 
   useEffect(() => {
     let active = true;

@@ -141,10 +141,10 @@ function DispatchSection({ task }: { task?: V2DispatchTaskSummary | null }) {
         派单来源：{task.dispatch_source || '-'}
       </Text>
       <Text style={styles.noticeDesc}>
-        目标飞手：
+        目标执行人员：
         {task.target_pilot?.nickname ||
           (task.target_pilot?.user_id
-            ? `飞手 #${task.target_pilot.user_id}`
+            ? `执行人员 #${task.target_pilot.user_id}`
             : '待确认')}
       </Text>
       <Text style={styles.noticeDesc}>
@@ -213,7 +213,7 @@ function PositionSection({
   if (!position) {
     return (
       <Text style={styles.emptyHint}>
-        当前还没有位置上报数据。测试环境下，可先到飞手执行工作台启动一段测试飞行。
+        当前还没有位置上报数据。测试环境下，可先到执行人员工作台启动一段测试飞行。
       </Text>
     );
   }

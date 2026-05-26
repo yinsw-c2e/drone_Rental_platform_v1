@@ -1,8 +1,84 @@
 import Taro from '@tarojs/taro';
 import { messageService } from '../services/message';
 import { notificationV2Service } from '../services/notificationV2';
+import { store } from '../store/store';
+import type { HaulRoleMode } from '../store/slices/roleSlice';
 
-const MESSAGE_TAB_INDEX = 1;
+const MESSAGE_TAB_INDEX = 2;
+const TAB_LABELS = {
+  customer: ['首页', '订单', '消息', '我的'],
+  provider: ['工作台', '接单', '消息', '我的'],
+};
+
+const PROVIDER_TAB_ICONS = [
+  {
+    iconPath: '/custom-tab-bar/assets/provider_tab_workbench_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/provider_tab_workbench_active.png',
+    iconWidth: 54,
+    iconHeight: 59,
+    selectedIconWidth: 57,
+    selectedIconHeight: 53,
+  },
+  {
+    iconPath: '/custom-tab-bar/assets/provider_tab_accept_order_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/provider_tab_accept_order_active.png',
+    iconWidth: 56,
+    iconHeight: 51,
+    selectedIconWidth: 70,
+    selectedIconHeight: 60,
+  },
+  {
+    iconPath: '/custom-tab-bar/assets/provider_tab_message_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/provider_tab_message_active.png',
+    iconWidth: 58,
+    iconHeight: 60,
+    selectedIconWidth: 58,
+    selectedIconHeight: 60,
+  },
+  {
+    iconPath: '/custom-tab-bar/assets/provider_tab_profile_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/provider_tab_profile_active.png',
+    iconWidth: 54,
+    iconHeight: 61,
+    selectedIconWidth: 54,
+    selectedIconHeight: 61,
+  },
+];
+
+const CUSTOMER_TAB_ICONS = [
+  {
+    iconPath: '/custom-tab-bar/assets/icon_tab_home_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/icon_tab_home_active.png',
+    iconWidth: 58,
+    iconHeight: 60,
+    selectedIconWidth: 58,
+    selectedIconHeight: 60,
+  },
+  {
+    iconPath: '/custom-tab-bar/assets/icon_tab_order_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/icon_tab_order_active.png',
+    iconWidth: 56,
+    iconHeight: 60,
+    selectedIconWidth: 56,
+    selectedIconHeight: 60,
+  },
+  {
+    iconPath: '/custom-tab-bar/assets/icon_tab_message_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/icon_tab_message_active.png',
+    iconWidth: 58,
+    iconHeight: 56,
+    selectedIconWidth: 58,
+    selectedIconHeight: 56,
+  },
+  {
+    iconPath: '/custom-tab-bar/assets/icon_tab_profile_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/icon_tab_profile_active.png',
+    iconWidth: 58,
+    iconHeight: 60,
+    selectedIconWidth: 58,
+    selectedIconHeight: 60,
+  },
+];
 
 function getCurrentTabBar() {
   const pages = Taro.getCurrentPages();
@@ -21,14 +97,39 @@ function isRealConversation(item: any) {
 
 function patchMessageBadge(tabBar: any, unreadCount: number) {
   const list = Array.isArray(tabBar?.data?.list) ? tabBar.data.list : [];
-  const badge = formatBadge(unreadCount);
+  const isProviderMode = store.getState().role.selectedMode === 'provider';
+  const badge = isProviderMode ? '' : formatBadge(unreadCount);
 
   if (!list.length) return;
 
   tabBar.setData({
     list: list.map((item: any, index: number) => (
-      index === MESSAGE_TAB_INDEX ? { ...item, badge } : item
+      index === MESSAGE_TAB_INDEX ? { ...item, badge, badgeDot: false } : item
     )),
+  });
+}
+
+function getRoleTabLabels(modeOverride?: HaulRoleMode) {
+  const selectedMode = modeOverride || store.getState().role.selectedMode;
+  return selectedMode === 'provider' ? TAB_LABELS.provider : TAB_LABELS.customer;
+}
+
+function patchRoleTabLabels(tabBar: any, selected?: number, modeOverride?: HaulRoleMode) {
+  const list = Array.isArray(tabBar?.data?.list) ? tabBar.data.list : [];
+  if (!list.length) return;
+
+  const selectedMode = modeOverride || store.getState().role.selectedMode;
+  const labels = getRoleTabLabels(selectedMode);
+  const icons = selectedMode === 'provider' ? PROVIDER_TAB_ICONS : CUSTOMER_TAB_ICONS;
+  tabBar.setData({
+    ...(typeof selected === 'number' ? { selected } : {}),
+    list: list.map((item: any, index: number) => ({
+      ...item,
+      text: labels[index] || item.text,
+      ...(icons[index] || {}),
+      badgeDot: false,
+      ...(selectedMode === 'provider' && index === MESSAGE_TAB_INDEX ? { badge: '' } : {}),
+    })),
   });
 }
 
@@ -55,6 +156,14 @@ async function fetchMessageTabUnread() {
 }
 
 export async function refreshCustomTabBarBadges() {
+  if (!store.getState().auth.isAuthenticated) {
+    const tabBar = getCurrentTabBar();
+    if (tabBar?.setData) {
+      patchMessageBadge(tabBar, 0);
+    }
+    return;
+  }
+
   try {
     const unreadCount = await fetchMessageTabUnread();
     const tabBar = getCurrentTabBar();
@@ -66,11 +175,11 @@ export async function refreshCustomTabBarBadges() {
   }
 }
 
-export function syncCustomTabBar(selected: number) {
+export function syncCustomTabBar(selected: number, modeOverride?: HaulRoleMode) {
   const tabBar = getCurrentTabBar();
 
   if (tabBar?.setData) {
-    tabBar.setData({ selected });
+    patchRoleTabLabels(tabBar, selected, modeOverride);
     refreshCustomTabBarBadges();
   }
 }

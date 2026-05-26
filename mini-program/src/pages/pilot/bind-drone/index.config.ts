@@ -1,1 +1,1 @@
-export default definePageConfig({ navigationBarTitleText: '绑定无人机' });
+export default definePageConfig({ navigationBarTitleText: '历史合作入口' });

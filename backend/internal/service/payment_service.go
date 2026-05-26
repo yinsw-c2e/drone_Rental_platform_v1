@@ -24,6 +24,7 @@ type PaymentService struct {
 	dispatchService   *DispatchService
 	eventService      *EventService
 	provider          payment.PaymentProvider
+	allowMockPayments bool
 	logger            *zap.Logger
 }
 
@@ -43,6 +44,7 @@ func NewPaymentService(
 		pilotRepo:         pilotRepo,
 		orderArtifactRepo: orderArtifactRepo,
 		provider:          provider,
+		allowMockPayments: true,
 		logger:            logger,
 	}
 }
@@ -59,10 +61,21 @@ func (s *PaymentService) SetContractRepo(contractRepo *repository.ContractRepo) 
 	s.contractRepo = contractRepo
 }
 
+func (s *PaymentService) SetAllowMockPayments(allow bool) {
+	s.allowMockPayments = allow
+}
+
+func (s *PaymentService) MockPaymentsEnabled() bool {
+	return s.allowMockPayments
+}
+
 func (s *PaymentService) CreatePayment(orderID, userID int64, method string) (*model.Payment, *payment.PaymentResult, error) {
 	method, err := normalizePaymentMethod(method)
 	if err != nil {
 		return nil, nil, err
+	}
+	if method == "mock" && !s.allowMockPayments {
+		return nil, nil, errors.New("当前环境不允许模拟支付")
 	}
 
 	order, err := s.orderRepo.GetByID(orderID)
@@ -217,6 +230,9 @@ func (s *PaymentService) HandlePaymentCallback(paymentNo, thirdPartyNo string) e
 
 // MockPaymentComplete simulates successful payment for development
 func (s *PaymentService) MockPaymentComplete(paymentNo string) error {
+	if !s.allowMockPayments {
+		return errors.New("当前环境不允许模拟支付")
+	}
 	return s.HandlePaymentCallback(paymentNo, "MOCK_"+paymentNo)
 }
 
@@ -516,7 +532,7 @@ func resolvePostPaymentTransition(order *model.Order, paidAt *time.Time, pilotRe
 				pilotID = pilot.ID
 			}
 		}
-		if pilotID == 0 || executorPilotUserID == 0 {
+		if executorPilotUserID == 0 {
 			executionMode = "dispatch_pool"
 		} else {
 			updates["status"] = "assigned"
@@ -524,14 +540,14 @@ func resolvePostPaymentTransition(order *model.Order, paidAt *time.Time, pilotRe
 			updates["needs_dispatch"] = false
 			updates["pilot_id"] = pilotID
 			updates["executor_pilot_user_id"] = executorPilotUserID
-			return "assigned", updates, "支付成功，订单进入自执行", nil
+			return "assigned", updates, "支付成功，订单进入履约推进", nil
 		}
 	}
 
 	updates["status"] = "pending_dispatch"
 	updates["execution_mode"] = "dispatch_pool"
 	updates["needs_dispatch"] = true
-	return "pending_dispatch", updates, "支付成功，订单待派单", nil
+	return "pending_dispatch", updates, "支付成功，订单待开始履约", nil
 }
 
 func isOrderPaidOrBeyond(status string) bool {

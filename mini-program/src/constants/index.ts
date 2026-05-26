@@ -14,7 +14,7 @@ export const API_TIMEOUT = 15000;
 export const ORDER_STATUS: Record<string, string> = {
   created: '待确认',
   accepted: '已接受',
-  rejected: '机主已拒绝',
+  rejected: '服务商已拒绝',
   paid: '已支付',
   in_progress: '正在运输',
   completed: '已完成',

@@ -1837,11 +1837,9 @@ func (s *DispatchService) manualDispatchOrderWithRepos(
 
 	if dispatchMode == "self_execute" {
 		pilot, err := pilotRepo.GetByUserID(providerUserID)
-		if err != nil || pilot == nil {
-			return nil, nil, false, errors.New("机主尚未具备可执行的飞手身份")
-		}
-		if pilot.VerificationStatus != "verified" {
-			return nil, nil, false, errors.New("机主飞手资质尚未审核通过，不能自执行")
+		pilotID := int64(0)
+		if err == nil && pilot != nil && pilot.VerificationStatus == "verified" {
+			pilotID = pilot.ID
 		}
 
 		now := time.Now()
@@ -1850,7 +1848,7 @@ func (s *DispatchService) manualDispatchOrderWithRepos(
 			"needs_dispatch":         false,
 			"dispatch_task_id":       nil,
 			"executor_pilot_user_id": providerUserID,
-			"pilot_id":               pilot.ID,
+			"pilot_id":               pilotID,
 			"execution_mode":         "self_execute",
 			"updated_at":             now,
 		}); err != nil {
@@ -1860,14 +1858,14 @@ func (s *DispatchService) manualDispatchOrderWithRepos(
 		order.NeedsDispatch = false
 		order.DispatchTaskID = nil
 		order.ExecutorPilotUserID = providerUserID
-		order.PilotID = pilot.ID
+		order.PilotID = pilotID
 		order.ExecutionMode = "self_execute"
 		if err := orderRepo.AddTimeline(&model.OrderTimeline{
 			OrderID:      order.ID,
 			Status:       "assigned",
-			Note:         firstNonEmpty(reason, "机主选择自执行，订单进入已分配"),
+			Note:         firstNonEmpty(reason, "服务商开始履约，订单进入履约推进"),
 			OperatorID:   providerUserID,
-			OperatorType: "owner",
+			OperatorType: "provider",
 		}); err != nil {
 			return nil, nil, false, err
 		}

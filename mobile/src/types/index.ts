@@ -17,6 +17,21 @@ export interface User {
   created_at?: string;
 }
 
+export type ProviderReviewStatus = 'none' | 'pending_review' | 'approved' | 'rejected' | 'suspended';
+export type ProviderNextAction = 'start_onboarding' | 'wait_review' | 'fix_rejected' | 'open_workbench';
+
+export interface ProviderRoleSummary {
+  status: ProviderReviewStatus;
+  asset_status: ProviderReviewStatus;
+  executor_status: ProviderReviewStatus;
+  can_use_workbench: boolean;
+  can_quote: boolean;
+  can_arrange_dispatch: boolean;
+  can_accept_dispatch: boolean;
+  can_self_execute: boolean;
+  next_action: ProviderNextAction;
+}
+
 export interface RoleSummary {
   has_client_role: boolean;
   has_owner_role: boolean;
@@ -24,6 +39,7 @@ export interface RoleSummary {
   can_publish_supply: boolean;
   can_accept_dispatch: boolean;
   can_self_execute: boolean;
+  provider?: ProviderRoleSummary | null;
 }
 
 export interface MeSummary {
@@ -496,9 +512,19 @@ export interface DemandSummary {
   status: string;
   service_type: string;
   cargo_scene?: string;
+  departure_address?: AddressSnapshot | null;
+  destination_address?: AddressSnapshot | null;
+  service_address?: AddressSnapshot | null;
   service_address_text?: string;
   scheduled_start_at?: string;
   scheduled_end_at?: string;
+  cargo_weight_kg?: number;
+  cargo_volume_m3?: number;
+  cargo_length_cm?: number;
+  cargo_width_cm?: number;
+  cargo_height_cm?: number;
+  cargo_type?: string;
+  cargo_special_requirements?: string;
   budget_min?: number;
   budget_max?: number;
   allows_pilot_candidate: boolean;
@@ -506,6 +532,16 @@ export interface DemandSummary {
   candidate_pilot_count: number;
   my_quote?: DemandQuoteSummary;
   my_candidate?: DemandCandidateSummary;
+  distance_km?: number;
+  service_range_km?: number;
+  service_coverage_status?: 'in_range' | 'out_of_range' | 'unknown' | string;
+  estimated_arrival_minutes?: number;
+  arrival_estimate_source?: string;
+  quote_response_seconds?: number;
+  matched_supply_id?: number;
+  matched_drone_id?: number;
+  matched_supply_title?: string;
+  created_at?: string;
 }
 
 export interface DemandDetail extends DemandSummary {

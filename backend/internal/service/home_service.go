@@ -170,7 +170,9 @@ func (s *HomeService) GetDashboard(userID int64) (*HomeDashboard, error) {
 	if err != nil {
 		return nil, err
 	}
-	demands, demandTotal, err := s.demandDomainRepo.ListRecommendedDemands(1, 4)
+	demands, demandTotal, err := s.demandDomainRepo.ListRecommendedDemands(repository.RecommendedDemandQuery{
+		ServiceType: homeDashboardServiceType,
+	}, 1, 4)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +267,7 @@ func (s *HomeService) buildClientDashboard(userID int64) (*HomeClientDashboard, 
 func (s *HomeService) buildOwnerDashboard(userID int64) (*HomeOwnerDashboard, error) {
 	view := &HomeOwnerDashboard{}
 
-	_, recommendedTotal, err := s.ownerService.ListRecommendedDemands(userID, 1, 1)
+	_, recommendedTotal, err := s.ownerService.ListRecommendedDemands(userID, 1, 1, RecommendedDemandQuery{})
 	if err != nil {
 		return nil, err
 	}

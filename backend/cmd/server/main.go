@@ -61,7 +61,6 @@ import (
 	longsettlement "wurenji-backend/internal/api/v2/longtail/settlement"
 	longuser "wurenji-backend/internal/api/v2/longtail/user"
 	"wurenji-backend/internal/config"
-	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/amap"
 	"wurenji-backend/internal/pkg/oauth"
 	paymentpkg "wurenji-backend/internal/pkg/payment"
@@ -117,8 +116,9 @@ func main() {
 		zapLogger.Fatal("Failed to unwrap database connection", zap.Error(err))
 	}
 
-	// Auto migrate
-	autoMigrate(db)
+	// Schema changes are managed by backend/migrations. Keep GORM AutoMigrate out of
+	// the server startup path so it cannot rewrite existing indexes or foreign keys.
+	zapLogger.Info("Skipping GORM auto migration; use backend/migrations for schema changes")
 
 	// Init Redis
 	rds := redis.NewClient(&redis.Options{
@@ -158,6 +158,9 @@ func main() {
 	creditRepo := repository.NewCreditRepository(db)
 	insuranceRepo := repository.NewInsuranceRepository(db)
 	analyticsRepo := repository.NewAnalyticsRepository(db)
+	serviceClassRepo := repository.NewServiceClassRepo(db)
+	providerPresenceRepo := repository.NewProviderPresenceRepo(db)
+	orderBroadcastRepo := repository.NewOrderBroadcastRepo(db)
 
 	contractRepo := repository.NewContractRepo(db)
 
@@ -223,9 +226,12 @@ func main() {
 	droneService := service.NewDroneService(droneRepo, roleProfileRepo, ownerDomainRepo)
 	ownerService := service.NewOwnerService(userRepo, droneRepo, pilotRepo, roleProfileRepo, ownerDomainRepo, demandDomainRepo)
 	orderService := service.NewOrderService(orderRepo, droneRepo, pilotRepo, demandRepo, paymentRepo, clientRepo, demandDomainRepo, ownerDomainRepo, orderArtifactRepo, cfg, zapLogger)
+	pricingService := service.NewPricingService(serviceClassRepo)
+	broadcastService := service.NewBroadcastService(providerPresenceRepo, orderBroadcastRepo, orderRepo, orderArtifactRepo, userService, zapLogger)
 	demandService := service.NewDemandService(demandRepo, clientRepo)
 	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, clientRepo, ownerDomainRepo, demandDomainRepo, zapLogger)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, droneRepo, pilotRepo, orderArtifactRepo, paymentProvider, zapLogger)
+	paymentService.SetAllowMockPayments(cfg.Payment.AllowMock)
 	messageService := service.NewMessageService(messageRepo)
 	messageService.SetCreditRepository(creditRepo)
 	eventService := service.NewEventService(messageService, pushService, zapLogger)
@@ -259,6 +265,9 @@ func main() {
 	paymentService.SetEventService(eventService)
 	paymentService.SetContractRepo(contractRepo)
 	orderService.SetEventService(eventService)
+	orderService.SetPricingService(pricingService)
+	orderService.SetBroadcastService(broadcastService)
+	orderService.SetSettlementService(settlementService)
 	dispatchService.SetEventService(eventService)
 	droneService.SetEventService(eventService)
 	contractService.SetEventService(eventService)
@@ -312,15 +321,16 @@ func main() {
 		Dispatch:   longdispatch.NewHandler(dispatchService, clientService, pilotService, orderRepo, orderArtifactRepo, demandDomainRepo, ownerDomainRepo),
 		Flight:     longflight.NewHandler(flightService, pilotService),
 		Airspace:   longairspace.NewHandler(airspaceService),
-		Settlement: longsettlement.NewHandler(settlementService),
+		Settlement: longsettlement.NewHandler(settlementService, operationsService),
 		Credit:     longcredit.NewHandler(creditService),
 		Insurance:  longinsurance.NewHandler(insuranceService),
 		Analytics:  longanalytics.NewHandler(analyticsService),
 	}
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, pricingService, broadcastService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)
+	broadcastService.StartReservationScheduler(context.Background())
 
 	// Setup Gin
 	gin.SetMode(cfg.Server.Mode)
@@ -379,105 +389,6 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	return db, nil
-}
-
-func autoMigrate(db *gorm.DB) {
-	db.AutoMigrate(
-		&model.User{},
-		&model.ClientProfile{},
-		&model.OwnerProfile{},
-		&model.PilotProfile{},
-		&model.Drone{},
-		&model.RentalOffer{},
-		&model.OwnerSupply{},
-		&model.RentalDemand{},
-		&model.CargoDemand{},
-		&model.Demand{},
-		&model.DemandQuote{},
-		&model.DemandCandidatePilot{},
-		&model.MatchingLog{},
-		&model.Order{},
-		&model.OrderTimeline{},
-		&model.OrderSnapshot{},
-		&model.Payment{},
-		&model.Refund{},
-		&model.DisputeRecord{},
-		&model.Message{},
-		&model.ConversationUserState{},
-		&model.Review{},
-		&model.MatchingRecord{},
-		&model.SystemConfig{},
-		&model.AdminLog{},
-		&model.MigrationEntityMapping{},
-		&model.MigrationAuditRecord{},
-		&model.UserAddress{},
-		// 飞手相关表
-		&model.Pilot{},
-		&model.PilotCertification{},
-		&model.PilotFlightLog{},
-		&model.PilotDroneBinding{},
-		&model.OwnerPilotBinding{},
-		// 无人机维护与保险表
-		&model.DroneMaintenanceLog{},
-		&model.DroneInsuranceRecord{},
-		// 业主/客户相关表
-		&model.Client{},
-		&model.ClientCreditCheck{},
-		&model.ClientEnterpriseCert{},
-		&model.CargoDeclaration{},
-		// 派单相关表
-		&model.DispatchTask{},
-		&model.DispatchCandidate{},
-		&model.DispatchConfig{},
-		&model.DispatchLog{},
-		&model.FormalDispatchTask{},
-		&model.FormalDispatchLog{},
-		// 飞行监控相关表
-		&model.FlightRecord{},
-		&model.FlightPosition{},
-		&model.FlightAlert{},
-		&model.Geofence{},
-		&model.GeofenceViolation{},
-		// 轨迹与路线相关表
-		&model.FlightTrajectory{},
-		&model.FlightWaypoint{},
-		&model.SavedRoute{},
-		// 多点任务相关表
-		&model.MultiPointTask{},
-		&model.MultiPointTaskStop{},
-		&model.FlightMonitorConfig{},
-		// 空域管理与合规相关表
-		&model.AirspaceApplication{},
-		&model.NoFlyZone{},
-		&model.ComplianceCheck{},
-		&model.ComplianceCheckItem{},
-		// 支付结算与分账相关表
-		&model.OrderSettlement{},
-		&model.UserWallet{},
-		&model.WalletTransaction{},
-		&model.WithdrawalRecord{},
-		&model.PricingConfig{},
-		// 信用评价与风控相关表
-		&model.CreditScore{},
-		&model.CreditScoreLog{},
-		&model.RiskControl{},
-		&model.Violation{},
-		&model.Blacklist{},
-		&model.Deposit{},
-		// 保险与理赔相关表
-		&model.InsurancePolicy{},
-		&model.InsuranceClaim{},
-		&model.ClaimTimeline{},
-		&model.InsuranceProduct{},
-		// 数据分析与报表相关表
-		&model.DailyStatistics{},
-		&model.HourlyMetrics{},
-		&model.RegionStatistics{},
-		&model.AnalyticsReport{},
-		&model.HeatmapData{},
-		&model.RealtimeDashboard{},
-		&model.OrderContract{},
-	)
 }
 
 func registerTopLevelRoutes(r *gin.Engine, hub *ws.Hub, cfg *config.Config, logger *zap.Logger) {

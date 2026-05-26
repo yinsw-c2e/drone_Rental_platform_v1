@@ -1,0 +1,328 @@
+page {
+  background: #F6F8FB;
+}
+
+.mode-page,
+.mode-page text {
+  font-family: PingFang SC, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+.mode-page {
+  min-height: 100vh;
+  color: #061E5B;
+  background: linear-gradient(180deg, #FAFAFC 0%, #F6F8FB 100%);
+}
+
+.mode-scroll {
+  height: 100vh;
+}
+
+.mode-content {
+  width: 750rpx;
+  box-sizing: border-box;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 32rpx);
+}
+
+.mode-brand-row {
+  width: 679rpx;
+  height: 91rpx;
+  margin-left: 35rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.mode-logo {
+  width: 89rpx;
+  height: 91rpx;
+  border-radius: 16rpx;
+  display: block;
+  flex-shrink: 0;
+}
+
+.mode-brand-row > view {
+  margin-left: 24rpx;
+  padding-top: 10rpx;
+}
+
+.mode-brand-title {
+  display: block;
+  color: #071E5E;
+  font-size: 38rpx;
+  line-height: 45rpx;
+  font-weight: 800;
+}
+
+.mode-brand-sub {
+  display: block;
+  margin-top: 8rpx;
+  color: #5B6A95;
+  font-size: 25rpx;
+  line-height: 30rpx;
+  font-weight: 400;
+}
+
+.mode-hero-copy {
+  margin-top: 76rpx;
+  margin-left: 42rpx;
+}
+
+.mode-hero-title {
+  display: block;
+  color: #03205C;
+  font-size: 54rpx;
+  line-height: 65rpx;
+  font-weight: 800;
+}
+
+.mode-hero-sub {
+  display: block;
+  margin-top: 28rpx;
+  color: #4C5C87;
+  font-size: 32rpx;
+  line-height: 38rpx;
+  font-weight: 400;
+}
+
+.mode-role-list {
+  margin-top: 42rpx;
+}
+
+.mode-role-card {
+  position: relative;
+  width: 679rpx;
+  margin-left: 35rpx;
+  box-sizing: border-box;
+}
+
+.mode-role-card-customer {
+  height: 221rpx;
+  border-radius: 18rpx;
+  border: 2rpx solid #FD5A04;
+  background: linear-gradient(180deg, #FEFAF7 0%, #FFFDFC 100%);
+  box-shadow: 0 10rpx 24rpx rgba(255, 90, 4, 0.10);
+}
+
+.mode-role-card-customer.is-inactive {
+  border: 1rpx solid #D9E0EA;
+  background: #FFFFFF;
+  box-shadow: 0 10rpx 24rpx rgba(17, 46, 105, 0.08);
+}
+
+.mode-role-card-provider {
+  height: 201rpx;
+  margin-top: 30rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid #D9E0EA;
+  background: #FFFFFF;
+  box-shadow: 0 10rpx 24rpx rgba(17, 46, 105, 0.08);
+}
+
+.mode-role-card-provider.is-selected {
+  border: 2rpx solid #0B5FE8;
+  background: #F7FAFF;
+  box-shadow: 0 10rpx 24rpx rgba(11, 95, 232, 0.10);
+}
+
+.mode-role-image {
+  position: absolute;
+  display: block;
+}
+
+.mode-role-card-customer .mode-role-image {
+  left: 45rpx;
+  top: 43rpx;
+  width: 89rpx;
+  height: 147rpx;
+}
+
+.mode-role-card-provider .mode-role-image {
+  left: 44rpx;
+  top: 47rpx;
+  width: 101rpx;
+  height: 104rpx;
+}
+
+.mode-role-title {
+  position: absolute;
+  left: 195rpx;
+  display: block;
+  color: #061E5B;
+  font-size: 35rpx;
+  line-height: 43rpx;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mode-role-card-customer .mode-role-title {
+  top: 66rpx;
+}
+
+.mode-role-card-provider .mode-role-title {
+  top: 55rpx;
+}
+
+.mode-role-badge {
+  position: absolute;
+  left: 379rpx;
+  top: 64rpx;
+  width: 71rpx;
+  height: 40rpx;
+  border-radius: 6rpx;
+  background: #FD5A04;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-role-badge-text {
+  color: #FFFFFF;
+  font-size: 22rpx;
+  line-height: 27rpx;
+  font-weight: 600;
+}
+
+.mode-role-desc {
+  position: absolute;
+  left: 194rpx;
+  display: block;
+  color: #445885;
+  font-size: 24rpx;
+  line-height: 30rpx;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.mode-role-card-customer .mode-role-desc {
+  top: 131rpx;
+}
+
+.mode-role-card-provider .mode-role-desc {
+  top: 120rpx;
+}
+
+.mode-chevron {
+  position: absolute;
+  left: 624rpx;
+  width: 16rpx;
+  display: block;
+}
+
+.mode-role-card-customer .mode-chevron {
+  top: 95rpx;
+  height: 27rpx;
+}
+
+.mode-role-card-provider .mode-chevron {
+  top: 84rpx;
+  height: 26rpx;
+}
+
+.mode-primary-button {
+  width: 679rpx;
+  height: 97rpx;
+  margin-top: 42rpx;
+  margin-left: 35rpx;
+  border-radius: 14rpx;
+  background: linear-gradient(90deg, #0038A1 0%, #0644AD 52%, #023491 100%);
+  box-shadow: 0 8rpx 18rpx rgba(0, 56, 161, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-primary-text {
+  color: #FFFFFF;
+  font-size: 32rpx;
+  line-height: 38rpx;
+  font-weight: 700;
+}
+
+.mode-login-row {
+  width: 229rpx;
+  height: 29rpx;
+  margin-top: 33rpx;
+  margin-left: 261rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.mode-login-hint,
+.mode-login-link {
+  display: block;
+  font-size: 23rpx;
+  line-height: 29rpx;
+}
+
+.mode-login-hint {
+  color: #5B6A95;
+  font-weight: 400;
+}
+
+.mode-login-link {
+  margin-left: 18rpx;
+  color: #024CFD;
+  font-weight: 500;
+}
+
+.mode-wechat-button {
+  position: relative;
+  width: 679rpx;
+  height: 70rpx;
+  margin-top: 26rpx;
+  margin-left: 35rpx;
+  border-radius: 13rpx;
+  border: 1rpx solid #D4DBE8;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+
+.mode-wechat-icon {
+  position: absolute;
+  left: 222rpx;
+  top: 20rpx;
+  width: 40rpx;
+  height: 32rpx;
+  display: block;
+}
+
+.mode-wechat-text {
+  position: absolute;
+  left: 281rpx;
+  top: 23rpx;
+  display: block;
+  color: #071E5E;
+  font-size: 24rpx;
+  line-height: 29rpx;
+  font-weight: 600;
+}
+
+.mode-footer {
+  position: relative;
+  width: 679rpx;
+  height: 60rpx;
+  margin-top: 33rpx;
+  margin-left: 35rpx;
+}
+
+.mode-footer-icon {
+  position: absolute;
+  left: 87rpx;
+  top: 0;
+  width: 26rpx;
+  height: 33rpx;
+  display: block;
+}
+
+.mode-footer-text {
+  position: absolute;
+  left: 132rpx;
+  top: 7rpx;
+  display: block;
+  color: #5D6B95;
+  font-size: 22rpx;
+  line-height: 27rpx;
+  font-weight: 400;
+  white-space: nowrap;
+}

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,11 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import {useSelector} from 'react-redux';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import {requestWithdrawal} from '../../services/settlement';
+import {RootState} from '../../store/store';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -22,6 +26,13 @@ const METHODS = [
 export default function WithdrawalScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [method, setMethod] = useState('bank_card');
   const [amountStr, setAmountStr] = useState('');
   const [bankName, setBankName] = useState('');
@@ -33,6 +44,9 @@ export default function WithdrawalScreen({navigation}: any) {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (!canUseProviderFinance) {
+      return Alert.alert('无法提现', isAuthenticated ? '服务商审核通过后才能发起提现。' : '请先登录服务商账号。');
+    }
     const amount = Math.round(parseFloat(amountStr) * 100); // 转为分
     if (isNaN(amount) || amount <= 0) {
       return Alert.alert('提示', '请输入正确的提现金额');
@@ -72,6 +86,19 @@ export default function WithdrawalScreen({navigation}: any) {
       setSubmitting(false);
     }
   };
+
+  if (!canUseProviderFinance) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商财务能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '服务商审核通过并产生可结算收入后，才能发起提现。' : '登录后才能发起服务商提现。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>

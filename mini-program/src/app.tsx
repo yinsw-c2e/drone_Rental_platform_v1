@@ -5,11 +5,13 @@ import { store, RootState } from './store/store';
 import './app.scss';
 
 const AUTH_FREE_ROUTES = new Set([
+  'pages/auth/mode-selection/index',
   'pages/auth/login/index',
   'pages/auth/register/index',
 ]);
 
 const VERIFICATION_PROMPT_FREE_ROUTES = new Set([
+  'pages/auth/mode-selection/index',
   'pages/auth/login/index',
   'pages/auth/register/index',
   'pages/verification/index',
@@ -29,6 +31,10 @@ const VERIFICATION_PROMPT_STATUSES = new Set([
 const shouldPromptVerification = (status?: string | null) =>
   VERIFICATION_PROMPT_STATUSES.has(String(status || '').trim().toLowerCase());
 
+const isRolePreviewRoute = (route: string, options?: Record<string, unknown>) =>
+  (route === 'pages/home/index' || route === 'pages/orders/index') &&
+  (options?.mode === 'customer' || options?.mode === 'provider');
+
 function AuthGate({ children }: PropsWithChildren) {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const user = useSelector((state: RootState) => state.auth.user);
@@ -37,10 +43,16 @@ function AuthGate({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const pages = Taro.getCurrentPages();
-    const currentRoute = (pages[pages.length - 1]?.route || '').replace(/^\//, '');
+    const currentPage = pages[pages.length - 1] as { route?: string; options?: Record<string, unknown> } | undefined;
+    const currentRoute = (currentPage?.route || '').replace(/^\//, '');
     if (!currentRoute) return;
-    if (!isAuthenticated && checked && !AUTH_FREE_ROUTES.has(currentRoute)) {
-      Taro.reLaunch({ url: '/pages/auth/login/index' });
+    if (
+      !isAuthenticated &&
+      checked &&
+      !AUTH_FREE_ROUTES.has(currentRoute) &&
+      !isRolePreviewRoute(currentRoute, currentPage?.options)
+    ) {
+      Taro.reLaunch({ url: '/pages/auth/mode-selection/index' });
     }
   }, [isAuthenticated, checked]);
 

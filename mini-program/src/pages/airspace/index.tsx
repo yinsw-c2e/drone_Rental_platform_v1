@@ -143,7 +143,7 @@ export default function AirspacePage() {
 
   const handleCreate = async () => {
     if (!pilotId) {
-      Taro.showToast({ title: '请先完成飞手认证', icon: 'none' });
+      Taro.showToast({ title: '请先完成履约资质认证', icon: 'none' });
       return;
     }
     if (!planName.trim()) {
@@ -317,7 +317,7 @@ export default function AirspacePage() {
           ) : !pilotId ? (
             <View className='empty-state'>
               <Text className='empty-state-icon'>🪪</Text>
-              <Text className='empty-state-text'>请先完成飞手认证后再办理空域报备</Text>
+              <Text className='empty-state-text'>请先完成履约资质认证后再办理空域报备</Text>
             </View>
           ) : applications.length === 0 ? (
             <View className='empty-state'>

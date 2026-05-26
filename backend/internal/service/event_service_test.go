@@ -13,6 +13,7 @@ func TestShouldSendPushEvent(t *testing.T) {
 		{name: "core order event", eventType: "order_paid", want: true},
 		{name: "contract event", eventType: "contract_fully_signed", want: true},
 		{name: "dispatch event", eventType: "dispatch_created", want: true},
+		{name: "settlement event", eventType: "settlement_settled", want: true},
 		{name: "qualification event", eventType: "drone_uom_reviewed", want: true},
 		{name: "non push event", eventType: "demand_quote_submitted", want: false},
 		{name: "conversation only event", eventType: "dispatch_assigned", want: false},

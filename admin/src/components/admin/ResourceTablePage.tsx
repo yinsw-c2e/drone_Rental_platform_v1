@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Descriptions, Drawer, Empty, Form, Input, Select, Space, Table, message } from 'antd';
+import { Button, Card, DatePicker, Descriptions, Drawer, Empty, Form, Input, Select, Space, Table, message } from 'antd';
 import { ExportOutlined, EyeOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import PageContainer from './PageContainer';
@@ -8,7 +8,7 @@ import { exportCsv, formatValue } from '../../utils/business';
 export type ResourceFilter = {
   key: string;
   label: string;
-  type?: 'input' | 'select';
+  type?: 'input' | 'select' | 'date';
   options?: Array<{ label: string; value: string | number | boolean }>;
   placeholder?: string;
 };
@@ -20,6 +20,15 @@ export type RowAction<T> = {
   onClick: (record: T, reload: () => void) => void | Promise<void>;
 };
 
+export type ResourceTableExtraContext<T extends Record<string, any>> = {
+  items: T[];
+  query: Record<string, any>;
+  page: number;
+  pageSize: number;
+  loading: boolean;
+  reload: () => void;
+};
+
 type Props<T extends Record<string, any>> = {
   title: string;
   description?: string;
@@ -28,16 +37,31 @@ type Props<T extends Record<string, any>> = {
   columns: ColumnsType<T>;
   filters?: ResourceFilter[];
   actions?: RowAction<T>[];
+  extraActions?: (context: ResourceTableExtraContext<T>) => React.ReactNode;
   detailTitle?: (record: T) => string;
 };
 
 const extractList = (res: any) => {
   const data = res?.data;
-  if (Array.isArray(data)) return { list: data, total: data.length };
+  if (Array.isArray(data)) return { list: data, total: res?.total || data.length };
   if (Array.isArray(data?.list)) return { list: data.list, total: data.total || data.list.length };
   if (Array.isArray(res?.list)) return { list: res.list, total: res.total || res.list.length };
   return { list: [], total: 0 };
 };
+
+const normalizeQueryValue = (value: any) => {
+  if (value && typeof value === 'object' && typeof value.format === 'function') {
+    return value.format('YYYY-MM-DD');
+  }
+  return value;
+};
+
+const compactQuery = (values: Record<string, any>) =>
+  Object.fromEntries(
+    Object.entries(values)
+      .map(([key, value]) => [key, normalizeQueryValue(value)])
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
 
 function ResourceTablePage<T extends Record<string, any>>({
   title,
@@ -47,6 +71,7 @@ function ResourceTablePage<T extends Record<string, any>>({
   columns,
   filters = [],
   actions = [],
+  extraActions,
   detailTitle,
 }: Props<T>) {
   const [form] = Form.useForm();
@@ -64,7 +89,7 @@ function ResourceTablePage<T extends Record<string, any>>({
       const res = await fetcher({
         page: nextPage,
         page_size: nextPageSize,
-        ...Object.fromEntries(Object.entries(nextQuery).filter(([, value]) => value !== undefined && value !== '')),
+        ...compactQuery(nextQuery),
       });
       const { list, total: nextTotal } = extractList(res);
       setItems(list);
@@ -84,7 +109,7 @@ function ResourceTablePage<T extends Record<string, any>>({
     const actionColumn: ColumnsType<T>[number] = {
       title: '操作',
       key: 'actions',
-      width: actions.length ? 170 : 72,
+      width: actions.length ? Math.max(170, 72 + actions.length * 58) : 72,
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
@@ -107,7 +132,7 @@ function ResourceTablePage<T extends Record<string, any>>({
   }, [columns, actions, page, pageSize, query]);
 
   const onSearch = () => {
-    const values = form.getFieldsValue();
+    const values = compactQuery(form.getFieldsValue());
     setPage(1);
     setQuery(values);
   };
@@ -118,13 +143,16 @@ function ResourceTablePage<T extends Record<string, any>>({
     setQuery({});
   };
 
+  const reload = () => load(page, pageSize, query);
+
   return (
     <PageContainer
       title={title}
       description={description}
       extra={
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => load(page, pageSize, query)}>刷新</Button>
+          {extraActions?.({ items, query, page, pageSize, loading, reload })}
+          <Button icon={<ReloadOutlined />} onClick={reload}>刷新</Button>
           <Button icon={<ExportOutlined />} onClick={() => exportCsv(`${title}.csv`, items)} disabled={!items.length}>导出</Button>
         </Space>
       }
@@ -136,6 +164,8 @@ function ResourceTablePage<T extends Record<string, any>>({
               <Form.Item key={filter.key} name={filter.key} label={filter.label}>
                 {filter.type === 'select' ? (
                   <Select allowClear placeholder={filter.placeholder || '全部'} options={filter.options} style={{ width: 160 }} />
+                ) : filter.type === 'date' ? (
+                  <DatePicker allowClear format="YYYY-MM-DD" placeholder={filter.placeholder || '选择日期'} style={{ width: 160 }} />
                 ) : (
                   <Input allowClear placeholder={filter.placeholder || `请输入${filter.label}`} style={{ width: 220 }} />
                 )}

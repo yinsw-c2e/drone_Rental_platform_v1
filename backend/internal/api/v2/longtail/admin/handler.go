@@ -133,6 +133,18 @@ func (h *Handler) DroneList(c *gin.Context) {
 	if cs := c.Query("certification_status"); cs != "" {
 		filters["certification_status"] = cs
 	}
+	if status := c.Query("insurance_verified"); status != "" {
+		filters["insurance_verified"] = status
+	}
+	if status := c.Query("uom_verified"); status != "" {
+		filters["uom_verified"] = status
+	}
+	if status := c.Query("airworthiness_verified"); status != "" {
+		filters["airworthiness_verified"] = status
+	}
+	if status := c.Query("availability_status"); status != "" {
+		filters["availability_status"] = status
+	}
 
 	// 1. 查询无人机列表
 	drones, total, err := h.droneService.List(page, pageSize, filters)
@@ -202,10 +214,11 @@ func (h *Handler) ApproveUOMRegistration(c *gin.Context) {
 func (h *Handler) ApproveInsurance(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	var req struct {
-		Approved bool `json:"approved"`
+		Approved bool   `json:"approved"`
+		Reason   string `json:"reason"`
 	}
 	c.ShouldBindJSON(&req)
-	if err := h.droneService.ApproveInsurance(id, req.Approved); err != nil {
+	if err := h.droneService.ApproveInsurance(id, c.GetInt64("user_id"), req.Approved, req.Reason); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}

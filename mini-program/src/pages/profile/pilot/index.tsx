@@ -4,8 +4,8 @@ import React, { useCallback, useRef, useState } from "react";
 import { Input, ScrollView, Switch, Text, View } from "@tarojs/components";
 
 import StatusBadge from "../../../components/business/StatusBadge";
-import { dispatchV2Service } from "../../../services/dispatchV2";
 import { locationService } from "../../../services/location";
+import { orderV2Service } from "../../../services/orderV2";
 import { pilotV2Service } from "../../../services/pilotV2";
 import {
   aggregateFlightRecords,
@@ -14,16 +14,16 @@ import {
 import "./index.scss";
 
 const STATUS_MAP = {
-  verified: { label: "已认证", tone: "green" },
-  approved: { label: "已认证", tone: "green" },
+  verified: { label: "已完善", tone: "green" },
+  approved: { label: "已完善", tone: "green" },
   pending: { label: "审核中", tone: "orange" },
   rejected: { label: "未通过", tone: "red" },
-  unverified: { label: "未认证", tone: "gray" },
+  unverified: { label: "待完善", tone: "gray" },
 };
 
 const availabilityMap = {
-  online: { label: "接单中", tone: "green" },
-  available: { label: "接单中", tone: "green" },
+  online: { label: "可履约", tone: "green" },
+  available: { label: "可履约", tone: "green" },
   busy: { label: "忙碌中", tone: "orange" },
   offline: { label: "离线", tone: "gray" },
 };
@@ -63,7 +63,7 @@ const pickLocationCity = (...values: any[]) =>
 
 const formatServiceBaseSubtitle = (lat: number, lng: number) => {
   if (!lat || !lng) {
-    return "派单匹配会从该地点开始计算覆盖距离";
+    return "履约覆盖会从该地点开始计算服务距离";
   }
   return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 };
@@ -87,18 +87,16 @@ export default function PilotProfilePage() {
     totalDistanceM: 0,
     maxAltitudeM: 0,
   });
-  const [dispatchStats, setDispatchStats] = useState({ pending: 0, active: 0 });
+  const [fulfillmentStats, setFulfillmentStats] = useState({ waiting: 0, active: 0 });
   const draftDirtyRef = useRef(false);
   const skipNextShowReloadRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [profileRes, flightRecords, dispatchRes] = await Promise.all([
+      const [profileRes, flightRecords, orderRes] = await Promise.all([
         pilotV2Service.getProfile().catch(() => null),
         pilotV2Service.listAllFlightRecords({ page_size: 50 }).catch(() => []),
-        dispatchV2Service
-          .list({ role: "pilot", page: 1, page_size: 50 })
-          .catch(() => null),
+        orderV2Service.list({ role: "owner", page: 1, page_size: 50 }).catch(() => null),
       ]);
 
       setPilot(profileRes || null);
@@ -108,13 +106,13 @@ export default function PilotProfilePage() {
 
       setFlightStats(aggregateFlightRecords(flightRecords || []));
 
-      const dispatchItems = dispatchRes?.items || [];
-      setDispatchStats({
-        pending: dispatchItems.filter(
-          (item: any) => item.status === "pending_response",
+      const orderItems = orderRes?.items || [];
+      setFulfillmentStats({
+        waiting: orderItems.filter((item: any) =>
+          ["pending_dispatch", "paid"].includes(item.status),
         ).length,
-        active: dispatchItems.filter((item: any) =>
-          ["accepted", "executing", "in_progress"].includes(item.status),
+        active: orderItems.filter((item: any) =>
+          ["assigned", "preparing", "in_transit", "in_progress"].includes(item.status),
         ).length,
       });
     } finally {
@@ -237,7 +235,7 @@ export default function PilotProfilePage() {
       draftDirtyRef.current = false;
       setPilot(savedProfile);
       setDraft(buildDraftFromProfile(savedProfile));
-      Taro.showToast({ title: "飞手设置已更新", icon: "success" });
+      Taro.showToast({ title: "履约资质设置已更新", icon: "success" });
     } catch (error: any) {
       Taro.showToast({
         title: error?.message || "保存失败，请稍后重试",
@@ -245,42 +243,6 @@ export default function PilotProfilePage() {
       });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleEnterFlightMonitoring = async () => {
-    try {
-      const res = await dispatchV2Service.list({
-        role: "pilot",
-        page: 1,
-        page_size: 20,
-      });
-      const activeTask = (res.items || []).find(
-        (item: any) =>
-          item.order?.id &&
-          !["rejected", "finished", "cancelled"].includes(item.status),
-      );
-      if (activeTask?.order?.id) {
-        Taro.navigateTo({
-          url: `/pages/flight/monitor/index?orderId=${activeTask.order.id}&dispatchId=${activeTask.id}`,
-        });
-        return;
-      }
-      Taro.showModal({
-        title: "当前没有可监控任务",
-        content: "先从正式派单里接受一条执行任务，再进入飞行监控。",
-        confirmText: "去派单任务",
-        success: (modalRes) => {
-          if (modalRes.confirm) {
-            Taro.navigateTo({ url: "/pages/dispatch/list/index" });
-          }
-        },
-      });
-    } catch (error: any) {
-      Taro.showToast({
-        title: error?.message || "获取失败，请稍后重试",
-        icon: "none",
-      });
     }
   };
 
@@ -311,7 +273,7 @@ export default function PilotProfilePage() {
     return (
       <View className="pilot-wrap">
         <View className="pilot-loading">
-          <Text className="pilot-loading-text">飞手档案加载中...</Text>
+          <Text className="pilot-loading-text">履约资质加载中...</Text>
         </View>
       </View>
     );
@@ -321,9 +283,9 @@ export default function PilotProfilePage() {
     return (
       <View className="pilot-wrap">
         <View className="pilot-empty">
-          <Text className="pilot-empty-title">还没有飞手档案</Text>
+          <Text className="pilot-empty-title">还没有履约资质</Text>
           <Text className="pilot-empty-desc">
-            先完成飞手认证，后面这里才会出现接单状态、服务范围和飞行统计。
+            先完成履约资质认证，后面这里才会出现服务范围和飞行统计。
           </Text>
           <View
             className="pilot-empty-btn"
@@ -331,7 +293,7 @@ export default function PilotProfilePage() {
               Taro.navigateTo({ url: "/pages/pilot/register/index" })
             }
           >
-            <Text className="pilot-empty-btn-text">去做飞手认证</Text>
+            <Text className="pilot-empty-btn-text">去完善履约资质</Text>
           </View>
         </View>
       </View>
@@ -351,8 +313,8 @@ export default function PilotProfilePage() {
           <View className="pilot-hero">
             <View className="pilot-hero-top">
               <View>
-                <Text className="pilot-hero-title">飞手工作台</Text>
-                <Text className="pilot-hero-sub">执照、接单与飞行统计</Text>
+                <Text className="pilot-hero-title">履约资质</Text>
+                <Text className="pilot-hero-sub">执照、服务范围与飞行统计</Text>
               </View>
               <StatusBadge
                 label={availabilityStatus.label}
@@ -363,12 +325,12 @@ export default function PilotProfilePage() {
             <View className="pilot-stats-grid">
               <View className="pilot-stat-card">
                 <Text className="pilot-stat-value">
-                  {dispatchStats.pending}
+                  {fulfillmentStats.waiting}
                 </Text>
-                <Text className="pilot-stat-label">待办派单</Text>
+                <Text className="pilot-stat-label">待开始</Text>
               </View>
               <View className="pilot-stat-card">
-                <Text className="pilot-stat-value">{dispatchStats.active}</Text>
+                <Text className="pilot-stat-value">{fulfillmentStats.active}</Text>
                 <Text className="pilot-stat-label">进行中</Text>
               </View>
               <View className="pilot-stat-card">
@@ -387,7 +349,7 @@ export default function PilotProfilePage() {
           </View>
 
           <View className="pilot-section">
-            <Text className="pilot-section-title">市场准入状态</Text>
+            <Text className="pilot-section-title">履约准入状态</Text>
             <View className="pilot-readiness-card">
               <View className="pilot-readiness-header">
                 <View className="pilot-readiness-main">
@@ -427,7 +389,7 @@ export default function PilotProfilePage() {
 
           <View className="pilot-section">
             <View className="pilot-section-header">
-              <Text className="pilot-section-title">接单状态</Text>
+              <Text className="pilot-section-title">履约状态</Text>
               <StatusBadge
                 label={verificationStatus.label}
                 tone={verificationStatus.tone}
@@ -436,9 +398,9 @@ export default function PilotProfilePage() {
 
             <View className="pilot-availability-row">
               <View className="pilot-availability-main">
-                <Text className="pilot-availability-label">当前是否接单</Text>
+                <Text className="pilot-availability-label">当前是否可履约</Text>
                 <Text className="pilot-availability-desc">
-                  已认证后可切换在线状态，平台会据此安排正式派单。
+                  资质完善后可切换在线状态，平台会据此判断服务商履约可用性。
                 </Text>
               </View>
               <Switch
@@ -456,11 +418,11 @@ export default function PilotProfilePage() {
               <View
                 className="pilot-quick-card"
                 onClick={() =>
-                  Taro.navigateTo({ url: "/pages/dispatch/list/index" })
+                  Taro.switchTab({ url: "/pages/orders/index" })
                 }
               >
                 <Text className="pilot-quick-icon">📮</Text>
-                <Text className="pilot-quick-title">派单任务</Text>
+                <Text className="pilot-quick-title">履约订单</Text>
               </View>
               <View
                 className="pilot-quick-card"
@@ -473,19 +435,21 @@ export default function PilotProfilePage() {
               </View>
               <View
                 className="pilot-quick-card"
-                onClick={handleEnterFlightMonitoring}
+                onClick={() =>
+                  Taro.navigateTo({ url: "/pages/profile/owner/index" })
+                }
               >
-                <Text className="pilot-quick-icon">🛰️</Text>
-                <Text className="pilot-quick-title">飞行监控</Text>
+                <Text className="pilot-quick-icon">🧭</Text>
+                <Text className="pilot-quick-title">服务商档案</Text>
               </View>
               <View
                 className="pilot-quick-card"
                 onClick={() =>
-                  Taro.navigateTo({ url: "/pages/pilot/bind-drone/index" })
+                  Taro.navigateTo({ url: "/pages/profile/drones/index" })
                 }
               >
-                <Text className="pilot-quick-icon">🤝</Text>
-                <Text className="pilot-quick-title">绑定无人机</Text>
+                <Text className="pilot-quick-icon">🚁</Text>
+                <Text className="pilot-quick-title">设备资质</Text>
               </View>
             </View>
           </View>
@@ -550,7 +514,7 @@ export default function PilotProfilePage() {
             onClick={handleSave}
           >
             <Text className="pilot-save-text">
-              {saving ? "保存中..." : "保存接单设置"}
+              {saving ? "保存中..." : "保存履约设置"}
             </Text>
           </View>
         </View>

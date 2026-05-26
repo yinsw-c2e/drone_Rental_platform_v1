@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, SafeAreaView,
@@ -6,18 +6,32 @@ import {
 import {useDispatch} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
+import {
+  HaulRoleMode,
+  setHaulRoleMode,
+} from '../../store/slices/roleSlice';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
-export default function RegisterScreen({navigation}: any) {
+const normalizeRoleMode = (value?: string): HaulRoleMode | null =>
+  value === 'provider' || value === 'customer' ? value : null;
+
+export default function RegisterScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const dispatch = useDispatch();
+  const routeRoleMode = normalizeRoleMode(route?.params?.roleMode);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    if (routeRoleMode) {
+      dispatch(setHaulRoleMode(routeRoleMode));
+    }
+  }, [dispatch, routeRoleMode]);
 
   const sendCode = async () => {
     if (!phone || phone.length !== 11) {

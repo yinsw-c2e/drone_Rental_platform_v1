@@ -49,7 +49,7 @@ export default function NearbyDronesPage() {
               <View className="drone-icon"><Text style={{ fontSize: '24px' }}>🚁</Text></View>
               <View className="drone-info">
                 <Text className="drone-name">{item.brand} {item.model}</Text>
-                <Text className="drone-meta">{item.owner?.nickname || '无人机主'} · ⭐{item.rating || '5.0'}</Text>
+                <Text className="drone-meta">{item.owner?.nickname || '服务商'} · ⭐{item.rating || '5.0'}</Text>
                 <Text className="drone-address">{item.address || item.city || '位置未知'}</Text>
               </View>
               <View className="drone-price">

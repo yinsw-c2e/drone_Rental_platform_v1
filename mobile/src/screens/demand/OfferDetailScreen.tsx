@@ -107,7 +107,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
     );
   }
 
-  const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
+  const ownerLabel = supply.owner?.nickname || `服务商 #${supply.owner_user_id}`;
   const ownerUserId = Number(supply.owner_user_id || supply.owner?.id || 0);
   const canContactOwner = ownerUserId > 0 && ownerUserId !== user?.id;
   const droneLabel = supply.drone ? `${supply.drone.brand} ${supply.drone.model}` : '未关联设备';
@@ -210,7 +210,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
 
         <ObjectCard>
           <Text style={styles.sectionTitle}>服务说明</Text>
-          <Text style={styles.description}>{supply.description || '机主未提供详细文字说明。'}</Text>
+          <Text style={styles.description}>{supply.description || '服务商暂未提供详细文字说明。'}</Text>
         </ObjectCard>
       </ScrollView>
 
@@ -227,7 +227,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
               style={[styles.secondaryBtn, {flex: 1}, !canContactOwner && styles.disabledBtn]}
               onPress={() => {
                 if (!ownerUserId) {
-                  Alert.alert('暂无法联系', '该服务暂未提供可联系的机主账号。');
+                  Alert.alert('暂无法联系', '该服务暂未提供可联系的服务商账号。');
                   return;
                 }
                 if (ownerUserId === user?.id) {
@@ -244,7 +244,7 @@ export default function OfferDetailScreen({route, navigation}: any) {
                 });
               }}
               disabled={!canContactOwner}>
-              <Text style={styles.secondaryBtnText}>联系机主</Text>
+              <Text style={styles.secondaryBtnText}>联系服务商</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryBtn, {flex: 2}, !canCreateDirectOrder && styles.disabledBtn]}

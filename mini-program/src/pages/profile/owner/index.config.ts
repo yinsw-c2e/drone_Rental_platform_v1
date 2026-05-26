@@ -1,1 +1,1 @@
-export default definePageConfig({ navigationBarTitleText: '机主档案' });
+export default definePageConfig({ navigationBarTitleText: '服务商档案' });

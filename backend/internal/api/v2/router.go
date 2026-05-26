@@ -39,6 +39,7 @@ import (
 	v2owner "wurenji-backend/internal/api/v2/owner"
 	v2payment "wurenji-backend/internal/api/v2/payment"
 	v2pilot "wurenji-backend/internal/api/v2/pilot"
+	v2provider "wurenji-backend/internal/api/v2/provider"
 	v2push "wurenji-backend/internal/api/v2/push"
 	v2review "wurenji-backend/internal/api/v2/review"
 	v2settlement "wurenji-backend/internal/api/v2/settlement"
@@ -60,6 +61,7 @@ type Handlers struct {
 	Demand       *v2demand.Handler
 	Owner        *v2owner.Handler
 	Pilot        *v2pilot.Handler
+	Provider     *v2provider.Handler
 	Order        *v2order.Handler
 	Dispatch     *v2dispatch.Handler
 	Flight       *v2flight.Handler
@@ -95,7 +97,7 @@ type LongtailHandlers struct {
 	Owner      *longowner.Handler
 }
 
-func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, uploadService *uploadpkg.UploadService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth, serverMode string, longtail *LongtailHandlers) *Handlers {
+func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, broadcastService *service.BroadcastService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, uploadService *uploadpkg.UploadService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth, serverMode string, longtail *LongtailHandlers) *Handlers {
 	return &Handlers{
 		Base:         base.NewHandler(),
 		Auth:         v2auth.NewHandler(authService, userService, wechatOAuth, wechatMiniOAuth, qqOAuth),
@@ -107,7 +109,8 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Demand:       v2demand.NewHandler(clientService),
 		Owner:        v2owner.NewHandler(ownerService, droneService),
 		Pilot:        v2pilot.NewHandler(pilotService, uploadService),
-		Order:        v2order.NewHandler(orderService, dispatchService, flightService),
+		Provider:     v2provider.NewHandler(broadcastService),
+		Order:        v2order.NewHandler(orderService, dispatchService, flightService, pricingService),
 		Dispatch:     v2dispatch.NewHandler(dispatchService, orderService),
 		Flight:       v2flight.NewHandler(flightService, orderService),
 		Message:      v2message.NewHandler(messageService),
@@ -126,6 +129,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 	api.Use(middleware.PaginationMiddleware(1, 20, 100))
 
 	api.GET("/status", h.Base.Status)
+	api.POST("/orders/estimate", h.Order.Estimate)
 	api.GET("/orders/:order_id/contract/pdf", h.Order.DownloadContractPDF)
 
 	authGroup := api.Group("/auth")
@@ -252,6 +256,15 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			ownerGroup.PATCH("/pilot-bindings/:binding_id/status", h.Owner.UpdatePilotBindingStatus)
 		}
 
+		providerGroup := authenticated.Group("/provider")
+		{
+			providerGroup.POST("/presence/online", h.Provider.Online)
+			providerGroup.POST("/presence/offline", h.Provider.Offline)
+			providerGroup.POST("/presence/heartbeat", h.Provider.Heartbeat)
+			providerGroup.GET("/broadcasts", h.Provider.ListBroadcasts)
+			providerGroup.POST("/broadcasts/:id/grab", h.Provider.GrabBroadcast)
+		}
+
 		pilotGroup := authenticated.Group("/pilot")
 		{
 			if lt != nil && lt.Pilot != nil {
@@ -361,6 +374,8 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		orderGroup := authenticated.Group("/orders")
 		{
 			orderGroup.GET("", h.Order.List)
+			orderGroup.POST("/instant", h.Order.CreateInstant)
+			orderGroup.POST("/reservation", h.Order.CreateReservation)
 			orderGroup.GET("/:order_id", h.Order.Get)
 			orderGroup.POST("/:order_id/provider-confirm", h.Order.ProviderConfirm)
 			orderGroup.POST("/:order_id/provider-reject", h.Order.ProviderReject)
@@ -369,6 +384,9 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.POST("/:order_id/start-preparing", h.Order.StartPreparing)
 			orderGroup.POST("/:order_id/start-flight", h.Order.StartFlight)
 			orderGroup.POST("/:order_id/confirm-delivery", h.Order.ConfirmDelivery)
+			orderGroup.POST("/:order_id/site-safety-check", h.Order.ConfirmSiteSafety)
+			orderGroup.POST("/:order_id/site-safety-checks", h.Order.SubmitSiteSafetyCheck)
+			orderGroup.GET("/:order_id/site-safety-checks/latest", h.Order.GetLatestSiteSafetyCheck)
 			orderGroup.POST("/:order_id/confirm-receipt", h.Order.ConfirmReceipt)
 			orderGroup.POST("/:order_id/execution-status", h.Order.UpdateExecutionStatus)
 			orderGroup.GET("/:order_id/monitor", h.Order.Monitor)
@@ -584,23 +602,37 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			settlementGroup := authenticated.Group("/settlement")
 			{
 				settlementGroup.POST("/calculate-price", lt.Settlement.CalculatePrice)
-				settlementGroup.POST("/create", lt.Settlement.CreateSettlement)
 				settlementGroup.GET("/:id", lt.Settlement.GetSettlement)
 				settlementGroup.GET("/order/:order_id", lt.Settlement.GetSettlementByOrder)
-				settlementGroup.POST("/:id/confirm", lt.Settlement.ConfirmSettlement)
 				settlementGroup.GET("/my", lt.Settlement.ListMySettlements)
 				settlementGroup.GET("/wallet", lt.Settlement.GetWallet)
 				settlementGroup.GET("/wallet/transactions", lt.Settlement.GetWalletTransactions)
 				settlementGroup.POST("/withdrawal", lt.Settlement.RequestWithdrawal)
 				settlementGroup.GET("/withdrawals", lt.Settlement.ListMyWithdrawals)
-				settlementGroup.POST("/admin/execute/:id", lt.Settlement.ExecuteSettlement)
-				settlementGroup.GET("/admin/list", lt.Settlement.ListSettlements)
-				settlementGroup.POST("/admin/process-pending", lt.Settlement.AdminProcessSettlements)
-				settlementGroup.GET("/admin/withdrawals/pending", lt.Settlement.AdminListPendingWithdrawals)
-				settlementGroup.POST("/admin/withdrawal/:id/approve", lt.Settlement.AdminApproveWithdrawal)
-				settlementGroup.POST("/admin/withdrawal/:id/reject", lt.Settlement.AdminRejectWithdrawal)
-				settlementGroup.GET("/admin/pricing-configs", lt.Settlement.GetPricingConfigs)
-				settlementGroup.PUT("/admin/pricing-config", lt.Settlement.UpdatePricingConfig)
+				settlementAdminGroup := settlementGroup.Group("/admin")
+				settlementAdminGroup.Use(middleware.AdminMiddleware())
+				{
+					settlementAdminGroup.POST("/create", lt.Settlement.CreateSettlement)
+					settlementAdminGroup.POST("/:id/confirm", lt.Settlement.ConfirmSettlement)
+					settlementAdminGroup.POST("/execute/:id", lt.Settlement.ExecuteSettlement)
+					settlementAdminGroup.POST("/:id/dispute", lt.Settlement.MarkSettlementDisputed)
+					settlementAdminGroup.POST("/:id/resolve-dispute", lt.Settlement.ResolveSettlementDispute)
+					settlementAdminGroup.GET("/list", lt.Settlement.ListSettlements)
+					settlementAdminGroup.GET("/export/settlements", lt.Settlement.ExportSettlements)
+					settlementAdminGroup.GET("/export/withdrawals", lt.Settlement.ExportWithdrawals)
+					settlementAdminGroup.POST("/process-pending", lt.Settlement.AdminProcessSettlements)
+					settlementAdminGroup.GET("/overview", lt.Settlement.AdminFinanceOverview)
+					settlementAdminGroup.GET("/withdrawals", lt.Settlement.AdminListWithdrawals)
+					settlementAdminGroup.GET("/withdrawals/pending", lt.Settlement.AdminListPendingWithdrawals)
+					settlementAdminGroup.POST("/withdrawal/:id/approve", lt.Settlement.AdminApproveWithdrawal)
+					settlementAdminGroup.POST("/withdrawal/:id/reject", lt.Settlement.AdminRejectWithdrawal)
+					settlementAdminGroup.GET("/anomalies", lt.Settlement.AdminListFinanceAnomalies)
+					settlementAdminGroup.POST("/anomalies/:id/resolve", lt.Settlement.AdminResolveFinanceAnomaly)
+					settlementAdminGroup.GET("/manual-actions", lt.Settlement.AdminListFinanceManualActions)
+					settlementAdminGroup.POST("/manual-actions/:id/rollback", lt.Settlement.AdminRollbackFinanceManualAction)
+					settlementAdminGroup.GET("/pricing-configs", lt.Settlement.GetPricingConfigs)
+					settlementAdminGroup.PUT("/pricing-config", lt.Settlement.UpdatePricingConfig)
+				}
 			}
 		}
 

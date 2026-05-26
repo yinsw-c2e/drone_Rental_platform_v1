@@ -1,24 +1,46 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, Input } from '@tarojs/components';
+import { useSelector } from 'react-redux';
+import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { demandV2Service } from '../../../services/demandV2';
 import { droneService } from '../../../services/drone';
+import { RootState } from '../../../store/store';
 import { Drone } from '../../../types';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 export default function DemandQuotePage() {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canQuote = Boolean(
+    isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply,
+  );
   const params = Taro.getCurrentInstance().router?.params || {};
   const demandId = Number(params.id || params.demandId || 0);
-  const demandTitle = params.demandTitle || '需求';
+  const demandTitle = params.demandTitle ? decodeURIComponent(String(params.demandTitle)) : '需求';
+  const initialPriceYuan = Number(params.priceYuan || 0);
+  const isQuickQuote = params.quick === '1';
 
   const [drones, setDrones] = useState<Drone[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedDroneId, setSelectedDroneId] = useState<number>(0);
-  const [priceText, setPriceText] = useState('');
-  const [executionPlan, setExecutionPlan] = useState('');
+  const [priceText, setPriceText] = useState(initialPriceYuan > 0 ? String(initialPriceYuan) : '');
+  const [executionPlan, setExecutionPlan] = useState(
+    isQuickQuote ? '根据需求时间、重量和现场条件安排可用无人机执行，作业前完成安全复核。' : '',
+  );
 
   useDidShow(() => {
+    if (!canQuote) {
+      setDrones([]);
+      setLoading(false);
+      return;
+    }
     droneService.myDrones({ page: 1, page_size: 50 }).then((res: any) => {
       const allDrones = res.data?.list || res.list || [];
       const list = allDrones.filter(
@@ -31,6 +53,7 @@ export default function DemandQuotePage() {
   });
 
   const handleSubmit = async () => {
+    if (!canQuote) return Taro.showToast({ title: '服务商设备能力审核通过后才能报价', icon: 'none' });
     if (!demandId) return Taro.showToast({ title: '需求无效', icon: 'none' });
     if (!selectedDroneId) return Taro.showToast({ title: '请选择无人机', icon: 'none' });
     const amountYuan = Number(priceText);
@@ -54,11 +77,26 @@ export default function DemandQuotePage() {
 
   if (loading) return <View className="page-wrap"><Text style={{ padding: '20px', textAlign: 'center' }}>加载中...</Text></View>;
 
+  if (!canQuote) {
+    return (
+      <ProviderAccessNotice
+        title={isAuthenticated ? '服务商报价能力未开通' : '请先登录服务商账号'}
+        description={isAuthenticated ? '设备与关键资质审核通过后，才能给客户需求提交正式报价。' : '登录后才能提交服务商报价。'}
+        actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+        onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
+      />
+    );
+  }
+
   return (
     <ScrollView scrollY className="page-wrap">
       <View className="hero">
         <Text className="hero-title">{demandTitle}</Text>
-        <Text className="hero-desc">机主报价只针对需求撮合，不会在这里混入订单信息。客户选定您的方案后，才会进入订单履约环节。</Text>
+        <Text className="hero-desc">
+          {isQuickQuote
+            ? '已按平台预算预填报价，确认无人机并提交后才会生成真实报价。'
+            : '服务商报价只针对需求撮合，不会在这里混入订单信息。客户选定您的方案后，才会进入订单履约环节。'}
+        </Text>
       </View>
 
       <View className="form-card">

@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,16 +24,17 @@ import {
   V2RefundSummary,
 } from '../../types';
 import {formatRefundStatusLabel} from '../../utils/orderPresentation';
+import {APP_CONFIG} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
-const METHODS = [
+const ALL_METHODS = [
   {key: 'mock', label: '模拟支付', icon: '🧪', desc: '当前正式联调路径，提交后立即回写支付成功'},
   {key: 'wechat', label: '微信支付', icon: '📱', desc: '预留真实通道，当前只创建待回调支付单'},
   {key: 'alipay', label: '支付宝', icon: '💳', desc: '预留真实通道，当前只创建待回调支付单'},
 ] as const;
 
-type PaymentMethod = (typeof METHODS)[number]['key'];
+type PaymentMethod = (typeof ALL_METHODS)[number]['key'];
 type ResultState = {
   mode: 'success' | 'pending' | 'fail';
   title: string;
@@ -110,7 +111,7 @@ export default function PaymentScreen({route, navigation}: any) {
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
   const [payments, setPayments] = useState<V2PaymentSummary[]>([]);
   const [refunds, setRefunds] = useState<V2RefundSummary[]>([]);
-  const [selected, setSelected] = useState<PaymentMethod>('mock');
+  const [selected, setSelected] = useState<PaymentMethod>(APP_CONFIG.mockPaymentEnabled ? 'mock' : 'wechat');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -155,13 +156,27 @@ export default function PaymentScreen({route, navigation}: any) {
 
   const paymentReady = detail?.payment_ready !== false && (!detail?.contract || detail.contract.payment_ready !== false);
   const canPay = !!detail && paymentReady && (detail.status === 'pending_payment' || detail.status === 'accepted') && !detail.paid_at;
-  const selectedMethod = METHODS.find(method => method.key === selected) || METHODS[0];
+  const methods = useMemo(
+    () => APP_CONFIG.mockPaymentEnabled ? ALL_METHODS : ALL_METHODS.filter(method => method.key !== 'mock'),
+    [],
+  );
+  const selectedMethod = methods.find(method => method.key === selected) || methods[0];
   const primaryActionLabel = selected === 'mock'
     ? `确认模拟支付 ${formatMoney(totalPay)}`
     : `创建待回调支付单 ${formatMoney(totalPay)}`;
 
+  useEffect(() => {
+    if (!methods.some(method => method.key === selected)) {
+      setSelected(methods[0]?.key || 'wechat');
+    }
+  }, [methods, selected]);
+
   const handlePay = async () => {
     if (!detail) {
+      return;
+    }
+    if (selected === 'mock' && !APP_CONFIG.mockPaymentEnabled) {
+      Alert.alert('当前不可用', '模拟支付仅在开发环境开放。');
       return;
     }
     setPaying(true);
@@ -169,7 +184,11 @@ export default function PaymentScreen({route, navigation}: any) {
       const res = await orderFinanceV2Service.createPayment(detail.id, selected);
       const latestPayment = res.data?.payment;
       const paymentFlow = res.data?.payment_flow;
-      const flowNotice = paymentFlow?.notice || '当前开发环境未接真实支付 SDK，请继续使用模拟支付联调。';
+      const flowNotice = paymentFlow?.notice || (
+        APP_CONFIG.mockPaymentEnabled
+          ? '当前开发环境未接真实支付 SDK，请继续使用模拟支付联调。'
+          : '支付单已创建，等待微信/支付宝真实回调。'
+      );
 
       if ((paymentFlow?.auto_completed || selected === 'mock') && String(latestPayment?.status || '').toLowerCase() === 'paid') {
         setResult({
@@ -292,8 +311,12 @@ export default function PaymentScreen({route, navigation}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>支付方式</Text>
-          <Text style={styles.sectionHint}>当前正式联调路径只有模拟支付。微信/支付宝在本阶段只保留占位支付单与接口字段，不会发起真实扣款。</Text>
-          {METHODS.map(method => (
+          <Text style={styles.sectionHint}>
+            {APP_CONFIG.mockPaymentEnabled
+              ? '当前开发联调路径可使用模拟支付。微信/支付宝在本阶段只保留占位支付单与接口字段，不会发起真实扣款。'
+              : '生产环境不开放模拟支付。微信/支付宝会创建待回调支付单，真实回调仍依赖商户资质接入。'}
+          </Text>
+          {methods.map(method => (
             <TouchableOpacity
               key={method.key}
               style={[styles.methodItem, selected === method.key && styles.methodItemActive]}
@@ -308,7 +331,7 @@ export default function PaymentScreen({route, navigation}: any) {
               </View>
             </TouchableOpacity>
           ))}
-          {selected !== 'mock' ? (
+          {APP_CONFIG.mockPaymentEnabled && selected !== 'mock' ? (
             <Text style={styles.sectionHint}>当前选择的是 {selectedMethod.label}，点击主按钮后只会生成待回调支付单；如需继续推进订单，请改用模拟支付。</Text>
           ) : null}
           <TouchableOpacity

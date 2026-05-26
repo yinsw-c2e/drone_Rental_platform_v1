@@ -14,7 +14,7 @@ import { sessionService } from '../../services/session';
 import { userService } from '../../services/user';
 import { logout, setMeSummary, updateUser } from '../../store/slices/authSlice';
 import { RootState } from '../../store/store';
-import { getEffectiveRoleSummary } from '../../utils/roleSummary';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import profileBgImage from '../../assets/mine/images/mine_profile_drone_bg_750x330.jpg';
 import defaultAvatarImage from '../../assets/mine/images/default_avatar_circle.png';
@@ -71,6 +71,8 @@ const getMenuIcon = (key: string) => {
       return cellTaskIcon;
     case 'my-drones':
       return identityDroneIcon;
+    case 'wallet':
+      return cellArchiveIcon;
     case 'edit-profile':
       return cellEditIcon;
     case 'settings':
@@ -96,6 +98,8 @@ const getMenuTone = (key: string) => {
       return 'blue';
     case 'my-offers':
       return 'teal';
+    case 'wallet':
+      return 'green';
     case 'edit-profile':
       return 'purple';
     case 'settings':
@@ -116,7 +120,7 @@ const getStatusTextTone = (text?: string) => {
 
 const getRoleBadgeIcon = (label: string) => {
   if (label.includes('客户')) return identityUserIcon;
-  if (label.includes('机主')) return identityOwnerIcon;
+  if (label.includes('服务商')) return identityOwnerIcon;
   return identityDroneIcon;
 };
 
@@ -124,7 +128,9 @@ export default function ProfilePage() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
+  const providerCapabilities = resolveProviderCapabilities(effectiveRoleSummary);
 
   const [stats, setStats] = useState({
     orders: 0,
@@ -143,6 +149,7 @@ export default function ProfilePage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     const summary = getEffectiveRoleSummary(roleSummary, user);
+    const capabilities = resolveProviderCapabilities(summary);
 
     try {
       const [
@@ -163,16 +170,16 @@ export default function ProfilePage() {
         summary.has_client_role
           ? demandV2Service.listMyDemands({ page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        capabilities.canUseWorkbench
           ? ownerService.listMySupplies({ page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        capabilities.canUseWorkbench
           ? ownerService.listMyQuotes({ page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        selectedMode === 'provider' || capabilities.hasProviderApplication || capabilities.canUseWorkbench
           ? droneService.myDrones({ page: 1, page_size: 50 }).catch(() => null)
           : Promise.resolve(null),
-        summary.has_owner_role
+        capabilities.canUseWorkbench
           ? ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
         summary.has_pilot_role
@@ -203,10 +210,10 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, roleSummary, user]);
+  }, [dispatch, roleSummary, selectedMode, user]);
 
   useDidShow(() => {
-    syncCustomTabBar(2);
+    syncCustomTabBar(3);
     loadData();
   });
 
@@ -298,7 +305,7 @@ export default function ProfilePage() {
       });
     }
 
-    if (effectiveRoleSummary.has_owner_role) {
+    if (providerCapabilities.canUseWorkbench) {
       orderItems.push({
         key: 'my-quotes',
         title: '我的报价',
@@ -306,6 +313,17 @@ export default function ProfilePage() {
         icon: '💬',
         screen: '/pages/profile/my-quotes/index',
         rightText: `${stats.quotes} 条`,
+      });
+    }
+
+    if (providerCapabilities.canUseWorkbench) {
+      orderItems.push({
+        key: 'wallet',
+        title: '我的钱包',
+        desc: '查看结算入账、钱包流水和提现记录',
+        icon: 'wallet',
+        screen: '/pages/settlement/wallet/index',
+        rightText: '查看',
       });
     }
 
@@ -328,30 +346,40 @@ export default function ProfilePage() {
       },
     ];
 
-    if (effectiveRoleSummary.has_owner_role) {
+    if (selectedMode === 'provider' || providerCapabilities.hasProviderApplication) {
+      const serviceStatusText =
+        providerCapabilities.canUseWorkbench
+          ? '已通过'
+          : providerCapabilities.nextAction === 'wait_review'
+            ? '审核中'
+            : providerCapabilities.nextAction === 'fix_rejected'
+              ? '待补充'
+              : '去入驻';
       identityItems.push({
         key: 'owner-profile',
-        title: '机主档案',
-        desc: '资产、服务与履约资料',
+        title: providerCapabilities.canUseWorkbench ? '服务商档案' : '服务商入驻',
+        desc: providerCapabilities.canUseWorkbench ? '资产、服务与履约资料' : '入驻资料、设备资质与审核状态',
         icon: '🧭',
-        screen: '/pages/profile/owner/index',
-        rightText: '已建立',
+        screen: providerCapabilities.canUseWorkbench
+          ? '/pages/profile/owner/index'
+          : '/pages/provider/onboarding/index',
+        rightText: serviceStatusText,
       });
     }
 
     identityItems.push({
       key: effectiveRoleSummary.has_pilot_role ? 'pilot-profile' : 'pilot-register',
-      title: effectiveRoleSummary.has_pilot_role ? '飞手中心' : '飞手认证',
-      desc: effectiveRoleSummary.has_pilot_role ? '接单状态、统计与服务范围' : '完成认证后才能接正式派单',
+      title: effectiveRoleSummary.has_pilot_role ? '履约资质' : '履约资质认证',
+      desc: effectiveRoleSummary.has_pilot_role ? '履约状态、统计与服务范围' : '完善后用于服务商履约推进',
       icon: effectiveRoleSummary.has_pilot_role ? '🎮' : '🪪',
       screen: effectiveRoleSummary.has_pilot_role
         ? '/pages/profile/pilot/index'
         : '/pages/pilot/register/index',
-      rightText: effectiveRoleSummary.has_pilot_role ? '已认证' : '去认证',
+      rightText: effectiveRoleSummary.has_pilot_role ? '已完善' : '去完善',
     });
 
     const assetItems = [];
-    if (effectiveRoleSummary.has_owner_role) {
+    if (providerCapabilities.canUseWorkbench) {
       assetItems.push(
         {
           key: 'my-offers',
@@ -361,6 +389,11 @@ export default function ProfilePage() {
           screen: '/pages/profile/my-offers/index',
           rightText: `${stats.supplies} 个`,
         },
+      );
+    }
+
+    if (selectedMode === 'provider' || providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench) {
+      assetItems.push(
         {
           key: 'my-drones',
           title: '我的无人机',
@@ -395,7 +428,7 @@ export default function ProfilePage() {
       { key: 'assets', title: '资产与服务', items: assetItems },
       { key: 'settings', title: '账户设置', items: settingItems },
     ].filter((group) => group.items.length > 0);
-  }, [effectiveRoleSummary, stats, verifyInfo.label]);
+  }, [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities, selectedMode, stats, verifyInfo.label]);
 
   const roleBadges = useMemo(
     () => [
@@ -404,15 +437,23 @@ export default function ProfilePage() {
         tone: getRoleTone(effectiveRoleSummary.has_client_role, 'orange'),
       },
       {
-        label: effectiveRoleSummary.has_owner_role ? '机主已持有' : '机主未建立',
-        tone: getRoleTone(effectiveRoleSummary.has_owner_role),
+        label: providerCapabilities.canUseWorkbench
+          ? '服务商已通过'
+          : providerCapabilities.hasProviderApplication
+            ? '服务商审核中'
+            : '服务商未开通',
+        tone: providerCapabilities.canUseWorkbench
+          ? 'green'
+          : providerCapabilities.hasProviderApplication
+            ? 'orange'
+            : 'gray',
       },
       {
-        label: effectiveRoleSummary.has_pilot_role ? '飞手已认证' : '飞手未认证',
+        label: effectiveRoleSummary.has_pilot_role ? '履约资质已完善' : '履约资质待完善',
         tone: getRoleTone(effectiveRoleSummary.has_pilot_role),
       },
     ],
-    [effectiveRoleSummary],
+    [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities.canUseWorkbench, providerCapabilities.hasProviderApplication],
   );
 
   const identityCards = useMemo(
@@ -433,47 +474,57 @@ export default function ProfilePage() {
       },
       {
         key: 'owner',
-        label: '机主身份',
-        screen: '/pages/profile/owner/index',
-        statusLabel: effectiveRoleSummary.has_owner_role ? '已建立' : '未建立',
-        statusTone: effectiveRoleSummary.has_owner_role ? 'green' : 'gray',
+        label: providerCapabilities.canUseWorkbench ? '服务商身份' : '服务商入驻',
+        screen: providerCapabilities.canUseWorkbench
+          ? '/pages/profile/owner/index'
+          : '/pages/provider/onboarding/index',
+        statusLabel: providerCapabilities.canUseWorkbench
+          ? '已通过'
+          : providerCapabilities.hasProviderApplication
+            ? '审核中'
+            : '未开通',
+        statusTone: providerCapabilities.canUseWorkbench
+          ? 'green'
+          : providerCapabilities.hasProviderApplication
+            ? 'orange'
+            : 'gray',
         lines: [
           `可用无人机 ${stats.drones}`,
           `在线服务 ${stats.supplies}`,
-          `协作飞手 ${stats.bindings}`,
+          `待开始履约 ${stats.pendingDispatches}`,
         ],
       },
       {
         key: 'pilot',
-        label: '飞手身份',
+        label: '履约资质',
         screen: effectiveRoleSummary.has_pilot_role
           ? '/pages/profile/pilot/index'
           : '/pages/pilot/register/index',
-        statusLabel: effectiveRoleSummary.has_pilot_role ? '已认证' : '未认证',
+        statusLabel: effectiveRoleSummary.has_pilot_role ? '已完善' : '待完善',
         statusTone: effectiveRoleSummary.has_pilot_role ? 'green' : 'gray',
         lines: [
-          `待响应派单 ${stats.pendingDispatches}`,
-          `真实飞行记录 ${stats.flightRecords}`,
+          `待履约订单 ${stats.pendingDispatches}`,
+          `履约记录 ${stats.flightRecords}`,
           effectiveRoleSummary.has_pilot_role
-            ? '飞手档案已建立，可继续管理在线状态。'
-            : '完成认证后，才能响应正式派单。',
+            ? '履约资质已建立，可继续维护服务范围。'
+            : '完善后用于服务商履约推进。',
         ],
       },
     ],
-    [effectiveRoleSummary, stats],
+    [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities.canUseWorkbench, providerCapabilities.hasProviderApplication, stats],
   );
 
   const capabilityItems = useMemo(
     () => [
-      { key: 'supply', label: '可发布供给', enabled: effectiveRoleSummary.can_publish_supply },
-      { key: 'dispatch', label: '可接派单', enabled: effectiveRoleSummary.can_accept_dispatch },
-      { key: 'self-execute', label: '可自执行', enabled: effectiveRoleSummary.can_self_execute },
+      { key: 'supply', label: '可发布供给', enabled: providerCapabilities.canPublishSupply },
+      { key: 'dispatch', label: '可推进履约', enabled: providerCapabilities.canAcceptDispatch },
+      { key: 'self-execute', label: '服务商履约', enabled: providerCapabilities.canSelfExecute },
     ],
-    [effectiveRoleSummary],
+    [providerCapabilities.canAcceptDispatch, providerCapabilities.canPublishSupply, providerCapabilities.canSelfExecute],
   );
 
   const canApplySelfExecute =
-    effectiveRoleSummary.can_publish_supply && effectiveRoleSummary.can_accept_dispatch;
+    providerCapabilities.canPublishSupply && providerCapabilities.canAcceptDispatch;
 
   return (
     <View className='profile-page'>
@@ -628,8 +679,8 @@ export default function ProfilePage() {
                 </View>
                 <Text className='capability-note'>
                   {canApplySelfExecute
-                    ? '你已经同时具备发布供给和接派单能力，可在机主档案里继续配置自执行。'
-                    : '要实现机主自执行，需要同时具备发布供给和接正式派单两种能力。'}
+                    ? '你已经具备供给发布和履约推进能力，可由服务商主体承接并履约。'
+                    : '要完整履约，需要同时完善设备资质和履约资质。'}
                 </Text>
               </View>
             </>

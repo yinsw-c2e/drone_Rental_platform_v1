@@ -15,10 +15,11 @@ const BUCKET_MAP: Record<string, { key: string; title: string; icon: string }> =
   demand: { key: 'demand', title: '需求动态', icon: '🧾' },
   quote: { key: 'quote', title: '报价动态', icon: '💬' },
   order: { key: 'order', title: '订单动态', icon: '📦' },
-  dispatch: { key: 'dispatch', title: '派单动态', icon: '🛫' },
+  dispatch: { key: 'dispatch', title: '履约动态', icon: '🛫' },
+  settlement: { key: 'settlement', title: '结算入账', icon: '💰' },
   refund: { key: 'refund', title: '退款售后', icon: '💸' },
   qualification: { key: 'qualification', title: '资质审核', icon: '📋' },
-  binding: { key: 'binding', title: '绑定协作', icon: '🤝' },
+  binding: { key: 'binding', title: '资质动态', icon: '🤝' },
   system: { key: 'system', title: '系统消息', icon: '🔔' },
 };
 
@@ -27,6 +28,7 @@ function getBucket(n: V2NotificationSummary) {
   const et = String(n.extra_data?.event_type || '').trim();
   if (bt && BUCKET_MAP[bt]) return BUCKET_MAP[bt];
   if (et.includes('refund') || et.includes('dispute')) return BUCKET_MAP.refund;
+  if (et.includes('settlement')) return BUCKET_MAP.settlement;
   if (et.includes('qualification') || et.includes('verification')) return BUCKET_MAP.qualification;
   if (et.includes('binding')) return BUCKET_MAP.binding;
   if (et.includes('dispatch')) return BUCKET_MAP.dispatch;
@@ -58,7 +60,7 @@ export default function MessagesPage() {
   const swipeMovedRef = useRef(false);
 
   useDidShow(() => {
-    syncCustomTabBar(1);
+    syncCustomTabBar(2);
     Promise.all([
       notificationV2Service.list({ page: 1, page_size: 50 }),
       messageService.getConversations()
@@ -91,7 +93,9 @@ export default function MessagesPage() {
       refreshCustomTabBarBadges();
     }
     const extra = n.extra_data || {};
-    if (extra.order_id) Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${extra.order_id}` });
+    if (extra.business_type === 'settlement' && extra.next_action === 'wallet') {
+      Taro.navigateTo({ url: '/pages/settlement/wallet/index' });
+    } else if (extra.order_id) Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${extra.order_id}` });
     else if (extra.dispatch_task_id) Taro.navigateTo({ url: `/pages/dispatch/detail/index?id=${extra.dispatch_task_id}` });
     else if (extra.demand_id) Taro.navigateTo({ url: `/pages/demand/detail/index?id=${extra.demand_id}` });
   };

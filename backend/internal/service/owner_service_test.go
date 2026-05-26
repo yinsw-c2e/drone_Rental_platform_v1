@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -241,5 +242,272 @@ func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) 
 	}
 	if profile.ServiceCity != drone.City {
 		t.Fatalf("expected owner service city %q, got %q", drone.City, profile.ServiceCity)
+	}
+}
+
+func TestOwnerServiceFormalProviderOperationsRequireApprovedAssetProvider(t *testing.T) {
+	db := newServiceTestDB(t,
+		&model.User{},
+		&model.OwnerProfile{},
+		&model.Drone{},
+		&model.Pilot{},
+		&model.Demand{},
+		&model.DemandQuote{},
+		&model.OwnerSupply{},
+		&model.OwnerPilotBinding{},
+	)
+
+	userRepo := repository.NewUserRepo(db)
+	droneRepo := repository.NewDroneRepo(db)
+	pilotRepo := repository.NewPilotRepo(db)
+	roleProfileRepo := repository.NewRoleProfileRepo(db)
+	ownerDomainRepo := repository.NewOwnerDomainRepo(db)
+	demandDomainRepo := repository.NewDemandDomainRepo(db)
+	ownerService := NewOwnerService(userRepo, droneRepo, pilotRepo, roleProfileRepo, ownerDomainRepo, demandDomainRepo)
+
+	pendingProvider := &model.User{ID: 1201, Phone: "13800001201", Nickname: "待审核服务商", Status: "active"}
+	executorUser := &model.User{ID: 1202, Phone: "13800001202", Nickname: "执行人员", Status: "active"}
+	if err := db.Create(pendingProvider).Error; err != nil {
+		t.Fatalf("create pending provider: %v", err)
+	}
+	if err := db.Create(executorUser).Error; err != nil {
+		t.Fatalf("create executor user: %v", err)
+	}
+	if err := db.Create(&model.OwnerProfile{
+		ID:                 1301,
+		UserID:             pendingProvider.ID,
+		VerificationStatus: "pending",
+		Status:             "active",
+	}).Error; err != nil {
+		t.Fatalf("create owner profile: %v", err)
+	}
+	if err := db.Create(&model.Pilot{
+		ID:                 1401,
+		UserID:             executorUser.ID,
+		VerificationStatus: "verified",
+		AvailabilityStatus: "online",
+	}).Error; err != nil {
+		t.Fatalf("create executor profile: %v", err)
+	}
+	if err := db.Create(&model.Drone{
+		ID:                    1501,
+		OwnerID:               pendingProvider.ID,
+		Brand:                 "DJI",
+		Model:                 "Pending",
+		SerialNumber:          "PENDING-DRONE-01",
+		CertificationStatus:   "pending",
+		UOMVerified:           "pending",
+		InsuranceVerified:     "pending",
+		AirworthinessVerified: "pending",
+		AvailabilityStatus:    "available",
+	}).Error; err != nil {
+		t.Fatalf("create pending drone: %v", err)
+	}
+	if err := db.Create(&model.OwnerSupply{
+		ID:              1601,
+		SupplyNo:        "SPPENDING0001",
+		OwnerUserID:     pendingProvider.ID,
+		DroneID:         1501,
+		Title:           "不应泄漏的服务",
+		Status:          "draft",
+		PricingUnit:     "per_trip",
+		BasePriceAmount: 10000,
+	}).Error; err != nil {
+		t.Fatalf("create pending supply: %v", err)
+	}
+	if err := db.Create(&model.DemandQuote{
+		ID:          1701,
+		QuoteNo:     "QTPENDING0001",
+		DemandID:    1801,
+		OwnerUserID: pendingProvider.ID,
+		DroneID:     1501,
+		PriceAmount: 10000,
+		Status:      "submitted",
+	}).Error; err != nil {
+		t.Fatalf("create pending quote: %v", err)
+	}
+	if err := db.Create(&model.OwnerPilotBinding{
+		ID:          1901,
+		OwnerUserID: pendingProvider.ID,
+		PilotUserID: executorUser.ID,
+		Status:      "active",
+		InitiatedBy: "owner",
+	}).Error; err != nil {
+		t.Fatalf("create binding: %v", err)
+	}
+
+	assertGate := func(label string, err error) {
+		t.Helper()
+		if err == nil {
+			t.Fatalf("%s expected provider gate error", label)
+		}
+		if !strings.Contains(err.Error(), "设备能力审核") {
+			t.Fatalf("%s expected device capability gate error, got %v", label, err)
+		}
+	}
+
+	_, _, err := ownerService.ListMySupplies(pendingProvider.ID, "", 1, 20)
+	assertGate("list supplies", err)
+
+	_, err = ownerService.GetSupply(pendingProvider.ID, 1601)
+	assertGate("get supply", err)
+
+	_, err = ownerService.CreateSupply(pendingProvider.ID, nil)
+	assertGate("create supply", err)
+
+	_, _, err = ownerService.ListMyQuotes(pendingProvider.ID, "", 1, 20)
+	assertGate("list quotes", err)
+
+	_, _, err = ownerService.ListPilotBindings(pendingProvider.ID, "", 1, 20)
+	assertGate("list bindings", err)
+
+	_, err = ownerService.InvitePilotBinding(pendingProvider.ID, executorUser.ID, false, "")
+	assertGate("invite binding", err)
+}
+
+func TestOwnerServiceListRecommendedDemandsSortsByOwnerSupplyDistance(t *testing.T) {
+	now := time.Now()
+	db := newServiceTestDB(t,
+		&model.User{},
+		&model.Drone{},
+		&model.OwnerSupply{},
+		&model.Demand{},
+	)
+
+	ownerUser := &model.User{ID: 1101, Phone: "13800001101", Nickname: "距离测试机主", Status: "active"}
+	clientUser := &model.User{ID: 1102, Phone: "13800001102", Nickname: "距离测试客户", Status: "active"}
+	if err := db.Create(ownerUser).Error; err != nil {
+		t.Fatalf("create owner user: %v", err)
+	}
+	if err := db.Create(clientUser).Error; err != nil {
+		t.Fatalf("create client user: %v", err)
+	}
+
+	drone := &model.Drone{
+		ID:                    2101,
+		OwnerID:               ownerUser.ID,
+		Brand:                 "DJI",
+		Model:                 "FC30",
+		SerialNumber:          "DIST-DRONE-01",
+		MTOWKG:                180,
+		MaxPayloadKG:          80,
+		MaxDistance:           12,
+		MaxFlightTime:         24,
+		Latitude:              22.7200,
+		Longitude:             114.2500,
+		AvailabilityStatus:    "available",
+		CertificationStatus:   "approved",
+		UOMVerified:           "verified",
+		InsuranceVerified:     "verified",
+		AirworthinessVerified: "verified",
+	}
+	if err := db.Create(drone).Error; err != nil {
+		t.Fatalf("create drone: %v", err)
+	}
+	supply := &model.OwnerSupply{
+		ID:                 7101,
+		SupplyNo:           "SPDIST0001",
+		OwnerUserID:        ownerUser.ID,
+		DroneID:            drone.ID,
+		Title:              "龙岗重载供给",
+		ServiceTypes:       model.JSON(`["heavy_cargo_lift_transport"]`),
+		CargoScenes:        model.JSON(`["power_grid"]`),
+		MTOWKG:             180,
+		MaxPayloadKG:       80,
+		MaxRangeKM:         15,
+		BasePriceAmount:    80000,
+		PricingUnit:        "per_trip",
+		AcceptsDirectOrder: true,
+		Status:             "active",
+	}
+	if err := db.Create(supply).Error; err != nil {
+		t.Fatalf("create supply: %v", err)
+	}
+
+	expiresAt := now.Add(24 * time.Hour)
+	nearDemand := &model.Demand{
+		ID:                       3101,
+		DemandNo:                 "DMDIST0001",
+		ClientUserID:             clientUser.ID,
+		Title:                    "近距离需求",
+		ServiceType:              "heavy_cargo_lift_transport",
+		CargoScene:               "power_grid",
+		DepartureAddressSnapshot: model.JSON(`{"text":"近点","latitude":22.7210,"longitude":114.2510}`),
+		CargoWeightKG:            60,
+		BudgetMax:                100000,
+		ExpiresAt:                &expiresAt,
+		Status:                   "published",
+		CreatedAt:                now.Add(-3 * time.Hour),
+	}
+	farDemand := &model.Demand{
+		ID:                       3102,
+		DemandNo:                 "DMDIST0002",
+		ClientUserID:             clientUser.ID,
+		Title:                    "远距离需求",
+		ServiceType:              "heavy_cargo_lift_transport",
+		CargoScene:               "power_grid",
+		DepartureAddressSnapshot: model.JSON(`{"text":"远点","latitude":22.9200,"longitude":114.4500}`),
+		CargoWeightKG:            60,
+		BudgetMax:                100000,
+		ExpiresAt:                &expiresAt,
+		Status:                   "published",
+		CreatedAt:                now.Add(-1 * time.Hour),
+	}
+	if err := db.Create([]*model.Demand{farDemand, nearDemand}).Error; err != nil {
+		t.Fatalf("create demands: %v", err)
+	}
+
+	ownerService := NewOwnerService(
+		repository.NewUserRepo(db),
+		repository.NewDroneRepo(db),
+		repository.NewPilotRepo(db),
+		repository.NewRoleProfileRepo(db),
+		repository.NewOwnerDomainRepo(db),
+		repository.NewDemandDomainRepo(db),
+	)
+
+	demands, total, err := ownerService.ListRecommendedDemands(ownerUser.ID, 1, 20, RecommendedDemandQuery{
+		ServiceType: "heavy_cargo_lift_transport",
+		Sort:        "distance",
+	})
+	if err != nil {
+		t.Fatalf("ListRecommendedDemands() error = %v", err)
+	}
+	if total != 2 || len(demands) != 2 {
+		t.Fatalf("expected 2 demands, got total=%d len=%d", total, len(demands))
+	}
+	if demands[0].ID != nearDemand.ID {
+		t.Fatalf("expected nearest demand first, got %d", demands[0].ID)
+	}
+
+	metrics, err := ownerService.GetRecommendedDemandMetrics(ownerUser.ID, demands)
+	if err != nil {
+		t.Fatalf("GetRecommendedDemandMetrics() error = %v", err)
+	}
+	nearMetric := metrics[nearDemand.ID]
+	farMetric := metrics[farDemand.ID]
+	if nearMetric.DistanceKM == nil || farMetric.DistanceKM == nil {
+		t.Fatalf("expected both demands to have distance metrics, got %#v %#v", nearMetric, farMetric)
+	}
+	if *nearMetric.DistanceKM >= *farMetric.DistanceKM {
+		t.Fatalf("expected near distance %.2f to be smaller than far %.2f", *nearMetric.DistanceKM, *farMetric.DistanceKM)
+	}
+	if nearMetric.MatchedSupplyID != supply.ID || nearMetric.MatchedDroneID != drone.ID {
+		t.Fatalf("expected matched supply/drone ids, got %#v", nearMetric)
+	}
+	if nearMetric.ServiceRangeKM == nil || *nearMetric.ServiceRangeKM != 12 {
+		t.Fatalf("expected conservative service range 12km, got %#v", nearMetric.ServiceRangeKM)
+	}
+	if nearMetric.ServiceCoverageStatus != "in_range" {
+		t.Fatalf("expected near demand in range, got %#v", nearMetric)
+	}
+	if nearMetric.EstimatedArrivalMin == nil || *nearMetric.EstimatedArrivalMin != 1 {
+		t.Fatalf("expected near demand estimated arrival 1 minute, got %#v", nearMetric.EstimatedArrivalMin)
+	}
+	if farMetric.ServiceCoverageStatus != "out_of_range" {
+		t.Fatalf("expected far demand out of range, got %#v", farMetric)
+	}
+	if farMetric.EstimatedArrivalMin != nil {
+		t.Fatalf("expected far demand to omit estimated arrival when out of range, got %#v", farMetric.EstimatedArrivalMin)
 	}
 }

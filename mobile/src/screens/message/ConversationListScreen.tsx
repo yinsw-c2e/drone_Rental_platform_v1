@@ -20,6 +20,7 @@ import {messageService} from '../../services/message';
 import {notificationV2Service} from '../../services/notificationV2';
 import {RootState} from '../../store/store';
 import {ConversationSummary, V2NotificationSummary} from '../../types';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {messageAssets} from '../../assets/miniProgramAssets';
@@ -236,6 +237,13 @@ export default function ConversationListScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderWorkbench = providerCapabilities.canUseWorkbench;
+  const canManageProviderBindings = canUseProviderWorkbench && providerCapabilities.canArrangeDispatch;
+  const hasExecutorCapability = providerCapabilities.hasExecutorRole;
   const [activeTab, setActiveTab] = useState<MessageCenterTab>('notifications');
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [notifications, setNotifications] = useState<V2NotificationSummary[]>([]);
@@ -322,7 +330,7 @@ export default function ConversationListScreen({navigation}: any) {
 
       const extra = notification.extra_data || {};
       if (extra.order_id) {
-        const preferOrderView = !roleSummary?.has_owner_role && !roleSummary?.has_pilot_role;
+        const preferOrderView = !canUseProviderWorkbench && !hasExecutorCapability;
         if (preferOrderView || !extra.dispatch_task_id) {
           navigation.navigate('OrderDetail', {orderId: Number(extra.order_id)});
           return;
@@ -341,27 +349,34 @@ export default function ConversationListScreen({navigation}: any) {
         return;
       }
       if (extra.binding_id) {
-        if (roleSummary?.has_owner_role) {
+        if (canManageProviderBindings) {
           navigation.navigate('OwnerPilotBindings');
           return;
         }
-        if (roleSummary?.has_pilot_role) {
+        if (hasExecutorCapability) {
           navigation.navigate('PilotOwnerBindings');
           return;
         }
       }
       if (resolveNotificationBucket(notification).key === 'qualification') {
-        if (roleSummary?.has_pilot_role) {
+        if (hasExecutorCapability) {
           navigation.navigate('PilotProfile');
           return;
         }
-        if (roleSummary?.has_owner_role) {
-          navigation.navigate('OwnerProfile');
+        if (providerCapabilities.hasProviderApplication || canUseProviderWorkbench) {
+          navigation.navigate(canUseProviderWorkbench ? 'OwnerProfile' : 'ProviderOnboarding');
           return;
         }
       }
     },
-    [markNotificationReadLocally, navigation, roleSummary],
+    [
+      canManageProviderBindings,
+      canUseProviderWorkbench,
+      hasExecutorCapability,
+      markNotificationReadLocally,
+      navigation,
+      providerCapabilities.hasProviderApplication,
+    ],
   );
 
   const openConversation = useCallback(

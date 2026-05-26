@@ -298,7 +298,9 @@ func (s *ClientService) ListMarketplaceDemands(page, pageSize int) ([]model.Dema
 	if pageSize <= 0 {
 		pageSize = 20
 	}
-	return s.demandDomainRepo.ListRecommendedDemands(page, pageSize)
+	return s.demandDomainRepo.ListRecommendedDemands(repository.RecommendedDemandQuery{
+		ServiceType: defaultDemandServiceType,
+	}, page, pageSize)
 }
 
 func (s *ClientService) GetDemandDetail(userID, demandID int64) (*model.Demand, error) {

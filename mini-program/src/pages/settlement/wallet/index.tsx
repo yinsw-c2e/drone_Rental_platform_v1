@@ -1,8 +1,12 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
+import { useSelector } from 'react-redux';
+import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { getWallet, getWalletTransactions, listMySettlements } from '../../../services/settlement';
+import { RootState } from '../../../store/store';
 import { formatUnknownEnumLabel } from '../../../utils';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 const TX_TYPE_MAP: Record<string, { label: string; tone: string; sign: string }> = {
@@ -23,6 +27,13 @@ const SETTLEMENT_STATUS_MAP: Record<string, { label: string; tone: string }> = {
 };
 
 export default function WalletPage() {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'settlements'>('overview');
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -30,6 +41,13 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
+    if (!canUseProviderFinance) {
+      setWallet(null);
+      setTransactions([]);
+      setSettlements([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [walletData, txData, settleData] = await Promise.all([
@@ -45,11 +63,22 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canUseProviderFinance]);
 
   useDidShow(() => {
     loadData();
   });
+
+  if (!canUseProviderFinance) {
+    return (
+      <ProviderAccessNotice
+        title={isAuthenticated ? '服务商财务未开通' : '请先登录服务商账号'}
+        description={isAuthenticated ? '服务商资质审核通过并产生真实履约后，才能查看结算、流水和提现。' : '登录后才能查看服务商财务。'}
+        actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+        onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
+      />
+    );
+  }
 
   const formatAmount = (amountFen: number) => {
     return ((amountFen || 0) / 100).toFixed(2);
@@ -110,8 +139,8 @@ export default function WalletPage() {
         <View className="settle-body">
           <View className="settle-row"><Text className="s-label">订单总额</Text><Text className="s-value">{formatAmount(item.final_amount)}元</Text></View>
           <View className="settle-row"><Text className="s-label">平台服务费({(item.platform_fee_rate * 100).toFixed(0)}%)</Text><Text className="s-value s-red">-{formatAmount(item.platform_fee)}</Text></View>
-          {item.pilot_fee > 0 && <View className="settle-row"><Text className="s-label">飞手劳务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text><Text className="s-value s-green">{formatAmount(item.pilot_fee)}</Text></View>}
-          {item.owner_fee > 0 && <View className="settle-row"><Text className="s-label">机主设备费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text><Text className="s-value s-green">{formatAmount(item.owner_fee)}</Text></View>}
+          {item.pilot_fee > 0 && <View className="settle-row"><Text className="s-label">履约服务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text><Text className="s-value s-green">{formatAmount(item.pilot_fee)}</Text></View>}
+          {item.owner_fee > 0 && <View className="settle-row"><Text className="s-label">设备服务费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text><Text className="s-value s-green">{formatAmount(item.owner_fee)}</Text></View>}
         </View>
         <Text className="settle-time">{new Date(item.created_at).toLocaleDateString()}</Text>
       </View>

@@ -27,7 +27,7 @@ func HandleServiceError(c *gin.Context, err error) {
 		response.V2Forbidden(c, message)
 	case strings.Contains(message, "未初始化"), strings.Contains(message, "数据库"):
 		response.V2InternalError(c, message)
-	case strings.Contains(message, "已存在"), strings.Contains(message, "已转为订单"), strings.Contains(message, "不可重复"):
+	case strings.Contains(message, "已存在"), strings.Contains(message, "已转为订单"), strings.Contains(message, "不可重复"), strings.Contains(message, "已被抢"), strings.Contains(message, "已过期"):
 		response.V2Conflict(c, message)
 	default:
 		response.V2BadRequest(c, message)

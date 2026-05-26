@@ -135,11 +135,20 @@ export const THIRD_PARTY_LOGIN = {
 // ============================================================
 // 应用配置
 // ============================================================
+const APP_ENV = getConfig('APP_ENV') || (__DEV__ ? 'development' : 'production');
+const IS_PRODUCTION_RUNTIME = APP_ENV === 'production' && !__DEV__;
+
 export const APP_CONFIG = {
   // 应用环境
-  env: getConfig('APP_ENV') || (__DEV__ ? 'development' : 'production'),
+  env: APP_ENV,
+  // 是否生产运行时
+  isProductionRuntime: IS_PRODUCTION_RUNTIME,
   // 是否调试模式
-  debugMode: getConfig('DEBUG_MODE') === 'true' || __DEV__,
+  debugMode: !IS_PRODUCTION_RUNTIME && (getConfig('DEBUG_MODE') === 'true' || __DEV__),
+  // 是否显示开发样本账号和诊断入口
+  devToolsEnabled: !IS_PRODUCTION_RUNTIME && getConfig('DEV_TOOLS_ENABLED') !== 'false',
+  // 是否允许模拟支付推进订单
+  mockPaymentEnabled: !IS_PRODUCTION_RUNTIME && getConfig('MOCK_PAYMENT_ENABLED') !== 'false',
   // 是否显示推送验收/诊断工具，默认关闭，避免影响真实用户路径
   pushDebugToolsEnabled: getConfig('PUSH_DEBUG_TOOLS_ENABLED') === 'true',
   // 版本检查地址
@@ -154,7 +163,7 @@ export const APP_CONFIG = {
 export const ORDER_STATUS = {
   created: '待确认',
   accepted: '已接受',
-  rejected: '机主已拒绝',
+  rejected: '服务商已拒绝',
   paid: '已支付',
   in_progress: '正在运输',
   completed: '已完成',

@@ -18,7 +18,7 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {droneService} from '../../services/drone';
 import {ownerService} from '../../services/owner';
 import {RootState} from '../../store/store';
-import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -30,6 +30,11 @@ export default function OwnerProfileScreen({navigation}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(effectiveRoleSummary),
+    [effectiveRoleSummary],
+  );
+  const canUseWorkbench = providerCapabilities.canUseWorkbench;
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,14 +45,27 @@ export default function OwnerProfileScreen({navigation}: any) {
   const [workbench, setWorkbench] = useState<any>(null);
 
   const loadData = useCallback(async () => {
+    const shouldLoadProviderBusiness =
+      providerCapabilities.canUseWorkbench &&
+      (providerCapabilities.canPublishSupply ||
+        providerCapabilities.canArrangeDispatch ||
+        providerCapabilities.hasAssetProviderRole);
     try {
       const [profileRes, dronesRes, suppliesRes, quotesRes, bindingsRes, workbenchRes] = await Promise.all([
         ownerService.getProfile().catch(() => null),
         droneService.myDrones({page: 1, page_size: 50}).catch(() => null),
-        ownerService.listMySupplies({page: 1, page_size: 50}).catch(() => null),
-        ownerService.listMyQuotes({page: 1, page_size: 50}).catch(() => null),
-        ownerService.listPilotBindings({status: 'active', page: 1, page_size: 50}).catch(() => null),
-        ownerService.getWorkbench().catch(() => null),
+        shouldLoadProviderBusiness
+          ? ownerService.listMySupplies({page: 1, page_size: 50}).catch(() => null)
+          : Promise.resolve(null),
+        shouldLoadProviderBusiness
+          ? ownerService.listMyQuotes({page: 1, page_size: 50}).catch(() => null)
+          : Promise.resolve(null),
+        shouldLoadProviderBusiness
+          ? ownerService.listPilotBindings({status: 'active', page: 1, page_size: 50}).catch(() => null)
+          : Promise.resolve(null),
+        providerCapabilities.canUseWorkbench
+          ? ownerService.getWorkbench().catch(() => null)
+          : Promise.resolve(null),
       ]);
 
       const nextProfile = profileRes?.data || null;
@@ -70,7 +88,13 @@ export default function OwnerProfileScreen({navigation}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.phone]);
+  }, [
+    providerCapabilities.canArrangeDispatch,
+    providerCapabilities.canPublishSupply,
+    providerCapabilities.canUseWorkbench,
+    providerCapabilities.hasAssetProviderRole,
+    user?.phone,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -92,7 +116,7 @@ export default function OwnerProfileScreen({navigation}: any) {
         intro: draft.intro.trim(),
       });
       setProfile(res.data);
-      Alert.alert('保存成功', '机主档案已更新。');
+      Alert.alert('保存成功', '服务商资料已更新。');
     } catch (e: any) {
       Alert.alert('保存失败', e?.message || '请稍后重试');
     } finally {
@@ -104,17 +128,38 @@ export default function OwnerProfileScreen({navigation}: any) {
     () => [
       {
         label: '可发布供给',
-        enabled: effectiveRoleSummary.can_publish_supply,
-        desc: effectiveRoleSummary.can_publish_supply ? '无人机与关键资质已满足主市场准入。' : '先完善无人机与关键资质，才能把供给上架到主市场。',
+        enabled: providerCapabilities.canPublishSupply,
+        desc: providerCapabilities.canPublishSupply ? '无人机与关键资质已满足主市场准入。' : '先完善无人机与关键资质，才能把供给上架到主市场。',
       },
       {
         label: '可自执行',
-        enabled: effectiveRoleSummary.can_self_execute,
-        desc: effectiveRoleSummary.can_self_execute ? '你已同时具备机主与飞手能力，可直接选择自执行。' : '如果要机主自执行，还需要同步具备飞手能力。',
+        enabled: providerCapabilities.canSelfExecute,
+        desc: providerCapabilities.canSelfExecute ? '你已同时具备服务商与执行人员能力，可直接选择自执行。' : '如需自执行，还需要同步具备执行人员能力。',
       },
     ],
-    [effectiveRoleSummary.can_publish_supply, effectiveRoleSummary.can_self_execute],
+    [providerCapabilities.canPublishSupply, providerCapabilities.canSelfExecute],
   );
+  const providerStatusMeta = useMemo(() => {
+    if (providerCapabilities.canUseWorkbench) return {label: '已开通', tone: 'green' as const};
+    if (providerCapabilities.providerStatus === 'pending_review') return {label: '审核中', tone: 'orange' as const};
+    if (providerCapabilities.providerStatus === 'rejected') return {label: '需补充', tone: 'red' as const};
+    if (providerCapabilities.providerStatus === 'suspended') return {label: '已暂停', tone: 'red' as const};
+    return {label: '未入驻', tone: 'gray' as const};
+  }, [providerCapabilities.canUseWorkbench, providerCapabilities.providerStatus]);
+  const assetStatusMeta = useMemo(() => {
+    if (providerCapabilities.assetStatus === 'approved') return {label: '已通过', tone: 'green' as const};
+    if (providerCapabilities.assetStatus === 'pending_review') return {label: '审核中', tone: 'orange' as const};
+    if (providerCapabilities.assetStatus === 'rejected') return {label: '需补充', tone: 'red' as const};
+    if (providerCapabilities.assetStatus === 'suspended') return {label: '已暂停', tone: 'red' as const};
+    return {label: '未提交', tone: 'gray' as const};
+  }, [providerCapabilities.assetStatus]);
+  const executorStatusMeta = useMemo(() => {
+    if (providerCapabilities.executorStatus === 'approved') return {label: '已认证', tone: 'green' as const};
+    if (providerCapabilities.executorStatus === 'pending_review') return {label: '审核中', tone: 'orange' as const};
+    if (providerCapabilities.executorStatus === 'rejected') return {label: '需补充', tone: 'red' as const};
+    if (providerCapabilities.executorStatus === 'suspended') return {label: '已暂停', tone: 'red' as const};
+    return {label: '未认证', tone: 'gray' as const};
+  }, [providerCapabilities.executorStatus]);
   const workbenchPreviewItems = useMemo(
     () => [
       ...(workbench?.recommended_demands || []).slice(0, 2).map((item: any) => ({
@@ -157,7 +202,7 @@ export default function OwnerProfileScreen({navigation}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingWrap}>
-          <Text style={styles.loadingText}>机主档案加载中...</Text>
+          <Text style={styles.loadingText}>服务商资料加载中...</Text>
         </View>
       </SafeAreaView>
     );
@@ -172,114 +217,156 @@ export default function OwnerProfileScreen({navigation}: any) {
         <View style={styles.headerHero}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.headerGreeting}>机主工作台</Text>
-              <Text style={styles.headerSubtitle}>管理设备、服务与履约进度</Text>
+              <Text style={styles.headerGreeting}>{canUseWorkbench ? '服务商工作台' : '服务商入驻'}</Text>
+              <Text style={styles.headerSubtitle}>
+                {canUseWorkbench ? '管理设备、服务与履约进度' : '补齐资料和资质后，审核通过才能正式接单'}
+              </Text>
             </View>
             <View style={styles.headerStatusRow}>
-              <StatusBadge label={effectiveRoleSummary.can_publish_supply ? '主市场准入' : '供给待就绪'} tone={effectiveRoleSummary.can_publish_supply ? 'blue' : 'gray'} />
+              <StatusBadge label={providerStatusMeta.label} tone={providerStatusMeta.tone} />
             </View>
           </View>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsValue}>{stats.drones}</Text>
-              <Text style={styles.statsLabel}>无人机资产</Text>
-            </View>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsValue}>{stats.activeSupplies}</Text>
-              <Text style={styles.statsLabel}>在线服务</Text>
-            </View>
-            <View style={styles.statsCard}>
-              <Text style={[styles.statsValue, {color: theme.primaryText}]}>{stats.quotes}</Text>
-              <Text style={styles.statsLabel}>方案报价</Text>
-            </View>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsValue}>{stats.bindings}</Text>
-              <Text style={styles.statsLabel}>协作飞手</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>经营待办</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('MyDemands', {role: 'owner'})}>
-              <Text style={styles.sectionLink}>查看全部</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.workbenchSummaryGrid}>
-            <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('ServiceHub')}>
-              <Text style={[styles.wbSummaryValue, {color: theme.primaryText}]}>{workbench?.summary?.recommended_demand_count || 0}</Text>
-              <Text style={styles.wbSummaryLabel}>新机会</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOrders', {roleFilter: 'owner', statusFilter: 'pending'})}>
-              <Text style={[styles.wbSummaryValue, {color: theme.warning}]}>{workbench?.summary?.pending_provider_confirmation_order_count || 0}</Text>
-              <Text style={styles.wbSummaryLabel}>待确认单</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOrders', {roleFilter: 'owner', statusFilter: 'in_progress'})}>
-              <Text style={[styles.wbSummaryValue, {color: theme.success}]}>{workbench?.summary?.pending_dispatch_order_count || 0}</Text>
-              <Text style={styles.wbSummaryLabel}>待派人</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOffers', {activeGroup: 'draft'})}>
-              <Text style={styles.wbSummaryValue}>{workbench?.summary?.draft_supply_count || 0}</Text>
-              <Text style={styles.wbSummaryLabel}>草稿服务</Text>
-            </TouchableOpacity>
-          </View>
-
-          {workbenchPreviewItems.length > 0 ? (
-            <View style={styles.wbPreviewList}>
-              {workbenchPreviewItems.map((item: any) => (
-                <TouchableOpacity key={item.key} style={styles.wbPreviewItem} onPress={item.onPress}>
-                  <View style={styles.wbItemLeft}>
-                    <View style={styles.wbItemEyebrowRow}>
-                      <Text style={styles.wbItemEyebrow}>{item.eyebrow}</Text>
-                    </View>
-                    <Text style={styles.wbItemTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.wbItemDesc} numberOfLines={1}>{item.desc}</Text>
-                  </View>
-                  <View style={styles.wbItemRight}>
-                    <Text style={styles.wbItemAction}>{item.actionText} ˃</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+          {canUseWorkbench ? (
+            <View style={styles.statsGrid}>
+              <View style={styles.statsCard}>
+                <Text style={styles.statsValue}>{stats.drones}</Text>
+                <Text style={styles.statsLabel}>无人机资产</Text>
+              </View>
+              <View style={styles.statsCard}>
+                <Text style={styles.statsValue}>{stats.activeSupplies}</Text>
+                <Text style={styles.statsLabel}>在线服务</Text>
+              </View>
+              <View style={styles.statsCard}>
+                <Text style={[styles.statsValue, {color: theme.primaryText}]}>{stats.quotes}</Text>
+                <Text style={styles.statsLabel}>方案报价</Text>
+              </View>
+              <View style={styles.statsCard}>
+                <Text style={styles.statsValue}>{stats.bindings}</Text>
+                <Text style={styles.statsLabel}>协作执行人员</Text>
+              </View>
             </View>
           ) : (
-            <View style={styles.emptyWb}>
-              <Text style={styles.emptyWbText}>暂无紧急经营事项</Text>
+            <View style={styles.onboardingNotice}>
+              <Text style={styles.onboardingNoticeTitle}>当前不能进入正式工作台</Text>
+              <Text style={styles.onboardingNoticeText}>
+                未审核账号只能查看入驻资料、设备资质、执行人员认证和审核状态，不展示报价、收入或正式经营待办。
+              </Text>
             </View>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>快捷管理</Text>
-          <View style={styles.quickActionGrid}>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('MyDrones')}>
-              <View style={[styles.quickIconBg, {backgroundColor: '#e6f4ff'}]}>
-                <Text style={styles.quickIconText}>🚁</Text>
+        {canUseWorkbench ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>经营待办</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('MyDemands', {role: 'owner'})}>
+                <Text style={styles.sectionLink}>查看全部</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.workbenchSummaryGrid}>
+              <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('ServiceHub')}>
+                <Text style={[styles.wbSummaryValue, {color: theme.primaryText}]}>{workbench?.summary?.recommended_demand_count || 0}</Text>
+                <Text style={styles.wbSummaryLabel}>新机会</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOrders', {roleFilter: 'owner', statusFilter: 'pending'})}>
+                <Text style={[styles.wbSummaryValue, {color: theme.warning}]}>{workbench?.summary?.pending_provider_confirmation_order_count || 0}</Text>
+                <Text style={styles.wbSummaryLabel}>待确认单</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOrders', {roleFilter: 'owner', statusFilter: 'in_progress'})}>
+                <Text style={[styles.wbSummaryValue, {color: theme.success}]}>{workbench?.summary?.pending_dispatch_order_count || 0}</Text>
+                <Text style={styles.wbSummaryLabel}>待派人</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOffers', {activeGroup: 'draft'})}>
+                <Text style={styles.wbSummaryValue}>{workbench?.summary?.draft_supply_count || 0}</Text>
+                <Text style={styles.wbSummaryLabel}>草稿服务</Text>
+              </TouchableOpacity>
+            </View>
+
+            {workbenchPreviewItems.length > 0 ? (
+              <View style={styles.wbPreviewList}>
+                {workbenchPreviewItems.map((item: any) => (
+                  <TouchableOpacity key={item.key} style={styles.wbPreviewItem} onPress={item.onPress}>
+                    <View style={styles.wbItemLeft}>
+                      <View style={styles.wbItemEyebrowRow}>
+                        <Text style={styles.wbItemEyebrow}>{item.eyebrow}</Text>
+                      </View>
+                      <Text style={styles.wbItemTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.wbItemDesc} numberOfLines={1}>{item.desc}</Text>
+                    </View>
+                    <View style={styles.wbItemRight}>
+                      <Text style={styles.wbItemAction}>{item.actionText} ˃</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <Text style={styles.quickActionTitle}>我的无人机</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('MyOffers')}>
-              <View style={[styles.quickIconBg, {backgroundColor: '#f6ffed'}]}>
-                <Text style={styles.quickIconText}>📦</Text>
+            ) : (
+              <View style={styles.emptyWb}>
+                <Text style={styles.emptyWbText}>暂无紧急经营事项</Text>
               </View>
-              <Text style={styles.quickActionTitle}>我的服务</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('PublishOffer')}>
-              <View style={[styles.quickIconBg, {backgroundColor: '#fff7e6'}]}>
-                <Text style={styles.quickIconText}>🧾</Text>
-              </View>
-              <Text style={styles.quickActionTitle}>发布服务</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('OwnerPilotBindings')}>
-              <View style={[styles.quickIconBg, {backgroundColor: '#f9f0ff'}]}>
-                <Text style={styles.quickIconText}>🤝</Text>
-              </View>
-              <Text style={styles.quickActionTitle}>协作飞手</Text>
-            </TouchableOpacity>
+            )}
           </View>
-        </View>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>入驻进度</Text>
+            <View style={styles.onboardingStepList}>
+              <View style={styles.onboardingStep}>
+                <View style={styles.capabilityInfo}>
+                  <Text style={styles.capabilityLabel}>服务商资料</Text>
+                  <Text style={styles.capabilityDesc}>维护服务城市、联系电话和经营简介。</Text>
+                </View>
+                <StatusBadge label={providerStatusMeta.label} tone={providerStatusMeta.tone} />
+              </View>
+              <TouchableOpacity style={styles.onboardingStep} onPress={() => navigation.navigate('MyDrones')}>
+                <View style={styles.capabilityInfo}>
+                  <Text style={styles.capabilityLabel}>设备与资质</Text>
+                  <Text style={styles.capabilityDesc}>补充无人机、证照、保险和主市场准入材料。</Text>
+                </View>
+                <StatusBadge label={assetStatusMeta.label} tone={assetStatusMeta.tone} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.onboardingStep} onPress={() => navigation.navigate('PilotRegister')}>
+                <View style={styles.capabilityInfo}>
+                  <Text style={styles.capabilityLabel}>执行人员认证</Text>
+                  <Text style={styles.capabilityDesc}>需要接派单或自执行时，补充执行人员资质。</Text>
+                </View>
+                <StatusBadge label={executorStatusMeta.label} tone={executorStatusMeta.tone} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {canUseWorkbench ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>快捷管理</Text>
+            <View style={styles.quickActionGrid}>
+              <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('MyDrones')}>
+                <View style={[styles.quickIconBg, {backgroundColor: '#e6f4ff'}]}>
+                  <Text style={styles.quickIconText}>🚁</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>我的无人机</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('MyOffers')}>
+                <View style={[styles.quickIconBg, {backgroundColor: '#f6ffed'}]}>
+                  <Text style={styles.quickIconText}>📦</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>我的服务</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('PublishOffer')}>
+                <View style={[styles.quickIconBg, {backgroundColor: '#fff7e6'}]}>
+                  <Text style={styles.quickIconText}>🧾</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>发布服务</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('OwnerPilotBindings')}>
+                <View style={[styles.quickIconBg, {backgroundColor: '#f9f0ff'}]}>
+                  <Text style={styles.quickIconText}>🤝</Text>
+                </View>
+                <Text style={styles.quickActionTitle}>协作执行人员</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
 
         <ObjectCard style={styles.profileEditCard}>
           <Text style={styles.sectionTitle}>档案设置</Text>
@@ -321,7 +408,7 @@ export default function OwnerProfileScreen({navigation}: any) {
             onPress={handleSave}
             disabled={saving}
           >
-            <Text style={styles.submitBtnText}>{saving ? '正在保存...' : '更新机主档案'}</Text>
+            <Text style={styles.submitBtnText}>{saving ? '正在保存...' : '更新服务商资料'}</Text>
           </TouchableOpacity>
         </ObjectCard>
 
@@ -397,6 +484,25 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
+  onboardingNotice: {
+    marginTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  onboardingNoticeTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  onboardingNoticeText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 18,
+    marginTop: 6,
+  },
 
   section: {
     backgroundColor: theme.card,
@@ -425,6 +531,20 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     fontSize: 13,
     color: theme.textSub,
     marginBottom: 12,
+  },
+  onboardingStepList: {
+    marginTop: 12,
+    gap: 10,
+  },
+  onboardingStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.inputBg,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
   },
 
   workbenchSummaryGrid: {

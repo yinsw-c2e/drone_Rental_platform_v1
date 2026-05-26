@@ -11,8 +11,8 @@ page {
 
 .login-root {
   position: relative;
-  min-height: 100vh;
-  overflow: visible;
+  height: 100vh;
+  overflow: hidden;
   background: linear-gradient(180deg, #EEF7FF 0%, #F6FAFF 46%, #ECF5FF 76%, #F7FBFF 100%);
   font-family: PingFang SC, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
 }
@@ -30,7 +30,7 @@ page {
 .login-scroll {
   position: relative;
   z-index: 2;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .login-scroll-content {

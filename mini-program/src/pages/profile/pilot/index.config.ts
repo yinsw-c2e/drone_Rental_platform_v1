@@ -1,1 +1,1 @@
-export default definePageConfig({ navigationBarTitleText: '飞手档案' });
+export default definePageConfig({ navigationBarTitleText: '履约资质' });

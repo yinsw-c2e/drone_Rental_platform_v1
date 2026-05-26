@@ -108,7 +108,7 @@ export default function AirspaceApplicationScreen({navigation, route}: any) {
       const res = await pilotV2Service.getProfile();
       setPilotId(res.data.id);
     } catch {
-      Alert.alert('提示', '请先完成飞手认证');
+      Alert.alert('提示', '请先完成执行人员认证');
     }
   };
 

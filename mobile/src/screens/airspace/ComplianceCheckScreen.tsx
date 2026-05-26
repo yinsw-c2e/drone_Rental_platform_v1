@@ -27,7 +27,7 @@ const RESULT_CONFIG: Record<string, {label: string; colorKey: 'success' | 'dange
 };
 
 const CATEGORY_MAP: Record<string, string> = {
-  pilot: '飞手资质',
+  pilot: '执行人员资质',
   drone: '无人机合规',
   cargo: '载荷检查',
   airspace: '空域检查',
@@ -73,7 +73,7 @@ export default function ComplianceCheckScreen({_navigation, route}: any) {
 
   const handleRunCheck = async () => {
     if (!pilotId || !droneId) {
-      Alert.alert('提示', '缺少飞手或无人机信息');
+      Alert.alert('提示', '缺少执行人员或无人机信息');
       return;
     }
 
@@ -251,7 +251,7 @@ export default function ComplianceCheckScreen({_navigation, route}: any) {
         {!check && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>暂无合规检查记录</Text>
-            <Text style={styles.emptyDesc}>点击上方按钮执行合规性检查，系统将对飞手资质、无人机合规性、载荷重量、空域限制进行全面检查</Text>
+            <Text style={styles.emptyDesc}>点击上方按钮执行合规性检查，系统将对执行人员资质、无人机合规性、载荷重量、空域限制进行全面检查</Text>
           </View>
         )}
       </ScrollView>

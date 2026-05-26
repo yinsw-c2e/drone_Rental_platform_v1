@@ -14,27 +14,33 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import * as WeChat from 'react-native-wechat-lib';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
-import {THIRD_PARTY_LOGIN} from '../../constants';
+import {
+  HaulRoleMode,
+  setHaulRoleMode,
+} from '../../store/slices/roleSlice';
+import {RootState} from '../../store/store';
+import {APP_CONFIG, THIRD_PARTY_LOGIN} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {loginAssets} from '../../assets/miniProgramAssets';
+import {canEnterMode} from '../../utils/roleSummary';
 
 const QUICK_LOGIN_ACCOUNTS = {
   client: [
     {label: '客户样本 (13800000004)', phone: '13800000004', password: 'password123', role: '客户'},
   ],
   owner: [
-    {label: '机主样本 (13800000007)', phone: '13800000007', password: 'password123', role: '机主'},
+    {label: '服务商样本 (13800000007)', phone: '13800000007', password: 'password123', role: '服务商'},
   ],
   pilot: [
-    {label: '飞手样本 (13900000016)', phone: '13900000016', password: 'password123', role: '飞手'},
-    {label: '陈飞手 (13900000017)', phone: '13900000017', password: 'password123', role: '飞手'},
+    {label: '执行人员样本 (13900000016)', phone: '13900000016', password: 'password123', role: '执行人员'},
+    {label: '陈执行人员 (13900000017)', phone: '13900000017', password: 'password123', role: '执行人员'},
   ],
   composite: [
-    {label: '复合身份样本 (13800000002)', phone: '13800000002', password: 'password123', role: '复合身份'},
+    {label: '综合服务样本 (13800000002)', phone: '13800000002', password: 'password123', role: '综合服务'},
   ],
   admin: [
     {label: '管理员 (13800000001)', phone: '13800000001', password: 'password123', role: '管理员'},
@@ -46,9 +52,9 @@ type DropdownKey = 'client' | 'owner' | 'pilot' | 'composite' | 'admin';
 
 const ROLE_CATEGORIES: Array<{key: DropdownKey; label: string; color: string}> = [
   {key: 'client', label: '客户', color: '#2A78FF'},
-  {key: 'owner', label: '机主', color: '#19A974'},
-  {key: 'pilot', label: '飞手', color: '#FA8C16'},
-  {key: 'composite', label: '复合', color: '#F5222D'},
+  {key: 'owner', label: '服务商', color: '#19A974'},
+  {key: 'pilot', label: '执行人员', color: '#FA8C16'},
+  {key: 'composite', label: '综合', color: '#F5222D'},
 ];
 
 const ROLE_ACCOUNTS: Record<DropdownKey, AccountItem[]> = {
@@ -62,11 +68,28 @@ const ROLE_ACCOUNTS: Record<DropdownKey, AccountItem[]> = {
   admin: QUICK_LOGIN_ACCOUNTS.admin,
 };
 
-export default function LoginScreen({navigation}: any) {
+const normalizeRoleMode = (value?: string): HaulRoleMode | null =>
+  value === 'provider' || value === 'customer' ? value : null;
+
+const modeLabel = (mode: HaulRoleMode) => mode === 'provider' ? '我要接单' : '我要吊运';
+
+const devCategoriesForMode = (mode: HaulRoleMode) =>
+  ROLE_CATEGORIES.filter(category => (
+    mode === 'provider'
+      ? true
+      : category.key === 'client'
+  ));
+
+export default function LoginScreen({navigation, route}: any) {
   const {theme, toggleTheme} = useTheme();
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const styles = getStyles(theme);
+  const selectedMode = useSelector(
+    (state: RootState) => state.role.selectedMode,
+  );
+  const routeRoleMode = normalizeRoleMode(route?.params?.roleMode);
+  const activeMode = routeRoleMode || selectedMode;
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -77,10 +100,17 @@ export default function LoginScreen({navigation}: any) {
   const requestIdRef = useRef(0);
   const mountedRef = useRef(true);
   const submittingRef = useRef(false);
+  const visibleDevCategories = devCategoriesForMode(activeMode);
 
   useEffect(() => {
     return () => { mountedRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    if (routeRoleMode) {
+      dispatch(setHaulRoleMode(routeRoleMode));
+    }
+  }, [dispatch, routeRoleMode]);
 
   // 初始化微信 SDK
   useEffect(() => {
@@ -110,6 +140,35 @@ export default function LoginScreen({navigation}: any) {
     if (isLatestRequest(requestId)) setSubmitting(false);
   };
 
+  const ensureModeAllowed = (mode: HaulRoleMode, roleSummary: any) => {
+    if (mode === 'provider') {
+      return true;
+    }
+    if (canEnterMode(mode, roleSummary)) {
+      return true;
+    }
+    Alert.alert(
+      '账号身份不匹配',
+      '当前账号不能进入“我要吊运”，请切换客户账号后再试。',
+    );
+    return false;
+  };
+
+  const finishLogin = (res: any, mode: HaulRoleMode) => {
+    const payload = res?.data || res || {};
+    const roleSummary = payload.role_summary || null;
+    if (!ensureModeAllowed(mode, roleSummary)) {
+      return false;
+    }
+    dispatch(setHaulRoleMode(mode));
+    dispatch(setCredentials({
+      user: payload.user,
+      token: payload.token,
+      roleSummary,
+    }));
+    return true;
+  };
+
   const handleWeChatLogin = async () => {
     console.log('[WeChat] handleWeChatLogin called');
     const appId = THIRD_PARTY_LOGIN.wechatAppId;
@@ -136,11 +195,7 @@ export default function LoginScreen({navigation}: any) {
         try {
           const res = await authService.wechatLogin(result.code);
           if (!isLatestRequest(requestId)) return;
-          dispatch(setCredentials({
-            user: res.data.user,
-            token: res.data.token,
-            roleSummary: (res.data as any).role_summary || null,
-          }));
+          finishLogin(res, activeMode);
         } catch (e: any) {
           if (isLatestRequest(requestId)) Alert.alert('微信登录失败', e.message);
         } finally {
@@ -164,7 +219,7 @@ export default function LoginScreen({navigation}: any) {
     }
     try {
       await authService.sendCode(phone);
-      Alert.alert('提示', '验证码已发送（开发模式请查看控制台）');
+      Alert.alert('提示', APP_CONFIG.devToolsEnabled ? '验证码已发送（开发模式请查看控制台）' : '验证码已发送');
       setCountdown(60);
       const timer = setInterval(() => {
         setCountdown(prev => {
@@ -189,11 +244,7 @@ export default function LoginScreen({navigation}: any) {
         res = await authService.login(phone, password);
       }
       if (!isLatestRequest(requestId)) return;
-      dispatch(setCredentials({
-        user: res.data.user,
-        token: res.data.token,
-        roleSummary: res.data.role_summary || null,
-      }));
+      finishLogin(res, activeMode);
     } catch (e: any) {
       if (isLatestRequest(requestId)) Alert.alert('登录失败', e.message);
     } finally {
@@ -201,17 +252,21 @@ export default function LoginScreen({navigation}: any) {
     }
   };
 
-  const quickLogin = async (userPhone: string, userPassword: string) => {
+  const quickLogin = async (
+    userPhone: string,
+    userPassword: string,
+    roleMode: HaulRoleMode,
+  ) => {
+    if (!APP_CONFIG.devToolsEnabled) {
+      Alert.alert('当前不可用', '快速登录仅在开发环境开放。');
+      return;
+    }
     const requestId = beginSubmit();
     if (!requestId) return;
     try {
       const res = await authService.login(userPhone, userPassword);
       if (!isLatestRequest(requestId)) return;
-      dispatch(setCredentials({
-        user: res.data.user,
-        token: res.data.token,
-        roleSummary: res.data.role_summary || null,
-      }));
+      finishLogin(res, roleMode);
     } catch (e: any) {
       if (!isLatestRequest(requestId)) return;
       const errorMsg = e.message || '未知错误';
@@ -234,8 +289,8 @@ export default function LoginScreen({navigation}: any) {
       ) : null}
       {theme.isDark && (
         <>
-          <View style={[styles.glowOrb, {top: -80, left: -60, backgroundColor: 'rgba(0,212,255,0.07)'}]} />
-          <View style={[styles.glowOrb, {top: 220, right: -100, backgroundColor: 'rgba(0,100,255,0.05)'}]} />
+          <View style={[styles.glowOrb, styles.glowOrbTop]} />
+          <View style={[styles.glowOrb, styles.glowOrbLower]} />
         </>
       )}
       <KeyboardAvoidingView
@@ -319,7 +374,10 @@ export default function LoginScreen({navigation}: any) {
                 {loginMode === 'code' ? '使用密码登录' : '使用验证码登录'}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate('Register', {roleMode: activeMode})
+              }>
               <Text style={styles.linkText}>注册新账号</Text>
             </TouchableOpacity>
           </View>
@@ -340,40 +398,48 @@ export default function LoginScreen({navigation}: any) {
             </View>
           </View>
 
-          <View style={styles.devSection}>
-            <View style={styles.devTitleRow}>
-              <Image source={loginAssets.tools} style={styles.devToolsIcon} resizeMode="contain" />
-              <Text style={styles.devTitle}>开发模式快速登录</Text>
+          {APP_CONFIG.devToolsEnabled ? (
+            <View style={styles.devSection}>
+              <View style={styles.devTitleRow}>
+                <Image source={loginAssets.tools} style={styles.devToolsIcon} resizeMode="contain" />
+                <Text style={styles.devTitle}>开发模式快速登录 · {modeLabel(activeMode)}</Text>
+              </View>
+              {visibleDevCategories.map(({key, label, color}) => {
+                const accounts = ROLE_ACCOUNTS[key] || [];
+                return (
+                  <View key={key} style={styles.devGroup}>
+                    <View style={styles.devRoleRow}>
+                      <Image source={loginAssets.user} style={styles.devUserIcon} resizeMode="contain" />
+                      <Text style={[styles.devRoleText, {color}]}>{label}</Text>
+                    </View>
+                    <View style={styles.devAccountList}>
+                      {accounts.map(account => (
+                        <TouchableOpacity
+                          key={account.phone}
+                          activeOpacity={0.76}
+                          style={[styles.devAccountBtn, {borderColor: color}]}
+                          onPress={() =>
+                            quickLogin(
+                              account.phone,
+                              account.password,
+                              activeMode,
+                            )
+                          }
+                          disabled={submitting}>
+                          <Text style={[styles.devAccountText, {color}]}>
+                            {submitting ? '登录中...' : account.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    {accounts.length === 0 ? (
+                      <Text style={styles.devEmpty}>暂无可用账号</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
-            {ROLE_CATEGORIES.map(({key, label, color}) => {
-              const accounts = ROLE_ACCOUNTS[key] || [];
-              return (
-                <View key={key} style={styles.devGroup}>
-                  <View style={styles.devRoleRow}>
-                    <Image source={loginAssets.user} style={styles.devUserIcon} resizeMode="contain" />
-                    <Text style={[styles.devRoleText, {color}]}>{label}</Text>
-                  </View>
-                  <View style={styles.devAccountList}>
-                    {accounts.map(account => (
-                      <TouchableOpacity
-                        key={account.phone}
-                        activeOpacity={0.76}
-                        style={[styles.devAccountBtn, {borderColor: color}]}
-                        onPress={() => quickLogin(account.phone, account.password)}
-                        disabled={submitting}>
-                        <Text style={[styles.devAccountText, {color}]}>
-                          {submitting ? '登录中...' : account.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  {accounts.length === 0 ? (
-                    <Text style={styles.devEmpty}>暂无可用账号</Text>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
       <TouchableOpacity
@@ -403,6 +469,16 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   kavFlex: {flex: 1},
   scrollContent: {paddingHorizontal: 17},
   glowOrb: {position: 'absolute', width: 260, height: 260, borderRadius: 130},
+  glowOrbTop: {
+    top: -80,
+    left: -60,
+    backgroundColor: 'rgba(0,212,255,0.07)',
+  },
+  glowOrbLower: {
+    top: 220,
+    right: -100,
+    backgroundColor: 'rgba(0,100,255,0.05)',
+  },
   hero: {
     alignItems: 'center',
     transform: [{translateX: -47}, {translateY: 15}],

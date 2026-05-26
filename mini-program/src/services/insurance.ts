@@ -7,7 +7,7 @@ export const insuranceService = {
 };
 
 export const getPolicyTypeText = (type: string) => {
-  const map: Record<string, string> = { liability: '第三者责任险', cargo: '货物险', hull: '机身险', accident: '飞手意外险' };
+  const map: Record<string, string> = { liability: '第三者责任险', cargo: '货物险', hull: '机身险', accident: '履约意外险' };
   return map[type] || formatUnknownEnumLabel(type, '其它险种');
 };
 export const getPolicyStatusText = (status: string) => {

@@ -26,6 +26,7 @@ var pushEventAllowlist = map[string]struct{}{
 	"order_preparing":              {},
 	"order_in_transit":             {},
 	"order_delivered":              {},
+	"settlement_settled":           {},
 	"dispatch_created":             {},
 	"dispatch_accepted":            {},
 	"dispatch_reassigned":          {},
@@ -50,7 +51,7 @@ func (s *EventService) NotifyDemandQuoteSubmitted(demand *model.Demand, quote *m
 		return
 	}
 	s.notifyUsers([]int64{demand.ClientUserID}, "demand_quote_submitted", "收到新报价",
-		fmt.Sprintf("需求“%s”收到新的机主报价。", fallbackTitle(demand.Title, demand.DemandNo, "需求")),
+		fmt.Sprintf("需求“%s”收到新的服务商报价。", fallbackTitle(demand.Title, demand.DemandNo, "需求")),
 		map[string]interface{}{
 			"demand_id":              demand.ID,
 			"demand_no":              demand.DemandNo,
@@ -141,7 +142,7 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 	providerUserID := orderProviderUserID(order)
 	clientRecipients := orderClientReceivers(order)
 	s.notifyUsers(orderClientReceivers(order), "direct_order_confirmed", "直达订单已确认",
-		fmt.Sprintf("订单“%s”已由机主确认，请先查看合同签署状态，再继续下一步。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+		fmt.Sprintf("订单“%s”已由服务商确认，请先查看合同签署状态，再继续下一步。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":      order.ID,
 			"order_no":      order.OrderNo,
@@ -152,7 +153,7 @@ func (s *EventService) NotifyDirectOrderConfirmed(order *model.Order) {
 	)
 	for _, clientUserID := range clientRecipients {
 		s.notifyConversation(providerUserID, clientUserID, "direct_order_confirmed", "直达订单已确认",
-			fmt.Sprintf("订单“%s”已由机主确认，请先查看合同签署状态，再继续下一步。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+			fmt.Sprintf("订单“%s”已由服务商确认，请先查看合同签署状态，再继续下一步。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 			map[string]interface{}{
 				"order_id":      order.ID,
 				"order_no":      order.OrderNo,
@@ -259,7 +260,7 @@ func (s *EventService) NotifyDirectOrderRejected(order *model.Order) {
 		return
 	}
 	s.notifyUsers(orderClientReceivers(order), "direct_order_rejected", "直达订单已被拒绝",
-		fmt.Sprintf("订单“%s”已被机主拒绝，请重新选择供给。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+		fmt.Sprintf("订单“%s”已被服务商拒绝，请重新选择服务方案。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":      order.ID,
 			"order_no":      order.OrderNo,
@@ -354,6 +355,72 @@ func (s *EventService) NotifyOrderStatusChanged(order *model.Order, eventType, t
 	}
 }
 
+func (s *EventService) NotifySettlementSettled(order *model.Order, settlement *model.OrderSettlement) {
+	if order == nil || settlement == nil {
+		return
+	}
+
+	orderTitle := fallbackTitle(order.Title, order.OrderNo, "订单")
+	basePayload := map[string]interface{}{
+		"order_id":        order.ID,
+		"order_no":        order.OrderNo,
+		"settlement_id":   settlement.ID,
+		"settlement_no":   settlement.SettlementNo,
+		"status":          settlement.Status,
+		"final_amount":    settlement.FinalAmount,
+		"platform_fee":    settlement.PlatformFee,
+		"pilot_fee":       settlement.PilotFee,
+		"owner_fee":       settlement.OwnerFee,
+		"business_type":   "settlement",
+		"settlement_type": "order_income",
+	}
+
+	for _, clientUserID := range orderClientReceivers(order) {
+		payload := cloneExtras(basePayload)
+		payload["role"] = "payer"
+		payload["next_action"] = "order"
+		s.notifyUsers([]int64{clientUserID}, "settlement_settled", "订单结算已完成",
+			fmt.Sprintf("订单“%s”已完成结算，服务方收入已入账。", orderTitle),
+			payload,
+		)
+	}
+
+	if settlement.PilotUserID > 0 && settlement.PilotUserID == settlement.OwnerUserID {
+		payload := cloneExtras(basePayload)
+		incomeAmount := settlement.PilotFee + settlement.OwnerFee
+		payload["role"] = "provider"
+		payload["income_amount"] = incomeAmount
+		payload["next_action"] = "wallet"
+		s.notifyUsers([]int64{settlement.PilotUserID}, "settlement_settled", "结算收入已入账",
+			fmt.Sprintf("订单“%s”结算收入%s已入账，可在钱包查看。", orderTitle, formatAmountFen(incomeAmount)),
+			payload,
+		)
+		return
+	}
+
+	if settlement.PilotUserID > 0 {
+		payload := cloneExtras(basePayload)
+		payload["role"] = "pilot"
+		payload["income_amount"] = settlement.PilotFee
+		payload["next_action"] = "wallet"
+		s.notifyUsers([]int64{settlement.PilotUserID}, "settlement_settled", "履约服务费已入账",
+			fmt.Sprintf("订单“%s”履约服务费%s已入账，可在钱包查看。", orderTitle, formatAmountFen(settlement.PilotFee)),
+			payload,
+		)
+	}
+
+	if settlement.OwnerUserID > 0 {
+		payload := cloneExtras(basePayload)
+		payload["role"] = "owner"
+		payload["income_amount"] = settlement.OwnerFee
+		payload["next_action"] = "wallet"
+		s.notifyUsers([]int64{settlement.OwnerUserID}, "settlement_settled", "设备服务费已入账",
+			fmt.Sprintf("订单“%s”设备服务费%s已入账，可在钱包查看。", orderTitle, formatAmountFen(settlement.OwnerFee)),
+			payload,
+		)
+	}
+}
+
 func (s *EventService) NotifyDispatchCreated(task *model.FormalDispatchTask, order *model.Order) {
 	if task == nil {
 		return
@@ -364,8 +431,8 @@ func (s *EventService) NotifyDispatchCreated(task *model.FormalDispatchTask, ord
 		orderNo = order.OrderNo
 		orderID = order.ID
 	}
-	s.notifyUsers([]int64{task.TargetPilotUserID}, "dispatch_created", "收到正式派单",
-		fmt.Sprintf("您收到正式派单 %s，请尽快响应。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
+	s.notifyUsers([]int64{task.TargetPilotUserID}, "dispatch_created", "收到履约任务",
+		fmt.Sprintf("您收到履约任务 %s，请尽快响应。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "履约任务")),
 		map[string]interface{}{
 			"dispatch_task_id": task.ID,
 			"dispatch_no":      task.DispatchNo,
@@ -383,8 +450,8 @@ func (s *EventService) NotifyDispatchCreated(task *model.FormalDispatchTask, ord
 	if providerUserID == 0 {
 		providerUserID = task.ProviderUserID
 	}
-	s.notifyConversation(providerUserID, task.TargetPilotUserID, "dispatch_created", "收到正式派单",
-		fmt.Sprintf("您收到正式派单 %s，请尽快响应。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
+	s.notifyConversation(providerUserID, task.TargetPilotUserID, "dispatch_created", "收到履约任务",
+		fmt.Sprintf("您收到履约任务 %s，请尽快响应。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "履约任务")),
 		map[string]interface{}{
 			"dispatch_task_id": task.ID,
 			"dispatch_no":      task.DispatchNo,
@@ -406,8 +473,8 @@ func (s *EventService) NotifyDispatchAccepted(task *model.FormalDispatchTask, or
 		recipients = append(recipients, order.ProviderUserID)
 		recipients = append(recipients, orderClientReceivers(order)...)
 	}
-	s.notifyUsers(recipients, "dispatch_accepted", "正式派单已接受",
-		fmt.Sprintf("正式派单 %s 已被飞手接受。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
+	s.notifyUsers(recipients, "dispatch_accepted", "履约任务已确认",
+		fmt.Sprintf("履约任务 %s 已被服务商确认。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "履约任务")),
 		map[string]interface{}{
 			"dispatch_task_id": task.ID,
 			"dispatch_no":      task.DispatchNo,
@@ -418,8 +485,8 @@ func (s *EventService) NotifyDispatchAccepted(task *model.FormalDispatchTask, or
 		},
 	)
 	providerUserID := orderProviderUserID(order)
-	s.notifyConversation(task.TargetPilotUserID, providerUserID, "dispatch_accepted", "正式派单已接受",
-		fmt.Sprintf("正式派单 %s 已被飞手接受。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "派单")),
+	s.notifyConversation(task.TargetPilotUserID, providerUserID, "dispatch_accepted", "履约任务已确认",
+		fmt.Sprintf("履约任务 %s 已被服务商确认。", fallbackTitle(task.DispatchNo, fmt.Sprintf("%d", task.ID), "履约任务")),
 		map[string]interface{}{
 			"dispatch_task_id": task.ID,
 			"dispatch_no":      task.DispatchNo,
@@ -430,8 +497,8 @@ func (s *EventService) NotifyDispatchAccepted(task *model.FormalDispatchTask, or
 		},
 	)
 	for _, clientUserID := range orderClientReceivers(order) {
-		s.notifyConversation(providerUserID, clientUserID, "dispatch_assigned", "订单已安排执行飞手",
-			fmt.Sprintf("订单“%s”已安排飞手执行，您可以在订单详情跟进进度。", fallbackTitle(orderTitleOrEmpty(order), orderNoOrEmpty(order), "订单")),
+		s.notifyConversation(providerUserID, clientUserID, "dispatch_assigned", "订单已进入履约安排",
+			fmt.Sprintf("订单“%s”已进入履约安排，您可以在订单详情跟进进度。", fallbackTitle(orderTitleOrEmpty(order), orderNoOrEmpty(order), "订单")),
 			map[string]interface{}{
 				"dispatch_task_id": task.ID,
 				"dispatch_no":      task.DispatchNo,
@@ -448,8 +515,8 @@ func (s *EventService) NotifyDispatchReassigned(order *model.Order, newTask *mod
 	if order == nil || newTask == nil {
 		return
 	}
-	s.notifyUsers([]int64{order.ProviderUserID}, "dispatch_reassigned", "派单已自动重派",
-		fmt.Sprintf("订单“%s”触发自动重派，系统已向新的飞手发起正式派单。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+	s.notifyUsers([]int64{order.ProviderUserID}, "dispatch_reassigned", "履约安排已更新",
+		fmt.Sprintf("订单“%s”触发履约安排更新，系统已重新生成履约任务。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":         order.ID,
 			"order_no":         order.OrderNo,
@@ -466,7 +533,7 @@ func (s *EventService) NotifyDispatchManualRequired(order *model.Order, reason s
 	if order == nil {
 		return
 	}
-	s.notifyUsers([]int64{order.ProviderUserID}, "dispatch_manual_required", "派单需人工处理",
+	s.notifyUsers([]int64{order.ProviderUserID}, "dispatch_manual_required", "履约安排需人工处理",
 		fmt.Sprintf("订单“%s”当前无人可自动接单，请您手动处理。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":      order.ID,
@@ -482,8 +549,8 @@ func (s *EventService) NotifyBindingInvitation(binding *model.OwnerPilotBinding)
 	if binding == nil {
 		return
 	}
-	s.notifyUsers([]int64{binding.PilotUserID}, "pilot_binding_invitation", "收到机主绑定邀请",
-		"有机主向您发起了绑定邀请，请尽快确认。",
+	s.notifyUsers([]int64{binding.PilotUserID}, "pilot_binding_invitation", "收到服务协作邀请",
+		"有服务商向您发起了协作邀请，请尽快确认。",
 		map[string]interface{}{
 			"binding_id":    binding.ID,
 			"owner_user_id": binding.OwnerUserID,
@@ -499,8 +566,8 @@ func (s *EventService) NotifyBindingApplication(binding *model.OwnerPilotBinding
 	if binding == nil {
 		return
 	}
-	s.notifyUsers([]int64{binding.OwnerUserID}, "pilot_binding_application", "收到飞手绑定申请",
-		"有飞手向您发起了绑定申请，请尽快处理。",
+	s.notifyUsers([]int64{binding.OwnerUserID}, "pilot_binding_application", "收到服务协作申请",
+		"有服务商向您发起了协作申请，请尽快处理。",
 		map[string]interface{}{
 			"binding_id":    binding.ID,
 			"owner_user_id": binding.OwnerUserID,
@@ -521,7 +588,7 @@ func (s *EventService) NotifyBindingStatus(binding *model.OwnerPilotBinding) {
 	switch binding.Status {
 	case "active":
 		title = "绑定关系已生效"
-		content = "机主与飞手的绑定关系已生效。"
+		content = "服务协作关系已生效。"
 	case "rejected":
 		title = "绑定请求被拒绝"
 		content = "绑定请求已被拒绝。"
@@ -547,10 +614,10 @@ func (s *EventService) NotifyBindingStatus(binding *model.OwnerPilotBinding) {
 }
 
 func (s *EventService) NotifyPilotVerification(pilotUserID int64, approved bool, note string) {
-	title := "飞手资质审核结果"
-	content := "您的飞手资质已审核通过。"
+	title := "服务资质审核结果"
+	content := "您的服务资质已审核通过。"
 	if !approved {
-		content = "您的飞手资质审核未通过，请查看原因并重新提交。"
+		content = "您的服务资质审核未通过，请查看原因并重新提交。"
 	}
 	s.notifyUsers([]int64{pilotUserID}, "pilot_verification_result", title, content, map[string]interface{}{
 		"pilot_user_id": pilotUserID,

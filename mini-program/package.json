@@ -4,9 +4,11 @@
   "private": true,
   "description": "无人机重载吊运平台-微信小程序",
   "scripts": {
-    "build:weapp": "taro build --type weapp",
-    "build:weapp:prod": "taro build --type weapp --mode production",
-    "dev:weapp": "npm run build:weapp -- --watch",
+    "build:weapp": "taro build --type weapp && node scripts/fix-weapp-wxss-imports.mjs",
+    "build:weapp:prod": "taro build --type weapp --mode production && node scripts/fix-weapp-wxss-imports.mjs",
+    "check:p1-freeze": "../scripts/mini_program_p1_freeze_check.sh",
+    "dev:weapp": "taro build --type weapp --watch",
+    "open:devtools": "../scripts/open_mini_program_devtools.sh",
     "lint": "eslint src/"
   },
   "dependencies": {

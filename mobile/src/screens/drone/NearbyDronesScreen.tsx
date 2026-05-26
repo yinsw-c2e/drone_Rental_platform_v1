@@ -94,7 +94,7 @@ export default function NearbyDronesScreen({navigation}: any) {
       <View style={styles.droneIcon}><Text style={{fontSize: 24}}>🚁</Text></View>
       <View style={{flex: 1}}>
         <Text style={styles.name}>{item.brand} {item.model}</Text>
-        <Text style={styles.meta}>{item.owner?.nickname || '无人机主'} · ⭐{item.rating || '0.0'}</Text>
+        <Text style={styles.meta}>{item.owner?.nickname || '无人机服务商'} · ⭐{item.rating || '0.0'}</Text>
         <Text style={styles.address}>{item.address || item.city || '位置未知'}</Text>
       </View>
       <Text style={styles.price}>¥{(item.daily_price / 100).toFixed(0)}/天</Text>

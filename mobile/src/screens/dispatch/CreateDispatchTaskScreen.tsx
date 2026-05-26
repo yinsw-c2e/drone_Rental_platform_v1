@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useSelector} from 'react-redux';
 
 import ObjectCard from '../../components/business/ObjectCard';
 import SourceTag from '../../components/business/SourceTag';
@@ -19,14 +20,16 @@ import {dispatchV2Service} from '../../services/dispatchV2';
 import {orderV2Service} from '../../services/orderV2';
 import {ownerService} from '../../services/owner';
 import {OwnerPilotBindingSummary, V2OrderDetail} from '../../types';
+import {RootState} from '../../store/store';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 
 const MODE_OPTIONS = [
   {
     key: 'bound_pilot',
-    title: '合作飞手',
-    desc: '优先联系你已建立长期合作的飞手，适合固定班底任务。',
+    title: '合作执行人员',
+    desc: '优先联系你已建立长期合作的执行人员，适合固定班底任务。',
     accent: '#1677ff',
   },
   {
@@ -67,9 +70,9 @@ const getBindingPilotName = (binding: OwnerPilotBindingSummary) => {
     return binding.pilot.nickname;
   }
   if (binding.pilot_user_id) {
-    return `飞手 #${binding.pilot_user_id}`;
+    return `执行人员 #${binding.pilot_user_id}`;
   }
-  return '未命名飞手';
+  return '未命名执行人员';
 };
 
 const getDispatchResultId = (payload: any) => Number(payload?.dispatch_task?.id || 0);
@@ -79,6 +82,11 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
   const styles = getStyles(theme);
   const orderId = Number(route?.params?.orderId || route?.params?.id || 0);
   const dispatchId = Number(route?.params?.dispatchId || 0);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary), [roleSummary]);
+  const providerCapabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
+  const canArrangeDispatch = providerCapabilities.canArrangeDispatch;
   const [detail, setDetail] = useState<V2OrderDetail | null>(null);
   const [bindings, setBindings] = useState<OwnerPilotBindingSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +98,12 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
   const isReassign = dispatchId > 0;
 
   const loadData = useCallback(async () => {
+    if (!isAuthenticated || !canArrangeDispatch) {
+      setDetail(null);
+      setBindings([]);
+      setLoading(false);
+      return;
+    }
     if (!orderId) {
       setDetail(null);
       setBindings([]);
@@ -113,7 +127,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [canArrangeDispatch, isAuthenticated, orderId]);
 
   useEffect(() => {
     loadData();
@@ -148,6 +162,10 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
   }, [bindings.length, detail, isReassign, selectedMode, selectedPilotUserId]);
 
   const submit = async () => {
+    if (!isAuthenticated || !canArrangeDispatch) {
+      Alert.alert('无法派单', isAuthenticated ? '设备服务能力审核通过后才能发起正式派单。' : '请先登录服务商账号。');
+      return;
+    }
     if (!detail || !canSubmit) {
       return;
     }
@@ -167,7 +185,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
       const successTitle = isReassign ? '已发起重派' : '已发起正式派单';
       const successDesc = isReassign
         ? '系统已按新的派单来源重新生成正式派单，你可以继续查看详情。'
-        : '正式派单已发出，飞手端会在待响应列表中看到这条指令。';
+        : '正式派单已发出，执行人员会在待响应列表中看到这条指令。';
 
       Alert.alert(successTitle, successDesc, [
         nextDispatchId > 0
@@ -207,6 +225,19 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
     );
   }
 
+  if (!isAuthenticated || !canArrangeDispatch) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <View style={styles.centerState}>
+          <Text style={styles.sectionTitle}>{isAuthenticated ? '设备服务能力未开通' : '请先登录'}</Text>
+          <Text style={styles.emptyText}>
+            {isAuthenticated ? '审核通过后才能为订单发起正式派单。' : '登录服务商账号后才能发起正式派单。'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!detail) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
@@ -224,7 +255,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
           <Text style={styles.heroEyebrow}>{isReassign ? '正式派单重派' : '发起正式派单'}</Text>
           <Text style={styles.heroTitle}>{isReassign ? '切换执行来源' : '从订单发出执行指令'}</Text>
           <Text style={styles.heroDesc}>
-            这里只处理正式派单。需求撮合和供给成交已经结束，现在要做的是决定从哪一层执行来源里选飞手。
+            这里只处理正式派单。需求撮合和供给成交已经结束，现在要做的是决定从哪一层执行来源里选执行人员。
           </Text>
         </View>
 
@@ -281,7 +312,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
                   <View style={[styles.modeDot, {backgroundColor: disabled ? '#d9d9d9' : option.accent}]} />
                 </View>
                 <Text style={styles.modeDesc}>{option.desc}</Text>
-                {disabled ? <Text style={styles.modeHint}>当前还没有可用的合作飞手</Text> : null}
+                {disabled ? <Text style={styles.modeHint}>当前还没有可用的合作执行人员</Text> : null}
               </TouchableOpacity>
             );
           })}
@@ -289,9 +320,9 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
 
         {selectedMode === 'bound_pilot' ? (
           <ObjectCard style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>选择合作飞手</Text>
+            <Text style={styles.sectionTitle}>选择合作执行人员</Text>
             {bindings.length === 0 ? (
-              <Text style={styles.emptyInline}>当前还没有可直接联系的合作飞手，建议改为优先候选或平台协调。</Text>
+              <Text style={styles.emptyInline}>当前还没有可直接联系的合作执行人员，建议改为优先候选或平台协调。</Text>
             ) : (
               bindings.map(binding => {
                 const selected = Number(selectedPilotUserId || 0) === Number(binding.pilot_user_id || 0);
@@ -304,7 +335,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
                       <Text style={styles.bindingName}>{getBindingPilotName(binding)}</Text>
                       <Text style={styles.bindingMeta}>{binding.is_priority ? '优先合作' : '普通合作'}</Text>
                     </View>
-                    <Text style={styles.bindingNote}>{binding.note || '长期绑定合作飞手，可优先指派。'}</Text>
+                    <Text style={styles.bindingNote}>{binding.note || '长期绑定合作执行人员，可优先指派。'}</Text>
                   </TouchableOpacity>
                 );
               })
@@ -314,13 +345,13 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
 
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>派单说明</Text>
-          <Text style={styles.sectionHint}>这段说明会进入正式派单日志，便于飞手和后续售后理解本次调度原因。</Text>
+          <Text style={styles.sectionHint}>这段说明会进入正式派单日志，便于执行人员和后续售后理解本次调度原因。</Text>
           <TextInput
             style={styles.textInput}
             multiline
             value={reason}
             onChangeText={setReason}
-            placeholder={selectedMode === 'bound_pilot' ? '例如：优先联系熟悉该山区吊运线路的合作飞手' : `例如：按${selectedModeMeta.title}方式继续安排执行`}
+            placeholder={selectedMode === 'bound_pilot' ? '例如：优先联系熟悉该山区吊运线路的合作执行人员' : `例如：按${selectedModeMeta.title}方式继续安排执行`}
           />
         </ObjectCard>
       </ScrollView>

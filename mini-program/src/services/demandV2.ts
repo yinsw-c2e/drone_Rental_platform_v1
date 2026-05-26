@@ -15,6 +15,14 @@ export type DemandListParams = {
   page?: number;
   page_size?: number;
   status?: string;
+  service_type?: string;
+  region?: string;
+  cargo_scene?: string;
+  min_weight_kg?: number;
+  max_weight_kg?: number;
+  start_from?: string;
+  start_to?: string;
+  sort?: 'price' | 'latest' | 'created_at' | 'distance';
 };
 
 export type DemandUpsertPayload = {

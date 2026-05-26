@@ -8,11 +8,11 @@ import (
 // DroneDTO 无人机数据传输对象（用于管理后台）
 type DroneDTO struct {
 	// 基本信息
-	ID           int64   `json:"id"`
-	Brand        string  `json:"brand"`
-	Model        string  `json:"model"`
-	SerialNumber string  `json:"serial_number"`
-	Description  string  `json:"description"`
+	ID           int64  `json:"id"`
+	Brand        string `json:"brand"`
+	Model        string `json:"model"`
+	SerialNumber string `json:"serial_number"`
+	Description  string `json:"description"`
 
 	// 性能参数
 	MaxLoad       float64 `json:"max_load"`
@@ -41,12 +41,15 @@ type DroneDTO struct {
 	UOMRegistrationDoc string     `json:"uom_registration_doc"`
 
 	// 保险信息
-	InsurancePolicyNo   string     `json:"insurance_policy_no"`
-	InsuranceCompany    string     `json:"insurance_company"`
-	InsuranceCoverage   int64      `json:"insurance_coverage"`
-	InsuranceExpireDate *time.Time `json:"insurance_expire_date"`
-	InsuranceDoc        string     `json:"insurance_doc"`
-	InsuranceVerified   string     `json:"insurance_verified"`
+	InsurancePolicyNo     string     `json:"insurance_policy_no"`
+	InsuranceCompany      string     `json:"insurance_company"`
+	InsuranceCoverage     int64      `json:"insurance_coverage"`
+	InsuranceExpireDate   *time.Time `json:"insurance_expire_date"`
+	InsuranceDoc          string     `json:"insurance_doc"`
+	InsuranceVerified     string     `json:"insurance_verified"`
+	InsuranceReviewedAt   *time.Time `json:"insurance_reviewed_at"`
+	InsuranceReviewedBy   int64      `json:"insurance_reviewed_by"`
+	InsuranceRejectReason string     `json:"insurance_reject_reason"`
 
 	// 适航证书
 	AirworthinessCertNo     string     `json:"airworthiness_cert_no"`
@@ -99,29 +102,32 @@ func ToDroneDTO(drone *model.Drone, owner *model.User) *DroneDTO {
 		UOMVerifiedAt:      drone.UOMVerifiedAt,
 		UOMRegistrationDoc: drone.UOMRegistrationDoc,
 		// 保险
-		InsurancePolicyNo:   drone.InsurancePolicyNo,
-		InsuranceCompany:    drone.InsuranceCompany,
-		InsuranceCoverage:   drone.InsuranceCoverage,
-		InsuranceExpireDate: drone.InsuranceExpireDate,
-		InsuranceDoc:        drone.InsuranceDoc,
-		InsuranceVerified:   drone.InsuranceVerified,
+		InsurancePolicyNo:     drone.InsurancePolicyNo,
+		InsuranceCompany:      drone.InsuranceCompany,
+		InsuranceCoverage:     drone.InsuranceCoverage,
+		InsuranceExpireDate:   drone.InsuranceExpireDate,
+		InsuranceDoc:          drone.InsuranceDoc,
+		InsuranceVerified:     drone.InsuranceVerified,
+		InsuranceReviewedAt:   drone.InsuranceReviewedAt,
+		InsuranceReviewedBy:   drone.InsuranceReviewedBy,
+		InsuranceRejectReason: drone.InsuranceRejectReason,
 		// 适航
 		AirworthinessCertNo:     drone.AirworthinessCertNo,
 		AirworthinessCertExpire: drone.AirworthinessCertExpire,
 		AirworthinessCertDoc:    drone.AirworthinessCertDoc,
 		AirworthinessVerified:   drone.AirworthinessVerified,
-		OwnerID:             drone.OwnerID,
-		CreatedAt:           drone.CreatedAt,
-		UpdatedAt:           drone.UpdatedAt,
+		OwnerID:                 drone.OwnerID,
+		CreatedAt:               drone.CreatedAt,
+		UpdatedAt:               drone.UpdatedAt,
 	}
-	
+
 	// 如果提供了 owner 信息，填充机主信息
 	if owner != nil {
 		dto.OwnerNickname = owner.Nickname
 		dto.OwnerPhone = owner.Phone
 		dto.OwnerAvatar = owner.AvatarURL
 	}
-	
+
 	return dto
 }
 
@@ -134,4 +140,3 @@ func ToDroneDTOList(drones []model.Drone, owners map[int64]*model.User) []*Drone
 	}
 	return dtoList
 }
-

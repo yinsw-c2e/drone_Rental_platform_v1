@@ -1,1 +1,5 @@
-export default definePageConfig({ navigationBarTitleText: '订单详情' });
+export default definePageConfig({
+  navigationStyle: 'custom',
+  disableScroll: true,
+  backgroundColor: '#F6F8FC',
+});

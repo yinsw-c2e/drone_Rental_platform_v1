@@ -12,6 +12,8 @@ type Order struct {
 	OrderType              string         `gorm:"type:varchar(20);not null" json:"order_type"` // rental, cargo
 	RelatedID              int64          `json:"related_id"`
 	OrderSource            string         `gorm:"type:varchar(30);default:demand_market;index" json:"order_source"`
+	OrderMode              string         `gorm:"type:varchar(20);default:negotiated;index" json:"order_mode"` // negotiated, instant, reservation
+	ServiceClassCode       string         `gorm:"type:varchar(50);index" json:"service_class_code"`
 	DemandID               int64          `gorm:"index" json:"demand_id"`
 	SourceSupplyID         int64          `gorm:"index" json:"source_supply_id"`
 	DroneID                int64          `gorm:"index" json:"drone_id"`
@@ -41,6 +43,13 @@ type Order struct {
 	DestLatitude           *float64       `gorm:"type:decimal(10,7)" json:"dest_latitude"`
 	DestLongitude          *float64       `gorm:"type:decimal(10,7)" json:"dest_longitude"`
 	DestAddress            string         `gorm:"type:varchar(255)" json:"dest_address"`
+	EstimatedDistanceM     int            `json:"estimated_distance_m"`
+	EstimatedDurationMin   int            `json:"estimated_duration_min"`
+	PriceBreakdownJSON     JSON           `gorm:"type:json" json:"price_breakdown_json"`
+	BroadcastPoolID        *int64         `gorm:"index" json:"broadcast_pool_id"`
+	ReservedStartAt        *time.Time     `gorm:"index" json:"reserved_start_at"`
+	GrabbedAt              *time.Time     `json:"grabbed_at"`
+	GrabbedByUserID        int64          `gorm:"index" json:"grabbed_by_user_id"`
 	TotalAmount            int64          `json:"total_amount"`
 	PlatformCommissionRate float64        `gorm:"type:decimal(5,2)" json:"platform_commission_rate"`
 	PlatformCommission     int64          `json:"platform_commission"`
@@ -111,6 +120,26 @@ type OrderSnapshot struct {
 
 func (OrderSnapshot) TableName() string {
 	return "order_snapshots"
+}
+
+type OrderSiteSafetyCheck struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID        int64     `gorm:"index;not null" json:"order_id"`
+	OperatorUserID int64     `gorm:"index;not null" json:"operator_user_id"`
+	OperatorRole   string    `gorm:"type:varchar(20);index" json:"operator_role"`
+	Status         string    `gorm:"type:varchar(20);default:completed;index" json:"status"`
+	Checklist      JSON      `gorm:"type:json" json:"checklist"`
+	Photos         JSON      `gorm:"type:json" json:"photos"`
+	Note           string    `gorm:"type:text" json:"note"`
+	CheckedAt      time.Time `gorm:"index" json:"checked_at"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+
+	Order *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+}
+
+func (OrderSiteSafetyCheck) TableName() string {
+	return "order_site_safety_checks"
 }
 
 type Payment struct {

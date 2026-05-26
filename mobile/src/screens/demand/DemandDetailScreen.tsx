@@ -24,7 +24,7 @@ import {
   getDemandSceneLabel,
   resolveDemandPrimaryAddress,
 } from '../../utils/demandMeta';
-import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {formatAmountYuan, summarizeFlexibleValue} from '../../utils/supplyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -42,8 +42,8 @@ const getDemandProgressFocus = (demand: DemandDetail, isOwnDemand: boolean) => {
     case 'quoting':
       return isOwnDemand
         ? {
-            eyebrow: '当前在等机主',
-            title: '正在等待机主提交报价方案',
+            eyebrow: '当前在等服务商',
+            title: '正在等待服务商提交报价方案',
             desc: '你只需要关注报价数量和预计响应时间。没有合适方案时，也可以继续补充任务说明。',
             eta: '通常 24 小时内会有首批响应',
           }
@@ -94,6 +94,10 @@ export default function DemandDetailScreen({route, navigation}: any) {
     () => getEffectiveRoleSummary(roleSummary, currentUser),
     [currentUser, roleSummary],
   );
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(effectiveRoleSummary),
+    [effectiveRoleSummary],
+  );
 
   const [demand, setDemand] = useState<DemandDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +111,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
   const isOwnDemand = demand?.client_user_id === currentUser?.id;
   const canEditOrCancel = isOwnDemand && ['draft', 'published', 'quoting'].includes(demand?.status || '');
   const canViewAndSelectQuotes = isOwnDemand && ['published', 'quoting', 'selected'].includes(demand?.status || '');
-  const canQuoteAsOwner = !isOwnDemand && effectiveRoleSummary.has_owner_role;
+  const canQuoteAsOwner = !isOwnDemand && providerCapabilities.canPublishSupply;
   const canOperateCandidate = !isOwnDemand && effectiveRoleSummary.has_pilot_role && !!demand?.allows_pilot_candidate;
   const activeCandidate = demand?.my_candidate?.status === 'active';
   const hasOwnQuote = Boolean(demand?.my_quote);
@@ -356,7 +360,7 @@ export default function DemandDetailScreen({route, navigation}: any) {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{demand.candidate_pilot_count || 0}</Text>
-              <Text style={styles.statLabel}>候选飞手</Text>
+              <Text style={styles.statLabel}>候选执行人员</Text>
             </View>
           </View>
 
@@ -377,13 +381,13 @@ export default function DemandDetailScreen({route, navigation}: any) {
             {quotesLoading ? (
               <ActivityIndicator style={{marginVertical: 20}} color={theme.primary} />
             ) : quotes.length === 0 ? (
-              <Text style={styles.emptyQuotesText}>暂时还没有机主提交报价</Text>
+              <Text style={styles.emptyQuotesText}>暂时还没有服务商提交报价</Text>
             ) : (
               <View style={styles.quotesList}>
                 {quotes.map(item => (
                   <View key={item.id} style={styles.quoteCard}>
                     <View style={styles.quoteTop}>
-                      <Text style={styles.quoteOwner}>{item.owner?.nickname || '机主'}</Text>
+                      <Text style={styles.quoteOwner}>{item.owner?.nickname || '服务商'}</Text>
                       <Text style={styles.quotePrice}>{formatAmountYuan(item.price_amount)}</Text>
                     </View>
                     <Text style={styles.quoteMeta}>设备：{item.drone?.brand} {item.drone?.model} | 吊重 {item.drone?.max_payload_kg}kg</Text>

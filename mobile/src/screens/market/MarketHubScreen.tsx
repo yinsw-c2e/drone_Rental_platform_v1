@@ -26,7 +26,7 @@ import {
   resolveDemandPrimaryAddress,
 } from '../../utils/demandMeta';
 import {formatSupplyPricing, getSupplySceneLabel} from '../../utils/supplyMeta';
-import {getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {marketAssets} from '../../assets/miniProgramAssets';
@@ -39,7 +39,7 @@ const serviceThumbs = [
   marketAssets.cardDrone3,
 ];
 
-const capabilityLabels = ['专业飞手团队', '合规运营', '安全可靠'];
+const capabilityLabels = ['专业执行团队', '合规运营', '安全可靠'];
 
 const regionFilters = [
   {label: '全部地区', value: ''},
@@ -99,10 +99,15 @@ export default function MarketHubScreen({navigation}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(effectiveRoleSummary),
+    [effectiveRoleSummary],
+  );
+  const canPublishService = providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply;
   const isClientFocused = effectiveRoleSummary.has_client_role;
 
   const [activeTab, setActiveTab] = useState<MarketTab>(
-    effectiveRoleSummary.has_client_role && !effectiveRoleSummary.has_owner_role && !effectiveRoleSummary.has_pilot_role
+    effectiveRoleSummary.has_client_role && !providerCapabilities.hasProviderApplication
       ? 'supply'
       : 'demand',
   );
@@ -363,10 +368,10 @@ export default function MarketHubScreen({navigation}: any) {
       };
     }
     return {
-      label: effectiveRoleSummary.has_owner_role ? '上架服务' : '查看全部服务',
-      onPress: () => navigation.navigate(effectiveRoleSummary.has_owner_role ? 'PublishOffer' : 'OfferList'),
+      label: canPublishService ? '上架服务' : providerCapabilities.hasProviderApplication ? '查看入驻' : '查看全部服务',
+      onPress: () => navigation.navigate(canPublishService ? 'PublishOffer' : providerCapabilities.hasProviderApplication ? 'ProviderOnboarding' : 'OfferList'),
     };
-  }, [activeTab, effectiveRoleSummary, navigation]);
+  }, [activeTab, canPublishService, effectiveRoleSummary.has_client_role, navigation, providerCapabilities.hasProviderApplication]);
 
   const handleBack = () => {
     if (navigation.canGoBack?.()) {

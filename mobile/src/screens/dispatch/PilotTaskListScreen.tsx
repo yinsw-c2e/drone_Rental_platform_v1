@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {useSelector} from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import OrderAnomalyBanner from '../../components/business/OrderAnomalyBanner';
@@ -21,9 +22,11 @@ import {dispatchV2Service} from '../../services/dispatchV2';
 import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import {pilotV2Service} from '../../services/pilotV2';
 import {V2DispatchTaskSummary, V2OrderAnomaly} from '../../types';
+import {RootState} from '../../store/store';
 import {buildOrderAnomalyLookup} from '../../utils/orderAnomalyMeta';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 
 const formatMoney = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
 
@@ -60,6 +63,8 @@ const getPilotEntryMeta = (entryMode: string) => {
 export default function PilotTaskListScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary));
   const [tasks, setTasks] = useState<V2DispatchTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,6 +78,14 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   const candidateReady = eligibility?.can_apply_candidate && !eligibility?.can_accept_dispatch;
 
   const loadData = useCallback(async () => {
+    if (!providerCapabilities.hasExecutorRole) {
+      setTasks([]);
+      setPilotProfile(null);
+      setAnomalyLookup({});
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const status = entryMode === 'assigned' ? 'pending_response' : (entryMode === 'accepted' ? 'accepted' : undefined);
       const [dispatchRes, profileRes] = await Promise.all([
@@ -84,13 +97,13 @@ export default function PilotTaskListScreen({navigation, route}: any) {
       const anomalyRes = await orderAnomalyV2Service.list({role: 'pilot', page: 1, page_size: 50});
       setAnomalyLookup(buildOrderAnomalyLookup(anomalyRes.data?.items || []));
     } catch (error) {
-      console.error('获取飞手正式派单失败:', error);
+      console.error('获取执行人员正式派单失败:', error);
       setAnomalyLookup({});
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [entryMode]);
+  }, [entryMode, providerCapabilities.hasExecutorRole]);
 
   useFocusEffect(
     useCallback(() => {
@@ -160,7 +173,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   };
 
   const renderItem = ({item}: {item: V2DispatchTaskSummary}) => {
-    const canRespond = String(item.status || '').toLowerCase() === 'pending_response';
+    const canRespond = providerCapabilities.canAcceptDispatch && String(item.status || '').toLowerCase() === 'pending_response';
     const isAccepted = String(item.status || '').toLowerCase() === 'accepted';
     const os = String(item.order?.status || '').toLowerCase();
     const isExecuting = isAccepted && !['completed', 'cancelled'].includes(os);
@@ -219,7 +232,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
 
         <View style={styles.cardFooter}>
           <View style={styles.providerInfo}>
-            <Text style={styles.providerName}>机主：{item.provider?.nickname || '机主'}</Text>
+            <Text style={styles.providerName}>服务商：{item.provider?.nickname || '服务商'}</Text>
           </View>
           <View style={styles.actionButtons}>
             {canRespond ? (
@@ -268,7 +281,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
             />
           </View>
           <Text style={styles.eligibilityDesc}>
-            {eligibility.recommended_next_step || '完善飞手认证资料以获得完整接单能力。'}
+            {eligibility.recommended_next_step || '完善执行人员认证资料以获得完整接单能力。'}
           </Text>
         </View>
       ) : null}
@@ -289,10 +302,10 @@ export default function PilotTaskListScreen({navigation, route}: any) {
             <View style={styles.emptyCard}>
               <EmptyState
                 icon="🧭"
-                title={entryMeta.empty}
-                description="正式派单会在这里统一收口。若您还未完成资质认证，请先参与「报名需求」累积履约记录。"
-                actionText="查看可报名需求"
-                onAction={() => navigation.navigate('DemandList', {mode: 'pilot'})}
+                title={providerCapabilities.hasExecutorRole ? entryMeta.empty : '执行人员认证未通过'}
+                description={providerCapabilities.hasExecutorRole ? '正式派单会在这里统一收口。上线后才能确认待响应派单。' : '完成执行人员认证并通过审核后，才能查看和确认正式派单。'}
+                actionText={providerCapabilities.hasExecutorRole ? undefined : '去认证'}
+                onAction={providerCapabilities.hasExecutorRole ? undefined : () => navigation.navigate('ProviderOnboarding')}
               />
             </View>
           )
@@ -304,7 +317,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
           <Text style={styles.rejectTitle}>拒绝正式派单</Text>
           <TextInput
             style={styles.rejectInput}
-            placeholder="选填：说明拒绝原因，便于机主判断是否需要重派"
+            placeholder="选填：说明拒绝原因，便于服务商判断是否需要重派"
             value={rejectReason}
             onChangeText={setRejectReason}
             multiline

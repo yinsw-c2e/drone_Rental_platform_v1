@@ -35,15 +35,24 @@ func (s *OperationsService) AdminGetOrderAnomalySummary() (*model.OrderAnomalySu
 	return s.orderRepo.AdminGetOrderAnomalySummary()
 }
 
-func (s *OperationsService) AdminListLogs(module, action string, page, pageSize int) ([]model.AdminLog, int64, error) {
+func (s *OperationsService) AdminListLogs(module, action, targetType string, targetID, adminID int64, page, pageSize int) ([]model.AdminLog, int64, error) {
 	var logs []model.AdminLog
 	var total int64
 	query := s.migrationRepo.DB().Model(&model.AdminLog{})
+	if adminID > 0 {
+		query = query.Where("admin_id = ?", adminID)
+	}
 	if module != "" {
 		query = query.Where("module = ?", module)
 	}
 	if action != "" {
 		query = query.Where("action = ?", action)
+	}
+	if targetType != "" {
+		query = query.Where("target_type = ?", targetType)
+	}
+	if targetID > 0 {
+		query = query.Where("target_id = ?", targetID)
 	}
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

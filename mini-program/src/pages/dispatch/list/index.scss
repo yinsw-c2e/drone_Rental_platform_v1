@@ -12,6 +12,28 @@ $primary: #1677FF;
   background-color: $primary;
 }
 
+.dispatch-role-switch {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.dispatch-role-chip {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+}
+
+.dispatch-role-chip-active {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: $primary;
+}
+
 .dispatch-status-badge {
   background-color: rgba(22, 119, 255, 0.12);
   color: $primary;
@@ -21,4 +43,42 @@ $primary: #1677FF;
   .list-item-no {
     flex-shrink: 0;
   }
+}
+
+.dispatch-card-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #EEF1F5;
+}
+
+.dispatch-card-btn {
+  min-width: 104px;
+  height: 36px;
+  line-height: 36px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 14px;
+  margin: 0;
+}
+
+.dispatch-card-btn-primary {
+  background: $primary;
+  color: #FFFFFF;
+}
+
+.dispatch-card-btn-secondary {
+  background: #FFF1F0;
+  color: #F5222D;
+  border: 1px solid #FFCCC7;
+}
+
+.dispatch-card-btn-ghost {
+  background: #F5F7FA;
+  color: #1A1D26;
+  border: 1px solid #E5E7EB;
 }

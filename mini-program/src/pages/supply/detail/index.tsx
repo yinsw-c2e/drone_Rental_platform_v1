@@ -36,14 +36,14 @@ export default function SupplyDetailPage() {
   const canOrder = !isMySupply && roleSummary?.has_client_role && supply.status === 'active' && supply.accepts_direct_order;
   const ownerUserId = Number((supply as any).owner_user_id || supply.owner?.id || 0);
   const canContactOwner = ownerUserId > 0 && ownerUserId !== user?.id;
-  const ownerLabel = supply.owner?.nickname || `机主 #${(supply as any).owner_user_id}`;
+  const ownerLabel = supply.owner?.nickname || `服务商 #${(supply as any).owner_user_id}`;
   const droneLabel = supply.drone ? `${supply.drone.brand} ${supply.drone.model}` : '未关联设备';
   const statusMeta = getObjectStatusMeta('supply', supply.status);
   const sceneLabel = (supply.cargo_scenes || []).map((s: string) => getSupplySceneLabel(s)).join(' / ') || '重载吊运';
 
   const handleContactOwner = () => {
     if (!ownerUserId) {
-      Taro.showToast({ title: '该服务暂未提供可联系的机主账号', icon: 'none' });
+      Taro.showToast({ title: '该服务暂未提供可联系的服务商账号', icon: 'none' });
       return;
     }
     if (ownerUserId === user?.id) {
@@ -109,7 +109,7 @@ export default function SupplyDetailPage() {
 
         <View className="card">
           <Text className="section-title">服务说明</Text>
-          <Text className="supply-desc">{supply.description || '机主未提供详细文字说明。'}</Text>
+          <Text className="supply-desc">{supply.description || '服务商未提供详细文字说明。'}</Text>
         </View>
         </View>
       </ScrollView>
@@ -125,7 +125,7 @@ export default function SupplyDetailPage() {
               className={`supply-footer-btn supply-footer-btn-secondary ${!canContactOwner ? 'supply-footer-btn-disabled' : ''}`}
               onClick={handleContactOwner}
             >
-              <Text className="supply-footer-btn-secondary-text">联系机主</Text>
+              <Text className="supply-footer-btn-secondary-text">联系服务商</Text>
             </View>
             <View className={`supply-footer-btn supply-footer-btn-primary ${!canOrder ? 'supply-footer-btn-disabled' : ''}`}
               onClick={() => canOrder && Taro.navigateTo({ url: `/pages/publish/quick-order/index?supplyId=${supplyId}` })}>

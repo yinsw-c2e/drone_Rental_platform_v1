@@ -70,7 +70,7 @@ export default function PilotOwnerBindingsScreen() {
 
   const handleApply = useCallback(async () => {
     if (!ownerUserId.trim()) {
-      Alert.alert('请补充信息', '请填写机主账号编号。');
+      Alert.alert('请补充信息', '请填写服务商账号编号。');
       return;
     }
     setSubmitting(true);
@@ -78,7 +78,7 @@ export default function PilotOwnerBindingsScreen() {
       await pilotV2Service.applyOwnerBinding({owner_user_id: Number(ownerUserId), note: note.trim() || undefined});
       setOwnerUserId('');
       setNote('');
-      Alert.alert('申请已提交', '机主确认后，你们的绑定关系才会生效。');
+      Alert.alert('申请已提交', '服务商确认后，你们的绑定关系才会生效。');
       loadData();
     } catch (e: any) {
       Alert.alert('提交失败', e?.message || '请稍后重试');
@@ -108,14 +108,14 @@ export default function PilotOwnerBindingsScreen() {
 
   const renderItem = ({item}: {item: OwnerPilotBindingSummary}) => {
     const meta = statusMeta[item.status] || {label: item.status, tone: 'gray' as const};
-    const ownerName = item.owner?.nickname || `机主 ${item.owner_user_id}`;
+    const ownerName = item.owner?.nickname || `服务商 ${item.owner_user_id}`;
 
     return (
       <ObjectCard style={styles.card}>
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.cardTitle}>{ownerName}</Text>
-            <Text style={styles.cardMeta}>发起方：{item.initiated_by === 'pilot' ? '飞手申请' : '机主邀请'}</Text>
+            <Text style={styles.cardMeta}>发起方：{item.initiated_by === 'pilot' ? '执行人员申请' : '服务商邀请'}</Text>
           </View>
           <StatusBadge label={meta.label} tone={meta.tone} />
         </View>
@@ -169,15 +169,15 @@ export default function PilotOwnerBindingsScreen() {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>绑定机主</Text>
+              <Text style={styles.heroEyebrow}>绑定服务商</Text>
               <Text style={styles.heroTitle}>长期协作关系从这里发起</Text>
               <Text style={styles.heroDesc}>建立长期协作后，后续接单沟通会更顺畅；每次任务仍会单独确认。</Text>
             </View>
 
             <ObjectCard style={styles.formCard}>
-              <Text style={styles.formTitle}>申请绑定机主</Text>
+              <Text style={styles.formTitle}>申请绑定服务商</Text>
               <Text style={styles.formDesc}>当前可先输入对方账号编号发起申请，确认后即可建立长期合作。</Text>
-              <TextInput style={styles.input} placeholder="机主账号编号" keyboardType="number-pad" value={ownerUserId} onChangeText={setOwnerUserId} />
+              <TextInput style={styles.input} placeholder="服务商账号编号" keyboardType="number-pad" value={ownerUserId} onChangeText={setOwnerUserId} />
               <TextInput style={[styles.input, styles.noteInput]} placeholder="合作说明（选填）" value={note} onChangeText={setNote} multiline textAlignVertical="top" />
               <TouchableOpacity style={[styles.primaryBtn, submitting && styles.disabledBtn]} onPress={handleApply} disabled={submitting}>
                 <Text style={styles.primaryBtnText}>{submitting ? '提交中...' : '提交申请'}</Text>
@@ -201,8 +201,8 @@ export default function PilotOwnerBindingsScreen() {
             <ObjectCard>
               <EmptyState
                 icon="🤝"
-                title={activeFilter === 'all' ? '还没有绑定机主关系' : '这个分组下暂无绑定关系'}
-                description="如果你有长期合作的机主，可以先发起绑定申请，后续在正式派单时会更顺。"
+                title={activeFilter === 'all' ? '还没有绑定服务商关系' : '这个分组下暂无绑定关系'}
+                description="如果你有长期合作的服务商，可以先发起绑定申请，后续在正式派单时会更顺。"
               />
             </ObjectCard>
           )

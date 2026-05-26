@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '快速下单',
+  navigationBarTitleText: '确认吊运信息',
   navigationStyle: 'custom',
-  backgroundColor: '#F5F7FB',
+  backgroundColor: '#F7F9FC',
 });

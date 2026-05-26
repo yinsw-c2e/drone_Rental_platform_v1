@@ -74,6 +74,30 @@ mobile/.env.*
 npm-debug.log*
 /backend/docs/*_last_run.json
 
+# Runtime databases / local state
+*.db
+*.sqlite
+*.sqlite3
+
+# Mobile native local artifacts
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/.cxx/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/app/*.keystore
+mobile/android/app/*.jks
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/DerivedData/
+mobile/ios/**/*.xcuserstate
+mobile/ios/**/*.xcuserdata/
+*.xcarchive/
+*.dSYM/
+*.ipa
+*.apk
+*.aab
+
 # Docker
 mysql_data/
 redis_data/

@@ -43,7 +43,7 @@ const pickLocationCity = (...values: any[]) =>
 
 const formatServiceBaseSubtitle = (lat: number, lng: number) => {
   if (!lat || !lng) {
-    return "后续派单会以该地点和服务半径计算覆盖范围";
+    return "后续履约会以该地点和服务半径计算覆盖范围";
   }
   return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 };
@@ -213,7 +213,7 @@ export default function PilotRegisterPage() {
       Taro.showModal({
         title: "提交成功",
         content:
-          "飞手认证资料已提交，后续可在飞手中心继续管理接单状态和服务范围。",
+          "履约资质资料已提交，后续可在履约资质页继续管理服务范围。",
         showCancel: false,
         success: () => {
           Taro.redirectTo({ url: "/pages/profile/pilot/index" });
@@ -306,10 +306,10 @@ export default function PilotRegisterPage() {
             <View className="pilot-register-hero-top">
               <View className="pilot-register-hero-main">
                 <Text className="pilot-register-hero-title">
-                  飞手认证与能力设置
+                  履约资质认证与能力设置
                 </Text>
                 <Text className="pilot-register-hero-subtitle">
-                  这里负责建立飞手档案。后续在线状态、服务城市和技能标签都围绕这份档案展开。
+                  这里负责建立服务商履约资料。后续服务城市、覆盖范围和技能标签都围绕这份资料展开。
                 </Text>
               </View>
               <StatusBadge label={`进度 ${progress}/4`} tone="blue" />
@@ -373,7 +373,7 @@ export default function PilotRegisterPage() {
           </View>
 
           <View className="pilot-register-section">
-            <Text className="pilot-register-section-title">接单能力设置</Text>
+            <Text className="pilot-register-section-title">履约能力设置</Text>
 
             <View className="pilot-register-field">
               <Text className="pilot-register-label">服务基准地点 *</Text>
@@ -469,7 +469,7 @@ export default function PilotRegisterPage() {
             onClick={handleSubmit}
           >
             <Text className="pilot-register-submit-text">
-              {loading ? "提交中..." : "提交飞手认证"}
+              {loading ? "提交中..." : "提交履约资质"}
             </Text>
           </View>
         </View>

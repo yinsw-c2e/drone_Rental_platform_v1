@@ -1,0 +1,160 @@
+@use "../../styles/haul-tokens.scss" as *;
+
+.haul-card {
+  @include haul-card;
+}
+
+.haul-button {
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: $haul-primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.haul-button-orange {
+  background: $haul-orange;
+}
+
+.haul-button-ghost {
+  background: #fff;
+  border: 1px solid $haul-line-strong;
+}
+
+.haul-button-disabled {
+  opacity: 0.48;
+}
+
+.haul-button-text {
+  color: #fff;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 800;
+}
+
+.haul-button-ghost .haul-button-text {
+  color: $haul-navy;
+}
+
+.haul-badge {
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.haul-badge-blue {
+  background: #E8F1FF;
+}
+
+.haul-badge-orange {
+  background: #FFF0E8;
+}
+
+.haul-badge-green {
+  background: #E9F8F0;
+}
+
+.haul-badge-gray {
+  background: #EEF2F7;
+}
+
+.haul-badge-text {
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 800;
+}
+
+.haul-badge-blue .haul-badge-text {
+  color: $haul-primary;
+}
+
+.haul-badge-orange .haul-badge-text {
+  color: $haul-orange;
+}
+
+.haul-badge-green .haul-badge-text {
+  color: $haul-success;
+}
+
+.haul-badge-gray .haul-badge-text {
+  color: $haul-navy-soft;
+}
+
+.haul-gradient-header {
+  padding: 14px 20px 92px;
+  background: linear-gradient(135deg, $haul-navy-deep, $haul-primary-deep);
+}
+
+.haul-gradient-nav {
+  min-height: 46px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.haul-gradient-side {
+  width: 82px;
+  min-height: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.haul-gradient-side-right {
+  align-items: flex-end;
+}
+
+.haul-gradient-title {
+  flex: 1;
+  text-align: center;
+  color: #fff;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 900;
+}
+
+.haul-bottom-bar {
+  padding: 12px 20px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid $haul-line;
+}
+
+.haul-role-tabs {
+  min-height: 40px;
+  padding: 4px;
+  border-radius: 20px;
+  background: #EEF4FB;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.haul-role-tab {
+  flex: 1;
+  min-height: 32px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.haul-role-tab-active {
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(14, 47, 111, 0.08);
+}
+
+.haul-role-tab-text {
+  color: $haul-navy-soft;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 800;
+}
+
+.haul-role-tab-active .haul-role-tab-text {
+  color: $haul-navy;
+}

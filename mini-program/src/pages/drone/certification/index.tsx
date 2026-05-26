@@ -12,8 +12,13 @@ const UPLOAD_ASSET_BASE_URL = API_ROOT_URL;
 export default function DroneCertificationPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
   const droneId = Number(params.id || 0);
+  const initialTab = params.tab === 'insurance'
+    ? 'insurance'
+    : params.tab === 'airworthiness'
+      ? 'airworthiness'
+      : 'uom';
 
-  const [activeTab, setActiveTab] = useState<'uom' | 'insurance' | 'airworthiness'>('uom');
+  const [activeTab, setActiveTab] = useState<'uom' | 'insurance' | 'airworthiness'>(initialTab);
   const [loading, setLoading] = useState(false);
 
   // Forms
@@ -64,17 +69,22 @@ export default function DroneCertificationPage() {
   };
 
   const submitInsurance = async () => {
-    if (!insPolicyNo || !insDoc) return Taro.showToast({ title: '请填写并上传', icon: 'none' });
+    if (!insPolicyNo || !insCompany || !insCoverage || !insExpiry || !insDoc) {
+      return Taro.showToast({ title: '请完整填写保单信息', icon: 'none' });
+    }
     setLoading(true);
     try {
       await apiV2.post(`/drone/${droneId}/insurance`, {
         policy_no: insPolicyNo.trim(),
-        company_name: insCompany.trim(),
+        insurance_company: insCompany.trim(),
         coverage_amount: Number(insCoverage) * 100,
-        expiry_date: insExpiry ? new Date(insExpiry).toISOString() : null,
-        policy_doc: insDoc
+        expire_date: new Date(insExpiry).toISOString(),
+        insurance_doc: insDoc
       });
       Taro.showToast({ title: '提交成功', icon: 'success' });
+      if (params.orderId) {
+        setTimeout(() => Taro.navigateBack(), 800);
+      }
     } catch (e: any) { Taro.showToast({ title: '提交失败', icon: 'none' }); }
     finally { setLoading(false); }
   };

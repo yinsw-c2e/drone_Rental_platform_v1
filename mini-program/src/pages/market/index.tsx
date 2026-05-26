@@ -27,7 +27,7 @@ type MarketTab = 'demand' | 'supply';
 
 const formatAmount = (v?: number | null) => `¥${((v || 0) / 100).toFixed(2)}`;
 const serviceThumbs = [serviceDrone1, serviceDrone2, serviceDrone3];
-const capabilityLabels = ['专业飞手团队', '合规运营', '安全可靠'];
+const capabilityLabels = ['专业执行团队', '合规运营', '安全可靠'];
 const regionFilters = [
   { label: '全部地区', value: '' },
   { label: '佛山', value: '佛山' },

@@ -167,12 +167,17 @@ func BuildClientSnapshot(order *model.Order) model.JSON {
 		"client_id":        order.ClientID,
 		"client_user_id":   order.ClientUserID,
 		"order_source":     order.OrderSource,
+		"order_mode":       order.OrderMode,
 		"provider_user_id": order.ProviderUserID,
 	})
 }
 
 func BuildPricingSnapshot(order *model.Order) model.JSON {
 	return mustArtifactJSON(map[string]interface{}{
+		"service_class_code":       order.ServiceClassCode,
+		"estimated_distance_m":     order.EstimatedDistanceM,
+		"estimated_duration_min":   order.EstimatedDurationMin,
+		"price_breakdown_json":     order.PriceBreakdownJSON,
 		"total_amount":             order.TotalAmount,
 		"deposit_amount":           order.DepositAmount,
 		"platform_commission_rate": order.PlatformCommissionRate,
@@ -189,6 +194,10 @@ func BuildExecutionSnapshot(order *model.Order) model.JSON {
 		"drone_owner_user_id":    order.DroneOwnerUserID,
 		"executor_pilot_user_id": order.ExecutorPilotUserID,
 		"dispatch_task_id":       order.DispatchTaskID,
+		"broadcast_pool_id":      order.BroadcastPoolID,
+		"reserved_start_at":      order.ReservedStartAt,
+		"grabbed_at":             order.GrabbedAt,
+		"grabbed_by_user_id":     order.GrabbedByUserID,
 		"needs_dispatch":         order.NeedsDispatch,
 		"execution_mode":         order.ExecutionMode,
 		"provider_confirmed_at":  order.ProviderConfirmedAt,

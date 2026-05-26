@@ -401,7 +401,11 @@ func (h *Handler) ListRecommendedDemands(c *gin.Context) {
 	}
 
 	page, pageSize := middleware.GetPagination(c)
-	demands, total, err := h.ownerService.ListRecommendedDemands(userID, page, pageSize)
+	query, ok := parseRecommendedDemandQuery(c)
+	if !ok {
+		return
+	}
+	demands, total, err := h.ownerService.ListRecommendedDemands(userID, page, pageSize, query)
 	if err != nil {
 		v2common.HandleServiceError(c, err)
 		return
@@ -416,12 +420,72 @@ func (h *Handler) ListRecommendedDemands(c *gin.Context) {
 		v2common.HandleServiceError(c, err)
 		return
 	}
+	metrics, err := h.ownerService.GetRecommendedDemandMetrics(userID, demands)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	myQuotes, err := h.ownerService.ListLatestQuotesByDemandIDsAndOwner(demandIDs, userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
 
 	items := make([]gin.H, 0, len(demands))
 	for i := range demands {
-		items = append(items, buildDemandSummary(&demands[i], stats[demands[i].ID]))
+		items = append(items, buildDemandSummary(&demands[i], stats[demands[i].ID], metrics[demands[i].ID], myQuotes[demands[i].ID]))
 	}
 	response.V2SuccessList(c, items, total)
+}
+
+func parseRecommendedDemandQuery(c *gin.Context) (service.RecommendedDemandQuery, bool) {
+	query := service.RecommendedDemandQuery{
+		ServiceType: c.Query("service_type"),
+		Region:      c.Query("region"),
+		CargoScene:  c.Query("cargo_scene"),
+		Sort:        c.Query("sort"),
+	}
+	if raw := c.Query("min_weight_kg"); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value < 0 {
+			response.V2ValidationError(c, "invalid min_weight_kg")
+			return query, false
+		}
+		query.MinWeightKG = value
+	}
+	if raw := c.Query("max_weight_kg"); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value < 0 {
+			response.V2ValidationError(c, "invalid max_weight_kg")
+			return query, false
+		}
+		query.MaxWeightKG = value
+	}
+	if query.MinWeightKG > 0 && query.MaxWeightKG > 0 && query.MinWeightKG > query.MaxWeightKG {
+		response.V2ValidationError(c, "min_weight_kg cannot be greater than max_weight_kg")
+		return query, false
+	}
+	if raw := c.Query("start_from"); raw != "" {
+		value, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			response.V2ValidationError(c, "invalid start_from")
+			return query, false
+		}
+		query.StartFrom = &value
+	}
+	if raw := c.Query("start_to"); raw != "" {
+		value, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			response.V2ValidationError(c, "invalid start_to")
+			return query, false
+		}
+		query.StartTo = &value
+	}
+	if query.StartFrom != nil && query.StartTo != nil && !query.StartFrom.Before(*query.StartTo) {
+		response.V2ValidationError(c, "start_from must be before start_to")
+		return query, false
+	}
+	return query, true
 }
 
 func (h *Handler) CreateQuote(c *gin.Context) {
@@ -604,18 +668,23 @@ func buildDroneSummary(drone *model.Drone) gin.H {
 		return gin.H{}
 	}
 	return gin.H{
-		"id":                     drone.ID,
-		"brand":                  drone.Brand,
-		"model":                  drone.Model,
-		"serial_number":          drone.SerialNumber,
-		"mtow_kg":                drone.MTOWKG,
-		"max_payload_kg":         drone.EffectivePayloadKG(),
-		"city":                   drone.City,
-		"availability_status":    drone.AvailabilityStatus,
-		"certification_status":   drone.CertificationStatus,
-		"uom_verified":           drone.UOMVerified,
-		"insurance_verified":     drone.InsuranceVerified,
-		"airworthiness_verified": drone.AirworthinessVerified,
+		"id":                      drone.ID,
+		"brand":                   drone.Brand,
+		"model":                   drone.Model,
+		"serial_number":           drone.SerialNumber,
+		"mtow_kg":                 drone.MTOWKG,
+		"max_payload_kg":          drone.EffectivePayloadKG(),
+		"max_distance":            drone.MaxDistance,
+		"max_flight_time":         drone.MaxFlightTime,
+		"city":                    drone.City,
+		"availability_status":     drone.AvailabilityStatus,
+		"certification_status":    drone.CertificationStatus,
+		"uom_verified":            drone.UOMVerified,
+		"insurance_verified":      drone.InsuranceVerified,
+		"insurance_reviewed_at":   drone.InsuranceReviewedAt,
+		"insurance_reviewed_by":   drone.InsuranceReviewedBy,
+		"insurance_reject_reason": drone.InsuranceRejectReason,
+		"airworthiness_verified":  drone.AirworthinessVerified,
 	}
 }
 
@@ -632,7 +701,12 @@ func buildDroneDetail(drone *model.Drone, certStatus map[string]interface{}) gin
 	data["uom_registration_no"] = drone.UOMRegistrationNo
 	data["insurance_policy_no"] = drone.InsurancePolicyNo
 	data["insurance_company"] = drone.InsuranceCompany
+	data["insurance_coverage"] = drone.InsuranceCoverage
 	data["insurance_expire_date"] = drone.InsuranceExpireDate
+	data["insurance_doc"] = drone.InsuranceDoc
+	data["insurance_reviewed_at"] = drone.InsuranceReviewedAt
+	data["insurance_reviewed_by"] = drone.InsuranceReviewedBy
+	data["insurance_reject_reason"] = drone.InsuranceRejectReason
 	data["airworthiness_cert_no"] = drone.AirworthinessCertNo
 	data["airworthiness_cert_expire"] = drone.AirworthinessCertExpire
 	data["created_at"] = drone.CreatedAt
@@ -681,26 +755,66 @@ func buildOwnerSupplyDetail(supply *model.OwnerSupply) gin.H {
 	return data
 }
 
-func buildDemandSummary(demand *model.Demand, stats service.DemandStats) gin.H {
+func buildDemandSummary(demand *model.Demand, stats service.DemandStats, metric service.RecommendedDemandMetric, myQuote *model.DemandQuote) gin.H {
 	if demand == nil {
 		return gin.H{}
 	}
-	return gin.H{
-		"id":                     demand.ID,
-		"demand_no":              demand.DemandNo,
-		"title":                  demand.Title,
-		"status":                 demand.Status,
-		"service_type":           demand.ServiceType,
-		"cargo_scene":            demand.CargoScene,
-		"service_address_text":   extractOwnerAddressText(demand.ServiceAddressSnapshot, demand.DepartureAddressSnapshot, demand.DestinationAddressSnapshot),
-		"scheduled_start_at":     demand.ScheduledStartAt,
-		"scheduled_end_at":       demand.ScheduledEndAt,
-		"budget_min":             demand.BudgetMin,
-		"budget_max":             demand.BudgetMax,
-		"allows_pilot_candidate": demand.AllowsPilotCandidate,
-		"quote_count":            stats.QuoteCount,
-		"candidate_pilot_count":  stats.CandidatePilotCount,
+	data := gin.H{
+		"id":                         demand.ID,
+		"demand_no":                  demand.DemandNo,
+		"title":                      demand.Title,
+		"status":                     demand.Status,
+		"service_type":               demand.ServiceType,
+		"cargo_scene":                demand.CargoScene,
+		"departure_address":          v2common.SafeJSONValue(demand.DepartureAddressSnapshot),
+		"destination_address":        v2common.SafeJSONValue(demand.DestinationAddressSnapshot),
+		"service_address":            v2common.SafeJSONValue(demand.ServiceAddressSnapshot),
+		"service_address_text":       extractOwnerAddressText(demand.ServiceAddressSnapshot, demand.DepartureAddressSnapshot, demand.DestinationAddressSnapshot),
+		"scheduled_start_at":         demand.ScheduledStartAt,
+		"scheduled_end_at":           demand.ScheduledEndAt,
+		"cargo_weight_kg":            demand.CargoWeightKG,
+		"cargo_volume_m3":            demand.CargoVolumeM3,
+		"cargo_length_cm":            demand.CargoLengthCM,
+		"cargo_width_cm":             demand.CargoWidthCM,
+		"cargo_height_cm":            demand.CargoHeightCM,
+		"cargo_type":                 demand.CargoType,
+		"cargo_special_requirements": demand.CargoSpecialRequirements,
+		"budget_min":                 demand.BudgetMin,
+		"budget_max":                 demand.BudgetMax,
+		"allows_pilot_candidate":     demand.AllowsPilotCandidate,
+		"quote_count":                stats.QuoteCount,
+		"candidate_pilot_count":      stats.CandidatePilotCount,
+		"created_at":                 demand.CreatedAt,
+		"updated_at":                 demand.UpdatedAt,
 	}
+	if metric.DistanceKM != nil {
+		data["distance_km"] = *metric.DistanceKM
+		if metric.ServiceRangeKM != nil {
+			data["service_range_km"] = *metric.ServiceRangeKM
+		}
+		if metric.EstimatedArrivalMin != nil {
+			data["estimated_arrival_minutes"] = *metric.EstimatedArrivalMin
+			data["arrival_estimate_source"] = "drone_specs_straight_line"
+		}
+		data["service_coverage_status"] = metric.ServiceCoverageStatus
+		data["matched_supply_title"] = metric.MatchedSupplyTitle
+		if metric.MatchedSupplyID > 0 {
+			data["matched_supply_id"] = metric.MatchedSupplyID
+		}
+		if metric.MatchedDroneID > 0 {
+			data["matched_drone_id"] = metric.MatchedDroneID
+		}
+	}
+	if myQuote != nil {
+		data["my_quote"] = buildQuoteSummary(myQuote)
+		if !demand.CreatedAt.IsZero() && !myQuote.CreatedAt.IsZero() {
+			responseSeconds := int64(myQuote.CreatedAt.Sub(demand.CreatedAt).Seconds())
+			if responseSeconds >= 0 {
+				data["quote_response_seconds"] = responseSeconds
+			}
+		}
+	}
+	return data
 }
 
 func buildQuoteSummary(quote *model.DemandQuote) gin.H {

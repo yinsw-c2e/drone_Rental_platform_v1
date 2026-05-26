@@ -85,9 +85,9 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
       case 'client':
         return '客户视角';
       case 'owner':
-        return '机主视角';
+        return '服务商视角';
       case 'pilot':
-        return '飞手视角';
+        return '执行人员视角';
       default:
         return '综合视角';
     }

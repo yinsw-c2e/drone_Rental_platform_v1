@@ -7,15 +7,18 @@ import { demandV2Service } from '../../../services/demandV2';
 import { DemandDetail, DemandQuoteSummary } from '../../../types';
 import { CARGO_TYPES } from '../../../constants';
 import { getDemandSceneLabel, getObjectStatusMeta } from '../../../utils';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 export default function DemandDetailPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary));
   const params = Taro.getCurrentInstance().router?.params || {};
   const demandId = Number(params.id || params.demandId || 0);
 
   const [demand, setDemand] = useState<DemandDetail | null>(null);
+  const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,19 +27,27 @@ export default function DemandDetailPage() {
     setLoading(true);
     try {
       const res = await demandV2Service.getById(demandId);
-      setDemand(res as any);
+      const detail = res as any;
+      setDemand(detail);
+      if (Number(detail?.client_user_id || 0) === Number(user?.id || 0)) {
+        const quoteRes: any = await demandV2Service.listQuotes(demandId).catch(() => null);
+        setQuotes(quoteRes?.data?.items || quoteRes?.items || []);
+      } else {
+        setQuotes([]);
+      }
     } catch {
       setDemand(null);
+      setQuotes([]);
     } finally {
       setLoading(false);
     }
-  }, [demandId]);
+  }, [demandId, user?.id]);
 
   useDidShow(() => { loadData(); });
 
   const isOwnDemand = demand?.client_user_id === user?.id;
   const canEdit = isOwnDemand && ['draft', 'published', 'quoting'].includes(demand?.status || '');
-  const canQuote = !isOwnDemand && roleSummary?.has_owner_role;
+  const canQuote = !isOwnDemand && providerCapabilities.canPublishSupply;
   const canCandidate = !isOwnDemand && roleSummary?.has_pilot_role && demand?.allows_pilot_candidate;
   const hasOwnQuote = Boolean((demand as any)?.my_quote);
 
@@ -60,6 +71,29 @@ export default function DemandDetailPage() {
       loadData();
     } catch (e: any) { Taro.showToast({ title: e.message, icon: 'none' }); }
     finally { setSubmitting(false); }
+  };
+
+  const handleSelectQuote = async (quote: DemandQuoteSummary) => {
+    const res = await Taro.showModal({
+      title: '选择报价',
+      content: `确认选择该服务商报价 ¥${((quote.price_amount || 0) / 100).toFixed(2)} 并生成订单？`,
+      confirmText: '生成订单',
+    });
+    if (!res.confirm) return;
+    setSubmitting(true);
+    try {
+      const result = await demandV2Service.selectProvider(demandId, quote.id);
+      Taro.showToast({ title: '订单已生成', icon: 'success' });
+      const orderId = Number((result as any)?.order_id || 0);
+      setTimeout(() => {
+        if (orderId) Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
+        else loadData();
+      }, 800);
+    } catch (e: any) {
+      Taro.showToast({ title: e.message || '选择失败', icon: 'none' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return <View className="page-wrap"><Text className="empty-text">加载中...</Text></View>;
@@ -112,10 +146,41 @@ export default function DemandDetailPage() {
           </View>
           <View className="stat-box">
             <Text className="stat-num stat-orange">{demand.candidate_pilot_count || 0}</Text>
-            <Text className="stat-label">候选飞手</Text>
+            <Text className="stat-label">候选服务商</Text>
           </View>
         </View>
       </View>
+
+      {isOwnDemand ? (
+        <View className="info-card">
+          <Text className="section-title">服务商报价</Text>
+          {quotes.length === 0 ? (
+            <View className="quote-empty">
+              <Text className="quote-empty-text">暂无服务商提交报价</Text>
+            </View>
+          ) : (
+            quotes.map((quote) => (
+              <View key={quote.id} className="quote-card">
+                <View className="quote-main">
+                  <Text className="quote-title">{quote.owner?.nickname || quote.drone?.brand || `服务商 #${quote.owner_user_id}`}</Text>
+                  <Text className="quote-desc">
+                    {quote.drone ? `${quote.drone.brand} ${quote.drone.model}` : '无人机信息待补'}
+                    {quote.execution_plan ? ` · ${quote.execution_plan}` : ''}
+                  </Text>
+                </View>
+                <Text className="quote-price">¥{((quote.price_amount || 0) / 100).toFixed(2)}</Text>
+                {quote.status === 'submitted' ? (
+                  <View className={`quote-select ${submitting ? 'disabled' : ''}`} onClick={() => handleSelectQuote(quote)}>
+                    <Text className="quote-select-text">{submitting ? '处理中' : '选定'}</Text>
+                  </View>
+                ) : (
+                  <Text className="quote-status">{getObjectStatusMeta('quote', quote.status).label || quote.status}</Text>
+                )}
+              </View>
+            ))
+          )}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }

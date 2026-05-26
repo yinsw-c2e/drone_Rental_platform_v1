@@ -8,7 +8,7 @@ import StatusBadge from '../../../components/business/StatusBadge';
 import { droneService } from '../../../services/drone';
 import { ownerService } from '../../../services/owner';
 import { RootState } from '../../../store/store';
-import { getEffectiveRoleSummary } from '../../../utils/roleSummary';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 const formatAmount = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
@@ -17,6 +17,8 @@ export default function OwnerProfilePage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
+  const providerCapabilities = resolveProviderCapabilities(effectiveRoleSummary);
+  const canUseWorkbench = providerCapabilities.canUseWorkbench;
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -28,6 +30,9 @@ export default function OwnerProfilePage() {
 
   const loadData = useCallback(async () => {
     try {
+      const summary = getEffectiveRoleSummary(roleSummary, user);
+      const capabilities = resolveProviderCapabilities(summary);
+      const canLoadWorkbench = capabilities.canUseWorkbench;
       const [
         profileRes,
         dronesRes,
@@ -37,11 +42,19 @@ export default function OwnerProfilePage() {
         workbenchRes,
       ] = await Promise.all([
         ownerService.getProfile().catch(() => null),
-        droneService.myDrones({ page: 1, page_size: 50 }).catch(() => null),
-        ownerService.listMySupplies({ page: 1, page_size: 50 }).catch(() => null),
-        ownerService.listMyQuotes({ page: 1, page_size: 50 }).catch(() => null),
-        ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 50 }).catch(() => null),
-        ownerService.getWorkbench().catch(() => null),
+        summary.has_owner_role || capabilities.assetStatus !== 'none'
+          ? droneService.myDrones({ page: 1, page_size: 50 }).catch(() => null)
+          : Promise.resolve(null),
+        canLoadWorkbench
+          ? ownerService.listMySupplies({ page: 1, page_size: 50 }).catch(() => null)
+          : Promise.resolve(null),
+        canLoadWorkbench
+          ? ownerService.listMyQuotes({ page: 1, page_size: 50 }).catch(() => null)
+          : Promise.resolve(null),
+        canLoadWorkbench
+          ? ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 50 }).catch(() => null)
+          : Promise.resolve(null),
+        canLoadWorkbench ? ownerService.getWorkbench().catch(() => null) : Promise.resolve(null),
       ]);
 
       setProfile(profileRes || null);
@@ -63,7 +76,7 @@ export default function OwnerProfilePage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.phone]);
+  }, [roleSummary, user]);
 
   useDidShow(() => {
     loadData();
@@ -84,14 +97,73 @@ export default function OwnerProfilePage() {
           : '先完善无人机与关键资质，才能把供给上架到主市场。',
       },
       {
-        label: '可自执行',
+        label: '服务商履约',
         enabled: effectiveRoleSummary.can_self_execute,
         desc: effectiveRoleSummary.can_self_execute
-          ? '你已同时具备机主与飞手能力，可直接选择自执行。'
-          : '如果要机主自执行，还需要同步具备飞手能力。',
+          ? '你已具备设备服务和履约推进能力，可由服务商主体直接履约。'
+          : '请继续完善设备资质和履约资质，审核通过后再推进履约。',
       },
     ],
     [effectiveRoleSummary.can_publish_supply, effectiveRoleSummary.can_self_execute],
+  );
+
+  const onboardingStatus = useMemo(() => {
+    if (providerCapabilities.nextAction === 'wait_review') {
+      return {
+        title: '服务商资质审核中',
+        desc: '资料已进入服务商入驻流程。审核通过后，这里会切换为正式经营工作台。',
+        badge: '审核中',
+        badgeTone: 'orange' as const,
+      };
+    }
+    if (providerCapabilities.nextAction === 'fix_rejected') {
+      return {
+        title: '服务商资质需补充',
+        desc: '当前资料未通过或账号已暂停，请按提示补充服务商资料、设备资质或履约资质。',
+        badge: '待补充',
+        badgeTone: 'red' as const,
+      };
+    }
+    return {
+      title: '开始服务商入驻',
+      desc: '完成服务商资料、设备资质和履约资质后，才能正式接单和管理履约。',
+      badge: '未开通',
+      badgeTone: 'gray' as const,
+    };
+  }, [providerCapabilities.nextAction]);
+
+  const onboardingItems = useMemo(
+    () => [
+      {
+        title: '服务商资料',
+        desc: profile ? '基础档案已创建，可继续补充城市和简介。' : '先建立服务商基础档案。',
+        status: profile ? '已创建' : '待创建',
+        ready: Boolean(profile),
+        onClick: () => null,
+      },
+      {
+        title: '设备与资质',
+        desc: '提交无人机、保险、适航和 UOM 等资料，审核通过后可报价。',
+        status: providerCapabilities.assetStatus === 'approved' ? '已通过' : providerCapabilities.assetStatus === 'pending_review' ? '审核中' : '去完善',
+        ready: providerCapabilities.assetStatus === 'approved',
+        onClick: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }),
+      },
+      {
+        title: '履约资质',
+        desc: '完善履约资料后，服务商可推进订单履约。',
+        status: providerCapabilities.executorStatus === 'approved' ? '已通过' : providerCapabilities.executorStatus === 'pending_review' ? '审核中' : '去完善',
+        ready: providerCapabilities.executorStatus === 'approved',
+        onClick: () => Taro.navigateTo({ url: '/pages/pilot/register/index' }),
+      },
+      {
+        title: '实名认证',
+        desc: '实名是入驻基础条件，但不是服务商全部资质。',
+        status: user?.id_verified === 'approved' ? '已实名' : '去实名',
+        ready: user?.id_verified === 'approved',
+        onClick: () => Taro.navigateTo({ url: '/pages/verification/index' }),
+      },
+    ],
+    [profile, providerCapabilities.assetStatus, providerCapabilities.executorStatus, user?.id_verified],
   );
 
   const workbenchPreviewItems = useMemo(
@@ -130,7 +202,7 @@ export default function OwnerProfilePage() {
         intro: draft.intro.trim(),
       });
       setProfile(nextProfile);
-      Taro.showToast({ title: '机主档案已更新', icon: 'success' });
+      Taro.showToast({ title: '服务商档案已更新', icon: 'success' });
     } catch (error: any) {
       Taro.showToast({ title: error?.message || '保存失败，请稍后重试', icon: 'none' });
     } finally {
@@ -142,7 +214,7 @@ export default function OwnerProfilePage() {
     return (
       <View className='owner-wrap'>
         <View className='owner-loading'>
-          <Text className='owner-loading-text'>机主档案加载中...</Text>
+          <Text className='owner-loading-text'>服务商档案加载中...</Text>
         </View>
       </View>
     );
@@ -152,9 +224,90 @@ export default function OwnerProfilePage() {
     return (
       <View className='owner-wrap'>
         <View className='owner-empty'>
-          <Text className='owner-empty-title'>还没有机主档案</Text>
-          <Text className='owner-empty-desc'>请先完善机主资料，后面这里才会出现服务和履约管理。</Text>
+          <Text className='owner-empty-title'>还没有服务商档案</Text>
+          <Text className='owner-empty-desc'>请先完善服务商资料，后面这里才会出现服务和履约管理。</Text>
         </View>
+      </View>
+    );
+  }
+
+  if (!canUseWorkbench) {
+    return (
+      <View className='owner-wrap'>
+        <ScrollView
+          scrollY
+          className='owner-scroll'
+          refresherEnabled
+          refresherTriggered={refreshing}
+          onRefresherRefresh={onRefresh}
+        >
+          <View className='owner-content'>
+            <View className='owner-hero'>
+              <View className='owner-hero-top'>
+                <View>
+                  <Text className='owner-hero-title'>{onboardingStatus.title}</Text>
+                  <Text className='owner-hero-sub'>{onboardingStatus.desc}</Text>
+                </View>
+                <StatusBadge label={onboardingStatus.badge} tone={onboardingStatus.badgeTone} />
+              </View>
+            </View>
+
+            <View className='owner-section'>
+              <Text className='owner-section-title'>入驻进度</Text>
+              {onboardingItems.map((item, index) => (
+                <View
+                  key={item.title}
+                  className={`owner-capability-row ${
+                    index === onboardingItems.length - 1 ? 'owner-capability-row-last' : ''
+                  }`}
+                  onClick={item.onClick}
+                >
+                  <View className='owner-capability-main'>
+                    <Text className='owner-capability-label'>{item.title}</Text>
+                    <Text className='owner-capability-desc'>{item.desc}</Text>
+                  </View>
+                  <StatusBadge label={item.status} tone={item.ready ? 'green' : 'gray'} />
+                </View>
+              ))}
+            </View>
+
+            <View className='owner-section'>
+              <Text className='owner-section-title'>档案设置</Text>
+
+              <Text className='owner-label'>服务城市</Text>
+              <Input
+                className='owner-input'
+                placeholder='例如：佛山'
+                value={draft.service_city}
+                onInput={(e) => setDraft((prev) => ({ ...prev, service_city: e.detail.value }))}
+              />
+
+              <Text className='owner-label'>联系电话</Text>
+              <Input
+                className='owner-input'
+                type='number'
+                placeholder='用于对外联系'
+                value={draft.contact_phone}
+                onInput={(e) => setDraft((prev) => ({ ...prev, contact_phone: e.detail.value }))}
+              />
+
+              <Text className='owner-label'>经营简介</Text>
+              <Input
+                className='owner-input'
+                placeholder='介绍常服务的场景与能力'
+                value={draft.intro}
+                onInput={(e) => setDraft((prev) => ({ ...prev, intro: e.detail.value }))}
+              />
+            </View>
+
+            <View
+              className={`owner-save-btn ${saving ? 'owner-save-disabled' : ''}`}
+              onClick={handleSave}
+            >
+              <Text className='owner-save-text'>{saving ? '保存中...' : '保存入驻资料'}</Text>
+            </View>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -172,7 +325,7 @@ export default function OwnerProfilePage() {
           <View className='owner-hero'>
             <View className='owner-hero-top'>
               <View>
-                <Text className='owner-hero-title'>机主工作台</Text>
+                <Text className='owner-hero-title'>服务商工作台</Text>
                 <Text className='owner-hero-sub'>管理设备、服务与履约进度</Text>
               </View>
               <StatusBadge
@@ -195,8 +348,10 @@ export default function OwnerProfilePage() {
                 <Text className='owner-stat-label'>方案报价</Text>
               </View>
               <View className='owner-stat-card'>
-                <Text className='owner-stat-value'>{stats.bindings}</Text>
-                <Text className='owner-stat-label'>协作飞手</Text>
+                <Text className='owner-stat-value'>
+                  {providerCapabilities.executorStatus === 'approved' ? '已完善' : '待完善'}
+                </Text>
+                <Text className='owner-stat-label'>履约资质</Text>
               </View>
             </View>
           </View>
@@ -229,7 +384,7 @@ export default function OwnerProfilePage() {
                 <Text className='owner-workbench-value owner-workbench-value-success'>
                   {workbench?.summary?.pending_dispatch_order_count || 0}
                 </Text>
-                <Text className='owner-workbench-label'>待派人</Text>
+                <Text className='owner-workbench-label'>待开始</Text>
               </View>
               <View className='owner-workbench-card'>
                 <Text className='owner-workbench-value'>
@@ -289,10 +444,10 @@ export default function OwnerProfilePage() {
               </View>
               <View
                 className='owner-quick-card'
-                onClick={() => Taro.navigateTo({ url: '/pages/owner/bind-pilot/index' })}
+                onClick={() => Taro.navigateTo({ url: '/pages/pilot/register/index' })}
               >
-                <Text className='owner-quick-icon'>🤝</Text>
-                <Text className='owner-quick-title'>绑定飞手</Text>
+                <Text className='owner-quick-icon'>✅</Text>
+                <Text className='owner-quick-title'>履约资质</Text>
               </View>
             </View>
           </View>
@@ -348,7 +503,7 @@ export default function OwnerProfilePage() {
             className={`owner-save-btn ${saving ? 'owner-save-disabled' : ''}`}
             onClick={handleSave}
           >
-            <Text className='owner-save-text'>{saving ? '保存中...' : '保存机主档案'}</Text>
+            <Text className='owner-save-text'>{saving ? '保存中...' : '保存服务商档案'}</Text>
           </View>
         </View>
       </ScrollView>

@@ -1,7 +1,11 @@
 import Taro from '@tarojs/taro';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Input } from '@tarojs/components';
+import { useSelector } from 'react-redux';
+import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { requestWithdrawal } from '../../../services/settlement';
+import { RootState } from '../../../store/store';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
 
 const METHODS = [
@@ -11,6 +15,13 @@ const METHODS = [
 ];
 
 export default function WithdrawalPage() {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [method, setMethod] = useState('bank_card');
   const [amountStr, setAmountStr] = useState('');
   const [bankName, setBankName] = useState('');
@@ -22,9 +33,13 @@ export default function WithdrawalPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (!canUseProviderFinance) {
+      Taro.showToast({ title: '服务商财务开通后才能提现', icon: 'none' });
+      return;
+    }
     const amount = Math.round(parseFloat(amountStr) * 100);
     if (isNaN(amount) || amount <= 0) return Taro.showToast({ title: '请输入正确的金额', icon: 'none' });
-    if (amount < 100) return Taro.showToast({ title: '最低提现1元', icon: 'none' });
+    if (amount <= 100) return Taro.showToast({ title: '最低提现2元', icon: 'none' });
 
     if (method === 'bank_card') {
       if (!bankName.trim()) return Taro.showToast({ title: '请输入银行名称', icon: 'none' });
@@ -54,6 +69,17 @@ export default function WithdrawalPage() {
     }
   };
 
+  if (!canUseProviderFinance) {
+    return (
+      <ProviderAccessNotice
+        title={isAuthenticated ? '服务商财务未开通' : '请先登录服务商账号'}
+        description={isAuthenticated ? '服务商资质审核通过并产生可提现余额后，才能提交提现申请。' : '登录后才能提交服务商提现申请。'}
+        actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+        onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
+      />
+    );
+  }
+
   return (
     <View className="page-wrap">
       <ScrollView scrollY className="form-content">
@@ -62,7 +88,7 @@ export default function WithdrawalPage() {
           <Text className="amount-prefix">¥</Text>
           <Input className="amount-input" type="digit" placeholder="0.00" value={amountStr} onInput={e => setAmountStr(e.detail.value)} />
         </View>
-        <Text className="hint">手续费: 0.1% (最低1元)</Text>
+        <Text className="hint">手续费: 0.1% (最低1元)，最低提现2元</Text>
 
         <Text className="section-title">提现方式</Text>
         <View className="method-row">

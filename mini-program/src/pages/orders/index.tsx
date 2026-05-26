@@ -1,11 +1,14 @@
-import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState, useMemo, useCallback } from 'react';
+import Taro, { useDidShow, useRouter } from '@tarojs/taro';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { useSelector } from 'react-redux';
-import { RootState } from '../../store/store';
+import { RootState, useAppDispatch } from '../../store/store';
+import { setHaulRoleMode } from '../../store/slices/roleSlice';
 import { orderV2Service } from '../../services/orderV2';
 import { V2OrderSummary } from '../../types';
 import { getEffectiveRoleSummary, getObjectStatusMeta } from '../../utils';
+import { syncCustomTabBar } from '../../utils/tabBar';
+import DemandListPage from '../demand/list';
 import './index.scss';
 
 type RoleFilter = 'all' | 'client' | 'owner' | 'pilot';
@@ -19,9 +22,9 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
 ];
 
 const roleLabelMap: Record<Exclude<RoleFilter, 'all'>, string> = {
-  client: '业主订单',
-  owner: '机主订单',
-  pilot: '飞手执行',
+  client: '客户订单',
+  owner: '服务商订单',
+  pilot: '履约订单',
 };
 
 const formatAmount = (amount?: number | null) => `¥${((amount || 0) / 100).toFixed(2)}`;
@@ -61,10 +64,10 @@ const buildRoleTabs = (summary: any): { key: RoleFilter; label: string }[] => {
 
 const getOrderProgressHint = (order: V2OrderSummary) => {
   switch (String(order.status || '').toLowerCase()) {
-    case 'pending_provider_confirmation': return '等待机主确认，通常 2 小时内回复';
-    case 'pending_payment': return '完成支付后才会继续安排执行';
-    case 'pending_dispatch': return '平台正在安排执行团队';
-    case 'assigned': return '执行团队已就位，待进入准备阶段';
+    case 'pending_provider_confirmation': return '等待服务商确认，通常 2 小时内回复';
+    case 'pending_payment': return '完成支付后才会进入履约流程';
+    case 'pending_dispatch': return '服务商待开始履约';
+    case 'assigned': return '服务商已接单，待进入准备阶段';
     case 'preparing': case 'loading': case 'airspace_applying': case 'airspace_approved': return '现场准备中，稍后会继续推进飞行';
     case 'in_transit': return '运输执行中，请留意飞行与送达更新';
     case 'delivered': return '等待签收确认';
@@ -84,7 +87,35 @@ const getStatusBadgeColor = (status?: string) => {
   }
 };
 
-export default function OrdersPage() {
+export default function RoleOrdersPage() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  const forcedMode = router.params?.mode === 'provider' ? 'provider' : selectedMode;
+
+  useEffect(() => {
+    if (router.params?.mode === 'provider' && selectedMode !== 'provider') {
+      dispatch(setHaulRoleMode('provider'));
+    }
+  }, [dispatch, router.params?.mode, selectedMode]);
+
+  useDidShow(() => {
+    if (router.params?.mode === 'provider') {
+      dispatch(setHaulRoleMode('provider'));
+      syncCustomTabBar(1, 'provider');
+      return;
+    }
+    syncCustomTabBar(1);
+  });
+
+  if (forcedMode === 'provider') {
+    return <DemandListPage />;
+  }
+
+  return <CustomerOrdersPage />;
+}
+
+function CustomerOrdersPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
@@ -148,6 +179,7 @@ export default function OrdersPage() {
   }, [activeRole, roleTabs]);
 
   useDidShow(() => {
+    syncCustomTabBar(1);
     fetchOrders();
   });
 
@@ -162,21 +194,6 @@ export default function OrdersPage() {
   );
 
   const handleOpenOrder = (item: { order: V2OrderSummary; roles: RoleFilter[] }) => {
-    const isPilotOrder = item.roles.includes('pilot');
-    const hasDispatchTask = Number(item.order.dispatch_task_id || 0) > 0;
-    const canPilotExecute =
-      isPilotOrder && hasDispatchTask && currentUserId > 0 &&
-      currentUserId === Number(item.order.executor_pilot_user_id || 0) &&
-      !['cancelled', 'completed'].includes(String(item.order.status || '').toLowerCase());
-
-    if (canPilotExecute) {
-      Taro.navigateTo({ url: `/pages/flight/monitor/index?dispatchId=${item.order.dispatch_task_id}&orderId=${item.order.id}` });
-      return;
-    }
-    if (isPilotOrder && hasDispatchTask) {
-      Taro.navigateTo({ url: `/pages/dispatch/detail/index?id=${item.order.dispatch_task_id}` });
-      return;
-    }
     Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${item.order.id}` });
   };
 
@@ -190,29 +207,6 @@ export default function OrdersPage() {
     >
       <View className="orders-page-content">
         <Text className="orders-page-title">我的订单</Text>
-
-        {(effectiveRoleSummary.has_owner_role || effectiveRoleSummary.has_pilot_role) && (
-          <View className="orders-tool-row">
-            {effectiveRoleSummary.has_owner_role && (
-              <View className="orders-tool-chip" onClick={() => Taro.navigateTo({ url: '/pages/dispatch/list/index' })}>
-                <Text className="orders-tool-icon">📡</Text>
-                <Text className="orders-tool-text">执行安排</Text>
-              </View>
-            )}
-            {effectiveRoleSummary.has_pilot_role && (
-              <View className="orders-tool-chip" onClick={() => Taro.navigateTo({ url: '/pages/dispatch/list/index' })}>
-                <Text className="orders-tool-icon">🧭</Text>
-                <Text className="orders-tool-text">飞手任务</Text>
-              </View>
-            )}
-            {effectiveRoleSummary.has_pilot_role && (
-              <View className="orders-tool-chip" onClick={() => Taro.navigateTo({ url: '/pages/flight/records/index' })}>
-                <Text className="orders-tool-icon">🛫</Text>
-                <Text className="orders-tool-text">飞行记录</Text>
-              </View>
-            )}
-          </View>
-        )}
 
         <View className="card orders-filter-card">
           <Text className="orders-filter-title">身份视角</Text>
@@ -307,8 +301,7 @@ export default function OrdersPage() {
                         const canPilotExecute = isPilotOrder && hasDispatchTask && currentUserId > 0 &&
                           currentUserId === Number(item.order.executor_pilot_user_id || 0) &&
                           !['cancelled', 'completed'].includes(String(item.order.status || '').toLowerCase());
-                        if (canPilotExecute) return '去执行';
-                        if (isPilotOrder && hasDispatchTask) return '执行安排';
+                        if (canPilotExecute || (isPilotOrder && hasDispatchTask)) return '履约详情';
                         return '详情';
                       })()}
                     </Text>

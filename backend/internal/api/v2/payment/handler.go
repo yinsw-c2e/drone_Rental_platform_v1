@@ -60,7 +60,7 @@ func (h *Handler) CreateOrderPayment(c *gin.Context) {
 	data := gin.H{
 		"payment":      buildPaymentSummary(paymentRecord),
 		"pay_params":   parsePaymentParams(payParams),
-		"payment_flow": buildPaymentFlow(req.Method, paymentRecord),
+		"payment_flow": buildPaymentFlow(req.Method, paymentRecord, h.paymentService.MockPaymentsEnabled()),
 	}
 	if strings.EqualFold(req.Method, "mock") {
 		if err := h.paymentService.MockPaymentComplete(paymentRecord.PaymentNo); err != nil {
@@ -69,7 +69,7 @@ func (h *Handler) CreateOrderPayment(c *gin.Context) {
 		}
 		if latestPayment, err := h.paymentService.GetPaymentStatus(paymentRecord.PaymentNo); err == nil && latestPayment != nil {
 			data["payment"] = buildPaymentSummary(latestPayment)
-			data["payment_flow"] = buildPaymentFlow(req.Method, latestPayment)
+			data["payment_flow"] = buildPaymentFlow(req.Method, latestPayment, h.paymentService.MockPaymentsEnabled())
 		}
 		if order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "client"); err == nil && order != nil {
 			data["order"] = gin.H{
@@ -217,12 +217,18 @@ func parsePaymentParams(result *paymentpkg.PaymentResult) interface{} {
 	return gin.H{"raw": result.PayParams}
 }
 
-func buildPaymentFlow(method string, paymentRecord *model.Payment) gin.H {
+func buildPaymentFlow(method string, paymentRecord *model.Payment, allowMock bool) gin.H {
 	normalizedMethod := strings.ToLower(strings.TrimSpace(method))
 	status := "pending"
 	autoCompleted := false
 	capability := "deferred"
+	recommendedMethod := ""
 	notice := "当前渠道暂未接入真实商户联调，本阶段只保留待回调支付单作为占位，请改用模拟支付完成联调。"
+	if allowMock {
+		recommendedMethod = "mock"
+	} else {
+		notice = "当前渠道暂未接入真实商户联调，本阶段只保留待回调支付单作为占位，不会发起真实扣款。"
+	}
 
 	if paymentRecord != nil && strings.EqualFold(paymentRecord.Status, "paid") {
 		status = "completed"
@@ -234,7 +240,12 @@ func buildPaymentFlow(method string, paymentRecord *model.Payment) gin.H {
 		if paymentRecord != nil && strings.EqualFold(paymentRecord.Status, "paid") {
 			autoCompleted = true
 		}
-		notice = "当前开发/测试环境正式联调路径为模拟支付，提交后会自动回写支付成功并继续推进订单状态。"
+		if allowMock {
+			notice = "当前开发/测试环境正式联调路径为模拟支付，提交后会自动回写支付成功并继续推进订单状态。"
+		} else {
+			capability = "disabled"
+			notice = "当前环境不允许模拟支付。"
+		}
 	case "wechat":
 		status = "pending_callback"
 		notice = "微信支付正式商户联调暂缓，当前只创建待回调支付单，不会发起真实扣款。"
@@ -250,7 +261,8 @@ func buildPaymentFlow(method string, paymentRecord *model.Payment) gin.H {
 		"capability":         capability,
 		"status":             status,
 		"auto_completed":     autoCompleted,
-		"recommended_method": "mock",
+		"mock_enabled":       allowMock,
+		"recommended_method": recommendedMethod,
 		"notice":             notice,
 	}
 }

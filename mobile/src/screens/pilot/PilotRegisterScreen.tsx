@@ -195,10 +195,10 @@ export default function PilotRegisterScreen({ navigation }: any) {
 
       Alert.alert(
         '提交成功',
-        '飞手认证资料已提交，后续可在飞手中心继续管理接单状态和服务范围。',
+        '执行人员认证资料已提交，后续可在执行人员中心继续管理接单状态和服务范围。',
         [
           {
-            text: '去飞手中心',
+            text: '去执行人员中心',
             onPress: () => navigation.replace('PilotProfile'),
           },
         ],
@@ -298,9 +298,9 @@ export default function PilotRegisterScreen({ navigation }: any) {
         <ObjectCard style={[styles.heroCard, { marginBottom: 0 }]}>
           <View style={styles.heroHeader}>
             <View style={styles.heroContent}>
-              <Text style={styles.heroTitle}>飞手认证与能力设置</Text>
+              <Text style={styles.heroTitle}>执行人员认证与能力设置</Text>
               <Text style={styles.heroSubtitle}>
-                这里负责建立飞手档案。后续在线状态、服务城市和技能标签都围绕这份档案展开。
+                这里负责建立执行人员档案。后续在线状态、服务城市和技能标签都围绕这份档案展开。
               </Text>
             </View>
             <View style={styles.heroBadge}>
@@ -441,7 +441,7 @@ export default function PilotRegisterScreen({ navigation }: any) {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>补充材料</Text>
             <Text style={styles.sectionDesc}>
-              这些材料用来补充核验信息，不影响飞手主档案提交。
+              这些材料用来补充核验信息，不影响执行人员主档案提交。
             </Text>
           </View>
           <View style={styles.sectionBody}>
@@ -477,7 +477,7 @@ export default function PilotRegisterScreen({ navigation }: any) {
           disabled={loading || uploading}
         >
           <Text style={styles.submitButtonText}>
-            {loading ? '提交中...' : '提交飞手认证'}
+            {loading ? '提交中...' : '提交执行人员认证'}
           </Text>
         </TouchableOpacity>
       </ScrollView>

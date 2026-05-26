@@ -1,10 +1,14 @@
 import React from 'react';
-import { Modal, Tag, message } from 'antd';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Modal, Row, Select, Space, Statistic, Tag, Typography, message } from 'antd';
+import { AlertOutlined, AuditOutlined, BankOutlined, DownloadOutlined, ReloadOutlined, WalletOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import PageContainer from '../../components/admin/PageContainer';
 import ResourceTablePage, { ResourceFilter, RowAction } from '../../components/admin/ResourceTablePage';
 import StatusTag from '../../components/admin/StatusTag';
 import { adminApi } from '../../services/api';
-import { PAYMENT_METHOD_LABELS, SCENE_LABELS, formatMoney, formatTime } from '../../utils/business';
+import { PAYMENT_METHOD_LABELS, SCENE_LABELS, downloadBlob, formatMoney, formatTime } from '../../utils/business';
+
+const { Text } = Typography;
 
 const statusFilter = (options: Array<[string, string]>): ResourceFilter => ({
   key: 'status',
@@ -12,6 +16,36 @@ const statusFilter = (options: Array<[string, string]>): ResourceFilter => ({
   type: 'select',
   options: options.map(([value, label]) => ({ value, label })),
 });
+
+const dateFilter = (key: string, label: string): ResourceFilter => ({
+  key,
+  label,
+  type: 'date',
+});
+
+const settlementTimeFieldFilter: ResourceFilter = {
+  key: 'time_field',
+  label: '导出时间',
+  type: 'select',
+  options: [
+    { value: 'created_at', label: '创建时间' },
+    { value: 'confirmed_at', label: '确认时间' },
+    { value: 'settled_at', label: '入账时间' },
+    { value: 'updated_at', label: '更新时间' },
+  ],
+};
+
+const withdrawalTimeFieldFilter: ResourceFilter = {
+  key: 'time_field',
+  label: '导出时间',
+  type: 'select',
+  options: [
+    { value: 'created_at', label: '创建时间' },
+    { value: 'reviewed_at', label: '审核时间' },
+    { value: 'completed_at', label: '完成时间' },
+    { value: 'updated_at', label: '更新时间' },
+  ],
+};
 
 const textCol = (title: string, dataIndex: string, width = 140): ColumnsType<any>[number] => ({
   title,
@@ -26,6 +60,17 @@ const statusCol = (title = '状态', dataIndex = 'status'): ColumnsType<any>[num
   dataIndex,
   width: 110,
   render: value => <StatusTag status={value} />,
+});
+
+const severityCol = (title = '级别', dataIndex = 'severity'): ColumnsType<any>[number] => ({
+  title,
+  dataIndex,
+  width: 100,
+  render: value => {
+    const color = value === 'critical' ? 'red' : value === 'warning' ? 'orange' : 'blue';
+    const label = value === 'critical' ? '严重' : value === 'warning' ? '警告' : value || '-';
+    return <Tag color={color}>{label}</Tag>;
+  },
 });
 
 const moneyCol = (title: string, dataIndex: string): ColumnsType<any>[number] => ({
@@ -57,6 +102,221 @@ const confirmAction = async (title: string, run: () => Promise<any>, reload: () 
   });
 };
 
+type AdminConfirmState = {
+  title: string;
+  run: () => Promise<any>;
+  reload: () => void;
+};
+
+const useAdminConfirmDialog = () => {
+  const [confirmState, setConfirmState] = React.useState<AdminConfirmState | null>(null);
+  const [confirmSubmitting, setConfirmSubmitting] = React.useState(false);
+
+  const openConfirm = React.useCallback((title: string, run: () => Promise<any>, reload: () => void) => {
+    setConfirmState({ title, run, reload });
+  }, []);
+
+  const closeConfirm = React.useCallback(() => {
+    setConfirmState(null);
+  }, []);
+
+  const submitConfirm = React.useCallback(async () => {
+    if (!confirmState) return;
+    setConfirmSubmitting(true);
+    try {
+      await confirmState.run();
+      message.success('操作成功');
+      confirmState.reload();
+      closeConfirm();
+    } finally {
+      setConfirmSubmitting(false);
+    }
+  }, [closeConfirm, confirmState]);
+
+  const confirmModal = (
+    <Modal
+      title={confirmState?.title}
+      open={!!confirmState}
+      onOk={submitConfirm}
+      confirmLoading={confirmSubmitting}
+      onCancel={closeConfirm}
+      okText="确认"
+      cancelText="取消"
+    >
+      操作会写入管理员审计日志。
+    </Modal>
+  );
+
+  return { openConfirm, confirmModal };
+};
+
+const centsToYuan = (value?: number | string | null) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? Number((numberValue / 100).toFixed(2)) : undefined;
+};
+
+const yuanToCents = (value?: number | string | null) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? Math.round(numberValue * 100) : undefined;
+};
+
+const csvFilename = (prefix: string) => `${prefix}_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`;
+
+const downloadServerCsv = async (filename: string, run: () => Promise<any>) => {
+  try {
+    const blob = await run();
+    downloadBlob(blob, filename);
+    message.success('CSV 已生成');
+  } catch (error: any) {
+    message.error(error?.message || 'CSV 下载失败');
+  }
+};
+
+export const FinanceOverviewPage: React.FC = () => {
+  const [overview, setOverview] = React.useState<any | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.getFinanceOverview();
+      setOverview(res?.data || res);
+    } catch (error: any) {
+      message.error(error?.message || '财务概览加载失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  const settlement = overview?.settlement || {};
+  const withdrawal = overview?.withdrawal || {};
+  const anomaly = overview?.anomaly || {};
+  const manualAction = overview?.manual_action || {};
+  const riskTotal =
+    Number(settlement.confirmed || 0) +
+    Number(settlement.disputed || 0) +
+    Number(withdrawal.pending || 0) +
+    Number(anomaly.open || 0) +
+    Number(manualAction.applied || 0);
+
+  const queueRows = [
+    {
+      title: '待入账结算',
+      desc: '已确认但尚未写入钱包',
+      value: settlement.confirmed || 0,
+      color: 'gold',
+      href: '/finance/settlements',
+    },
+    {
+      title: '待审核提现',
+      desc: `待付金额 ${formatMoney(withdrawal.pending_amount)}`,
+      value: withdrawal.pending || 0,
+      color: 'blue',
+      href: '/finance/withdrawals',
+    },
+    {
+      title: '未处理异常',
+      desc: `严重 ${anomaly.critical_open || 0} / 警告 ${anomaly.warning_open || 0}`,
+      value: anomaly.open || 0,
+      color: Number(anomaly.critical_open || 0) > 0 ? 'red' : 'orange',
+      href: '/finance/anomalies',
+    },
+    {
+      title: '生效人工处理',
+      desc: '可继续复核或按规则回滚',
+      value: manualAction.applied || 0,
+      color: 'purple',
+      href: '/finance/manual-actions',
+    },
+  ];
+
+  return (
+    <PageContainer
+      title="财务概览"
+      description="汇总结算、提现、异常和人工处理队列，优先暴露需要运营介入的风险项。"
+      extra={<Button icon={<ReloadOutlined />} onClick={load} loading={loading}>刷新</Button>}
+    >
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Alert
+          type={riskTotal > 0 ? 'warning' : 'success'}
+          showIcon
+          message={riskTotal > 0 ? `当前有 ${riskTotal} 个财务待处理项` : '当前没有财务待处理项'}
+          description={`最后更新：${formatTime(overview?.updated_at)}`}
+        />
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} xl={6}>
+            <Card bordered={false} loading={loading}>
+              <Statistic title="待入账结算" value={settlement.confirmed || 0} prefix={<BankOutlined />} valueStyle={{ color: '#d48806' }} />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} xl={6}>
+            <Card bordered={false} loading={loading}>
+              <Statistic title="今日已结算" value={settlement.settled_today || 0} prefix={<BankOutlined />} suffix={formatMoney(settlement.total_settled_amount_today)} />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} xl={6}>
+            <Card bordered={false} loading={loading}>
+              <Statistic title="待审核提现" value={withdrawal.pending || 0} prefix={<WalletOutlined />} suffix={formatMoney(withdrawal.pending_amount)} />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} xl={6}>
+            <Card bordered={false} loading={loading}>
+              <Statistic title="未处理异常" value={anomaly.open || 0} prefix={<AlertOutlined />} valueStyle={{ color: Number(anomaly.critical_open || 0) > 0 ? '#cf1322' : '#d46b08' }} />
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={14}>
+            <Card title="风险队列" bordered={false} loading={loading}>
+              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                {queueRows.map(row => (
+                  <div
+                    key={row.title}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      borderBottom: '1px solid #f0f0f0',
+                      paddingBottom: 12,
+                    }}
+                  >
+                    <Space direction="vertical" size={0}>
+                      <Space>
+                        <Text strong>{row.title}</Text>
+                        <Tag color={row.color}>{row.value}</Tag>
+                      </Space>
+                      <Text type="secondary">{row.desc}</Text>
+                    </Space>
+                    <Button size="small" href={row.href}>查看</Button>
+                  </div>
+                ))}
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} xl={10}>
+            <Card title="今日处理" bordered={false} loading={loading}>
+              <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                <Statistic title="提现完成" value={withdrawal.completed_today || 0} prefix={<WalletOutlined />} />
+                <Statistic title="提现驳回" value={withdrawal.rejected_today || 0} prefix={<WalletOutlined />} valueStyle={{ color: '#cf1322' }} />
+                <Statistic title="异常已处理" value={anomaly.resolved_today || 0} prefix={<AuditOutlined />} />
+                <Statistic title="人工处理已回滚" value={manualAction.rolled_back_today || 0} prefix={<AuditOutlined />} />
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+      </Space>
+    </PageContainer>
+  );
+};
+
 export const RefundListPage: React.FC = () => (
   <ResourceTablePage
     title="退款审核"
@@ -76,66 +336,477 @@ export const RefundListPage: React.FC = () => (
 );
 
 export const SettlementListPage: React.FC = () => {
+  const { openConfirm, confirmModal } = useAdminConfirmDialog();
+  const [disputeForm] = Form.useForm();
+  const [resolveForm] = Form.useForm();
+  const [disputeTarget, setDisputeTarget] = React.useState<any | null>(null);
+  const [resolveTarget, setResolveTarget] = React.useState<any | null>(null);
+  const [settlementReload, setSettlementReload] = React.useState<(() => void) | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const closeSettlementModal = () => {
+    setDisputeTarget(null);
+    setResolveTarget(null);
+    setSettlementReload(null);
+    disputeForm.resetFields();
+    resolveForm.resetFields();
+  };
+
+  const openDisputeModal = (row: any, reload: () => void) => {
+    setSettlementReload(() => reload);
+    disputeForm.setFieldsValue({ reason: '' });
+    setDisputeTarget(row);
+  };
+
+  const openResolveModal = (row: any, reload: () => void) => {
+    setSettlementReload(() => reload);
+    resolveForm.setFieldsValue({
+      resolution: '后台复核通过，恢复结算执行',
+      next_status: 'confirmed',
+      platform_fee: centsToYuan(row.platform_fee),
+      pilot_fee: centsToYuan(row.pilot_fee),
+      owner_fee: centsToYuan(row.owner_fee),
+      insurance_deduction: centsToYuan(row.insurance_deduction),
+    });
+    setResolveTarget(row);
+  };
+
+  const submitDispute = async () => {
+    const values = await disputeForm.validateFields();
+    if (!disputeTarget) return;
+    setSubmitting(true);
+    try {
+      await adminApi.markSettlementDisputed(disputeTarget.id, values.reason);
+      message.success('已标记争议');
+      closeSettlementModal();
+      settlementReload?.();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitResolve = async () => {
+    const values = await resolveForm.validateFields();
+    if (!resolveTarget) return;
+    setSubmitting(true);
+    try {
+      await adminApi.resolveSettlementDispute(resolveTarget.id, {
+        resolution: values.resolution,
+        next_status: values.next_status,
+        platform_fee: yuanToCents(values.platform_fee),
+        pilot_fee: yuanToCents(values.pilot_fee),
+        owner_fee: yuanToCents(values.owner_fee),
+        insurance_deduction: yuanToCents(values.insurance_deduction),
+      });
+      message.success('争议已处理');
+      closeSettlementModal();
+      settlementReload?.();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const actions: RowAction<any>[] = [
     {
-      label: '执行',
-      disabled: row => row.status !== 'confirmed',
-      onClick: (row, reload) => confirmAction('确认执行结算？', () => adminApi.executeSettlement(row.id, '后台结算执行'), reload),
+      label: '确认',
+      disabled: row => !['pending', 'calculated'].includes(row.status),
+      onClick: (row, reload) => openConfirm('确认该结算单进入待执行状态？', () => adminApi.confirmSettlement(row.id), reload),
+    },
+    {
+      label: '入账',
+      disabled: row => ['settled', 'disputed'].includes(row.status),
+      onClick: (row, reload) => openConfirm('确认执行结算入账？', () => adminApi.executeSettlement(row.id, '后台结算执行'), reload),
+    },
+    {
+      label: '争议',
+      danger: true,
+      disabled: row => ['settled', 'disputed'].includes(row.status),
+      onClick: openDisputeModal,
+    },
+    {
+      label: '解除',
+      disabled: row => row.status !== 'disputed',
+      onClick: openResolveModal,
     },
   ];
   return (
-    <ResourceTablePage
-      title="结算执行"
-      description="订单分账、平台服务费、飞手劳务费、机主设备费的后台执行闭环。"
-      fetcher={adminApi.getSettlements}
-      filters={[statusFilter([['calculated', '已计算'], ['confirmed', '待执行'], ['settled', '已结算'], ['disputed', '争议中']])]}
-      actions={actions}
-      columns={[
-        textCol('结算号', 'settlement_no', 190),
-        textCol('订单号', 'order_no', 160),
-        moneyCol('最终金额', 'final_amount'),
-        moneyCol('平台服务费', 'platform_fee'),
-        moneyCol('飞手劳务费', 'pilot_fee'),
-        moneyCol('机主设备费', 'owner_fee'),
-        statusCol(),
-        timeCol('创建时间', 'created_at'),
-      ]}
-    />
+    <>
+      <ResourceTablePage
+        title="结算执行"
+        description="订单分账、平台服务费、飞手劳务费、机主设备费的后台执行闭环。"
+        fetcher={adminApi.getSettlements}
+        filters={[
+          statusFilter([['pending', '待处理'], ['calculated', '已计算'], ['confirmed', '待执行'], ['settled', '已结算'], ['disputed', '争议中']]),
+          settlementTimeFieldFilter,
+          dateFilter('start_date', '开始日期'),
+          dateFilter('end_date', '结束日期'),
+        ]}
+        extraActions={({ query, loading }) => (
+          <Button
+            icon={<DownloadOutlined />}
+            loading={loading}
+            onClick={() => downloadServerCsv(
+              csvFilename('settlements'),
+              () => adminApi.exportSettlementCsv({ ...query, limit: 5000 })
+            )}
+          >
+            下载对账CSV
+          </Button>
+        )}
+        actions={actions}
+        columns={[
+          textCol('结算号', 'settlement_no', 190),
+          textCol('订单号', 'order_no', 160),
+          moneyCol('实付金额', 'final_amount'),
+          moneyCol('平台服务费', 'platform_fee'),
+          moneyCol('飞手劳务费', 'pilot_fee'),
+          moneyCol('机主设备费', 'owner_fee'),
+          moneyCol('保险代扣', 'insurance_deduction'),
+          statusCol(),
+          timeCol('确认时间', 'confirmed_at'),
+          timeCol('入账时间', 'settled_at'),
+          timeCol('创建时间', 'created_at'),
+        ]}
+      />
+
+      {confirmModal}
+
+      <Modal
+        title="标记结算争议"
+        open={!!disputeTarget}
+        onOk={submitDispute}
+        confirmLoading={submitting}
+        onCancel={closeSettlementModal}
+        okText="标记争议"
+        cancelText="取消"
+      >
+        <Form form={disputeForm} layout="vertical">
+          <Form.Item
+            name="reason"
+            label="争议原因"
+            rules={[{ required: true, message: '请填写争议原因' }]}
+          >
+            <Input.TextArea rows={4} placeholder="例如：客户投诉金额有误、保险扣款待复核" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="解除结算争议"
+        open={!!resolveTarget}
+        onOk={submitResolve}
+        confirmLoading={submitting}
+        onCancel={closeSettlementModal}
+        okText="提交处理"
+        cancelText="取消"
+        width={680}
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Tag color="blue">实付金额 {formatMoney(resolveTarget?.final_amount)}</Tag>
+          <Form form={resolveForm} layout="vertical">
+            <Form.Item
+              name="resolution"
+              label="处理结论"
+              rules={[{ required: true, message: '请填写处理结论' }]}
+            >
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Form.Item
+              name="next_status"
+              label="处理后状态"
+              rules={[{ required: true, message: '请选择处理后状态' }]}
+            >
+              <Select
+                options={[
+                  { value: 'confirmed', label: '待执行' },
+                  { value: 'calculated', label: '已计算' },
+                ]}
+              />
+            </Form.Item>
+            <Space size={12} wrap>
+              <Form.Item name="platform_fee" label="平台服务费(元)">
+                <InputNumber min={0} precision={2} style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item name="pilot_fee" label="飞手劳务费(元)">
+                <InputNumber min={0} precision={2} style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item name="owner_fee" label="机主设备费(元)">
+                <InputNumber min={0} precision={2} style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item name="insurance_deduction" label="保险代扣(元)">
+                <InputNumber min={0} precision={2} style={{ width: 150 }} />
+              </Form.Item>
+            </Space>
+          </Form>
+        </Space>
+      </Modal>
+    </>
   );
 };
 
 export const WithdrawalListPage: React.FC = () => {
+  const { openConfirm, confirmModal } = useAdminConfirmDialog();
   const actions: RowAction<any>[] = [
     {
       label: '通过',
       disabled: row => row.status !== 'pending',
-      onClick: (row, reload) => confirmAction('确认通过提现吗？', () => adminApi.approveWithdrawal(row.id, '后台提现审核通过'), reload),
+      onClick: (row, reload) => openConfirm('确认通过提现吗？', () => adminApi.approveWithdrawal(row.id, '后台提现审核通过'), reload),
     },
     {
       label: '拒绝',
       danger: true,
       disabled: row => row.status !== 'pending',
-      onClick: (row, reload) => confirmAction('确认拒绝提现吗？', () => adminApi.rejectWithdrawal(row.id, '后台审核拒绝'), reload),
+      onClick: (row, reload) => openConfirm('确认拒绝提现吗？', () => adminApi.rejectWithdrawal(row.id, '后台审核拒绝'), reload),
     },
   ];
   return (
-    <ResourceTablePage
-      title="提现审核"
-      description="审核钱包提现申请，测试通道转账会在记录中保留第三方流水占位。"
-      fetcher={adminApi.getWithdrawals}
-      filters={[statusFilter([['pending', '待审核'], ['processing', '处理中'], ['completed', '已完成'], ['rejected', '已拒绝']])]}
-      actions={actions}
-      columns={[
-        textCol('提现号', 'withdrawal_no', 190),
-        textCol('用户ID', 'user_id', 90),
-        moneyCol('申请金额', 'amount'),
-        moneyCol('手续费', 'service_fee'),
-        moneyCol('实际到账', 'actual_amount'),
-        textCol('方式', 'withdraw_method', 110),
-        statusCol(),
-        timeCol('创建时间', 'created_at'),
-      ]}
-    />
+    <>
+      <ResourceTablePage
+        title="提现审核"
+        description="审核钱包提现申请，测试通道转账会在记录中保留第三方流水占位。"
+        fetcher={adminApi.getWithdrawals}
+        filters={[
+          statusFilter([['pending', '待审核'], ['processing', '处理中'], ['completed', '已完成'], ['rejected', '已拒绝']]),
+          withdrawalTimeFieldFilter,
+          dateFilter('start_date', '开始日期'),
+          dateFilter('end_date', '结束日期'),
+        ]}
+        extraActions={({ query, loading }) => (
+          <Button
+            icon={<DownloadOutlined />}
+            loading={loading}
+            onClick={() => downloadServerCsv(
+              csvFilename('withdrawals'),
+              () => adminApi.exportWithdrawalCsv({ ...query, limit: 5000 })
+            )}
+          >
+            下载对账CSV
+          </Button>
+        )}
+        actions={actions}
+        columns={[
+          textCol('提现号', 'withdrawal_no', 190),
+          textCol('用户ID', 'user_id', 90),
+          moneyCol('申请金额', 'amount'),
+          moneyCol('手续费', 'service_fee'),
+          moneyCol('实际到账', 'actual_amount'),
+          textCol('方式', 'withdraw_method', 110),
+          statusCol(),
+          timeCol('审核时间', 'reviewed_at'),
+          timeCol('完成时间', 'completed_at'),
+          timeCol('创建时间', 'created_at'),
+        ]}
+      />
+      {confirmModal}
+    </>
+  );
+};
+
+export const FinanceAnomalyPage: React.FC = () => {
+  const [form] = Form.useForm();
+  const [target, setTarget] = React.useState<any | null>(null);
+  const [reload, setReload] = React.useState<(() => void) | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const closeModal = () => {
+    setTarget(null);
+    setReload(null);
+    form.resetFields();
+  };
+
+  const submitResolve = async () => {
+    const values = await form.validateFields();
+    if (!target) return;
+    setSubmitting(true);
+    try {
+      await adminApi.resolveFinanceAnomaly(target.id, values.note);
+      message.success('已标记处理');
+      closeModal();
+      reload?.();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const actions: RowAction<any>[] = [
+    {
+      label: '处理',
+      disabled: row => row.status === 'resolved',
+      onClick: (row, tableReload) => {
+        setReload(() => tableReload);
+        form.setFieldsValue({ note: '' });
+        setTarget(row);
+      },
+    },
+  ];
+
+  return (
+    <>
+      <ResourceTablePage
+        title="财务异常"
+        description="记录结算入账、提现审核和分账复核中的异常，便于后台追踪和处理。"
+        fetcher={adminApi.getFinanceAnomalies}
+        filters={[
+          statusFilter([['open', '待处理'], ['resolved', '已处理']]),
+          { key: 'severity', label: '级别', type: 'select', options: [
+            { value: 'critical', label: '严重' },
+            { value: 'warning', label: '警告' },
+            { value: 'info', label: '提示' },
+          ] },
+          { key: 'anomaly_type', label: '异常类型' },
+          { key: 'source', label: '来源', type: 'select', options: [
+            { value: 'settlement', label: '结算' },
+            { value: 'withdrawal', label: '提现' },
+            { value: 'reconciliation', label: '对账' },
+          ] },
+          { key: 'settlement_id', label: '结算ID' },
+          { key: 'withdrawal_id', label: '提现ID' },
+          { key: 'user_id', label: '用户ID' },
+          { key: 'keyword', label: '关键词' },
+        ]}
+        actions={actions}
+        columns={[
+          textCol('异常号', 'anomaly_no', 190),
+          severityCol(),
+          statusCol(),
+          textCol('异常类型', 'anomaly_type', 190),
+          textCol('来源', 'source', 110),
+          textCol('目标', 'target_type', 100),
+          textCol('目标ID', 'target_id', 90),
+          textCol('结算ID', 'settlement_id', 90),
+          textCol('提现ID', 'withdrawal_id', 90),
+          textCol('用户ID', 'user_id', 90),
+          textCol('说明', 'message', 280),
+          timeCol('发生时间', 'created_at'),
+          timeCol('处理时间', 'resolved_at'),
+        ]}
+      />
+
+      <Modal
+        title="处理财务异常"
+        open={!!target}
+        onOk={submitResolve}
+        confirmLoading={submitting}
+        onCancel={closeModal}
+        okText="标记已处理"
+        cancelText="取消"
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Tag color={target?.severity === 'critical' ? 'red' : 'orange'}>
+            {target?.anomaly_no} {target?.anomaly_type}
+          </Tag>
+          <Form form={form} layout="vertical">
+            <Form.Item
+              name="note"
+              label="处理说明"
+              rules={[{ required: true, message: '请填写处理说明' }]}
+            >
+              <Input.TextArea rows={4} placeholder="例如：已核对钱包流水，手工补偿完成" />
+            </Form.Item>
+          </Form>
+        </Space>
+      </Modal>
+    </>
+  );
+};
+
+export const FinanceManualActionPage: React.FC = () => {
+  const [form] = Form.useForm();
+  const [target, setTarget] = React.useState<any | null>(null);
+  const [reload, setReload] = React.useState<(() => void) | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const closeModal = () => {
+    setTarget(null);
+    setReload(null);
+    form.resetFields();
+  };
+
+  const submitRollback = async () => {
+    const values = await form.validateFields();
+    if (!target) return;
+    setSubmitting(true);
+    try {
+      await adminApi.rollbackFinanceManualAction(target.id, values.note);
+      message.success('已回滚');
+      closeModal();
+      reload?.();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const actions: RowAction<any>[] = [
+    {
+      label: '回滚',
+      danger: true,
+      disabled: row => row.status !== 'applied',
+      onClick: (row, tableReload) => {
+        setReload(() => tableReload);
+        form.setFieldsValue({ note: '' });
+        setTarget(row);
+      },
+    },
+  ];
+
+  return (
+    <>
+      <ResourceTablePage
+        title="人工处理记录"
+        description="记录财务人工处理前后快照；未入账且未被后续变更覆盖的处理可回滚。"
+        fetcher={adminApi.getFinanceManualActions}
+        filters={[
+          statusFilter([['applied', '已应用'], ['rolled_back', '已回滚'], ['rollback_failed', '回滚失败']]),
+          { key: 'action_type', label: '动作类型' },
+          { key: 'target_type', label: '目标类型', type: 'select', options: [
+            { value: 'settlement', label: '结算' },
+            { value: 'finance_anomaly', label: '财务异常' },
+          ] },
+          { key: 'settlement_id', label: '结算ID' },
+          { key: 'anomaly_id', label: '异常ID' },
+          { key: 'admin_id', label: '管理员ID' },
+          { key: 'keyword', label: '关键词' },
+        ]}
+        actions={actions}
+        columns={[
+          textCol('处理号', 'action_no', 190),
+          statusCol(),
+          textCol('动作类型', 'action_type', 200),
+          textCol('目标类型', 'target_type', 110),
+          textCol('目标ID', 'target_id', 90),
+          textCol('结算ID', 'settlement_id', 90),
+          textCol('异常ID', 'anomaly_id', 90),
+          textCol('管理员ID', 'admin_id', 100),
+          textCol('原因', 'reason', 260),
+          textCol('回滚人', 'rollback_by', 90),
+          timeCol('回滚时间', 'rollback_at'),
+          timeCol('创建时间', 'created_at'),
+        ]}
+      />
+
+      <Modal
+        title="回滚人工处理"
+        open={!!target}
+        onOk={submitRollback}
+        confirmLoading={submitting}
+        onCancel={closeModal}
+        okText="确认回滚"
+        cancelText="取消"
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Tag color="red">{target?.action_no} {target?.action_type}</Tag>
+          <Form form={form} layout="vertical">
+            <Form.Item
+              name="note"
+              label="回滚原因"
+              rules={[{ required: true, message: '请填写回滚原因' }]}
+            >
+              <Input.TextArea rows={4} placeholder="例如：人工处理金额录入错误，恢复处理前状态" />
+            </Form.Item>
+          </Form>
+        </Space>
+      </Modal>
+    </>
   );
 };
 
@@ -547,6 +1218,9 @@ export const AdminLogPage: React.FC = () => (
     filters={[
       { key: 'module', label: '模块' },
       { key: 'action', label: '动作' },
+      { key: 'target_type', label: '目标类型' },
+      { key: 'target_id', label: '目标ID' },
+      { key: 'admin_id', label: '管理员ID' },
     ]}
     columns={[
       textCol('管理员ID', 'admin_id', 100),

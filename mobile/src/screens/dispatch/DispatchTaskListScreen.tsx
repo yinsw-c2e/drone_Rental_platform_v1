@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {useSelector} from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
@@ -18,8 +19,10 @@ import StatusBadge from '../../components/business/StatusBadge';
 import {getObjectStatusMeta} from '../../components/business/visuals';
 import {dispatchV2Service} from '../../services/dispatchV2';
 import {V2DispatchTaskSummary} from '../../types';
+import {RootState} from '../../store/store';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 
 const STATUS_TABS = [
   {key: 'all', label: '全部'},
@@ -65,20 +68,29 @@ const getPilotLabel = (task: V2DispatchTaskSummary) => {
     return task.target_pilot.nickname;
   }
   if (task.target_pilot?.user_id) {
-    return `飞手 #${task.target_pilot.user_id}`;
+    return `执行人员 #${task.target_pilot.user_id}`;
   }
-  return '待指定飞手';
+  return '待指定执行人员';
 };
 
 export default function DispatchTaskListScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary));
+  const canManageDispatch = providerCapabilities.canArrangeDispatch;
   const [tasks, setTasks] = useState<V2DispatchTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeStatus, setActiveStatus] = useState<StatusFilter>('all');
 
   const loadData = useCallback(async () => {
+    if (!canManageDispatch) {
+      setTasks([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const res = await dispatchV2Service.list({role: 'owner', page: 1, page_size: 50});
       setTasks(res.data?.items || []);
@@ -88,7 +100,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [canManageDispatch]);
 
   useFocusEffect(
     useCallback(() => {
@@ -123,7 +135,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
             </Text>
 
             <View style={styles.metaRow}>
-              <Text style={styles.metaText}>目标飞手：{getPilotLabel(item)}</Text>
+              <Text style={styles.metaText}>目标执行人员：{getPilotLabel(item)}</Text>
               <Text style={styles.metaText}>派单来源：{item.dispatch_source || '-'}</Text>
             </View>
             <View style={styles.metaRow}>
@@ -173,10 +185,10 @@ export default function DispatchTaskListScreen({navigation}: any) {
             <ObjectCard>
               <EmptyState
                 icon="📡"
-                title="当前没有正式派单"
-                description="如果订单还没进入派单阶段，请先去订单页确认待处理订单；只有正式发出的派单，才会出现在这里。"
-                actionText="查看订单"
-                onAction={() => navigation.navigate('MyOrders', {roleFilter: 'owner'})}
+                title={canManageDispatch ? '当前没有正式派单' : '设备服务能力未开通'}
+                description={canManageDispatch ? '如果订单还没进入派单阶段，请先去订单页确认待处理订单；只有正式发出的派单，才会出现在这里。' : '审核通过后才能查看派单管理和发起正式派单。'}
+                actionText={canManageDispatch ? '查看订单' : undefined}
+                onAction={canManageDispatch ? () => navigation.navigate('MyOrders', {roleFilter: 'owner'}) : undefined}
               />
             </ObjectCard>
           )

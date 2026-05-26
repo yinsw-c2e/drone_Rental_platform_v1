@@ -97,7 +97,7 @@ export default function FlightMonitorPage() {
       <View className="monitor-wrap">
         <View className="empty-state">
           <Text className="empty-state-icon">📡</Text>
-          <Text className="empty-state-text">请从订单或派单详情进入飞行监控</Text>
+          <Text className="empty-state-text">请从订单或履约详情进入飞行监控</Text>
         </View>
       </View>
     );

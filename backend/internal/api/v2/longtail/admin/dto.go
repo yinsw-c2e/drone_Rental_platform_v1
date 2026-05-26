@@ -41,12 +41,15 @@ type DroneDTO struct {
 	UOMRegistrationDoc string     `json:"uom_registration_doc"`
 
 	// 保险信息
-	InsurancePolicyNo   string     `json:"insurance_policy_no"`
-	InsuranceCompany    string     `json:"insurance_company"`
-	InsuranceCoverage   int64      `json:"insurance_coverage"`
-	InsuranceExpireDate *time.Time `json:"insurance_expire_date"`
-	InsuranceDoc        string     `json:"insurance_doc"`
-	InsuranceVerified   string     `json:"insurance_verified"`
+	InsurancePolicyNo     string     `json:"insurance_policy_no"`
+	InsuranceCompany      string     `json:"insurance_company"`
+	InsuranceCoverage     int64      `json:"insurance_coverage"`
+	InsuranceExpireDate   *time.Time `json:"insurance_expire_date"`
+	InsuranceDoc          string     `json:"insurance_doc"`
+	InsuranceVerified     string     `json:"insurance_verified"`
+	InsuranceReviewedAt   *time.Time `json:"insurance_reviewed_at"`
+	InsuranceReviewedBy   int64      `json:"insurance_reviewed_by"`
+	InsuranceRejectReason string     `json:"insurance_reject_reason"`
 
 	// 适航证书
 	AirworthinessCertNo     string     `json:"airworthiness_cert_no"`
@@ -99,12 +102,15 @@ func ToDroneDTO(drone *model.Drone, owner *model.User) *DroneDTO {
 		UOMVerifiedAt:      drone.UOMVerifiedAt,
 		UOMRegistrationDoc: drone.UOMRegistrationDoc,
 		// 保险
-		InsurancePolicyNo:   drone.InsurancePolicyNo,
-		InsuranceCompany:    drone.InsuranceCompany,
-		InsuranceCoverage:   drone.InsuranceCoverage,
-		InsuranceExpireDate: drone.InsuranceExpireDate,
-		InsuranceDoc:        drone.InsuranceDoc,
-		InsuranceVerified:   drone.InsuranceVerified,
+		InsurancePolicyNo:     drone.InsurancePolicyNo,
+		InsuranceCompany:      drone.InsuranceCompany,
+		InsuranceCoverage:     drone.InsuranceCoverage,
+		InsuranceExpireDate:   drone.InsuranceExpireDate,
+		InsuranceDoc:          drone.InsuranceDoc,
+		InsuranceVerified:     drone.InsuranceVerified,
+		InsuranceReviewedAt:   drone.InsuranceReviewedAt,
+		InsuranceReviewedBy:   drone.InsuranceReviewedBy,
+		InsuranceRejectReason: drone.InsuranceRejectReason,
 		// 适航
 		AirworthinessCertNo:     drone.AirworthinessCertNo,
 		AirworthinessCertExpire: drone.AirworthinessCertExpire,

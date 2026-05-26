@@ -10,6 +10,12 @@ import {
 } from '../types';
 
 export const orderFinanceV2Service = {
+  getContract: (orderId: number) =>
+    apiV2.get<any>(`/orders/${orderId}/contract`),
+
+  signContract: (orderId: number) =>
+    apiV2.post<any>(`/orders/${orderId}/contract/sign`),
+
   createPayment: (orderId: number, method: string) =>
     apiV2.post<V2CreateOrderPaymentResult>(`/orders/${orderId}/pay`, { method }),
 

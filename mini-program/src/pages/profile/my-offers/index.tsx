@@ -1,10 +1,14 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
+import { useSelector } from 'react-redux';
+import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { ownerService } from '../../../services/owner';
 import { supplyService } from '../../../services/supply';
 import { SupplySummary } from '../../../types';
+import { RootState } from '../../../store/store';
 import { getObjectStatusMeta } from '../../../utils';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import '../shared-list.scss';
 
 const GROUPS = ['all', 'draft', 'active', 'paused', 'closed'] as const;
@@ -12,18 +16,48 @@ const LABELS: Record<string, string> = { all: '全部', draft: '草稿', active:
 const NEXT: Record<string, { status: string; label: string }> = { draft: { status: 'active', label: '立即上架' }, active: { status: 'paused', label: '暂停' }, paused: { status: 'active', label: '恢复上架' } };
 
 export default function MyOffersPage() {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canManageServices = Boolean(
+    isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply,
+  );
   const [offers, setOffers] = useState<SupplySummary[]>([]);
   const [activeGroup, setActiveGroup] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-  const load = () => ownerService.listMySupplies({ page: 1, page_size: 50 }).then(res => setOffers((res as any).items || [])).catch(() => {});
+  const load = () => {
+    if (!canManageServices) {
+      setOffers([]);
+      return Promise.resolve();
+    }
+    return ownerService.listMySupplies({ page: 1, page_size: 50 }).then(res => setOffers((res as any).items || [])).catch(() => {});
+  };
   useDidShow(() => { load(); });
   const filtered = useMemo(() => offers.filter(o => activeGroup === 'all' || o.status === activeGroup), [offers, activeGroup]);
 
   const handleStatus = async (item: SupplySummary) => {
+    if (!canManageServices) {
+      Taro.showToast({ title: '服务商设备能力审核通过后才能管理正式服务', icon: 'none' });
+      return;
+    }
     const next = NEXT[item.status]; if (!next) return;
     setUpdatingId(item.id);
     try { await supplyService.updateStatus(item.id, next.status); await load(); } catch {} finally { setUpdatingId(null); }
   };
+
+  if (!canManageServices) {
+    return (
+      <ProviderAccessNotice
+        title={isAuthenticated ? '服务商设备能力未开通' : '请先登录服务商账号'}
+        description={isAuthenticated ? '设备与关键资质审核通过后，才能查看、编辑和上架正式服务。' : '登录后才能查看服务商服务列表。'}
+        actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+        onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
+      />
+    );
+  }
 
   return (
     <ScrollView scrollY className="profile-list-page">

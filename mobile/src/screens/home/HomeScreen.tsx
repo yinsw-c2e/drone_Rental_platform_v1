@@ -208,9 +208,9 @@ const getPriorityRoleLabel = (role: RoleView | 'all') => {
     case 'client':
       return '客户';
     case 'owner':
-      return '机主';
+      return '服务商';
     case 'pilot':
-      return '飞手';
+      return '执行人员';
     default:
       return '综合';
   }
@@ -410,7 +410,7 @@ function getHeroTheme(role: RoleView): HeroTheme {
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
         softText: 'rgba(255,255,255,0.9)',
-        eyebrow: '机主概览',
+        eyebrow: '服务商概览',
       };
     case 'pilot':
       return {
@@ -419,7 +419,7 @@ function getHeroTheme(role: RoleView): HeroTheme {
         surface: 'rgba(255,255,255,0.14)',
         border: 'rgba(255,255,255,0.22)',
         softText: 'rgba(255,255,255,0.9)',
-        eyebrow: '飞手概览',
+        eyebrow: '执行人员概览',
       };
     default:
       return {
@@ -494,10 +494,10 @@ export default function HomeScreen({ navigation }: any) {
       tabs.push({ key: 'client', label: '客户' });
     }
     if (hasOwner) {
-      tabs.push({ key: 'owner', label: '机主' });
+      tabs.push({ key: 'owner', label: '服务商' });
     }
     if (hasPilot) {
-      tabs.push({ key: 'pilot', label: '飞手' });
+      tabs.push({ key: 'pilot', label: '执行人员' });
     }
     if (tabs.length === 0) {
       tabs.push({ key: 'all', label: '综合' });
@@ -627,7 +627,7 @@ export default function HomeScreen({ navigation }: any) {
                 subtitle: `${order.service_address || '起点待确认'}${order.dest_address ? ` → ${order.dest_address}` : ''}`,
                 meta:
                   bucket === 'confirm'
-                    ? '等待机主确认后才会进入支付阶段'
+                    ? '等待服务商确认后才会进入支付阶段'
                     : bucket === 'payment'
                       ? `待支付金额 ${formatAmountYuan(order.total_amount)}`
                       : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
@@ -692,7 +692,7 @@ export default function HomeScreen({ navigation }: any) {
                 subtitle: `${order.service_address || '起点待确认'}${order.dest_address ? ` → ${order.dest_address}` : ''}`,
                 meta:
                   bucket === 'confirm'
-                    ? '客户已下单，机主确认后才能继续推进'
+                    ? '客户已下单，服务商确认后才能继续推进'
                     : bucket === 'dispatch'
                       ? '已承接订单，下一步要安排执行'
                       : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
@@ -961,7 +961,7 @@ export default function HomeScreen({ navigation }: any) {
               label: '待安排执行',
               value:
                 currentDashboard.role_views.owner.pending_dispatch_order_count,
-              hint: '成交后安排飞手',
+              hint: '成交后安排执行人员',
             },
           ] as MetricCard[],
         };
@@ -1257,7 +1257,7 @@ export default function HomeScreen({ navigation }: any) {
           actions.push({
             key: 'all-pilot',
             title: '待接派单',
-            desc: '飞手优先处理正式派单',
+            desc: '执行人员优先处理正式派单',
             icon: '🎯',
             tone: 'orange',
             onPress: () =>

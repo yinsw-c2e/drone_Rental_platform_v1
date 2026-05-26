@@ -1,28 +1,32 @@
-import Taro from '@tarojs/taro';
-import React, { useEffect, useState } from 'react';
-import { Image, Input, Picker, ScrollView, Text, View } from '@tarojs/components';
+import Taro, { useDidShow } from '@tarojs/taro';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, ScrollView, Text, View } from '@tarojs/components';
 
 import {
   AirspaceCheckResult,
   airspaceService,
 } from '../../../services/airspace';
 import { getClientEligibility } from '../../../services/client';
+import { demandV2Service, DemandUpsertPayload } from '../../../services/demandV2';
 import { supplyService } from '../../../services/supply';
-import { AddressData, DirectOrderInput, SupplySummary } from '../../../types';
+import { AddressData, AddressSnapshot, DirectOrderInput, QuickOrderDraft } from '../../../types';
 import { isAirspaceHardBlocked } from '../../../utils/airspaceRisk';
-import backIcon from '../../../assets/quick-order/icons/back.png';
-import calendarIcon from '../../../assets/quick-order/icons/calendar.png';
-import checkCircleIcon from '../../../assets/quick-order/icons/check_circle.png';
-import chevronDownIcon from '../../../assets/quick-order/icons/chevron_down.png';
-import chevronRightIcon from '../../../assets/quick-order/icons/chevron_right.png';
-import clockIcon from '../../../assets/quick-order/icons/clock.png';
-import cubeIcon from '../../../assets/quick-order/icons/cube.png';
-import gridIcon from '../../../assets/quick-order/icons/grid.png';
-import pinEndIcon from '../../../assets/quick-order/icons/pin_end.png';
-import pinStartIcon from '../../../assets/quick-order/icons/pin_start.png';
-import rulerIcon from '../../../assets/quick-order/icons/ruler.png';
-import targetIcon from '../../../assets/quick-order/icons/target.png';
-import weightBagIcon from '../../../assets/quick-order/icons/weight_bag.png';
+import addWorkPointPlusIcon from '../../../assets/haul/quick-order-confirm/icon_add_work_point_plus.png';
+import chevronRightIcon from '../../../assets/haul/quick-order-confirm/icon_chevron_right.png';
+import detectAirspaceIcon from '../../../assets/haul/quick-order-confirm/icon_detect_airspace.png';
+import detectDistancePinIcon from '../../../assets/haul/quick-order-confirm/icon_detect_distance_pin.png';
+import detectDurationClockIcon from '../../../assets/haul/quick-order-confirm/icon_detect_duration_clock.png';
+import detectPayloadScaleIcon from '../../../assets/haul/quick-order-confirm/icon_detect_payload_scale.png';
+import infoCircleIcon from '../../../assets/haul/quick-order-confirm/icon_info_circle.png';
+import navBackIcon from '../../../assets/haul/quick-order-confirm/icon_nav_back.png';
+import navChatIcon from '../../../assets/haul/quick-order-confirm/icon_nav_chat.png';
+import radioSelectedIcon from '../../../assets/haul/quick-order-confirm/icon_radio_selected.png';
+import radioUnselectedIcon from '../../../assets/haul/quick-order-confirm/icon_radio_unselected.png';
+import routeEndPinIcon from '../../../assets/haul/quick-order-confirm/icon_route_end_pin.png';
+import routeStartPinIcon from '../../../assets/haul/quick-order-confirm/icon_route_start_pin.png';
+import sectionDetectionShieldIcon from '../../../assets/haul/quick-order-confirm/icon_section_detection_shield.png';
+import sectionLocationPinIcon from '../../../assets/haul/quick-order-confirm/icon_section_location_pin.png';
+import sectionPlanClipboardIcon from '../../../assets/haul/quick-order-confirm/icon_section_plan_clipboard.png';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -33,6 +37,81 @@ const SCENE_OPTIONS = [
   { key: 'emergency', label: '应急救援' },
 ];
 
+const QUICK_ORDER_PREFILL_STORAGE_KEY = 'customer_home_quick_order_prefill_v1';
+const QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY = 'quick_order_offer_draft_v1';
+
+type ServicePlanKey = 'standard' | 'urgent' | 'survey';
+type AddressTarget = 'pickup' | 'delivery' | 'extra';
+
+type HomeQuickOrderPrefill = {
+  pickupAddress?: AddressData;
+  deliveryAddress?: AddressData;
+  cargoWeight?: string;
+  timeOption?: '尽快' | '今天' | '明天' | '预约';
+  scheduledStartAt?: string;
+  city?: string;
+};
+
+const QUICK_ORDER_ADDRESS_TARGET_STORAGE_KEY = 'quick_order_address_target';
+
+const servicePlans: Array<{
+  key: ServicePlanKey;
+  title: string;
+  subtitle: string;
+  price: string;
+  prefix?: string;
+  suffix?: string;
+  recommended?: boolean;
+}> = [
+  {
+    key: 'standard',
+    title: '标准吊运',
+    subtitle: '服务商确认后生效',
+    price: '服务商报价',
+    recommended: true,
+  },
+  {
+    key: 'urgent',
+    title: '加急吊运',
+    subtitle: '优先匹配服务商',
+    price: '服务商报价',
+  },
+  {
+    key: 'survey',
+    title: '现场勘查',
+    subtitle: '勘查费用可抵扣服务费',
+    price: '提交后确认',
+  },
+];
+
+const cargoWeightOptions = [
+  { label: '50kg以下', value: '50' },
+  { label: '50-100kg', value: '80' },
+  { label: '100-300kg', value: '200' },
+  { label: '300kg以上', value: '300' },
+];
+
+const roundToHundred = (value: number) => Math.round(value / 100) * 100;
+
+const estimateBudgetCents = (plan: ServicePlanKey, weightKg: number, routeDistanceKm: number) => {
+  const safeWeight = Math.max(Number(weightKg || 0), 1);
+  const safeDistance = Math.max(Number(routeDistanceKm || 0), 1);
+  if (plan === 'survey') {
+    const surveyBase = 18000 + Math.min(safeDistance, 30) * 300;
+    return {
+      min: roundToHundred(surveyBase * 0.9),
+      max: roundToHundred(surveyBase * 1.15),
+    };
+  }
+
+  const base = 36000 + safeWeight * 420 + safeDistance * 1600;
+  const multiplier = plan === 'urgent' ? 1.25 : 1;
+  const estimated = base * multiplier;
+  const min = Math.max(30000, roundToHundred(estimated * 0.85));
+  const max = Math.max(min + 10000, roundToHundred(estimated * 1.2));
+  return { min, max };
+};
+
 const buildDefaultTime = (hourOffset = 0) => {
   const date = new Date(Date.now() + 24 * 60 * 60 * 1000 + hourOffset * 60 * 60 * 1000);
   const y = date.getFullYear();
@@ -40,6 +119,52 @@ const buildDefaultTime = (hourOffset = 0) => {
   const d = String(date.getDate()).padStart(2, '0');
   const h = String(hourOffset ? 11 : 9).padStart(2, '0');
   return `${y}-${m}-${d} ${h}:00`;
+};
+
+const formatDateTime = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const mi = String(date.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d} ${h}:${mi}`;
+};
+
+const buildScheduleFromHomeOption = (option?: HomeQuickOrderPrefill['timeOption']) => {
+  const start = new Date();
+  if (option === '尽快') {
+    start.setHours(start.getHours() + 2, 0, 0, 0);
+  } else if (option === '今天') {
+    start.setHours(Math.max(start.getHours() + 2, 9), 0, 0, 0);
+    if (start.getHours() >= 18) {
+      start.setDate(start.getDate() + 1);
+      start.setHours(9, 0, 0, 0);
+    }
+  } else {
+    start.setDate(start.getDate() + 1);
+    start.setHours(9, 0, 0, 0);
+  }
+  const end = new Date(start);
+  end.setHours(start.getHours() + 2, 0, 0, 0);
+  return {
+    startTime: formatDateTime(start),
+    endTime: formatDateTime(end),
+  };
+};
+
+const buildScheduleFromHomeDraft = (draft: HomeQuickOrderPrefill) => {
+  if (draft.scheduledStartAt) {
+    const start = new Date(draft.scheduledStartAt);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start);
+      end.setHours(start.getHours() + 2, 0, 0, 0);
+      return {
+        startTime: formatDateTime(start),
+        endTime: formatDateTime(end),
+      };
+    }
+  }
+  return buildScheduleFromHomeOption(draft.timeOption);
 };
 
 const parseDateInput = (value: string) => {
@@ -50,49 +175,180 @@ const parseDateInput = (value: string) => {
 const formatAddress = (addr?: AddressData | null) =>
   addr?.address || addr?.name || '';
 
-const splitDateTimeValue = (value: string) => {
-  const [date = '', time = ''] = String(value || '').split(/\s+/);
-  return { date, time };
-};
+const compactAddress = (addr?: AddressData | null, placeholder = '请选择作业地点') =>
+  formatAddress(addr) || placeholder;
 
-const toAddressSnapshot = (addr: AddressData) => ({
+const shortAddress = (addr?: AddressData | null, placeholder = '作业点') =>
+  addr?.name || addr?.district || addr?.address || placeholder;
+
+const toAddressSnapshot = (addr: AddressData): AddressSnapshot => ({
   text: formatAddress(addr),
+  province: addr.province,
+  city: addr.city,
+  district: addr.district,
   latitude: addr.latitude,
   longitude: addr.longitude,
 });
 
-const getAirspaceLabel = (result?: AirspaceCheckResult | null, hasAddress = false, error = '') => {
-  if (error) {
-    return error;
-  }
-  if (!hasAddress) {
-    return '选择地址后自动检测空域';
-  }
-  if (!result) {
-    return '等待自动检测空域';
-  }
-  if (isAirspaceHardBlocked(result)) {
-    return result.recommended_action || result.blocked_reason || '当前位置命中禁飞限制';
-  }
-  if (result.status === 'warning' || (result.restrictions || []).length > 0) {
-    return result.recommended_action || '附近存在限飞/提醒区域，请按要求报备';
-  }
-  return '空域可用';
+const parseIsoDate = (value?: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
+
+const resolveDraftEndDate = (draft: QuickOrderDraft, startDate: Date) => {
+  const endDate = parseIsoDate(draft.scheduled_end_at);
+  if (endDate && endDate > startDate) return endDate;
+  const fallback = new Date(startDate);
+  fallback.setHours(startDate.getHours() + 2, startDate.getMinutes(), 0, 0);
+  return fallback;
+};
+
+const buildDirectOrderPayload = (draft: QuickOrderDraft): DirectOrderInput => {
+  if (!draft.departure_address || !draft.destination_address) {
+    throw new Error('请先补充起吊点和落放点');
+  }
+  const startDate = parseIsoDate(draft.scheduled_start_at);
+  if (!startDate) {
+    throw new Error('请先填写作业时间');
+  }
+  const weight = Number(draft.cargo_weight_kg || 0);
+  if (!Number.isFinite(weight) || weight <= 0) {
+    throw new Error('请填写有效货物重量');
+  }
+
+  return {
+    service_type: 'heavy_cargo_lift_transport',
+    cargo_scene: draft.cargo_scene || 'power_grid',
+    departure_address: toAddressSnapshot(draft.departure_address),
+    destination_address: toAddressSnapshot(draft.destination_address),
+    service_address: null,
+    scheduled_start_at: startDate.toISOString(),
+    scheduled_end_at: resolveDraftEndDate(draft, startDate).toISOString(),
+    cargo_weight_kg: weight,
+    cargo_volume_m3: draft.cargo_volume_m3,
+    cargo_length_cm: draft.cargo_length_cm,
+    cargo_width_cm: draft.cargo_width_cm,
+    cargo_height_cm: draft.cargo_height_cm,
+    cargo_type: draft.cargo_type || '重载物资',
+    cargo_special_requirements: draft.special_requirements,
+    description: draft.description,
+  };
+};
+
+const buildDemandPayload = (
+  draft: QuickOrderDraft,
+  selectedPlan: ServicePlanKey,
+  routeDistance: number,
+): DemandUpsertPayload => {
+  if (!draft.departure_address || !draft.destination_address) {
+    throw new Error('请先补充起吊点和落放点');
+  }
+  const startDate = parseIsoDate(draft.scheduled_start_at);
+  if (!startDate) {
+    throw new Error('请先填写作业时间');
+  }
+  const weight = Number(draft.cargo_weight_kg || 0);
+  if (!Number.isFinite(weight) || weight <= 0) {
+    throw new Error('请填写有效货物重量');
+  }
+  const budget = estimateBudgetCents(selectedPlan, weight, routeDistance);
+  const routeNote = routeDistance > 0 ? `预计距离：${routeDistance.toFixed(1)}km。` : '';
+  const extraDescription = [draft.description, routeNote].filter(Boolean).join('\n');
+
+  return {
+    title: `${shortAddress(draft.departure_address, '起吊点')} → ${shortAddress(draft.destination_address, '落放点')}`,
+    service_type: 'heavy_cargo_lift_transport',
+    cargo_scene: draft.cargo_scene,
+    description: extraDescription || undefined,
+    departure_address: toAddressSnapshot(draft.departure_address),
+    destination_address: toAddressSnapshot(draft.destination_address),
+    service_address: toAddressSnapshot(draft.departure_address),
+    scheduled_start_at: startDate.toISOString(),
+    scheduled_end_at: resolveDraftEndDate(draft, startDate).toISOString(),
+    cargo_weight_kg: weight,
+    cargo_volume_m3: draft.cargo_volume_m3,
+    cargo_length_cm: draft.cargo_length_cm,
+    cargo_width_cm: draft.cargo_width_cm,
+    cargo_height_cm: draft.cargo_height_cm,
+    cargo_type: draft.cargo_type || '重载物资',
+    cargo_special_requirements: draft.special_requirements,
+    estimated_trip_count: 1,
+    budget_min: budget.min,
+    budget_max: budget.max,
+    allows_pilot_candidate: true,
+  };
+};
+
+const normalizeSelectedAddress = (value: unknown): AddressData | null => {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const item = parsed as AddressData;
+    if (!item.latitude || !item.longitude || !(item.address || item.name)) return null;
+    return item;
+  } catch {
+    return null;
+  }
+};
+
+const getStoredAddressTarget = (): AddressTarget | null => {
+  try {
+    const target = Taro.getStorageSync(QUICK_ORDER_ADDRESS_TARGET_STORAGE_KEY);
+    return target === 'pickup' || target === 'delivery' || target === 'extra'
+      ? target
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+
+const distanceKm = (from?: AddressData | null, to?: AddressData | null) => {
+  if (!from?.latitude || !from?.longitude || !to?.latitude || !to?.longitude) {
+    return 0;
+  }
+  const earthRadius = 6371;
+  const dLat = toRadians(to.latitude - from.latitude);
+  const dLng = toRadians(to.longitude - from.longitude);
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const payloadLevel = (weightValue: string) => {
+  const weight = Number(weightValue || 0);
+  if (!weight || weight <= 50) return '50kg';
+  if (weight <= 100) return '100kg';
+  if (weight <= 300) return '300kg';
+  return '300kg+';
+};
+
+const planTitle = (key: ServicePlanKey) =>
+  servicePlans.find(item => item.key === key)?.title || '标准吊运';
+
+const resolveMatchRegion = (pickup?: AddressData | null, delivery?: AddressData | null) =>
+  delivery?.city ||
+  pickup?.city ||
+  delivery?.district ||
+  pickup?.district ||
+  delivery?.address ||
+  pickup?.address ||
+  '';
 
 export default function QuickOrderPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
-  const targetSupplyId = Number(params.supplyId || 0);
-
+  const directSupplyId = Number(params.supplyId || params.id || 0);
   const [cargoScene, setCargoScene] = useState(SCENE_OPTIONS[0].key);
-  const [customCargoScene, setCustomCargoScene] = useState('');
   const [cargoWeight, setCargoWeight] = useState('');
-  const [cargoLength, setCargoLength] = useState('');
-  const [cargoWidth, setCargoWidth] = useState('');
-  const [cargoHeight, setCargoHeight] = useState('');
   const [cargoType, setCargoType] = useState('重载物资');
   const [pickupAddress, setPickupAddress] = useState<AddressData | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState<AddressData | null>(null);
+  const [extraWorkPoint, setExtraWorkPoint] = useState<AddressData | null>(null);
   const [startTime, setStartTime] = useState(buildDefaultTime(0));
   const [endTime, setEndTime] = useState(buildDefaultTime(2));
   const [pickupAirspace, setPickupAirspace] = useState<AirspaceCheckResult | null>(null);
@@ -101,7 +357,68 @@ export default function QuickOrderPage() {
   const [deliveryAirspaceError, setDeliveryAirspaceError] = useState('');
   const [checkingPickup, setCheckingPickup] = useState(false);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<ServicePlanKey>('standard');
   const [submitting, setSubmitting] = useState(false);
+  const pendingAddressTargetRef = useRef<AddressTarget | null>(null);
+
+  const clearAddressSelection = useCallback(() => {
+    pendingAddressTargetRef.current = null;
+    Taro.removeStorageSync(QUICK_ORDER_ADDRESS_TARGET_STORAGE_KEY);
+    Taro.removeStorageSync('selectedAddress');
+  }, []);
+
+  const applySelectedAddress = useCallback((target: AddressTarget, address: AddressData) => {
+    if (target === 'pickup') {
+      setPickupAddress(address);
+    } else if (target === 'delivery') {
+      setDeliveryAddress(address);
+    } else {
+      setExtraWorkPoint(address);
+      Taro.showToast({ title: '已添加作业点', icon: 'success' });
+    }
+  }, []);
+
+  const consumeStoredAddress = useCallback(() => {
+    const target = pendingAddressTargetRef.current || getStoredAddressTarget();
+    if (!target) return;
+    const address = normalizeSelectedAddress(Taro.getStorageSync('selectedAddress'));
+    if (!address) return;
+    applySelectedAddress(target, address);
+    clearAddressSelection();
+  }, [applySelectedAddress, clearAddressSelection]);
+
+  useDidShow(() => {
+    consumeStoredAddress();
+  });
+
+  useEffect(() => {
+    const handler = (address: AddressData) => {
+      const target = pendingAddressTargetRef.current || getStoredAddressTarget();
+      if (!target) return;
+      applySelectedAddress(target, address);
+      clearAddressSelection();
+    };
+    Taro.eventCenter.on('addressSelected', handler);
+    return () => {
+      Taro.eventCenter.off('addressSelected', handler);
+    };
+  }, [applySelectedAddress, clearAddressSelection]);
+
+  useEffect(() => {
+    try {
+      const draft = Taro.getStorageSync(QUICK_ORDER_PREFILL_STORAGE_KEY) as HomeQuickOrderPrefill | '';
+      if (!draft || typeof draft !== 'object') return;
+      if (draft.pickupAddress) setPickupAddress(draft.pickupAddress);
+      if (draft.deliveryAddress) setDeliveryAddress(draft.deliveryAddress);
+      if (draft.cargoWeight) setCargoWeight(String(draft.cargoWeight));
+      const schedule = buildScheduleFromHomeDraft(draft);
+      setStartTime(schedule.startTime);
+      setEndTime(schedule.endTime);
+      Taro.removeStorageSync(QUICK_ORDER_PREFILL_STORAGE_KEY);
+    } catch {
+      Taro.removeStorageSync(QUICK_ORDER_PREFILL_STORAGE_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +440,7 @@ export default function QuickOrderPage() {
       .catch(() => {
         if (!cancelled) {
           setPickupAirspace(null);
-          setPickupAirspaceError('空域检测失败，请点详情重试');
+          setPickupAirspaceError('空域检测失败');
         }
       })
       .finally(() => {
@@ -156,7 +473,7 @@ export default function QuickOrderPage() {
       .catch(() => {
         if (!cancelled) {
           setDeliveryAirspace(null);
-          setDeliveryAirspaceError('空域检测失败，请点详情重试');
+          setDeliveryAirspaceError('空域检测失败');
         }
       })
       .finally(() => {
@@ -169,67 +486,33 @@ export default function QuickOrderPage() {
     };
   }, [deliveryAddress?.latitude, deliveryAddress?.longitude]);
 
+  const routeDistance = useMemo(
+    () => distanceKm(pickupAddress, deliveryAddress),
+    [pickupAddress, deliveryAddress],
+  );
   const hasAirspaceHardBlock =
     isAirspaceHardBlocked(pickupAirspace) || isAirspaceHardBlocked(deliveryAirspace);
   const hasAirspaceCheckError =
     Boolean(pickupAddress && pickupAirspaceError) || Boolean(deliveryAddress && deliveryAirspaceError);
-  const effectiveCargoScene = customCargoScene.trim() || cargoScene;
 
-  const handleChooseLocation = async (type: 'pickup' | 'delivery') => {
-    try {
-      const res = await Taro.chooseLocation({});
-      if (res && (res.name || res.address)) {
-        const addr: AddressData = {
-          name: res.name || res.address,
-          address: res.address || res.name,
-          latitude: res.latitude,
-          longitude: res.longitude,
-        };
-        if (type === 'pickup') {
-          setPickupAddress(addr);
-        } else {
-          setDeliveryAddress(addr);
-        }
-      }
-    } catch {
-      // 用户取消选点或地图不可用时不注入测试地址。
-    }
-  };
+  const airspaceStatus = useMemo(() => {
+    if (checkingPickup || checkingDelivery) return { label: '检测中', tone: 'checking' };
+    if (hasAirspaceCheckError) return { label: '重试', tone: 'warning' };
+    if (hasAirspaceHardBlock) return { label: '受限', tone: 'danger' };
+    if (pickupAddress && deliveryAddress) return { label: '可飞', tone: 'ok' };
+    return { label: '待检测', tone: 'pending' };
+  }, [checkingDelivery, checkingPickup, deliveryAddress, hasAirspaceCheckError, hasAirspaceHardBlock, pickupAddress]);
 
-  const resolveDirectSupplyId = async (weightKG: number) => {
-    if (targetSupplyId > 0) {
-      return targetSupplyId;
-    }
+  const durationMinutes = routeDistance > 0
+    ? Math.max(30, Math.round(25 + routeDistance * 2.3))
+    : 45;
+  const distanceLabel = routeDistance > 0 ? `${routeDistance.toFixed(1)} km` : '--';
+  const durationLabel = `约 ${durationMinutes} 分钟`;
 
-    const res = await supplyService.list({
-      page: 1,
-      page_size: 10,
-      accepts_direct_order: true,
-      service_type: 'heavy_cargo_lift_transport',
-      cargo_scene: effectiveCargoScene,
-      min_payload_kg: weightKG,
-    });
-    const items = ((res as any).items || []) as SupplySummary[];
-    const matched = items.find((item) => {
-      const scenes = item.cargo_scenes || [];
-      return item.accepts_direct_order &&
-        Number(item.max_payload_kg || 0) >= weightKG &&
-        (scenes.length === 0 || scenes.includes(effectiveCargoScene));
-    });
-
-    if (!matched) {
-      throw new Error('暂无匹配的直达服务，请改为发布任务');
-    }
-    return matched.id;
-  };
-
-  const openNoFlyDetails = (addr?: AddressData | null) => {
-    if (!addr?.latitude || !addr?.longitude) {
-      return;
-    }
-    Taro.navigateTo({
-      url: `/pages/airspace/no-fly/index?latitude=${addr.latitude}&longitude=${addr.longitude}`,
-    });
+  const handleChooseLocation = (type: AddressTarget) => {
+    pendingAddressTargetRef.current = type;
+    Taro.setStorageSync(QUICK_ORDER_ADDRESS_TARGET_STORAGE_KEY, type);
+    Taro.navigateTo({ url: '/pages/address/index' });
   };
 
   const handleBack = () => {
@@ -241,28 +524,119 @@ export default function QuickOrderPage() {
     Taro.switchTab({ url: '/pages/home/index' });
   };
 
-  const startParts = splitDateTimeValue(startTime);
-  const endParts = splitDateTimeValue(endTime);
+  const handleEditLocation = async () => {
+    const res = await Taro.showActionSheet({ itemList: ['修改起吊点', '修改落放点'] }).catch(() => null);
+    if (!res || typeof res.tapIndex !== 'number') return;
+    handleChooseLocation(res.tapIndex === 0 ? 'pickup' : 'delivery');
+  };
 
-  const setSchedulePart = (
-    type: 'start' | 'end',
-    part: 'date' | 'time',
-    value: string,
+  const showEligibilityBlocker = async (
+    fallbackMessage: string,
+    suggestedAction?: string,
   ) => {
-    const current = type === 'start' ? startParts : endParts;
-    const nextDate = part === 'date' ? value : current.date;
-    const nextTime = part === 'time' ? value : current.time;
-    const nextValue = `${nextDate || buildDefaultTime(0).slice(0, 10)} ${nextTime || '09:00'}`;
-    if (type === 'start') {
-      setStartTime(nextValue);
-    } else {
-      setEndTime(nextValue);
+    if (suggestedAction === 'verify_identity') {
+      const res = await Taro.showModal({
+        title: '请先完成实名认证',
+        content: fallbackMessage || '完成实名认证后即可继续。',
+        confirmText: '去认证',
+      }).catch(() => null);
+      if (res?.confirm) {
+        Taro.navigateTo({ url: '/pages/verification/index' });
+      }
+      return;
+    }
+    Taro.showToast({ title: fallbackMessage || '当前暂不可提交', icon: 'none' });
+  };
+
+  const ensureClientEligible = async (action: 'publish' | 'direct') => {
+    const eligibility = await getClientEligibility();
+    const allowed = action === 'publish'
+      ? eligibility.can_publish_demand
+      : eligibility.can_create_direct_order;
+    if (allowed) return true;
+
+    const blocker = eligibility.blockers?.[0];
+    await showEligibilityBlocker(blocker?.message || eligibility.summary || '当前账号暂不可提交', blocker?.suggested_action);
+    return false;
+  };
+
+  const createDirectOrder = async (draft: QuickOrderDraft, supplyId: number) => {
+    const eligible = await ensureClientEligible('direct');
+    if (!eligible) return;
+
+    const confirm = await Taro.showModal({
+      title: '确认下单',
+      content: '将按当前吊运信息向该服务商创建真实订单。',
+      confirmText: '确认下单',
+      cancelText: '再修改',
+    }).catch(() => null);
+    if (!confirm?.confirm) return;
+
+    Taro.showLoading({ title: '正在创建订单...' });
+    try {
+      const result = await supplyService.createDirectOrder(supplyId, buildDirectOrderPayload(draft));
+      const orderId = Number((result as any)?.order_id || (result as any)?.order?.id || (result as any)?.id || 0);
+      if (!orderId) throw new Error('订单创建成功但未返回订单ID');
+      Taro.removeStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY);
+      Taro.hideLoading();
+      Taro.showToast({ title: '订单已创建', icon: 'success' });
+      setTimeout(() => {
+        Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
+      }, 500);
+    } catch (error: any) {
+      Taro.hideLoading();
+      Taro.showToast({ title: error?.message || '创建订单失败', icon: 'none' });
     }
   };
 
+  const publishDemand = async (draft: QuickOrderDraft) => {
+    const eligible = await ensureClientEligible('publish');
+    if (!eligible) return;
+
+    Taro.showLoading({ title: '正在发布需求...' });
+    try {
+      const created = await demandV2Service.create(buildDemandPayload(draft, selectedPlan, routeDistance));
+      const demandId = Number((created as any)?.id || (created as any)?.data?.id || 0);
+      if (!demandId) throw new Error('需求创建成功但未返回需求ID');
+      await demandV2Service.publish(demandId);
+      Taro.hideLoading();
+      Taro.showToast({ title: '需求已发布', icon: 'success' });
+      setTimeout(() => {
+        Taro.redirectTo({ url: `/pages/demand/detail/index?id=${demandId}` });
+      }, 500);
+    } catch (error: any) {
+      Taro.hideLoading();
+      Taro.showToast({ title: error?.message || '发布失败', icon: 'none' });
+    }
+  };
+
+  const continueToSupplyList = (draft: QuickOrderDraft) => {
+    Taro.setStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY, draft);
+    Taro.navigateTo({ url: '/pages/supply/list/index?quickOrder=1' });
+  };
+
+  const chooseCargoWeight = async () => {
+    const res = await Taro.showActionSheet({
+      itemList: cargoWeightOptions.map(item => item.label),
+    }).catch(() => null);
+    if (!res || typeof res.tapIndex !== 'number') return false;
+    const selected = cargoWeightOptions[res.tapIndex];
+    if (!selected) return false;
+    setCargoWeight(selected.value);
+    return true;
+  };
+
   const handleSubmit = async () => {
-    if (!cargoWeight || !pickupAddress || !deliveryAddress || !startTime || !endTime) {
-      return Taro.showToast({ title: '请完善订单信息', icon: 'none' });
+    if (submitting || hasAirspaceHardBlock) return;
+    if (!pickupAddress || !deliveryAddress || !startTime || !endTime) {
+      return Taro.showToast({ title: '请先完善作业地点和重量', icon: 'none' });
+    }
+    if (!cargoWeight) {
+      const selected = await chooseCargoWeight();
+      if (selected) {
+        Taro.showToast({ title: '已选择重量，请再次提交', icon: 'none' });
+      }
+      return;
     }
     if (Number(cargoWeight) <= 0) {
       return Taro.showToast({ title: '请填写有效货物重量', icon: 'none' });
@@ -271,7 +645,7 @@ export default function QuickOrderPage() {
       return Taro.showToast({ title: '空域检测中，请稍候', icon: 'none' });
     }
     if (hasAirspaceCheckError) {
-      return Taro.showToast({ title: '空域检测失败，请先查看详情', icon: 'none' });
+      return Taro.showToast({ title: '空域检测失败，请重新选择地点', icon: 'none' });
     }
     if (hasAirspaceHardBlock) {
       return Taro.showToast({ title: '地址命中禁飞区，请先更换地址', icon: 'none' });
@@ -281,278 +655,180 @@ export default function QuickOrderPage() {
     if (!startDate || !endDate || endDate <= startDate) {
       return Taro.showToast({ title: '请填写正确作业时间', icon: 'none' });
     }
-    try {
-      const eligibility = await getClientEligibility();
-      if (!eligibility.can_create_direct_order) {
-        const blocker = eligibility.blockers?.[0];
-        if (blocker?.suggested_action === 'verify_identity') {
-          const res = await Taro.showModal({
-            title: '请先完成实名认证',
-            content: blocker.message || '完成实名认证后即可直达下单。',
-            confirmText: '去认证',
-            cancelText: '稍后再说',
-          });
-          if (res.confirm) {
-            Taro.navigateTo({ url: '/pages/verification/index' });
-          }
-        } else {
-          Taro.showToast({ title: blocker?.message || '当前暂不可下单', icon: 'none' });
-        }
-        return;
-      }
-    } catch (error: any) {
-      return Taro.showToast({ title: error?.message || '资格检查失败', icon: 'none' });
-    }
-
     setSubmitting(true);
     try {
       const weightKG = Number(cargoWeight);
-      const lengthCM = Number(cargoLength);
-      const widthCM = Number(cargoWidth);
-      const heightCM = Number(cargoHeight);
-      const supplyId = await resolveDirectSupplyId(weightKG);
-      const payload: DirectOrderInput = {
-        service_type: 'heavy_cargo_lift_transport',
-        cargo_scene: effectiveCargoScene,
+      const extraText = extraWorkPoint ? `，途经作业点：${formatAddress(extraWorkPoint)}` : '';
+      const draft: QuickOrderDraft = {
+        cargo_scene: cargoScene,
         cargo_type: cargoType.trim() || '重载物资',
         cargo_weight_kg: weightKG,
-        departure_address: toAddressSnapshot(pickupAddress),
-        destination_address: toAddressSnapshot(deliveryAddress),
-        service_address: toAddressSnapshot(pickupAddress),
+        departure_address: pickupAddress,
+        destination_address: deliveryAddress,
         scheduled_start_at: startDate.toISOString(),
         scheduled_end_at: endDate.toISOString(),
-        description: `${formatAddress(pickupAddress)} 到 ${formatAddress(deliveryAddress)}吊运`,
+        description: `${planTitle(selectedPlan)}：${formatAddress(pickupAddress)} 到 ${formatAddress(deliveryAddress)}吊运${extraText}`,
+        special_requirements: `服务方案：${planTitle(selectedPlan)}；预计开始：${formatDateTime(startDate)}`,
+        match_region: resolveMatchRegion(pickupAddress, deliveryAddress),
       };
-      if (lengthCM > 0) payload.cargo_length_cm = lengthCM;
-      if (widthCM > 0) payload.cargo_width_cm = widthCM;
-      if (heightCM > 0) payload.cargo_height_cm = heightCM;
-      if (lengthCM > 0 && widthCM > 0 && heightCM > 0) {
-        payload.cargo_volume_m3 = lengthCM * widthCM * heightCM / 1000000;
+
+      if (directSupplyId > 0) {
+        await createDirectOrder(draft, directSupplyId);
+        return;
       }
 
-      const result = await supplyService.createDirectOrder(supplyId, payload);
-      Taro.showToast({ title: '下单成功，待确认', icon: 'success' });
-      setTimeout(() => {
-        Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${result.order_id}` })
-          .catch(() => Taro.switchTab({ url: '/pages/home/index' }));
-      }, 1500);
+      const action = await Taro.showActionSheet({
+        itemList: ['匹配服务商方案', '发布需求等服务商报价'],
+      }).catch(() => null);
+      if (!action || typeof action.tapIndex !== 'number') return;
+      if (action.tapIndex === 1) {
+        await publishDemand(draft);
+        return;
+      }
+      continueToSupplyList(draft);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '下单失败', icon: 'none' });
+      Taro.showToast({ title: e.message || '进入方案列表失败', icon: 'none' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const renderAddressBlock = (
-    type: 'pickup' | 'delivery',
-    title: string,
-    icon: string,
-    address: AddressData | null,
-    checking: boolean,
-    result: AirspaceCheckResult | null,
-    error: string,
-  ) => {
-    const hasAddress = Boolean(address);
-    const isBlocked = isAirspaceHardBlocked(result);
-    const showNote = hasAddress || checking || Boolean(error);
+  const renderPlan = (plan: typeof servicePlans[number], index: number) => {
+    const active = selectedPlan === plan.key;
     return (
-      <View className='qo-field-block'>
-        <View className='qo-field-title-row'>
-          <Image className='qo-field-icon' src={icon} mode='aspectFit' />
-          <Text className='qo-field-title'>{title}</Text>
-          <Text className='qo-required'>*</Text>
-        </View>
-        <View className='qo-large-input' onClick={() => handleChooseLocation(type)}>
-          <Text className={`qo-address-text ${hasAddress ? '' : 'qo-placeholder'}`}>
-            {formatAddress(address) || '选择地址后自动检测空域'}
-          </Text>
-          <View className='qo-input-right'>
-            <Image className='qo-right-icon' src={chevronRightIcon} mode='aspectFit' />
-            <View className='qo-right-divider' />
-            <View
-              className='qo-target-btn'
-              onClick={(e: any) => {
-                e.stopPropagation();
-                openNoFlyDetails(address);
-              }}
-            >
-              <Image className='qo-target-icon' src={targetIcon} mode='aspectFit' />
-            </View>
-          </View>
-        </View>
-        {showNote ? (
-          <View
-            className={`qo-airspace-note ${isBlocked ? 'qo-airspace-note-danger' : error ? 'qo-airspace-note-warning' : ''}`}
-            onClick={() => openNoFlyDetails(address)}
-          >
-            <Text className='qo-airspace-note-text'>
-              {checking
-                ? `${title.replace('地址', '')}空域检测中...`
-                : getAirspaceLabel(result, hasAddress, error)}
-            </Text>
-            {hasAddress ? <Text className='qo-airspace-note-link'>详情</Text> : null}
+      <View
+        key={plan.key}
+        className={`qo3-plan-row qo3-plan-row-${index + 1}`}
+        onClick={() => setSelectedPlan(plan.key)}
+      >
+        <Image className='qo3-plan-radio' src={active ? radioSelectedIcon : radioUnselectedIcon} mode='aspectFit' />
+        <Text className='qo3-plan-title'>{plan.title}</Text>
+        {plan.recommended ? (
+          <View className='qo3-recommend-badge'>
+            <Text className='qo3-recommend-text'>推荐</Text>
           </View>
         ) : null}
+        <Text className='qo3-plan-subtitle'>{plan.subtitle}</Text>
+        <View className='qo3-price'>
+          {plan.prefix ? <Text className='qo3-price-prefix'>{plan.prefix}</Text> : null}
+          <Text className='qo3-price-main'>{plan.price}</Text>
+          {plan.suffix ? <Text className='qo3-price-suffix'>{plan.suffix}</Text> : null}
+        </View>
       </View>
     );
   };
 
-  const renderScheduleRow = (
-    title: string,
-    type: 'start' | 'end',
-    parts: { date: string; time: string },
-  ) => (
-    <View className='qo-schedule-row'>
-      <View className='qo-left-label-row qo-calendar-label'>
-        <Image className='qo-field-icon' src={calendarIcon} mode='aspectFit' />
-        <Text className='qo-field-title'>{title}</Text>
-        <Text className='qo-required'>*</Text>
-      </View>
-      <View className='qo-date-time-wrap'>
-        <Picker mode='date' value={parts.date} onChange={(e) => setSchedulePart(type, 'date', String(e.detail.value || ''))}>
-          <View className='qo-date-input'>
-            <Text className='qo-value qo-date-text'>{parts.date || '请选择日期'}</Text>
-            <Image className='qo-small-side-icon' src={calendarIcon} mode='aspectFit' />
-          </View>
-        </Picker>
-        <Picker mode='time' value={parts.time} onChange={(e) => setSchedulePart(type, 'time', String(e.detail.value || ''))}>
-          <View className='qo-time-input'>
-            <Text className='qo-value qo-time-text'>{parts.time || '时间'}</Text>
-            <Image className='qo-small-side-icon' src={clockIcon} mode='aspectFit' />
-          </View>
-        </Picker>
-      </View>
-    </View>
-  );
-
   return (
-    <View className='qo-page'>
-      <View className='qo-navbar'>
-        <View className='qo-nav-side'>
-          <View className='qo-nav-back' onClick={handleBack}>
-            <Image className='qo-back-icon' src={backIcon} mode='aspectFit' />
-          </View>
+    <View className='qo3-page'>
+      <View className='qo3-blue-bg' />
+      <View className='qo3-navbar'>
+        <View className='qo3-nav-back' onClick={handleBack}>
+          <Image className='qo3-nav-back-icon' src={navBackIcon} mode='aspectFit' />
         </View>
-        <Text className='qo-nav-title'>快速下单</Text>
-        <View className='qo-nav-side qo-nav-side-right' />
+        <Text className='qo3-nav-title'>确认吊运信息</Text>
+        <View className='qo3-nav-service' onClick={() => Taro.switchTab({ url: '/pages/messages/index' })}>
+          <Image className='qo3-nav-chat' src={navChatIcon} mode='aspectFit' />
+          <Text className='qo3-nav-service-text'>客服</Text>
+        </View>
       </View>
 
-      <ScrollView scrollY className='qo-scroll'>
-        <View className='qo-body'>
-          <View className='qo-form-card'>
-            {renderAddressBlock('pickup', '起点地址', pinStartIcon, pickupAddress, checkingPickup, pickupAirspace, pickupAirspaceError)}
-            {renderAddressBlock('delivery', '终点地址', pinEndIcon, deliveryAddress, checkingDelivery, deliveryAirspace, deliveryAirspaceError)}
-
-            <View className='qo-split-row'>
-              <View className='qo-left-label-row'>
-                <Image className='qo-field-icon' src={weightBagIcon} mode='aspectFit' />
-                <Text className='qo-field-title'>货物重量</Text>
-                <Text className='qo-required'>*</Text>
-              </View>
-              <View className='qo-inline-input'>
-                <Input
-                  className='qo-inline-input-field'
-                  type='digit'
-                  placeholder='请输入重量'
-                  placeholderClass='qo-input-placeholder'
-                  value={cargoWeight}
-                  onInput={(e) => setCargoWeight(e.detail.value)}
-                />
-                <Text className='qo-unit'>kg</Text>
-              </View>
+      <ScrollView scrollY className='qo3-scroll'>
+        <View className='qo3-canvas'>
+          <View className='qo3-card qo3-location-card'>
+            <View className='qo3-section-head qo3-location-head'>
+              <Image className='qo3-section-location-icon' src={sectionLocationPinIcon} mode='aspectFit' />
+              <Text className='qo3-section-title'>作业地点</Text>
+              <Text className='qo3-edit-link' onClick={handleEditLocation}>编辑</Text>
             </View>
+            <View className='qo3-location-box'>
+              <Image className='qo3-route-pin qo3-route-start' src={routeStartPinIcon} mode='aspectFit' />
+              <View className='qo3-route-dash' />
+              <Image className='qo3-route-pin qo3-route-end' src={routeEndPinIcon} mode='aspectFit' />
 
-            <View className='qo-split-row qo-split-row-gap'>
-              <View className='qo-left-label-row'>
-                <Image className='qo-field-icon' src={cubeIcon} mode='aspectFit' />
-                <Text className='qo-field-title'>货物类型</Text>
-                <Text className='qo-required'>*</Text>
+              <View className='qo3-location-row qo3-location-start' onClick={() => handleChooseLocation('pickup')}>
+                <Text className='qo3-location-label'>起吊点</Text>
+                <Text className={`qo3-location-address ${pickupAddress ? '' : 'is-placeholder'}`}>
+                  {compactAddress(pickupAddress, '请选择货物起吊位置')}
+                </Text>
+                <Image className='qo3-chevron qo3-chevron-start' src={chevronRightIcon} mode='aspectFit' />
               </View>
-              <View className='qo-inline-input qo-select-input'>
-                <Input
-                  className='qo-inline-input-field qo-cargo-type-input'
-                  placeholder='重载物资'
-                  placeholderClass='qo-input-placeholder'
-                  value={cargoType}
-                  onInput={(e) => setCargoType(e.detail.value)}
-                />
-                <Image className='qo-down-icon' src={chevronDownIcon} mode='aspectFit' />
+              <View className='qo3-location-divider qo3-location-divider-1' />
+              <View className='qo3-location-row qo3-location-end' onClick={() => handleChooseLocation('delivery')}>
+                <Text className='qo3-location-label'>落放点</Text>
+                <Text className={`qo3-location-address ${deliveryAddress ? '' : 'is-placeholder'}`}>
+                  {compactAddress(deliveryAddress, '请选择货物落放位置')}
+                </Text>
+                <Image className='qo3-chevron qo3-chevron-end' src={chevronRightIcon} mode='aspectFit' />
               </View>
-            </View>
-
-            <View className='qo-field-block qo-dim-block'>
-              <View className='qo-field-title-row'>
-                <Image className='qo-field-icon' src={rulerIcon} mode='aspectFit' />
-                <Text className='qo-field-title'>货物尺寸（cm，可选）</Text>
-              </View>
-              <View className='qo-dim-row'>
-                <View className='qo-dim-input'>
-                  <Text className='qo-dim-prefix'>长</Text>
-                  <Input className='qo-dim-native-input' type='digit' placeholder='请输入' placeholderClass='qo-input-placeholder' value={cargoLength} onInput={(e) => setCargoLength(e.detail.value)} />
-                </View>
-                <View className='qo-dim-input'>
-                  <Text className='qo-dim-prefix'>宽</Text>
-                  <Input className='qo-dim-native-input' type='digit' placeholder='请输入' placeholderClass='qo-input-placeholder' value={cargoWidth} onInput={(e) => setCargoWidth(e.detail.value)} />
-                </View>
-                <View className='qo-dim-input'>
-                  <Text className='qo-dim-prefix'>高</Text>
-                  <Input className='qo-dim-native-input' type='digit' placeholder='请输入' placeholderClass='qo-input-placeholder' value={cargoHeight} onInput={(e) => setCargoHeight(e.detail.value)} />
-                </View>
-              </View>
-            </View>
-
-            <View className='qo-field-block qo-scene-block'>
-              <View className='qo-field-title-row'>
-                <Image className='qo-field-icon' src={gridIcon} mode='aspectFit' />
-                <Text className='qo-field-title'>作业场景</Text>
-                <Text className='qo-required'>*</Text>
-              </View>
-              <View className='qo-scene-row'>
-                {SCENE_OPTIONS.map((s) => {
-                  const active = !customCargoScene.trim() && cargoScene === s.key;
-                  return (
-                    <View
-                      key={s.key}
-                      className={`qo-scene-pill ${active ? 'is-active' : ''}`}
-                      onClick={() => {
-                        setCargoScene(s.key);
-                        setCustomCargoScene('');
-                      }}
-                    >
-                      <Text className={`qo-scene-text ${active ? 'active' : ''}`}>{s.label}</Text>
-                      {active ? <Image className='qo-check-icon' src={checkCircleIcon} mode='aspectFit' /> : null}
-                    </View>
-                  );
-                })}
-              </View>
-              <Input
-                className='qo-other-input'
-                placeholder='其他场景，可直接填写'
-                placeholderClass='qo-input-placeholder'
-                value={customCargoScene}
-                onInput={(e) => setCustomCargoScene(e.detail.value)}
-              />
-            </View>
-
-            <View className='qo-schedule-block'>
-              {renderScheduleRow('预计开始', 'start', startParts)}
-              <View className='qo-schedule-row-gap'>
-                {renderScheduleRow('预计结束', 'end', endParts)}
+              <View className='qo3-location-divider qo3-location-divider-2' />
+              <View className='qo3-add-point' onClick={() => handleChooseLocation('extra')}>
+                <Image className='qo3-add-icon' src={addWorkPointPlusIcon} mode='aspectFit' />
+                <Text className='qo3-add-text'>{extraWorkPoint ? '已添加作业点' : '添加作业点'}</Text>
               </View>
             </View>
           </View>
 
-          {hasAirspaceHardBlock ? (
-            <Text className='qo-blocked-hint'>当前起飞点或降落点命中禁飞限制，请先更换地址后再下单。</Text>
-          ) : null}
+          <View className='qo3-card qo3-detect-card'>
+            <View className='qo3-section-head qo3-detect-head'>
+              <Image className='qo3-section-detect-icon' src={sectionDetectionShieldIcon} mode='aspectFit' />
+              <Text className='qo3-section-title'>智能检测结果</Text>
+            </View>
+            <View className='qo3-detect-grid'>
+              <View className='qo3-grid-vline' />
+              <View className='qo3-grid-hline' />
+              <View className='qo3-detect-cell qo3-detect-airspace'>
+                <Image className='qo3-detect-icon qo3-airspace-icon' src={detectAirspaceIcon} mode='aspectFit' />
+                <Text className='qo3-detect-title'>空域检测</Text>
+                <View className={`qo3-status-badge ${airspaceStatus.tone}`}>
+                  <Text className={`qo3-status-text ${airspaceStatus.tone}`}>{airspaceStatus.label}</Text>
+                </View>
+              </View>
+              <View className='qo3-detect-cell qo3-detect-payload' onClick={chooseCargoWeight}>
+                <Image className='qo3-detect-icon qo3-payload-icon' src={detectPayloadScaleIcon} mode='aspectFit' />
+                <Text className='qo3-detect-title'>载重匹配</Text>
+                <Text className='qo3-detect-desc'>
+                  {cargoWeight ? `预计需 ${payloadLevel(cargoWeight)} 级服务` : '点击选择重量'}
+                </Text>
+              </View>
+              <View className='qo3-detect-cell qo3-detect-distance'>
+                <Image className='qo3-detect-icon qo3-distance-icon' src={detectDistancePinIcon} mode='aspectFit' />
+                <Text className='qo3-detect-title'>预计距离</Text>
+                <Text className='qo3-detect-value'>{distanceLabel}</Text>
+              </View>
+              <View className='qo3-detect-cell qo3-detect-duration'>
+                <Image className='qo3-detect-icon qo3-duration-icon' src={detectDurationClockIcon} mode='aspectFit' />
+                <Text className='qo3-detect-title'>预计作业时长</Text>
+                <Text className='qo3-detect-value'>{durationLabel}</Text>
+              </View>
+            </View>
+            <View className='qo3-cost-note'>
+              <Image className='qo3-info-icon' src={infoCircleIcon} mode='aspectFit' />
+              <Text className='qo3-cost-text'>最终费用以服务商确认方案为准</Text>
+            </View>
+          </View>
 
-          <View className='qo-bottom-spacer' />
+          <View className='qo3-card qo3-plan-card'>
+            <View className='qo3-section-head qo3-plan-head'>
+              <Image className='qo3-section-plan-icon' src={sectionPlanClipboardIcon} mode='aspectFit' />
+              <Text className='qo3-section-title'>选择服务方案</Text>
+            </View>
+            <View className='qo3-plan-list'>
+              <View className='qo3-plan-line qo3-plan-line-1' />
+              <View className='qo3-plan-line qo3-plan-line-2' />
+              {servicePlans.map(renderPlan)}
+            </View>
+          </View>
         </View>
       </ScrollView>
 
-      <View className='qo-bottom-bar'>
-        <View className={`qo-submit-btn ${(submitting || hasAirspaceHardBlock) ? 'disabled' : ''}`} onClick={handleSubmit}>
-          <Text className='qo-submit-btn-text'>{submitting ? '提交中...' : '立即下单'}</Text>
+      <View className='qo3-bottom-bar'>
+        <View className='qo3-back-button' onClick={handleBack}>
+          <Text className='qo3-back-button-text'>返回修改</Text>
+        </View>
+        <View className={`qo3-submit-button ${(submitting || hasAirspaceHardBlock) ? 'disabled' : ''}`} onClick={handleSubmit}>
+          <Text className='qo3-submit-button-text'>
+            {submitting ? '提交中...' : directSupplyId > 0 ? '确认下单' : '提交预约'}
+          </Text>
         </View>
       </View>
     </View>

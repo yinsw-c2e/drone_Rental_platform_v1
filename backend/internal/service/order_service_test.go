@@ -1,11 +1,15 @@
 package service
 
 import (
+	"encoding/json"
 	"math"
 	"strings"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
+	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/repository"
 )
@@ -143,6 +147,218 @@ func TestValidateExecutionStatusTransition(t *testing.T) {
 	}
 }
 
+func TestHuolalaOrderModeInitialStatusCompatibility(t *testing.T) {
+	tests := []struct {
+		name                       string
+		orderSource                string
+		orderMode                  string
+		expectedStatus             string
+		expectProviderConfirmation bool
+	}{
+		{
+			name:                       "legacy direct empty mode stays negotiated",
+			orderSource:                "supply_direct",
+			orderMode:                  "",
+			expectedStatus:             "pending_provider_confirmation",
+			expectProviderConfirmation: true,
+		},
+		{
+			name:                       "negotiated direct asks provider confirmation",
+			orderSource:                "supply_direct",
+			orderMode:                  OrderModeNegotiated,
+			expectedStatus:             "pending_provider_confirmation",
+			expectProviderConfirmation: true,
+		},
+		{
+			name:           "negotiated market keeps created default",
+			orderSource:    "demand_market",
+			orderMode:      OrderModeNegotiated,
+			expectedStatus: "created",
+		},
+		{
+			name:           "instant direct never asks provider confirmation",
+			orderSource:    "supply_direct",
+			orderMode:      OrderModeInstant,
+			expectedStatus: "pending_dispatch",
+		},
+		{
+			name:           "instant source enters pending dispatch",
+			orderSource:    OrderModeInstant,
+			orderMode:      OrderModeInstant,
+			expectedStatus: "pending_dispatch",
+		},
+		{
+			name:           "reservation direct enters scheduled",
+			orderSource:    "supply_direct",
+			orderMode:      OrderModeReservation,
+			expectedStatus: "scheduled",
+		},
+		{
+			name:           "reservation source enters scheduled",
+			orderSource:    OrderModeReservation,
+			orderMode:      OrderModeReservation,
+			expectedStatus: "scheduled",
+		},
+		{
+			name:                       "unknown mode defaults to negotiated compatibility",
+			orderSource:                "supply_direct",
+			orderMode:                  "bad-mode",
+			expectedStatus:             "pending_provider_confirmation",
+			expectProviderConfirmation: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := initialOrderStatus(tt.orderSource, tt.orderMode); got != tt.expectedStatus {
+				t.Fatalf("expected status %s, got %s", tt.expectedStatus, got)
+			}
+			if got := shouldEnterProviderConfirmation(tt.orderSource, tt.orderMode); got != tt.expectProviderConfirmation {
+				t.Fatalf("expected provider confirmation=%v, got %v", tt.expectProviderConfirmation, got)
+			}
+		})
+	}
+}
+
+func TestProviderConfirmRejectsInstantOrderEvenIfLegacyStatusLeaked(t *testing.T) {
+	db := newServiceTestDB(t, &model.Order{}, &model.OrderTimeline{}, &model.Review{})
+	order := &model.Order{
+		OrderNo:        "WRJ-H2-INSTANT-CONFIRM",
+		OrderSource:    "supply_direct",
+		OrderMode:      OrderModeInstant,
+		Status:         "pending_provider_confirmation",
+		ProviderUserID: 7,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	service := &OrderService{}
+	err := service.providerConfirmOrderWithRepos(order.ID, 7, repository.NewOrderRepo(db), nil, nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected instant order to reject provider confirmation path")
+	}
+}
+
+func TestCreateInstantOrderUsesServerPricingAndStoresBreakdown(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Client{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+	)
+	orderRepo := repository.NewOrderRepo(db)
+	service := NewOrderService(
+		orderRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		repository.NewClientRepo(db),
+		nil,
+		nil,
+		repository.NewOrderArtifactRepo(db),
+		&config.Config{Payment: config.PaymentConfig{CommissionRate: 10}},
+		zap.NewNop(),
+	)
+	service.SetPricingService(seedPricingServiceClasses(t))
+
+	start := time.Date(2026, 6, 1, 10, 0, 0, 0, time.Local)
+	result, err := service.CreateInstantOrder(13800000004, &PlatformPricedOrderInput{
+		Origin:           PricingPoint{Latitude: 22.5431, Longitude: 114.0579, Address: "深圳市龙岗区坂田仓库"},
+		Destination:      PricingPoint{Latitude: 22.6283, Longitude: 114.3612, Address: "深圳市坪山区施工点"},
+		CargoWeightKG:    80,
+		ScheduledStartAt: start,
+		ServiceClassCode: "light_heavy",
+		CargoScene:       "施工物料吊运",
+	})
+	if err != nil {
+		t.Fatalf("create instant order: %v", err)
+	}
+	if result.Order.OrderMode != OrderModeInstant || result.Order.OrderSource != OrderModeInstant {
+		t.Fatalf("expected instant order mode/source, got mode=%s source=%s", result.Order.OrderMode, result.Order.OrderSource)
+	}
+	if result.Order.Status != "pending_dispatch" {
+		t.Fatalf("expected pending_dispatch, got %s", result.Order.Status)
+	}
+	if result.Order.TotalAmount != result.Estimate.TotalEstimatedCents {
+		t.Fatalf("expected total_amount from server estimate %d, got %d", result.Estimate.TotalEstimatedCents, result.Order.TotalAmount)
+	}
+	if result.Order.EstimatedDistanceM != result.Estimate.DistanceM || result.Order.EstimatedDurationMin != result.Estimate.EstimatedDurationMin {
+		t.Fatalf("expected estimate metadata to persist, order=%#v estimate=%#v", result.Order, result.Estimate)
+	}
+	if len(result.Order.PriceBreakdownJSON) == 0 || string(result.Order.PriceBreakdownJSON) == "null" {
+		t.Fatal("expected price breakdown json to be stored")
+	}
+
+	var persisted model.Order
+	if err := db.First(&persisted, result.Order.ID).Error; err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	if persisted.TotalAmount != result.Estimate.TotalEstimatedCents {
+		t.Fatalf("expected persisted total amount %d, got %d", result.Estimate.TotalEstimatedCents, persisted.TotalAmount)
+	}
+	if persisted.ProviderUserID != 0 || persisted.DemandID != 0 || persisted.SourceSupplyID != 0 {
+		t.Fatalf("instant order should not bind demand/provider before grab, got %#v", persisted)
+	}
+
+	var timelines []model.OrderTimeline
+	if err := db.Where("order_id = ?", result.Order.ID).Find(&timelines).Error; err != nil {
+		t.Fatalf("query timelines: %v", err)
+	}
+	if len(timelines) != 1 || timelines[0].Status != "pending_dispatch" {
+		t.Fatalf("expected pending_dispatch timeline, got %#v", timelines)
+	}
+}
+
+func TestCreateReservationOrderSchedulesWithoutProviderConfirmation(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Client{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+	)
+	service := NewOrderService(
+		repository.NewOrderRepo(db),
+		nil,
+		nil,
+		nil,
+		nil,
+		repository.NewClientRepo(db),
+		nil,
+		nil,
+		repository.NewOrderArtifactRepo(db),
+		&config.Config{Payment: config.PaymentConfig{CommissionRate: 10}},
+		zap.NewNop(),
+	)
+	service.SetPricingService(seedPricingServiceClasses(t))
+
+	start := time.Now().Add(24 * time.Hour)
+	result, err := service.CreateReservationOrder(13800000004, &PlatformPricedOrderInput{
+		Origin:           PricingPoint{Latitude: 22.5431, Longitude: 114.0579, Address: "深圳市龙岗区坂田仓库"},
+		Destination:      PricingPoint{Latitude: 22.6283, Longitude: 114.3612, Address: "深圳市坪山区施工点"},
+		CargoWeightKG:    120,
+		ScheduledStartAt: start,
+		ServiceClassCode: "medium_heavy",
+	})
+	if err != nil {
+		t.Fatalf("create reservation order: %v", err)
+	}
+	if result.Order.OrderMode != OrderModeReservation || result.Order.Status != "scheduled" {
+		t.Fatalf("expected scheduled reservation, got mode=%s status=%s", result.Order.OrderMode, result.Order.Status)
+	}
+	if result.Order.ReservedStartAt == nil || !result.Order.ReservedStartAt.Equal(start) {
+		t.Fatalf("expected reserved_start_at=%v, got %v", start, result.Order.ReservedStartAt)
+	}
+	if result.Order.Status == "pending_provider_confirmation" {
+		t.Fatal("reservation order must not enter pending_provider_confirmation")
+	}
+}
+
 func TestBuildExecutionStatusUpdates(t *testing.T) {
 	now := time.Date(2026, 4, 13, 10, 30, 0, 0, time.Local)
 	order := &model.Order{AirspaceStatus: ""}
@@ -198,6 +414,182 @@ func TestFilterExecutionStatusUpdates(t *testing.T) {
 	}
 	if _, ok := filtered["loading_confirmed_at"]; !ok {
 		t.Fatal("expected available optional timestamp column to stay intact")
+	}
+}
+
+func TestConfirmSiteSafetyCheckUpdatesAirspaceStatusAndTimeline(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Drone{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.Review{},
+	)
+
+	drone := &model.Drone{
+		OwnerID:            801,
+		Brand:              "DJI",
+		Model:              "FlyCart",
+		SerialNumber:       "SN-SAFETY-001",
+		AvailabilityStatus: "busy",
+	}
+	if err := db.Create(drone).Error; err != nil {
+		t.Fatalf("create drone: %v", err)
+	}
+	order := &model.Order{
+		OrderNo:             "WRJ-SAFETY-001",
+		DroneID:             drone.ID,
+		ClientUserID:        601,
+		ProviderUserID:      801,
+		ExecutorPilotUserID: 901,
+		Title:               "现场复核测试单",
+		Status:              "assigned",
+		NeedsDispatch:       true,
+		ExecutionMode:       "dispatch_pool",
+		AirspaceStatus:      "pending_review",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	service := &OrderService{
+		orderRepo: repository.NewOrderRepo(db),
+		droneRepo: repository.NewDroneRepo(db),
+	}
+
+	if err := service.ConfirmSiteSafetyCheck(order.ID, order.ProviderUserID, "现场安全复核通过"); err != nil {
+		t.Fatalf("confirm site safety: %v", err)
+	}
+
+	var updated model.Order
+	if err := db.First(&updated, order.ID).Error; err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	if updated.AirspaceStatus != "approved" {
+		t.Fatalf("expected airspace approved, got %s", updated.AirspaceStatus)
+	}
+	if updated.Status != "assigned" {
+		t.Fatalf("expected order status to stay assigned, got %s", updated.Status)
+	}
+
+	var timeline model.OrderTimeline
+	if err := db.Where("order_id = ? AND status = ?", order.ID, "airspace_approved").First(&timeline).Error; err != nil {
+		t.Fatalf("query safety timeline: %v", err)
+	}
+	if timeline.OperatorID != order.ProviderUserID || timeline.OperatorType != "owner" {
+		t.Fatalf("unexpected timeline operator: %#v", timeline)
+	}
+	if !strings.Contains(timeline.Note, "现场安全复核通过") {
+		t.Fatalf("expected safety note, got %s", timeline.Note)
+	}
+}
+
+func TestConfirmSiteSafetyCheckRejectsUnauthorizedUser(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Drone{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.Review{},
+	)
+	order := &model.Order{
+		OrderNo:        "WRJ-SAFETY-002",
+		ClientUserID:   601,
+		ProviderUserID: 801,
+		Status:         "assigned",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	service := &OrderService{orderRepo: repository.NewOrderRepo(db)}
+	if err := service.ConfirmSiteSafetyCheck(order.ID, 777, ""); err == nil {
+		t.Fatal("expected unauthorized user to be rejected")
+	}
+}
+
+func TestSubmitSiteSafetyCheckPersistsEvidenceAndApprovesAirspace(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Drone{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSiteSafetyCheck{},
+		&model.Review{},
+	)
+
+	order := &model.Order{
+		OrderNo:             "WRJ-SAFETY-003",
+		ClientUserID:        601,
+		ProviderUserID:      801,
+		ExecutorPilotUserID: 901,
+		Title:               "现场证据测试单",
+		Status:              "assigned",
+		AirspaceStatus:      "pending_review",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	service := &OrderService{orderRepo: repository.NewOrderRepo(db)}
+	record, err := service.SubmitSiteSafetyCheck(order.ID, order.ProviderUserID, SubmitSiteSafetyCheckInput{
+		Checklist: []SiteSafetyChecklistItem{
+			{Key: "pickup_clearance", Label: "起吊点安全距离已确认", Checked: true},
+			{Key: "weather_wind", Label: "天气与风速满足作业条件", Checked: true},
+		},
+		Photos: []string{"/uploads/drone/site-1.jpg", "/uploads/drone/site-1.jpg", " /uploads/drone/site-2.jpg "},
+		Note:   "现场已拍照复核",
+	})
+	if err != nil {
+		t.Fatalf("submit site safety: %v", err)
+	}
+	if record.ID == 0 {
+		t.Fatal("expected persisted site safety record")
+	}
+	if record.OperatorRole != "owner" {
+		t.Fatalf("expected owner operator role, got %s", record.OperatorRole)
+	}
+
+	var updated model.Order
+	if err := db.First(&updated, order.ID).Error; err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	if updated.AirspaceStatus != "approved" {
+		t.Fatalf("expected airspace approved, got %s", updated.AirspaceStatus)
+	}
+
+	var photos []string
+	if err := json.Unmarshal([]byte(record.Photos), &photos); err != nil {
+		t.Fatalf("decode photos: %v", err)
+	}
+	if len(photos) != 2 || photos[0] != "/uploads/drone/site-1.jpg" || photos[1] != "/uploads/drone/site-2.jpg" {
+		t.Fatalf("expected normalized photos, got %#v", photos)
+	}
+
+	var timeline model.OrderTimeline
+	if err := db.Where("order_id = ? AND status = ?", order.ID, "airspace_approved").First(&timeline).Error; err != nil {
+		t.Fatalf("query timeline: %v", err)
+	}
+	if timeline.OperatorID != order.ProviderUserID || timeline.OperatorType != "owner" {
+		t.Fatalf("unexpected timeline operator: %#v", timeline)
+	}
+}
+
+func TestSubmitSiteSafetyCheckRejectsIncompleteEvidence(t *testing.T) {
+	service := &OrderService{}
+	_, err := service.SubmitSiteSafetyCheck(1, 801, SubmitSiteSafetyCheckInput{
+		Checklist: []SiteSafetyChecklistItem{{Key: "weather_wind", Label: "天气与风速满足作业条件", Checked: false}},
+		Photos:    []string{"/uploads/drone/site-1.jpg"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "天气与风速") {
+		t.Fatalf("expected unchecked item error, got %v", err)
+	}
+
+	_, err = service.SubmitSiteSafetyCheck(1, 801, SubmitSiteSafetyCheckInput{
+		Checklist: []SiteSafetyChecklistItem{{Key: "weather_wind", Label: "天气与风速满足作业条件", Checked: true}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "上传") {
+		t.Fatalf("expected missing photo error, got %v", err)
 	}
 }
 
@@ -301,6 +693,141 @@ func TestConfirmReceiptCompletesFormalDispatchTask(t *testing.T) {
 	}
 	if updatedDrone.AvailabilityStatus != "available" {
 		t.Fatalf("expected drone availability restored, got %s", updatedDrone.AvailabilityStatus)
+	}
+}
+
+func TestConfirmReceiptFinalizesSettlementWalletIncome(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Drone{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSettlement{},
+		&model.UserWallet{},
+		&model.WalletTransaction{},
+		&model.Message{},
+		&model.PricingConfig{},
+		&model.Review{},
+	)
+
+	drone := &model.Drone{
+		OwnerID:            7,
+		Brand:              "DJI",
+		Model:              "FlyCart",
+		SerialNumber:       "SN-SETTLE-001",
+		AvailabilityStatus: "busy",
+	}
+	if err := db.Create(drone).Error; err != nil {
+		t.Fatalf("create drone: %v", err)
+	}
+
+	order := &model.Order{
+		OrderNo:             "WRJ-CONFIRM-SETTLE-001",
+		OrderType:           "cargo",
+		DroneID:             drone.ID,
+		ClientUserID:        4,
+		RenterID:            4,
+		ProviderUserID:      7,
+		ExecutorPilotUserID: 16,
+		Title:               "签收后自动结算测试单",
+		TotalAmount:         168000,
+		Status:              "delivered",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	orderRepo := repository.NewOrderRepo(db)
+	settlementService := NewSettlementService(repository.NewSettlementRepo(db), orderRepo, zap.NewNop())
+	messageService := NewMessageService(repository.NewMessageRepo(db))
+	eventService := NewEventService(messageService, nil, zap.NewNop())
+	service := &OrderService{
+		orderRepo:         orderRepo,
+		droneRepo:         repository.NewDroneRepo(db),
+		eventService:      eventService,
+		settlementService: settlementService,
+		logger:            zap.NewNop(),
+	}
+
+	if err := service.ConfirmReceipt(order.ClientUserID, order.ID); err != nil {
+		t.Fatalf("confirm receipt: %v", err)
+	}
+
+	var settlement model.OrderSettlement
+	if err := db.Where("order_id = ?", order.ID).First(&settlement).Error; err != nil {
+		t.Fatalf("load settlement: %v", err)
+	}
+	if settlement.Status != "settled" {
+		t.Fatalf("expected settlement settled, got %s", settlement.Status)
+	}
+	if settlement.PilotUserID != 16 || settlement.OwnerUserID != 7 || settlement.PayerUserID != 4 {
+		t.Fatalf("unexpected participants: pilot=%d owner=%d payer=%d", settlement.PilotUserID, settlement.OwnerUserID, settlement.PayerUserID)
+	}
+
+	var pilotWallet model.UserWallet
+	if err := db.Where("user_id = ?", int64(16)).First(&pilotWallet).Error; err != nil {
+		t.Fatalf("load pilot wallet: %v", err)
+	}
+	if pilotWallet.AvailableBalance != 75600 {
+		t.Fatalf("expected pilot wallet 75600, got %d", pilotWallet.AvailableBalance)
+	}
+
+	var ownerWallet model.UserWallet
+	if err := db.Where("user_id = ?", int64(7)).First(&ownerWallet).Error; err != nil {
+		t.Fatalf("load owner wallet: %v", err)
+	}
+	if ownerWallet.AvailableBalance != 67200 {
+		t.Fatalf("expected owner wallet 67200, got %d", ownerWallet.AvailableBalance)
+	}
+
+	var settledTimelineCount int64
+	if err := db.Model(&model.OrderTimeline{}).Where("order_id = ? AND status = ?", order.ID, "settled").Count(&settledTimelineCount).Error; err != nil {
+		t.Fatalf("count settled timeline: %v", err)
+	}
+	if settledTimelineCount != 1 {
+		t.Fatalf("expected one settled timeline event, got %d", settledTimelineCount)
+	}
+
+	var allNotifications []model.Message
+	if err := db.
+		Where("sender_id = ? AND message_type = ? AND receiver_id IN ?", int64(0), "system", []int64{4, 7, 16}).
+		Order("receiver_id ASC").
+		Find(&allNotifications).Error; err != nil {
+		t.Fatalf("query settlement notifications: %v", err)
+	}
+	notifications := make([]model.Message, 0, 3)
+	for _, notification := range allNotifications {
+		var extra map[string]interface{}
+		if err := json.Unmarshal(notification.ExtraData, &extra); err != nil {
+			t.Fatalf("unmarshal notification extra: %v", err)
+		}
+		if extra["event_type"] == "settlement_settled" {
+			notifications = append(notifications, notification)
+		}
+	}
+	if len(notifications) != 3 {
+		t.Fatalf("expected 3 settlement notifications, got %d: %#v", len(notifications), notifications)
+	}
+
+	byReceiver := map[int64]model.Message{}
+	for _, notification := range notifications {
+		var extra map[string]interface{}
+		if err := json.Unmarshal(notification.ExtraData, &extra); err != nil {
+			t.Fatalf("unmarshal notification extra: %v", err)
+		}
+		if extra["event_type"] != "settlement_settled" || extra["business_type"] != "settlement" {
+			t.Fatalf("unexpected notification extra for receiver %d: %#v", notification.ReceiverID, extra)
+		}
+		byReceiver[notification.ReceiverID] = notification
+	}
+	if !strings.Contains(byReceiver[16].Content, "履约服务费¥756.00已入账") {
+		t.Fatalf("unexpected pilot settlement notification: %s", byReceiver[16].Content)
+	}
+	if !strings.Contains(byReceiver[7].Content, "设备服务费¥672.00已入账") {
+		t.Fatalf("unexpected owner settlement notification: %s", byReceiver[7].Content)
+	}
+	if !strings.Contains(byReceiver[4].Content, "已完成结算") {
+		t.Fatalf("unexpected client settlement notification: %s", byReceiver[4].Content)
 	}
 }
 

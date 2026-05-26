@@ -24,6 +24,7 @@ import {RootState} from '../../store/store';
 import {V2DispatchTaskDetail, V2DispatchTaskSummary, V2OrderAnomaly} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 
 type ActionButton = {
   label: string;
@@ -97,6 +98,8 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
   const currentUserId = Number(useSelector((state: RootState) => state.auth.user?.id) || 0);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary));
   const dispatchId = Number(route?.params?.id || route?.params?.dispatchId || 0);
   const [detail, setDetail] = useState<V2DispatchTaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,9 +157,10 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
     }
   }, [detail, isClient, order, navigation]);
 
-  const canRespond = String(task?.status || '').toLowerCase() === 'pending_response' && isPilot;
+  const canRespond = providerCapabilities.canAcceptDispatch && String(task?.status || '').toLowerCase() === 'pending_response' && isPilot;
   const canReassign = Boolean(
     isOwner &&
+      providerCapabilities.canArrangeDispatch &&
       task?.id &&
       order?.id &&
       ['pending_response', 'accepted', 'rejected', 'expired', 'exception'].includes(String(task?.status || '').toLowerCase()) &&
@@ -275,7 +279,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
       await dispatchV2Service.reject(task.id, rejectReason.trim() || undefined);
       setShowRejectSheet(false);
       setRejectReason('');
-      Alert.alert('已拒绝', '这条正式派单已回退。系统若找到下一位可用飞手，会自动生成新的正式派单。', [
+      Alert.alert('已拒绝', '这条正式派单已回退。系统若找到下一位可用执行人员，会自动生成新的正式派单。', [
         {
           text: '返回待办',
           onPress: () => navigation.navigate('PilotTaskList', {entry: 'assigned', refreshedAt: Date.now()}),
@@ -328,7 +332,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
           </View>
           <Text style={styles.heroTitle}>{orderData?.title || '正式派单详情'}</Text>
           <Text style={styles.heroDesc}>
-            正式派单只表达执行指令：派给谁、为何派、是否已响应，以及如果飞手拒绝后系统是否已开始自动重派。
+            正式派单只表达执行指令：派给谁、为何派、是否已响应，以及如果执行人员拒绝后系统是否已开始自动重派。
           </Text>
         </View>
 
@@ -343,8 +347,8 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
           <Text style={styles.sectionTitle}>派单摘要</Text>
           <DetailRow label="派单状态" value={getObjectStatusMeta('dispatch_task', taskData.status).label} />
           <DetailRow label="派单来源" value={taskData.dispatch_source || '-'} />
-          <DetailRow label="目标飞手" value={getPartyName(taskData.target_pilot, '飞手')} />
-          <DetailRow label="机主" value={getPartyName(taskData.provider, '机主')} />
+          <DetailRow label="目标执行人员" value={getPartyName(taskData.target_pilot, '执行人员')} />
+          <DetailRow label="服务商" value={getPartyName(taskData.provider, '服务商')} />
           <DetailRow label="重派次数" value={String(taskData.retry_count || 0)} />
           <DetailRow label="发出时间" value={formatDateTime(taskData.sent_at)} />
           <DetailRow label="响应时间" value={formatDateTime(taskData.responded_at)} />
@@ -422,7 +426,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
           <Text style={styles.rejectTitle}>拒绝正式派单</Text>
           <TextInput
             style={styles.rejectInput}
-            placeholder="选填：补充拒绝原因，方便机主判断是否需要重派或调整执行来源"
+            placeholder="选填：补充拒绝原因，方便服务商判断是否需要重派或调整执行来源"
             multiline
             value={rejectReason}
             onChangeText={setRejectReason}

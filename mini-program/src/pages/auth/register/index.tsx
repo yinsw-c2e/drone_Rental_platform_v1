@@ -1,16 +1,31 @@
-import Taro from '@tarojs/taro';
-import React, { useState } from 'react';
+import Taro, { useRouter } from '@tarojs/taro';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Input, Button } from '@tarojs/components';
 import { useDispatch } from 'react-redux';
 import { authService } from '../../../services/auth';
 import { setCredentials } from '../../../store/slices/authSlice';
+import {
+  HaulRoleMode,
+  setHaulRoleMode,
+} from '../../../store/slices/roleSlice';
+
+const normalizeRoleMode = (value?: string): HaulRoleMode | null =>
+  value === 'provider' || value === 'customer' ? value : null;
 
 export default function RegisterPage() {
   const dispatch = useDispatch();
+  const router = useRouter();
+  const routeRoleMode = normalizeRoleMode(router.params.roleMode);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (routeRoleMode) {
+      dispatch(setHaulRoleMode(routeRoleMode));
+    }
+  }, [dispatch, routeRoleMode]);
 
   const handleRegister = async () => {
     if (!phone || !password) {

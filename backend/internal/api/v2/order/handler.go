@@ -25,6 +25,7 @@ type Handler struct {
 	orderService    *service.OrderService
 	dispatchService *service.DispatchService
 	flightService   *service.FlightService
+	pricingService  *service.PricingService
 	contractService *service.ContractService
 }
 
@@ -42,16 +43,206 @@ type aggregatedOrderTimelineEvent struct {
 	Payload      gin.H     `json:"payload,omitempty"`
 }
 
-func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService) *Handler {
+func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService) *Handler {
 	return &Handler{
 		orderService:    orderService,
 		dispatchService: dispatchService,
 		flightService:   flightService,
+		pricingService:  pricingService,
 	}
 }
 
 func (h *Handler) SetContractService(cs *service.ContractService) {
 	h.contractService = cs
+}
+
+type estimatePointRequest struct {
+	Latitude  *float64 `json:"latitude"`
+	Longitude *float64 `json:"longitude"`
+	Address   string   `json:"address"`
+	Text      string   `json:"text"`
+}
+
+type estimateOrderRequest struct {
+	Origin               estimatePointRequest `json:"origin"`
+	Destination          estimatePointRequest `json:"destination"`
+	OriginLatitude       *float64             `json:"origin_latitude"`
+	OriginLongitude      *float64             `json:"origin_longitude"`
+	DestinationLatitude  *float64             `json:"destination_latitude"`
+	DestinationLongitude *float64             `json:"destination_longitude"`
+	CargoWeightKG        float64              `json:"cargo_weight_kg"`
+	ScheduledAt          string               `json:"scheduled_at"`
+	ScheduledStartAt     string               `json:"scheduled_start_at"`
+	ServiceClassCode     string               `json:"service_class_code"`
+	ServiceClass         string               `json:"service_class"`
+	CargoScene           string               `json:"cargo_scene"`
+	Note                 string               `json:"note"`
+	Description          string               `json:"description"`
+}
+
+func (h *Handler) Estimate(c *gin.Context) {
+	if h.pricingService == nil {
+		response.V2InternalError(c, "计价服务未初始化")
+		return
+	}
+
+	var req estimateOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid estimate payload")
+		return
+	}
+
+	scheduledAt, err := parseEstimateTime(firstEstimateString(req.ScheduledAt, req.ScheduledStartAt))
+	if err != nil {
+		response.V2ValidationError(c, err.Error())
+		return
+	}
+	input, err := req.toPricingInput(scheduledAt)
+	if err != nil {
+		response.V2ValidationError(c, err.Error())
+		return
+	}
+
+	estimate, err := h.pricingService.Estimate(input)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, estimate)
+}
+
+func (h *Handler) CreateInstant(c *gin.Context) {
+	h.createPlatformPricedOrder(c, service.OrderModeInstant)
+}
+
+func (h *Handler) CreateReservation(c *gin.Context) {
+	h.createPlatformPricedOrder(c, service.OrderModeReservation)
+}
+
+func (h *Handler) createPlatformPricedOrder(c *gin.Context, mode string) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	var req estimateOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid order payload")
+		return
+	}
+
+	scheduledAt, err := parseEstimateTime(firstEstimateString(req.ScheduledAt, req.ScheduledStartAt))
+	if err != nil {
+		response.V2ValidationError(c, err.Error())
+		return
+	}
+	input, err := req.toPlatformPricedOrderInput(scheduledAt)
+	if err != nil {
+		response.V2ValidationError(c, err.Error())
+		return
+	}
+
+	var result *service.PlatformPricedOrderResult
+	switch mode {
+	case service.OrderModeInstant:
+		result, err = h.orderService.CreateInstantOrder(userID, input)
+	case service.OrderModeReservation:
+		result, err = h.orderService.CreateReservationOrder(userID, input)
+	default:
+		response.V2ValidationError(c, "unsupported order mode")
+		return
+	}
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, buildPlatformPricedOrderResponse(result))
+}
+
+func (req estimateOrderRequest) toPricingInput(scheduledAt time.Time) (service.PricingEstimateInput, error) {
+	origin, err := req.Origin.toPricingPoint(req.OriginLatitude, req.OriginLongitude)
+	if err != nil {
+		return service.PricingEstimateInput{}, fmt.Errorf("起点%s", err.Error())
+	}
+	destination, err := req.Destination.toPricingPoint(req.DestinationLatitude, req.DestinationLongitude)
+	if err != nil {
+		return service.PricingEstimateInput{}, fmt.Errorf("终点%s", err.Error())
+	}
+	return service.PricingEstimateInput{
+		Origin:           origin,
+		Destination:      destination,
+		CargoWeightKG:    req.CargoWeightKG,
+		ScheduledStartAt: scheduledAt,
+		ServiceClassCode: strings.TrimSpace(firstEstimateString(req.ServiceClassCode, req.ServiceClass)),
+		CargoScene:       strings.TrimSpace(req.CargoScene),
+	}, nil
+}
+
+func (req estimateOrderRequest) toPlatformPricedOrderInput(scheduledAt time.Time) (*service.PlatformPricedOrderInput, error) {
+	pricingInput, err := req.toPricingInput(scheduledAt)
+	if err != nil {
+		return nil, err
+	}
+	return &service.PlatformPricedOrderInput{
+		Origin:           pricingInput.Origin,
+		Destination:      pricingInput.Destination,
+		CargoWeightKG:    pricingInput.CargoWeightKG,
+		ScheduledStartAt: pricingInput.ScheduledStartAt,
+		ServiceClassCode: pricingInput.ServiceClassCode,
+		CargoScene:       pricingInput.CargoScene,
+		Note:             strings.TrimSpace(req.Note),
+		Description:      strings.TrimSpace(req.Description),
+	}, nil
+}
+
+func (p estimatePointRequest) toPricingPoint(latOverride, lngOverride *float64) (service.PricingPoint, error) {
+	lat := p.Latitude
+	lng := p.Longitude
+	if latOverride != nil {
+		lat = latOverride
+	}
+	if lngOverride != nil {
+		lng = lngOverride
+	}
+	if lat == nil || lng == nil {
+		return service.PricingPoint{}, errors.New("经纬度不能为空")
+	}
+	return service.PricingPoint{
+		Latitude:  *lat,
+		Longitude: *lng,
+		Address:   firstEstimateString(p.Address, p.Text),
+	}, nil
+}
+
+func parseEstimateTime(raw string) (time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return time.Now(), nil
+	}
+	for _, layout := range []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	} {
+		parsed, err := time.ParseInLocation(layout, value, time.Local)
+		if err == nil {
+			return parsed, nil
+		}
+	}
+	return time.Time{}, errors.New("预约时间格式无效")
+}
+
+func firstEstimateString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -265,6 +456,85 @@ func (h *Handler) ConfirmDelivery(c *gin.Context) {
 	}, true)
 }
 
+func (h *Handler) ConfirmSiteSafety(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Note string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		response.V2ValidationError(c, "invalid site safety payload")
+		return
+	}
+
+	if err := h.orderService.ConfirmSiteSafetyCheck(orderID, userID, req.Note); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, buildOrderSummary(order))
+}
+
+func (h *Handler) SubmitSiteSafetyCheck(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	var req service.SubmitSiteSafetyCheckInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid site safety payload")
+		return
+	}
+
+	record, err := h.orderService.SubmitSiteSafetyCheck(orderID, userID, req)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, buildSiteSafetyCheckSummary(record))
+}
+
+func (h *Handler) GetLatestSiteSafetyCheck(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	record, err := h.orderService.GetLatestSiteSafetyCheck(orderID, userID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, buildSiteSafetyCheckSummary(record))
+}
+
 func (h *Handler) Monitor(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -462,6 +732,10 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 	if err != nil {
 		return nil, err
 	}
+	siteSafetyCheck, err := h.orderService.GetLatestSiteSafetyCheckByOrder(order.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	currentDispatch, err := h.dispatchService.GetCurrentFormalTaskByOrder(order.ID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -505,6 +779,7 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 	data["disputes"] = buildDisputeList(disputes)
 	data["dispute_count"] = len(disputes)
 	data["timeline"] = buildTimelineList(timeline)
+	data["site_safety_check"] = buildSiteSafetyCheckSummary(siteSafetyCheck)
 	return data, nil
 }
 
@@ -640,6 +915,8 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"order_no":               order.OrderNo,
 		"title":                  order.Title,
 		"order_source":           order.OrderSource,
+		"order_mode":             order.OrderMode,
+		"service_class_code":     order.ServiceClassCode,
 		"demand_id":              nullableInt64(order.DemandID),
 		"source_supply_id":       nullableInt64(order.SourceSupplyID),
 		"status":                 order.Status,
@@ -656,6 +933,13 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"cargo_height_cm":        order.CargoHeightCM,
 		"service_address":        order.ServiceAddress,
 		"dest_address":           order.DestAddress,
+		"estimated_distance_m":   order.EstimatedDistanceM,
+		"estimated_duration_min": order.EstimatedDurationMin,
+		"price_breakdown_json":   order.PriceBreakdownJSON,
+		"broadcast_pool_id":      order.BroadcastPoolID,
+		"reserved_start_at":      order.ReservedStartAt,
+		"grabbed_at":             order.GrabbedAt,
+		"grabbed_by_user_id":     nullableInt64(order.GrabbedByUserID),
 		"start_time":             order.StartTime,
 		"end_time":               order.EndTime,
 		"total_amount":           order.TotalAmount,
@@ -665,6 +949,7 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"unloading_confirmed_at": order.UnloadingConfirmedAt,
 		"flight_start_time":      order.FlightStartTime,
 		"flight_end_time":        order.FlightEndTime,
+		"airspace_status":        order.AirspaceStatus,
 		"payment_ready":          order.PaidAt != nil || order.Status == "accepted" || order.Status == "pending_payment",
 		"provider_confirmed_at":  order.ProviderConfirmedAt,
 		"provider_rejected_at":   order.ProviderRejectedAt,
@@ -678,6 +963,16 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"drone":                  buildDroneSummary(order.Drone),
 		"created_at":             order.CreatedAt,
 		"updated_at":             order.UpdatedAt,
+	}
+}
+
+func buildPlatformPricedOrderResponse(result *service.PlatformPricedOrderResult) gin.H {
+	if result == nil {
+		return nil
+	}
+	return gin.H{
+		"order":    buildOrderSummary(result.Order),
+		"estimate": result.Estimate,
 	}
 }
 
@@ -724,13 +1019,21 @@ func buildDroneSummary(drone *model.Drone) gin.H {
 		return nil
 	}
 	return gin.H{
-		"id":                  drone.ID,
-		"brand":               drone.Brand,
-		"model":               drone.Model,
-		"serial_number":       drone.SerialNumber,
-		"mtow_kg":             drone.MTOWKG,
-		"max_payload_kg":      drone.MaxPayloadKG,
-		"availability_status": drone.AvailabilityStatus,
+		"id":                      drone.ID,
+		"brand":                   drone.Brand,
+		"model":                   drone.Model,
+		"serial_number":           drone.SerialNumber,
+		"mtow_kg":                 drone.MTOWKG,
+		"max_payload_kg":          drone.MaxPayloadKG,
+		"availability_status":     drone.AvailabilityStatus,
+		"insurance_policy_no":     drone.InsurancePolicyNo,
+		"insurance_company":       drone.InsuranceCompany,
+		"insurance_coverage":      drone.InsuranceCoverage,
+		"insurance_expire_date":   drone.InsuranceExpireDate,
+		"insurance_verified":      drone.InsuranceVerified,
+		"insurance_reviewed_at":   drone.InsuranceReviewedAt,
+		"insurance_reviewed_by":   drone.InsuranceReviewedBy,
+		"insurance_reject_reason": drone.InsuranceRejectReason,
 	}
 }
 
@@ -763,7 +1066,7 @@ func buildExecutorSummary(order *model.Order, task *model.FormalDispatchTask) gi
 		return nil
 	}
 	if order.ExecutionMode == "self_execute" {
-		return buildUserSummary(order.Owner, order.ProviderUserID, "pilot")
+		return buildUserSummary(order.Owner, order.ProviderUserID, "provider")
 	}
 	if task != nil && task.TargetPilot != nil {
 		return buildUserSummary(task.TargetPilot, task.TargetPilot.ID, "pilot")
@@ -946,6 +1249,33 @@ func buildFinancialSummary(order *model.Order, payments []model.Payment, refunds
 	}
 }
 
+func buildSiteSafetyCheckSummary(record *model.OrderSiteSafetyCheck) gin.H {
+	if record == nil {
+		return nil
+	}
+	var checklist []service.SiteSafetyChecklistItem
+	if len(record.Checklist) > 0 {
+		_ = json.Unmarshal([]byte(record.Checklist), &checklist)
+	}
+	var photos []string
+	if len(record.Photos) > 0 {
+		_ = json.Unmarshal([]byte(record.Photos), &photos)
+	}
+	return gin.H{
+		"id":               record.ID,
+		"order_id":         record.OrderID,
+		"operator_user_id": record.OperatorUserID,
+		"operator_role":    record.OperatorRole,
+		"status":           record.Status,
+		"checklist":        checklist,
+		"photos":           photos,
+		"note":             record.Note,
+		"checked_at":       record.CheckedAt,
+		"created_at":       record.CreatedAt,
+		"updated_at":       record.UpdatedAt,
+	}
+}
+
 func buildTimelineList(items []model.OrderTimeline) []gin.H {
 	result := make([]gin.H, 0, len(items))
 	for i := range items {
@@ -1072,9 +1402,9 @@ func buildAggregatedOrderTimeline(
 			SourceType: "dispatch_task",
 			SourceID:   dispatchTasks[i].ID,
 			EventType:  "dispatch_sent",
-			Title:      "已发起派单",
+			Title:      "履约任务已生成",
 			Description: fmt.Sprintf(
-				"派单方式：%s",
+				"履约方式：%s",
 				dispatchTasks[i].DispatchSource,
 			),
 			Status:     dispatchTasks[i].Status,
@@ -1157,9 +1487,9 @@ func orderTimelineEventTitle(status string) string {
 	case "paid":
 		return "订单已支付"
 	case "pending_dispatch":
-		return "订单待派单"
+		return "订单待开始履约"
 	case "assigned":
-		return "订单已分配"
+		return "服务商已接单"
 	case "preparing", "loading":
 		return "订单准备中"
 	case "in_transit":
@@ -1202,15 +1532,15 @@ func refundEventTitle(status string) string {
 func dispatchTimelineTitle(status string) string {
 	switch status {
 	case "accepted":
-		return "飞手已接受派单"
+		return "服务商已开始履约"
 	case "rejected":
-		return "飞手已拒绝派单"
+		return "履约安排已退回"
 	case "expired":
-		return "派单已过期"
+		return "履约任务已过期"
 	case "cancelled":
-		return "派单已取消"
+		return "履约任务已取消"
 	default:
-		return "派单状态更新"
+		return "履约任务状态更新"
 	}
 }
 
@@ -1554,7 +1884,7 @@ func contractSignAvailability(order *model.Order) (bool, string) {
 	case "pending_payment", "accepted":
 		return true, ""
 	case "pending_provider_confirmation":
-		return false, "机主尚未确认承接，暂时不能签署合同"
+		return false, "服务商尚未确认承接，暂时不能签署合同"
 	case "cancelled":
 		return false, "订单已取消，不能继续签署合同"
 	case "completed":
@@ -1562,7 +1892,7 @@ func contractSignAvailability(order *model.Order) (bool, string) {
 	case "refunded":
 		return false, "订单已退款，不能继续签署合同"
 	case "provider_rejected":
-		return false, "机主已拒绝订单，不能继续签署合同"
+		return false, "服务商已拒绝订单，不能继续签署合同"
 	default:
 		return false, "当前订单状态暂不支持签署合同"
 	}

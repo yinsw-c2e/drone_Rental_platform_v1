@@ -26,15 +26,15 @@ const emptySummary: V2OrderAnomalySummary = {
 const roleLabels: Record<RoleFilter, string> = {
   all: '综合视角',
   client: '客户视角',
-  owner: '机主视角',
-  pilot: '飞手视角',
+  owner: '服务商视角',
+  pilot: '服务商履约视角',
 };
 
 const anomalyTypeLabels: Record<string, string> = {
   payment_overdue: '支付逾期',
-  provider_confirmation_overdue: '机主确认超时',
-  dispatch_overdue: '派单超时',
-  dispatch_response_overdue: '飞手响应超时',
+  provider_confirmation_overdue: '服务商确认超时',
+  dispatch_overdue: '履约开始超时',
+  dispatch_response_overdue: '履约响应超时',
   execution_stalled: '履约停滞',
   airspace_blocked: '空域受阻',
   compliance_risk: '合规风险',

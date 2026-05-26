@@ -128,6 +128,11 @@ export const exportCsv = (filename: string, rows: any[]) => {
   const escape = (value: any) => `"${String(formatValue(value)).replace(/"/g, '""')}"`;
   const csv = [keys.join(','), ...rows.map(row => keys.map(key => escape(row[key])).join(','))].join('\n');
   const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, filename);
+};
+
+export const downloadBlob = (content: Blob | string, filename: string) => {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

@@ -40,12 +40,15 @@ type Drone struct {
 	UOMRegistrationDoc string     `gorm:"type:varchar(500)" json:"uom_registration_doc"` // UOM登记证明文件
 
 	// ==================== 保险信息 ====================
-	InsurancePolicyNo   string     `gorm:"type:varchar(100)" json:"insurance_policy_no"`               // 保险单号
-	InsuranceCompany    string     `gorm:"type:varchar(100)" json:"insurance_company"`                 // 保险公司
-	InsuranceCoverage   int64      `json:"insurance_coverage"`                                         // 保额(分)，要求≥500万
-	InsuranceExpireDate *time.Time `json:"insurance_expire_date"`                                      // 保险到期日
-	InsuranceDoc        string     `gorm:"type:varchar(500)" json:"insurance_doc"`                     // 保险单文件
-	InsuranceVerified   string     `gorm:"type:varchar(20);default:pending" json:"insurance_verified"` // pending, verified, rejected
+	InsurancePolicyNo     string     `gorm:"type:varchar(100)" json:"insurance_policy_no"`               // 保险单号
+	InsuranceCompany      string     `gorm:"type:varchar(100)" json:"insurance_company"`                 // 保险公司
+	InsuranceCoverage     int64      `json:"insurance_coverage"`                                         // 保额(分)，要求≥500万
+	InsuranceExpireDate   *time.Time `json:"insurance_expire_date"`                                      // 保险到期日
+	InsuranceDoc          string     `gorm:"type:varchar(500)" json:"insurance_doc"`                     // 保险单文件
+	InsuranceVerified     string     `gorm:"type:varchar(20);default:pending" json:"insurance_verified"` // pending, verified, rejected
+	InsuranceReviewedAt   *time.Time `json:"insurance_reviewed_at"`                                      // 保险审核时间
+	InsuranceReviewedBy   int64      `gorm:"index" json:"insurance_reviewed_by"`                         // 保险审核人
+	InsuranceRejectReason string     `gorm:"type:varchar(500)" json:"insurance_reject_reason"`           // 保险驳回原因
 
 	// ==================== 适航证书 ====================
 	AirworthinessCertNo     string     `gorm:"type:varchar(100)" json:"airworthiness_cert_no"`                 // 适航证书编号

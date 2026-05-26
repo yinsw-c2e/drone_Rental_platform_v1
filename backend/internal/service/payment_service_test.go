@@ -128,3 +128,47 @@ func TestCreatePaymentRequiresFullySignedContract(t *testing.T) {
 		t.Fatalf("expected contract signing error, got %v", err)
 	}
 }
+
+func TestCreatePaymentRejectsMockWhenDisabled(t *testing.T) {
+	db := newServiceTestDB(t, &model.Order{}, &model.Payment{})
+
+	orderRepo := repository.NewOrderRepo(db)
+	paymentRepo := repository.NewPaymentRepo(db)
+
+	order := &model.Order{
+		OrderNo:      "ORD202604160002",
+		OrderSource:  "supply_direct",
+		ClientUserID: 302,
+		RenterID:     302,
+		Status:       "pending_payment",
+		TotalAmount:  66000,
+	}
+	if err := orderRepo.Create(order); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	service := NewPaymentService(paymentRepo, orderRepo, nil, nil, nil, nil, nil)
+	service.SetAllowMockPayments(false)
+
+	_, _, err := service.CreatePayment(order.ID, 302, "mock")
+	if err == nil {
+		t.Fatal("expected mock disabled error, got nil")
+	}
+	if !strings.Contains(err.Error(), "不允许模拟支付") {
+		t.Fatalf("expected mock disabled error, got %v", err)
+	}
+}
+
+func TestMockPaymentCompleteRejectsWhenDisabled(t *testing.T) {
+	db := newServiceTestDB(t, &model.Order{}, &model.Payment{})
+	service := NewPaymentService(repository.NewPaymentRepo(db), repository.NewOrderRepo(db), nil, nil, nil, nil, nil)
+	service.SetAllowMockPayments(false)
+
+	err := service.MockPaymentComplete("PAY_TEST_002")
+	if err == nil {
+		t.Fatal("expected mock disabled error, got nil")
+	}
+	if !strings.Contains(err.Error(), "不允许模拟支付") {
+		t.Fatalf("expected mock disabled error, got %v", err)
+	}
+}

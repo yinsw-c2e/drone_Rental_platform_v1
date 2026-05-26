@@ -111,8 +111,8 @@ export const getObjectStatusMeta = (objectType: string, status?: string): { labe
     pending_provider_confirmation: '待确认',
     pending_payment: '待付款',
     paid: '已支付',
-    pending_dispatch: '待派单',
-    assigned: '已分配',
+    pending_dispatch: '待开始履约',
+    assigned: '服务商已接单',
     preparing: '准备中',
     airspace_applying: '空域申请中',
     airspace_approved: '空域已通过',
@@ -122,7 +122,7 @@ export const getObjectStatusMeta = (objectType: string, status?: string): { labe
     completed: '已完成',
     cancelled: '已取消',
     refunded: '已退款',
-    provider_rejected: '机主已拒绝',
+    provider_rejected: '服务商已拒绝',
   };
   const demandLabels: Record<string, string> = {
     draft: '草稿',
@@ -224,19 +224,10 @@ export const getObjectStatusMeta = (objectType: string, status?: string): { labe
 
 export { getObjectStatusMeta as getObjectStatusMetaFn };
 
-// Role summary helpers — from mobile/src/utils/roleSummary
-import { RoleSummary, User } from '../types';
-
-const EMPTY_ROLE_SUMMARY: RoleSummary = {
-  has_client_role: true,
-  has_owner_role: false,
-  has_pilot_role: false,
-  can_publish_supply: false,
-  can_accept_dispatch: false,
-  can_self_execute: false,
-};
-
-export const buildFallbackRoleSummary = (): RoleSummary => EMPTY_ROLE_SUMMARY;
-
-export const getEffectiveRoleSummary = (roleSummary?: RoleSummary | null, _user?: User | null): RoleSummary =>
-  roleSummary || buildFallbackRoleSummary();
+export {
+  buildFallbackRoleSummary,
+  canEnterMode,
+  canUseProviderWorkbench,
+  getEffectiveRoleSummary,
+  resolveProviderCapabilities,
+} from './roleSummary';

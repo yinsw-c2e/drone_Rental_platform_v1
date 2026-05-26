@@ -1,4 +1,4 @@
-import Taro, { useDidShow, usePullDownRefresh } from '@tarojs/taro';
+import Taro, { useDidShow, usePullDownRefresh, useRouter } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, Image } from '@tarojs/components';
 import { useSelector } from 'react-redux';
@@ -26,7 +26,31 @@ import entryMyDemand from '../../assets/workbench/icons/entrance_my_demand.png';
 import entryQuickOrder from '../../assets/workbench/icons/entrance_quick_order.png';
 import entryPublishTask from '../../assets/workbench/icons/entrance_publish_task.png';
 import entryInquiryTask from '../../assets/workbench/icons/entrance_inquiry_task.png';
+import CustomerHaulHome from './CustomerHaulHome';
+import ProviderWorkbench from './ProviderWorkbench';
+import { setHaulRoleMode } from '../../store/slices/roleSlice';
 import './index.scss';
+
+function RoleHomePage() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  const forcedMode = router.params?.mode === 'provider' ? 'provider' : selectedMode;
+
+  useEffect(() => {
+    if (router.params?.mode === 'provider' && selectedMode !== 'provider') {
+      dispatch(setHaulRoleMode('provider'));
+    }
+  }, [dispatch, router.params?.mode, selectedMode]);
+
+  if (forcedMode === 'provider') {
+    return <ProviderWorkbench />;
+  }
+
+  return <CustomerHaulHome />;
+}
+
+export default RoleHomePage;
 
 // ── Types ──
 type RoleView = 'all' | 'client' | 'owner' | 'pilot';
@@ -74,14 +98,14 @@ const getOrderStatusBucket = (status?: string): PriorityQueueCategory | null => 
 
 const getPriorityItemTimestamp = (v?: string | null): number => { if (!v) return 0; const d = new Date(v); return isNaN(d.getTime()) ? 0 : d.getTime(); };
 const getPriorityRoleLabel = (role: RoleView | 'all') =>
-  ({ client: '客户', owner: '机主', pilot: '飞手', all: '综合' } as Record<RoleView | 'all', string>)[role];
+  ({ client: '客户', owner: '服务商', pilot: '服务商履约', all: '综合' } as Record<RoleView | 'all', string>)[role];
 
 const getPriorityFilterLabel = (role: RoleView, filter: PriorityQueueFilter) => {
   switch (filter) {
     case 'quote': return role === 'owner' ? '待报价' : role === 'client' ? '待确认方案' : '方案/报价';
     case 'confirm': return '待确认';
     case 'payment': return '待付款';
-    case 'dispatch': return role === 'pilot' ? '待接单' : '待派单';
+    case 'dispatch': return role === 'pilot' ? '待履约' : '待开始';
     case 'progress': return '进行中';
     case 'anomaly': return '异常';
     default: return '全部';
@@ -142,8 +166,8 @@ const getPriorityTimeLabel = (item: PriorityQueueItem): string => {
 const getHeroTheme = (role: RoleView): HeroTheme => {
   switch (role) {
     case 'client': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '客户概览' };
-    case 'owner': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '机主概览' };
-    case 'pilot': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '飞手概览' };
+    case 'owner': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '服务商概览' };
+    case 'pilot': return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '服务商履约概览' };
     default: return { gradient: 'linear-gradient(135deg, #0756D8, #2F82FF)', accent: '#135ED9', softText: 'rgba(255,255,255,0.9)', eyebrow: '今日概览' };
   }
 };
@@ -161,7 +185,7 @@ function EmptyStateView({ icon, title, description, actionText, onAction }: { ic
 }
 
 // ── Main Component ──
-export default function HomeScreen() {
+export function LegacyHomeScreen() {
   const dispatch = useAppDispatch();
   const authRoleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -200,8 +224,8 @@ export default function HomeScreen() {
     const tabs: { key: RoleView; label: string }[] = [];
     if (roleCount > 1) tabs.push({ key: 'all', label: '综合' });
     if (hasClient) tabs.push({ key: 'client', label: '客户' });
-    if (hasOwner) tabs.push({ key: 'owner', label: '机主' });
-    if (hasPilot) tabs.push({ key: 'pilot', label: '飞手' });
+    if (hasOwner) tabs.push({ key: 'owner', label: '服务商' });
+    if (hasPilot) tabs.push({ key: 'pilot', label: '履约' });
     if (tabs.length === 0) tabs.push({ key: 'all', label: '综合' });
     return tabs;
   }, [hasClient, hasOwner, hasPilot, roleCount]);
@@ -260,7 +284,7 @@ export default function HomeScreen() {
             nextItems.push({
               key: `client-order-${order.id}`, role: 'client', category: bucket, title: order.title || order.order_no,
               subtitle: `${order.service_address || '起点待确认'}${(order as any).dest_address ? ` → ${(order as any).dest_address}` : ''}`,
-              meta: bucket === 'confirm' ? '等待机主确认' : bucket === 'payment' ? `待支付 ${formatAmountYuan(order.total_amount)}` : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
+              meta: bucket === 'confirm' ? '等待服务商确认' : bucket === 'payment' ? `待支付 ${formatAmountYuan(order.total_amount)}` : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
               tagLabel: bucket === 'confirm' ? '待确认' : bucket === 'payment' ? '待付款' : '进行中',
               tagTone: bucket === 'confirm' ? 'orange' : bucket === 'payment' ? 'blue' : 'teal',
               urgency, sortAt: getPriorityItemTimestamp(order.updated_at || order.created_at),
@@ -283,8 +307,8 @@ export default function HomeScreen() {
             nextItems.push({
               key: `owner-order-${order.id}`, role: 'owner', category: bucket, title: order.title || order.order_no,
               subtitle: `${order.service_address || '起点待确认'}${(order as any).dest_address ? ` → ${(order as any).dest_address}` : ''}`,
-              meta: bucket === 'confirm' ? '客户已下单' : bucket === 'dispatch' ? '已承接，待安排执行' : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
-              tagLabel: bucket === 'confirm' ? '待确认' : bucket === 'dispatch' ? '待派单' : '进行中',
+              meta: bucket === 'confirm' ? '客户已下单' : bucket === 'dispatch' ? '已承接，待开始履约' : `当前状态：${getObjectStatusMeta('order', order.status).label}`,
+              tagLabel: bucket === 'confirm' ? '待确认' : bucket === 'dispatch' ? '待开始' : '进行中',
               tagTone: bucket === 'confirm' ? 'red' : bucket === 'dispatch' ? 'orange' : 'teal',
               urgency: bucket === 'confirm' ? 95 : bucket === 'dispatch' ? 90 : 68,
               sortAt: getPriorityItemTimestamp(order.updated_at || order.created_at),
@@ -298,9 +322,9 @@ export default function HomeScreen() {
             const ts = String(task.status || '').toLowerCase();
             const os = String(task.order?.status || '').toLowerCase();
             if (ts === 'pending_response') nextItems.push({
-              key: `pilot-dispatch-${task.id}`, role: 'pilot', category: 'dispatch', title: task.order?.title || '待响应派单',
+              key: `pilot-dispatch-${task.id}`, role: 'pilot', category: 'dispatch', title: task.order?.title || '待履约订单',
               subtitle: `${task.order?.service_address || ''}${task.order?.dest_address ? ` → ${task.order.dest_address}` : ''}`,
-              meta: '正式派单已发', tagLabel: '待接单', tagTone: 'orange', urgency: 98,
+              meta: '履约订单待确认', tagLabel: '待履约', tagTone: 'orange', urgency: 98,
               sortAt: getPriorityItemTimestamp(task.sent_at || task.updated_at || task.created_at),
               referenceNo: task.dispatch_no, target: { screen: 'DispatchTaskDetail', params: { id: task.id, dispatchId: task.id } },
             });
@@ -372,14 +396,14 @@ export default function HomeScreen() {
   const heroConfig = useMemo(() => {
     switch (activeRole) {
       case 'client': return { title: '今天先处理这些订单', subtitle: '要下单就走快速下单；需要比价或说明更多细节，就发布任务。', primaryAction: { title: '快速下单', onPress: () => Taro.navigateTo({ url: '/pages/publish/quick-order/index' }) }, secondaryActions: [{ title: '发布任务', onPress: () => Taro.navigateTo({ url: '/pages/publish/demand/index' }) }] };
-      case 'owner': return { title: '今天先看这些机会', subtitle: '新任务、待确认订单和待安排执行都放在这里。', primaryAction: { title: '查看新需求', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }) }, secondaryActions: [{ title: '上架服务', onPress: () => Taro.navigateTo({ url: '/pages/publish/supply/index' }) }, { title: '机队资质', onPress: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }) }] };
-      case 'pilot': return { title: '今天有哪些任务要处理', subtitle: '待接单、执行中和飞行记录都在这里。', primaryAction: { title: '查看待接派单', onPress: () => Taro.navigateTo({ url: '/pages/dispatch/list/index' }) }, secondaryActions: [{ title: '飞行执行', onPress: () => Taro.navigateTo({ url: '/pages/pilot/workbench/index' }) }, { title: '资质管理', onPress: () => Taro.navigateTo({ url: '/pages/profile/pilot/index' }) }] };
+      case 'owner': return { title: '今天先看这些机会', subtitle: '新任务、待确认订单和待开始履约都放在这里。', primaryAction: { title: '查看新需求', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }) }, secondaryActions: [{ title: '上架服务', onPress: () => Taro.navigateTo({ url: '/pages/publish/supply/index' }) }, { title: '机队资质', onPress: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }) }] };
+      case 'pilot': return { title: '今天有哪些履约要处理', subtitle: '待履约、进行中和飞行记录都在这里。', primaryAction: { title: '查看履约订单', onPress: () => Taro.navigateTo({ url: '/pages/orders/index' }) }, secondaryActions: [{ title: '飞行记录', onPress: () => Taro.navigateTo({ url: '/pages/flight/records/index' }) }, { title: '资质管理', onPress: () => Taro.navigateTo({ url: '/pages/provider/onboarding/index?from=home' }) }] };
       default: return {
         title: '今天先处理这些事',
         subtitle: '下单、报价、接单和异常提醒都集中在工作台。',
         primaryAction: {
-          title: hasClient ? '快速下单' : hasOwner ? '查看新需求' : '待接派单',
-          onPress: () => Taro.navigateTo({ url: hasClient ? '/pages/publish/quick-order/index' : hasOwner ? '/pages/market/index' : '/pages/dispatch/list/index' }),
+          title: hasClient ? '快速下单' : hasOwner ? '查看新需求' : '履约订单',
+          onPress: () => Taro.navigateTo({ url: hasClient ? '/pages/publish/quick-order/index' : hasOwner ? '/pages/market/index' : '/pages/orders/index' }),
         },
         secondaryActions: hasClient ? [{ title: '发布任务', onPress: () => Taro.navigateTo({ url: '/pages/publish/demand/index' }) }] : [],
       };
@@ -405,8 +429,8 @@ export default function HomeScreen() {
         { key: 'drones', title: '机队资质', desc: '设备认证', icon: '📄', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }) },
       ];
       case 'pilot': return [...base,
-        { key: 'assigned', title: '待接派单', desc: '正式指派任务', icon: '🎯', tone: 'orange', onPress: () => Taro.navigateTo({ url: '/pages/dispatch/list/index' }), badge: currentDashboard.role_views.pilot.pending_response_dispatch_count },
-        { key: 'fulfill', title: '飞行执行', desc: '监控看板', icon: '🚁', tone: 'teal', onPress: () => Taro.navigateTo({ url: '/pages/pilot/workbench/index' }) },
+        { key: 'assigned', title: '履约订单', desc: '待处理履约', icon: '🎯', tone: 'orange', onPress: () => Taro.navigateTo({ url: '/pages/orders/index' }), badge: currentDashboard.role_views.pilot.pending_response_dispatch_count },
+        { key: 'fulfill', title: '飞行记录', desc: '履约记录', icon: '🚁', tone: 'teal', onPress: () => Taro.navigateTo({ url: '/pages/flight/records/index' }) },
         { key: 'nearby', title: '报名需求', desc: '候选池', icon: '📡', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.pilot.candidate_demand_count },
         { key: 'profile', title: '资质设置', desc: '执照技能', icon: '📑', tone: 'purple', onPress: () => Taro.navigateTo({ url: '/pages/profile/pilot/index' }) },
       ];
@@ -414,7 +438,7 @@ export default function HomeScreen() {
         const a: DashboardAction[] = [...base];
         if (hasClient) { a.push({ key: 'quick-order', title: '快速下单', desc: '直达下单', icon: '📦', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/publish/quick-order/index' }) }); }
         if (hasOwner) { a.push({ key: 'demand', title: '查看新需求', desc: '可承接', icon: '📈', tone: 'blue', onPress: () => Taro.navigateTo({ url: '/pages/profile/my-demands/index' }), badge: currentDashboard.role_views.owner.recommended_demand_count }); }
-        if (hasPilot) { a.push({ key: 'assigned', title: '待接派单', desc: '正式指派', icon: '🎯', tone: 'orange', onPress: () => Taro.navigateTo({ url: '/pages/dispatch/list/index' }), badge: currentDashboard.role_views.pilot.pending_response_dispatch_count }); }
+        if (hasPilot) { a.push({ key: 'assigned', title: '履约订单', desc: '待处理履约', icon: '🎯', tone: 'orange', onPress: () => Taro.navigateTo({ url: '/pages/orders/index' }), badge: currentDashboard.role_views.pilot.pending_response_dispatch_count }); }
         return a.slice(0, 6);
       }
     }

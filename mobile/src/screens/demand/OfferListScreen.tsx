@@ -1,61 +1,72 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  SafeAreaView,
+  Image,
+  ImageSourcePropType,
+  ImageStyle,
+  ScrollView,
+  StatusBar,
+  StyleProp,
   StyleSheet,
   Text,
-  TextInput,
+  TextStyle,
   TouchableOpacity,
   View,
+  ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
-import {useSelector} from 'react-redux';
+import LinearGradient from 'react-native-linear-gradient';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-import AddressInputField from '../../components/AddressInputField';
-import EmptyState from '../../components/business/EmptyState';
-import ObjectCard from '../../components/business/ObjectCard';
-import SourceTag from '../../components/business/SourceTag';
-import StatusBadge from '../../components/business/StatusBadge';
-import {getObjectStatusMeta} from '../../components/business/visuals';
+import {offerListAssets} from '../../assets/haul/offerList';
 import {supplyService} from '../../services/supply';
-import {RootState} from '../../store/store';
+import {store} from '../../store/store';
 import {AddressData, QuickOrderDraft, SupplySummary} from '../../types';
-import {formatSupplyPricing, getSupplySceneLabel} from '../../utils/supplyMeta';
-import {useTheme} from '../../theme/ThemeContext';
-import type {AppTheme} from '../../theme/index';
 
-const SCENE_FILTERS = [
-  {key: '', label: '全部场景'},
-  {key: 'power_grid', label: '电网建设'},
-  {key: 'mountain_agriculture', label: '山区农副产品'},
-  {key: 'plateau_supply', label: '高原给养'},
-  {key: 'island_supply', label: '海岛补给'},
-  {key: 'emergency', label: '应急救援'},
-];
+const DESIGN_WIDTH = 852;
+const DESIGN_TOTAL_HEIGHT = 1847;
+const DESIGN_SCROLL_HEIGHT = 2020;
 
-function buildDefaultStartDate(): Date {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  date.setHours(9, 0, 0, 0);
-  return date;
+type DesignTextProps = React.PropsWithChildren<{
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+}>;
+
+type OfferPlan = {
+  key: string;
+  title: string;
+  logo: ImageSourcePropType;
+  payloadText: string;
+  priceText: string;
+  tags: string[];
+  supply: SupplySummary;
+};
+
+const logoByIndex = [offerListAssets.providerAnyi, offerListAssets.providerYunling, offerListAssets.providerQihang];
+const providerCardTop = [539, 960, 1381];
+
+const DesignText = ({style, numberOfLines, children}: DesignTextProps) => (
+  <Text allowFontScaling={false} numberOfLines={numberOfLines} style={style}>
+    {children}
+  </Text>
+);
+
+function normalizeInitialQuickOrderDraft(params: any): QuickOrderDraft | undefined {
+  if (params?.quickOrderDraft) {
+    return params.quickOrderDraft as QuickOrderDraft;
+  }
+  if (params?.quickOrder) {
+    return {
+      cargo_scene: params.quickOrder.cargoScene || 'power_grid',
+      cargo_weight_kg: Number(params.quickOrder.cargoWeight) || undefined,
+      departure_address: params.quickOrder.pickupAddress || null,
+      destination_address: params.quickOrder.deliveryAddress || null,
+    };
+  }
+  return undefined;
 }
 
-function buildDefaultEndDate(startDate: Date): Date {
-  const date = new Date(startDate.getTime());
-  date.setHours(date.getHours() + 2);
-  return date;
-}
-
-function parseDraftDate(value: string | undefined, fallback: Date): Date {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return fallback;
-  }
-  return parsed;
+function normalizeSupplies(res: any): SupplySummary[] {
+  return (res?.data?.items || res?.items || []) as SupplySummary[];
 }
 
 function resolveMatchRegion(draft: QuickOrderDraft): string {
@@ -71,816 +82,406 @@ function resolveMatchRegion(draft: QuickOrderDraft): string {
   );
 }
 
-function summarizeAddress(address?: AddressData | null): string {
-  if (!address) {
-    return '待补充';
-  }
-  return address.name || address.address || '待补充';
-}
+const formatAddressName = (addr?: AddressData | null, fallback = '-') =>
+  addr?.name || addr?.address || fallback;
 
-function normalizeInitialQuickOrderDraft(params: any): QuickOrderDraft | undefined {
-  if (params?.quickOrderDraft) {
-    return params.quickOrderDraft as QuickOrderDraft;
-  }
-  if (params?.quickOrder) {
-    return {
-      cargo_scene: params.quickOrder.cargoScene || SCENE_FILTERS[1].key,
-      cargo_weight_kg: Number(params.quickOrder.cargoWeight) || undefined,
-      departure_address: params.quickOrder.pickupAddress || null,
-      destination_address: params.quickOrder.deliveryAddress || null,
-    };
-  }
-  return undefined;
-}
+const formatAddressSub = (addr?: AddressData | null, fallback = '-') => {
+  if (!addr) return fallback;
+  const mainName = addr.name || '';
+  const text = addr.address || '';
+  if (mainName && text.includes(mainName)) return text.replace(mainName, '') || text;
+  return text || fallback;
+};
 
-function SceneTag({label}: {label: string}) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
+const formatWorkTime = (value?: string) => {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const prefix = date.toDateString() === now.toDateString()
+    ? '今天'
+    : date.toDateString() === tomorrow.toDateString()
+      ? '明天'
+      : `${date.getMonth() + 1}-${date.getDate()}`;
+  const hour = `${date.getHours()}`.padStart(2, '0');
+  const minute = `${date.getMinutes()}`.padStart(2, '0');
+  return `${prefix} ${hour}:${minute} 前`;
+};
+
+const formatSupplyPrice = (item: SupplySummary) => {
+  const amount = Number(item.base_price_amount || 0);
+  if (amount <= 0) return '待议';
+  return `￥${Math.round(amount / 100)}`;
+};
+
+const formatPayloadText = (item: SupplySummary) => {
+  const payload = Number(item.max_payload_kg || 0);
+  return payload > 0 ? `${payload}kg` : '待确认';
+};
+
+const buildProviderTags = (item: SupplySummary) => {
+  const tags = [
+    item.accepts_direct_order ? '支持直达下单' : '',
+    item.status === 'active' ? '服务中' : item.status ? `状态 ${item.status}` : '',
+    Number(item.max_payload_kg || 0) > 0 ? `载重 ${formatPayloadText(item)}` : '',
+  ].filter(Boolean);
+  return tags.length > 0 ? tags : ['需服务商确认'];
+};
+
+const toOfferPlan = (item: SupplySummary, index: number): OfferPlan => ({
+  key: `supply-${item.id}`,
+  title: item.title || `服务商方案 #${item.id}`,
+  logo: logoByIndex[index % logoByIndex.length],
+  payloadText: formatPayloadText(item),
+  priceText: formatSupplyPrice(item),
+  tags: buildProviderTags(item),
+  supply: item,
+});
+
+export default function OfferListScreen({route, navigation}: any) {
+  const insets = useSafeAreaInsets();
+  const {width} = useWindowDimensions();
+  const screenWidth = width || DESIGN_WIDTH;
+  const scale = screenWidth / DESIGN_WIDTH;
+  const routeDraft = useMemo(() => normalizeInitialQuickOrderDraft(route?.params), [route?.params]);
+  const draft = routeDraft;
+
+  const [supplies, setSupplies] = useState<SupplySummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorText, setErrorText] = useState('');
+
+  const dp = (value: number) => Number((value * scale).toFixed(2));
+  const frame = (x: number, y: number, w: number, h: number): ViewStyle => ({
+    position: 'absolute',
+    left: dp(x),
+    top: dp(y),
+    width: dp(w),
+    height: dp(h),
+  });
+  const type = (
+    fontSize: number,
+    lineHeight: number,
+    fontWeight: TextStyle['fontWeight'],
+    color: string,
+  ): TextStyle => ({
+    color,
+    fontSize: dp(fontSize),
+    lineHeight: dp(lineHeight),
+    fontWeight,
+  });
+  const imageFrame = (x: number, y: number, w: number, h: number): ImageStyle => ({
+    position: 'absolute',
+    left: dp(x),
+    top: dp(y),
+    width: dp(w),
+    height: dp(h),
+  });
+  const cardShadow = (opacity = 0.09): ViewStyle => ({
+    shadowColor: '#0C2550',
+    shadowOpacity: opacity,
+    shadowRadius: dp(16),
+    shadowOffset: {width: 0, height: dp(8)},
+    elevation: 6,
+  });
+
+  const fetchSupplies = useCallback(async () => {
+    if (!draft) {
+      setSupplies([]);
+      setErrorText('缺少吊运需求信息，请从预约吊运重新进入。');
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorText('');
+      if (!store.getState().auth.accessToken) {
+        setSupplies([]);
+        setErrorText('请先登录后再选择服务商方案。');
+        return;
+      }
+      const res = await supplyService.list({
+        page: 1,
+        page_size: 10,
+        region: resolveMatchRegion(draft) || undefined,
+        cargo_scene: draft.cargo_scene || undefined,
+        min_payload_kg: draft.cargo_weight_kg,
+        accepts_direct_order: true,
+        service_type: 'heavy_cargo_lift_transport',
+      });
+      setSupplies(normalizeSupplies(res));
+    } catch (error: any) {
+      setSupplies([]);
+      setErrorText(error?.message || '服务商方案加载失败，请稍后重试。');
+    } finally {
+      setLoading(false);
+    }
+  }, [draft]);
+
+  useEffect(() => {
+    fetchSupplies();
+  }, [fetchSupplies]);
+
+  const plans = useMemo(
+    () => supplies.slice(0, 3).map(toOfferPlan),
+    [supplies],
+  );
+
+  const handleBack = () => {
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs', {screen: 'Orders'});
+  };
+
+  const handleService = () => navigation.navigate('MainTabs', {screen: 'Messages'});
+
+  const handleSelectPlan = (plan: OfferPlan) => {
+    navigation.navigate('OfferDetail', {
+      id: plan.supply.id,
+      quickOrderDraft: draft,
+    });
+  };
+
+  const handleEmptyAction = () => {
+    if (!draft) {
+      navigation.replace('PublishCargo');
+      return;
+    }
+    fetchSupplies();
+  };
+
+  const renderImage = (
+    source: ImageSourcePropType,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    extraStyle?: StyleProp<ImageStyle>,
+  ) => (
+    <Image source={source} style={[imageFrame(x, y, w, h), extraStyle]} resizeMode="contain" />
+  );
+
+  const renderProviderCard = (plan: OfferPlan, index: number) => {
+    const top = providerCardTop[index] || providerCardTop[providerCardTop.length - 1];
+    const cardHeight = index === 0 ? 400 : 402;
+    return (
+      <React.Fragment key={plan.key}>
+        <View style={[frame(22, top, 806, cardHeight), styles.card, {borderRadius: dp(24)}, cardShadow()]} />
+        {renderImage(plan.logo, 60, top + 26, 73, 73)}
+        <DesignText style={[frame(158, top + 42, 310, 43), type(39, 47, '700', '#061736')]}>
+          {plan.title}
+        </DesignText>
+        {renderImage(offerListAssets.starFilled, 548, top + 53, 34, 34)}
+        <DesignText style={[frame(590, top + 50, 86, 35), type(31, 37, '500', '#061736')]}>真实供给</DesignText>
+        <View style={[frame(699, top + 47, 1, 43), styles.metricDivider]} />
+        <DesignText style={[frame(720, top + 50, 70, 35), type(31, 37, '500', '#061736')]}>#{plan.supply.id}</DesignText>
+        <View style={[frame(60, top + 118, 733, 1), styles.line]} />
+        {renderImage(offerListAssets.clock, 73, top + 153, 51, 51)}
+        <DesignText style={[frame(132, top + 144, 105, 28), type(27, 34, '400', '#586B93')]}>最大载重</DesignText>
+        <DesignText style={[frame(132, top + 179, 170, 37), type(34, 42, '600', '#061736')]}>{plan.payloadText}</DesignText>
+        <View style={[frame(426, top + 118, 1, 100), styles.line]} />
+        <DesignText style={[frame(452, top + 166, 51, 29), type(27, 34, '400', '#586B93')]}>报价</DesignText>
+        <DesignText style={[frame(585, top + 150, 202, 64), type(58, 68, '800', '#FF5A04'), styles.rightText]}>
+          {plan.priceText}
+        </DesignText>
+        <View style={[frame(60, top + 230, 620, 43), styles.tagRow]}>
+          {plan.tags.slice(0, 3).map(tag => (
+            <View key={tag} style={[styles.tag, {height: dp(43), paddingHorizontal: dp(17), marginRight: dp(18), borderRadius: dp(7)}]}>
+              <DesignText style={type(26, 31, '500', '#009B45')}>{tag}</DesignText>
+            </View>
+          ))}
+        </View>
+        <TouchableOpacity activeOpacity={0.86} onPress={() => handleSelectPlan(plan)} style={[frame(60, top + 296, 733, 80), styles.selectButton, {borderRadius: dp(12)}]}>
+          <LinearGradient
+            colors={['#FF6505', '#FF4B00']}
+            start={{x: 0, y: 0.5}}
+            end={{x: 1, y: 0.5}}
+            style={styles.fill}>
+            <DesignText style={[type(34, 42, '700', '#FFFFFF'), styles.centerText]}>选择此方案</DesignText>
+          </LinearGradient>
+        </TouchableOpacity>
+      </React.Fragment>
+    );
+  };
+
+  const renderEmptyState = () => {
+    const title = loading ? '正在匹配服务商方案...' : errorText || '暂无可直达下单的服务商方案';
+    const subtitle = loading
+      ? '正在根据起落点、载重和场景查询真实供给。'
+      : errorText
+        ? '不会展示本地兜底方案，请处理后重试。'
+        : '当前筛选条件下后端没有返回真实服务商，可调整地点、载重或改为发布任务等待报价。';
+    return (
+      <React.Fragment>
+        <View style={[frame(22, 539, 806, 336), styles.card, {borderRadius: dp(24)}, cardShadow(0.08)]} />
+        <DesignText style={[frame(92, 620, 668, 42), type(34, 42, '700', '#061E4F'), styles.centerText]}>
+          {title}
+        </DesignText>
+        <DesignText style={[frame(92, 682, 668, 70), type(27, 36, '400', '#586B93'), styles.centerText]}>
+          {subtitle}
+        </DesignText>
+        {!loading ? (
+          <TouchableOpacity activeOpacity={0.86} onPress={handleEmptyAction} style={[frame(226, 780, 400, 74), styles.emptyActionButton, {borderRadius: dp(12)}]}>
+            <DesignText style={[type(30, 38, '700', '#FFFFFF'), styles.centerText]}>
+              {draft ? '重新匹配' : '重新填写需求'}
+            </DesignText>
+          </TouchableOpacity>
+        ) : null}
+      </React.Fragment>
+    );
+  };
+
+  const bottomBarHeight = dp(DESIGN_TOTAL_HEIGHT - 1661) + insets.bottom;
+  const canvasHeight = dp(DESIGN_SCROLL_HEIGHT) + bottomBarHeight;
+
   return (
-    <View style={styles.sceneTag}>
-      <Text style={styles.sceneTagText}>{label}</Text>
+    <View style={styles.root}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <LinearGradient
+        colors={['#00377B', '#004A9B', '#00306B']}
+        start={{x: 0.08, y: 0}}
+        end={{x: 0.92, y: 1}}
+        style={[styles.topBlue, {width: screenWidth, height: dp(374)}]}
+      />
+      <View style={[styles.navLayer, {width: screenWidth, height: dp(211)}]}>
+        {renderImage(offerListAssets.navBack, 33, 128, 26, 42)}
+        <DesignText style={[frame(328, 132, 197, 46), type(40, 48, '700', '#FFFFFF'), styles.centerText]}>
+          服务商方案
+        </DesignText>
+        {renderImage(offerListAssets.navChat, 701, 129, 43, 40)}
+        <DesignText style={[frame(751, 135, 61, 30), type(28, 34, '500', '#FFFFFF')]}>客服</DesignText>
+        <TouchableOpacity activeOpacity={0.82} onPress={handleBack} style={frame(18, 112, 72, 72)} />
+        <TouchableOpacity activeOpacity={0.82} onPress={handleService} style={frame(690, 112, 140, 72)} />
+      </View>
+
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{height: canvasHeight}}>
+        <View style={[styles.canvas, {width: screenWidth, height: canvasHeight}]}>
+          <View style={[frame(22, 211, 806, 302), styles.card, {borderRadius: dp(24)}, cardShadow(0.08)]} />
+          {renderImage(offerListAssets.locationPin, 82, 256, 40, 47)}
+          <DesignText numberOfLines={1} style={[frame(146, 256, 190, 41), type(36, 44, '700', '#061E4F')]}>
+            {formatAddressName(draft?.departure_address, '未选择起吊点')}
+          </DesignText>
+          <DesignText numberOfLines={1} style={[frame(146, 316, 210, 29), type(27, 34, '400', '#586B93')]}>
+            {formatAddressSub(draft?.departure_address, '--')}
+          </DesignText>
+          {renderImage(offerListAssets.routeArrow, 407, 284, 34, 25)}
+          {renderImage(offerListAssets.locationPin, 491, 256, 40, 47)}
+          <DesignText numberOfLines={1} style={[frame(546, 256, 220, 41), type(36, 44, '700', '#061E4F')]}>
+            {formatAddressName(draft?.destination_address, '未选择落放点')}
+          </DesignText>
+          <DesignText numberOfLines={1} style={[frame(546, 316, 190, 29), type(27, 34, '400', '#586B93')]}>
+            {formatAddressSub(draft?.destination_address, '--')}
+          </DesignText>
+          <View style={[frame(60, 368, 733, 1), styles.line]} />
+          {renderImage(offerListAssets.weightM, 96, 416, 46, 53)}
+          <DesignText style={[frame(174, 412, 105, 29), type(27, 34, '400', '#586B93')]}>货物重量</DesignText>
+          <DesignText style={[frame(174, 457, 120, 37), type(34, 42, '600', '#061736')]}>
+            {draft?.cargo_weight_kg ? `${draft.cargo_weight_kg} kg` : '--'}
+          </DesignText>
+          <View style={[frame(427, 411, 1, 74), styles.line]} />
+          {renderImage(offerListAssets.clock, 481, 417, 51, 51)}
+          <DesignText style={[frame(548, 412, 105, 29), type(27, 34, '400', '#586B93')]}>作业时间</DesignText>
+          <DesignText style={[frame(548, 457, 210, 37), type(34, 42, '600', '#061736')]}>
+            {formatWorkTime(draft?.scheduled_start_at)}
+          </DesignText>
+
+          {plans.length > 0 ? plans.map(renderProviderCard) : renderEmptyState()}
+        </View>
+      </ScrollView>
+
+      <View style={[styles.bottomBar, {width: screenWidth, height: bottomBarHeight, paddingBottom: insets.bottom}]}>
+        {renderImage(offerListAssets.tabHomeInactive, 73, 28, 50, 50)}
+        <DesignText style={[frame(76, 81, 45, 28), type(25, 32, '500', '#52658C'), styles.centerText]}>首页</DesignText>
+        {renderImage(offerListAssets.tabOrderActive, 292, 25, 45, 55)}
+        <DesignText style={[frame(293, 81, 45, 28), type(25, 32, '600', '#034FCD'), styles.centerText]}>订单</DesignText>
+        {renderImage(offerListAssets.tabMessageInactive, 505, 27, 53, 47)}
+        <DesignText style={[frame(514, 81, 45, 28), type(25, 32, '500', '#52658C'), styles.centerText]}>消息</DesignText>
+        {renderImage(offerListAssets.tabProfileInactive, 727, 26, 46, 51)}
+        <DesignText style={[frame(730, 81, 45, 28), type(25, 32, '500', '#52658C'), styles.centerText]}>我的</DesignText>
+        <TouchableOpacity activeOpacity={0.82} onPress={() => navigation.navigate('MainTabs', {screen: 'Home'})} style={frame(24, 0, 150, 126)} />
+        <TouchableOpacity activeOpacity={0.82} onPress={() => navigation.navigate('MainTabs', {screen: 'Orders'})} style={frame(214, 0, 150, 126)} />
+        <TouchableOpacity activeOpacity={0.82} onPress={handleService} style={frame(405, 0, 150, 126)} />
+        <TouchableOpacity activeOpacity={0.82} onPress={() => navigation.navigate('MainTabs', {screen: 'Profile'})} style={frame(596, 0, 150, 126)} />
+      </View>
     </View>
   );
 }
 
-export default function OfferListScreen({route, navigation}: any) {
-  const {theme} = useTheme();
-  const styles = getStyles(theme);
-  const currentUser = useSelector((state: RootState) => state.auth.user);
-  const initialQuickOrderDraft = useMemo(() => normalizeInitialQuickOrderDraft(route?.params), [route?.params]);
-  const quickEntryRequested = Boolean(route?.params?.quickOrderMode || initialQuickOrderDraft);
-  const initializedRef = useRef(false);
-  const defaultQuickStart = useMemo(
-    () => parseDraftDate(initialQuickOrderDraft?.scheduled_start_at, buildDefaultStartDate()),
-    [initialQuickOrderDraft?.scheduled_start_at],
-  );
-  const defaultQuickEnd = useMemo(
-    () => parseDraftDate(initialQuickOrderDraft?.scheduled_end_at, buildDefaultEndDate(defaultQuickStart)),
-    [defaultQuickStart, initialQuickOrderDraft?.scheduled_end_at],
-  );
-
-  const [supplies, setSupplies] = useState<SupplySummary[]>([]);
-  const [loading, setLoading] = useState(!quickEntryRequested || Boolean(initialQuickOrderDraft));
-  const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [quickOrderMode, setQuickOrderMode] = useState(quickEntryRequested);
-  const [hasQuickOrderSearch, setHasQuickOrderSearch] = useState(Boolean(initialQuickOrderDraft));
-  const [lastQuickOrderDraft, setLastQuickOrderDraft] = useState<QuickOrderDraft | null>(
-    initialQuickOrderDraft || null,
-  );
-  const [editQuickOrder, setEditQuickOrder] = useState(!initialQuickOrderDraft);
-
-  const [region, setRegion] = useState(initialQuickOrderDraft ? resolveMatchRegion(initialQuickOrderDraft) : '');
-  const [activeScene, setActiveScene] = useState(initialQuickOrderDraft?.cargo_scene || '');
-  const [minPayloadKg, setMinPayloadKg] = useState<number | undefined>(
-    initialQuickOrderDraft?.cargo_weight_kg,
-  );
-
-  const [departureAddress, setDepartureAddress] = useState<AddressData | null>(
-    initialQuickOrderDraft?.departure_address || null,
-  );
-  const [destinationAddress, setDestinationAddress] = useState<AddressData | null>(
-    initialQuickOrderDraft?.destination_address || null,
-  );
-  const [quickCargoScene, setQuickCargoScene] = useState(
-    initialQuickOrderDraft?.cargo_scene || SCENE_FILTERS[1].key,
-  );
-  const [quickCargoWeight, setQuickCargoWeight] = useState(
-    initialQuickOrderDraft?.cargo_weight_kg ? String(initialQuickOrderDraft.cargo_weight_kg) : '',
-  );
-  const [quickCargoType] = useState(initialQuickOrderDraft?.cargo_type || '');
-  const startDate = defaultQuickStart;
-  const endDate = defaultQuickEnd;
-
-  const fetchSupplies = useCallback(
-    async (
-      pageNum = 1,
-      isRefresh = false,
-      query?: {
-        region?: string;
-        cargoScene?: string;
-        minPayloadKg?: number;
-      },
-    ) => {
-      const targetRegion = query?.region || '';
-      const targetScene = query?.cargoScene || '';
-      const targetMinPayloadKg = query?.minPayloadKg;
-
-      try {
-        const res = await supplyService.list({
-          page: pageNum,
-          page_size: 10,
-          region: targetRegion.trim() || undefined,
-          cargo_scene: targetScene || undefined,
-          min_payload_kg: targetMinPayloadKg,
-          accepts_direct_order: true,
-          service_type: 'heavy_cargo_lift_transport',
-        });
-        const list = res.data?.items || [];
-        if (isRefresh || pageNum === 1) {
-          setSupplies(list);
-        } else {
-          setSupplies(prev => [...prev, ...list]);
-        }
-        const total = res.meta?.total || 0;
-        setHasMore(pageNum * 10 < total);
-      } catch (error) {
-        console.error('获取供给市场失败:', error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (initializedRef.current) {
-      return;
-    }
-    initializedRef.current = true;
-
-    if (quickOrderMode && !hasQuickOrderSearch) {
-      setSupplies([]);
-      setHasMore(false);
-      setLoading(false);
-      return;
-    }
-    const initialRegion = initialQuickOrderDraft ? resolveMatchRegion(initialQuickOrderDraft) : region;
-    const initialScene = initialQuickOrderDraft?.cargo_scene || activeScene;
-    const initialMinPayloadKg = initialQuickOrderDraft?.cargo_weight_kg || minPayloadKg;
-
-    setLoading(true);
-    setPage(1);
-    fetchSupplies(1, true, {
-      region: initialRegion,
-      cargoScene: initialScene,
-      minPayloadKg: initialMinPayloadKg,
-    });
-  }, [fetchSupplies, hasQuickOrderSearch, initialQuickOrderDraft, quickOrderMode, activeScene, minPayloadKg, region]);
-
-  const buildQuickOrderDraft = useCallback(
-    (overrides?: Partial<QuickOrderDraft>): QuickOrderDraft => {
-      const weight = Number(quickCargoWeight);
-      const fallbackDraft: QuickOrderDraft = {
-        cargo_scene: quickCargoScene || SCENE_FILTERS[1].key,
-        cargo_type: quickCargoType.trim() || '重载物资',
-        cargo_weight_kg: Number.isFinite(weight) && weight > 0 ? weight : undefined,
-        cargo_length_cm: initialQuickOrderDraft?.cargo_length_cm,
-        cargo_width_cm: initialQuickOrderDraft?.cargo_width_cm,
-        cargo_height_cm: initialQuickOrderDraft?.cargo_height_cm,
-        cargo_volume_m3: initialQuickOrderDraft?.cargo_volume_m3,
-        departure_address: departureAddress,
-        destination_address: destinationAddress,
-        scheduled_start_at: startDate.toISOString(),
-        scheduled_end_at: endDate.toISOString(),
-        match_region: resolveMatchRegion({
-          cargo_scene: quickCargoScene || SCENE_FILTERS[1].key,
-          departure_address: departureAddress,
-          destination_address: destinationAddress,
-        }),
-      };
-
-      return {
-        ...fallbackDraft,
-        ...overrides,
-      };
-    },
-    [
-      departureAddress,
-      destinationAddress,
-      endDate,
-      initialQuickOrderDraft?.cargo_height_cm,
-      initialQuickOrderDraft?.cargo_length_cm,
-      initialQuickOrderDraft?.cargo_volume_m3,
-      initialQuickOrderDraft?.cargo_width_cm,
-      quickCargoScene,
-      quickCargoType,
-      quickCargoWeight,
-      startDate,
-    ],
-  );
-
-  const handleQuickOrderSearch = useCallback(async () => {
-    if (!departureAddress || !destinationAddress) {
-      return;
-    }
-
-    const weight = Number(quickCargoWeight);
-    if (!weight || weight <= 0) {
-      return;
-    }
-    if (endDate <= startDate) {
-      return;
-    }
-
-    const nextDraft = buildQuickOrderDraft({
-      cargo_weight_kg: weight,
-    });
-    const matchRegion = resolveMatchRegion(nextDraft);
-
-    setLastQuickOrderDraft({...nextDraft, match_region: matchRegion});
-    setQuickOrderMode(true);
-    setHasQuickOrderSearch(true);
-    setEditQuickOrder(false);
-    setRegion(matchRegion);
-    setActiveScene(nextDraft.cargo_scene);
-    setMinPayloadKg(weight);
-    setPage(1);
-    setLoading(true);
-    await fetchSupplies(1, true, {
-      region: matchRegion,
-      cargoScene: nextDraft.cargo_scene,
-      minPayloadKg: weight,
-    });
-  }, [
-    buildQuickOrderDraft,
-    departureAddress,
-    destinationAddress,
-    endDate,
-    fetchSupplies,
-    quickCargoWeight,
-    startDate,
-  ]);
-
-  const handleBrowseMode = useCallback(async () => {
-    setQuickOrderMode(false);
-    setHasQuickOrderSearch(false);
-    setLastQuickOrderDraft(null);
-    setEditQuickOrder(false);
-    setRegion('');
-    setActiveScene('');
-    setMinPayloadKg(undefined);
-    setPage(1);
-    setLoading(true);
-    await fetchSupplies(1, true, {
-      region: '',
-      cargoScene: '',
-      minPayloadKg: undefined,
-    });
-  }, [fetchSupplies]);
-
-  const onRefresh = useCallback(() => {
-    if (quickOrderMode && !hasQuickOrderSearch) {
-      setRefreshing(false);
-      return;
-    }
-    setRefreshing(true);
-    setPage(1);
-    fetchSupplies(1, true, {
-      region,
-      cargoScene: activeScene,
-      minPayloadKg,
-    });
-  }, [activeScene, fetchSupplies, hasQuickOrderSearch, minPayloadKg, quickOrderMode, region]);
-
-  const onLoadMore = useCallback(() => {
-    if (loading || refreshing || !hasMore || (quickOrderMode && !hasQuickOrderSearch)) {
-      return;
-    }
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchSupplies(nextPage, false, {
-      region,
-      cargoScene: activeScene,
-      minPayloadKg,
-    });
-  }, [activeScene, fetchSupplies, hasMore, hasQuickOrderSearch, loading, minPayloadKg, page, quickOrderMode, refreshing, region]);
-
-  const heroTitle = useMemo(() => {
-    if (quickOrderMode) {
-      if (hasQuickOrderSearch && lastQuickOrderDraft) {
-        return '已为你筛出可直接下单的服务';
-      }
-      return '先填最少信息，我来帮你筛服务';
-    }
-    if (region.trim()) {
-      return `${region.trim()} 服务市场`;
-    }
-    return '重载吊运服务市场';
-  }, [hasQuickOrderSearch, lastQuickOrderDraft, quickOrderMode, region]);
-
-  const heroDesc = useMemo(() => {
-    if (quickOrderMode) {
-      if (hasQuickOrderSearch && lastQuickOrderDraft) {
-        const regionText = resolveMatchRegion(lastQuickOrderDraft) || '当前区域';
-        return `当前按 ${regionText}、${getSupplySceneLabel(lastQuickOrderDraft.cargo_scene)} 和 ${
-          lastQuickOrderDraft.cargo_weight_kg || 0
-        }kg 吊重需求筛选。合适就继续确认方案，不合适就一键改为发布任务。`;
-      }
-      return '输入起点、终点、货物和时间后，系统只推荐支持直达下单的服务，尽量把流程压缩成最短链路。';
-    }
-    return '这里只展示满足平台重载门槛、并支持客户直达下单的服务，不再混任务卡片和订单卡片。';
-  }, [hasQuickOrderSearch, lastQuickOrderDraft, quickOrderMode]);
-
-  const renderItem = ({item}: {item: SupplySummary}) => {
-    const isMySupply = item.owner_user_id === currentUser?.id;
-    const isQuickOrderResult = Boolean(lastQuickOrderDraft);
-    return (
-      <ObjectCard
-        style={styles.card}
-        onPress={() =>
-          navigation.navigate('OfferDetail', {
-            id: item.id,
-            quickOrderDraft: isQuickOrderResult ? lastQuickOrderDraft : undefined,
-          })
-        }>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
-            <SourceTag source="supply" />
-            <StatusBadge label="" meta={getObjectStatusMeta('supply', item.status)} />
-          </View>
-          {item.accepts_direct_order ? (
-            <View style={styles.directPill}>
-              <Text style={styles.directPillText}>支持直达下单</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <Text style={styles.supplyNo}>{item.supply_no}</Text>
-        <Text style={styles.title}>{item.title}</Text>
-
-        <View style={styles.sceneRow}>
-          {(item.cargo_scenes || []).slice(0, 3).map(scene => (
-            <SceneTag key={scene} label={getSupplySceneLabel(scene)} />
-          ))}
-        </View>
-
-        <View style={styles.metricRow}>
-          <Text style={styles.metricText}>起飞重量 {item.mtow_kg || 0}kg</Text>
-          <Text style={styles.metricText}>最大吊重 {item.max_payload_kg || 0}kg</Text>
-          {isQuickOrderResult && lastQuickOrderDraft?.cargo_weight_kg ? (
-            <Text style={styles.metricText}>你的货物 {lastQuickOrderDraft.cargo_weight_kg}kg</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.cardFooter}>
-          <Text style={styles.price}>{formatSupplyPricing(item.base_price_amount, item.pricing_unit)}</Text>
-          <TouchableOpacity
-            style={[styles.detailBtn, isMySupply && styles.detailBtnOwner]}
-            onPress={() =>
-              navigation.navigate('OfferDetail', {
-                id: item.id,
-                quickOrderDraft: isQuickOrderResult ? lastQuickOrderDraft : undefined,
-              })
-            }>
-            <Text style={[styles.detailBtnText, isMySupply && styles.detailBtnTextOwner]}>
-              {isMySupply ? '查看供给' : isQuickOrderResult ? '确认方案' : '查看详情'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ObjectCard>
-    );
-  };
-
-  const listEmptyComponent = () => {
-    if (loading) {
-      return <ActivityIndicator style={styles.loading} color={theme.primary} />;
-    }
-
-    if (quickOrderMode && !hasQuickOrderSearch) {
-      return (
-        <ObjectCard>
-          <EmptyState
-            icon="📍"
-            title="先填写快速下单信息"
-            description="输入起点、终点、货物和时间后，我会只展示当前可直接下单的服务。"
-            actionText="改为浏览全部服务"
-            onAction={handleBrowseMode}
-          />
-        </ObjectCard>
-      );
-    }
-
-    return (
-      <ObjectCard>
-        <EmptyState
-          icon="🛩️"
-          title={lastQuickOrderDraft ? '这次没有筛到可直接下单的服务' : '当前没有匹配的服务'}
-          description={
-            lastQuickOrderDraft
-              ? '已保留你的起终点和货物摘要，可以一键改为发布任务，让平台继续反向撮合。'
-              : '可以调整场景或区域筛选，或者先发布任务，让平台反向撮合合适机主。'
-          }
-          actionText="发布任务"
-          onAction={() =>
-            navigation.navigate('PublishCargo', {
-              quickOrderDraft: lastQuickOrderDraft || buildQuickOrderDraft(),
-            })
-          }
-        />
-      </ObjectCard>
-    );
-  };
-
-  return (
-    <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
-      <View style={styles.stepHeader}>
-        <View style={styles.stepTrack}>
-          <View style={[styles.stepDot, styles.stepDotCompleted]} />
-          <View style={[styles.stepLine, styles.stepLineCompleted]} />
-          <View style={[styles.stepDot, styles.stepDotActive]} />
-          <View style={styles.stepLine} />
-          <View style={styles.stepDot} />
-        </View>
-        <View style={styles.stepLabels}>
-          <Text style={[styles.stepLabelText, styles.stepLabelTextCompleted]}>填写信息</Text>
-          <Text style={[styles.stepLabelText, styles.stepLabelTextActive]}>挑选服务</Text>
-          <Text style={styles.stepLabelText}>确认下单</Text>
-        </View>
-      </View>
-
-      <FlatList
-        data={supplies}
-        keyExtractor={item => String(item.id)}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.refreshColor]} />
-        }
-        onEndReached={onLoadMore}
-        onEndReachedThreshold={0.35}
-        contentContainerStyle={styles.content}
-        ListHeaderComponent={
-          <View>
-            {quickOrderMode ? (
-              <View style={styles.quickOrderHeader}>
-                <View style={styles.headerTitleRow}>
-                  <Text style={styles.headerTitle}>为您匹配到以下机组</Text>
-                  <TouchableOpacity style={styles.editBtn} onPress={() => setEditQuickOrder(!editQuickOrder)}>
-                    <Text style={styles.editBtnText}>{editQuickOrder ? '收起' : '修改条件'}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {editQuickOrder ? (
-                  <ObjectCard style={styles.editCard}>
-                    <Text style={styles.inputLabel}>起点地址</Text>
-                    <AddressInputField
-                      value={departureAddress}
-                      onSelect={setDepartureAddress}
-                    />
-                    <Text style={styles.inputLabel}>终点地址</Text>
-                    <AddressInputField
-                      value={destinationAddress}
-                      onSelect={setDestinationAddress}
-                    />
-                    <View style={styles.cargoRow}>
-                      <View style={{flex: 1}}>
-                        <Text style={styles.inputLabel}>重量 (kg)</Text>
-                        <TextInput
-                          style={styles.inlineInput}
-                          keyboardType="numeric"
-                          value={quickCargoWeight}
-                          onChangeText={setQuickCargoWeight}
-                        />
-                      </View>
-                      <View style={{flex: 1}}>
-                        <Text style={styles.inputLabel}>场景</Text>
-                        <TouchableOpacity
-                          style={styles.sceneSelect}
-                          onPress={() => {
-                            const currentIndex = SCENE_FILTERS.findIndex(f => f.key === quickCargoScene);
-                            const nextIndex = (currentIndex + 1) % SCENE_FILTERS.length;
-                            setQuickCargoScene(SCENE_FILTERS[nextIndex === 0 ? 1 : nextIndex].key);
-                          }}
-                        >
-                          <Text style={styles.sceneSelectText}>{getSupplySceneLabel(quickCargoScene)}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    <TouchableOpacity style={styles.applyBtn} onPress={handleQuickOrderSearch}>
-                      <Text style={styles.applyBtnText}>重新匹配</Text>
-                    </TouchableOpacity>
-                  </ObjectCard>
-                ) : (
-                  <View style={styles.summaryBadge}>
-                    <Text style={styles.summaryBadgeText} numberOfLines={1}>
-                      {summarizeAddress(departureAddress)} → {summarizeAddress(destinationAddress)} | {quickCargoWeight}kg
-                    </Text>
-                  </View>
-                )}
-
-                {supplies.length > 0 && !loading && (
-                  <Text style={styles.resultCount}>找到 {supplies.length} 个支持直接下单的优质服务</Text>
-                )}
-              </View>
-            ) : (
-              <View style={styles.hero}>
-                <Text style={styles.heroEyebrow}>服务市场</Text>
-                <Text style={styles.heroTitle}>{heroTitle}</Text>
-                <Text style={styles.heroDesc}>{heroDesc}</Text>
-                <View style={styles.heroActionRow}>
-                  <TouchableOpacity
-                    style={styles.heroGhostBtn}
-                    onPress={() => {
-                      setQuickOrderMode(true);
-                      setHasQuickOrderSearch(false);
-                      setLastQuickOrderDraft(null);
-                      setSupplies([]);
-                    }}>
-                    <Text style={styles.heroGhostBtnText}>切换到快速下单模式</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        }
-        ListEmptyComponent={listEmptyComponent}
-      />
-    </SafeAreaView>
-  );
-}
-
-const getStyles = (theme: AppTheme) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.bg,
-    },
-    stepHeader: {
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-      backgroundColor: theme.bg,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.divider,
-    },
-    stepTrack: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    stepDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: theme.divider,
-    },
-    stepDotActive: {
-      backgroundColor: theme.primary,
-      width: 10,
-      height: 10,
-    },
-    stepDotCompleted: {
-      backgroundColor: theme.primary,
-    },
-    stepLine: {
-      width: 50,
-      height: 2,
-      backgroundColor: theme.divider,
-      marginHorizontal: 4,
-    },
-    stepLineCompleted: {
-      backgroundColor: theme.primary,
-    },
-    stepLabels: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 6,
-    },
-    stepLabelText: {
-      fontSize: 10,
-      color: theme.textHint,
-      fontWeight: '600',
-    },
-    stepLabelTextActive: {
-      color: theme.primary,
-      fontWeight: '700',
-    },
-    stepLabelTextCompleted: {
-      color: theme.textSub,
-    },
-    content: {
-      padding: 16,
-      paddingBottom: 28,
-    },
-    quickOrderHeader: {
-      marginBottom: 16,
-    },
-    headerTitleRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: theme.text,
-    },
-    editBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-    },
-    editBtnText: {
-      fontSize: 13,
-      color: theme.primary,
-      fontWeight: '700',
-    },
-    summaryBadge: {
-      backgroundColor: theme.bgSecondary,
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderWidth: 1,
-      borderColor: theme.divider,
-    },
-    summaryBadgeText: {
-      fontSize: 12,
-      color: theme.textSub,
-      fontWeight: '600',
-    },
-    editCard: {
-      padding: 14,
-      borderRadius: 16,
-      marginBottom: 10,
-    },
-    inputLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: theme.textHint,
-      marginBottom: 4,
-    },
-    cargoRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 8,
-    },
-    inlineInput: {
-      backgroundColor: theme.bgSecondary,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      fontSize: 14,
-      color: theme.text,
-    },
-    sceneSelect: {
-      backgroundColor: theme.bgSecondary,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      justifyContent: 'center',
-    },
-    sceneSelectText: {
-      fontSize: 14,
-      color: theme.text,
-      fontWeight: '600',
-    },
-    applyBtn: {
-      marginTop: 14,
-      backgroundColor: theme.primary,
-      borderRadius: 10,
-      paddingVertical: 10,
-      alignItems: 'center',
-    },
-    applyBtnText: {
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    resultCount: {
-      marginTop: 16,
-      fontSize: 13,
-      color: theme.textSub,
-      fontWeight: '600',
-    },
-    hero: {
-      backgroundColor: theme.primary,
-      borderRadius: 24,
-      padding: 20,
-      marginBottom: 16,
-    },
-    heroEyebrow: {
-      fontSize: 11,
-      color: 'rgba(255,255,255,0.7)',
-      fontWeight: '700',
-    },
-    heroTitle: {
-      marginTop: 4,
-      fontSize: 24,
-      color: '#FFFFFF',
-      fontWeight: '800',
-    },
-    heroDesc: {
-      marginTop: 8,
-      fontSize: 13,
-      lineHeight: 18,
-      color: 'rgba(255,255,255,0.85)',
-    },
-    heroActionRow: {
-      marginTop: 12,
-    },
-    heroGhostBtn: {
-      alignSelf: 'flex-start',
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.3)',
-    },
-    heroGhostBtnText: {
-      color: '#FFFFFF',
-      fontSize: 12,
-      fontWeight: '700',
-    },
-    card: {
-      marginBottom: 12,
-      borderRadius: 20,
-      overflow: 'hidden',
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    cardHeaderLeft: {
-      flexDirection: 'row',
-      gap: 6,
-    },
-    directPill: {
-      backgroundColor: theme.success + '15',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 6,
-    },
-    directPillText: {
-      fontSize: 10,
-      color: theme.success,
-      fontWeight: '800',
-    },
-    supplyNo: {
-      marginTop: 10,
-      fontSize: 10,
-      color: theme.textHint,
-      fontWeight: '700',
-    },
-    title: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: theme.text,
-      marginTop: 4,
-    },
-    sceneRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 6,
-      marginTop: 10,
-    },
-    sceneTag: {
-      backgroundColor: theme.bgSecondary,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 6,
-    },
-    sceneTagText: {
-      fontSize: 10,
-      color: theme.textSub,
-      fontWeight: '700',
-    },
-    metricRow: {
-      flexDirection: 'row',
-      marginTop: 12,
-      gap: 12,
-    },
-    metricText: {
-      fontSize: 11,
-      color: theme.textSub,
-      fontWeight: '500',
-    },
-    cardFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: 14,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: theme.divider,
-    },
-    price: {
-      fontSize: 17,
-      color: theme.danger,
-      fontWeight: '800',
-    },
-    detailBtn: {
-      backgroundColor: theme.primary,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 10,
-    },
-    detailBtnOwner: {
-      backgroundColor: theme.card,
-      borderWidth: 1,
-      borderColor: theme.primary,
-    },
-    detailBtnText: {
-      color: '#FFFFFF',
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    detailBtnTextOwner: {
-      color: theme.primaryText,
-    },
-    loading: {
-      paddingVertical: 40,
-    },
-  });
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+  },
+  topBlue: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  navLayer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    zIndex: 20,
+  },
+  canvas: {
+    position: 'relative',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+  },
+  line: {
+    backgroundColor: '#DEE6F0',
+  },
+  metricDivider: {
+    backgroundColor: '#D4DDEB',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tag: {
+    backgroundColor: '#E8F9EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectButton: {
+    overflow: 'hidden',
+  },
+  fill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyActionButton: {
+    position: 'absolute',
+    backgroundColor: '#005BFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    zIndex: 30,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#DFE6F1',
+    shadowColor: '#0C2550',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: {width: 0, height: -4},
+    elevation: 8,
+  },
+  centerText: {
+    textAlign: 'center',
+  },
+  rightText: {
+    textAlign: 'right',
+  },
+});

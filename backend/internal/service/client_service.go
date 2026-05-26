@@ -140,6 +140,8 @@ type DemandStats struct {
 	CandidatePilotCount int64 `json:"candidate_pilot_count"`
 }
 
+type SupplyMarketStats = repository.SupplyMarketStats
+
 func (s *ClientService) SetMatchingService(matchingService *MatchingService) {
 	s.matchingService = matchingService
 }
@@ -436,6 +438,13 @@ func (s *ClientService) ListMarketplaceSupplies(query SupplyMarketQuery, page, p
 		page,
 		pageSize,
 	)
+}
+
+func (s *ClientService) GetMarketplaceSupplyStats(supplies []model.OwnerSupply) (map[int64]SupplyMarketStats, error) {
+	if s.ownerDomainRepo == nil || len(supplies) == 0 {
+		return map[int64]SupplyMarketStats{}, nil
+	}
+	return s.ownerDomainRepo.GetMarketplaceSupplyStats(supplies)
 }
 
 func (s *ClientService) GetMarketplaceSupplyDetail(supplyID int64) (*model.OwnerSupply, error) {

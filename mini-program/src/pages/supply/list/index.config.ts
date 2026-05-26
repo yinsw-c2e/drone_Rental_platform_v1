@@ -1,3 +1,4 @@
 export default definePageConfig({
-  navigationBarTitleText: '服务大厅',
+  navigationStyle: 'custom',
+  disableScroll: true,
 });

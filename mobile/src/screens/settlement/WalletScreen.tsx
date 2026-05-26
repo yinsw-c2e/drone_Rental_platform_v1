@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   FlatList,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {useSelector} from 'react-redux';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import {
   getWallet,
   getWalletTransactions,
@@ -18,6 +20,8 @@ import {
   WalletTransaction,
   OrderSettlement,
 } from '../../services/settlement';
+import {RootState} from '../../store/store';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -43,6 +47,13 @@ type TabType = 'wallet' | 'transactions' | 'settlements';
 export default function WalletScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [activeTab, setActiveTab] = useState<TabType>('wallet');
   const [wallet, setWallet] = useState<UserWallet | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -50,6 +61,13 @@ export default function WalletScreen({navigation}: any) {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
+    if (!canUseProviderFinance) {
+      setWallet(null);
+      setTransactions([]);
+      setSettlements([]);
+      setRefreshing(false);
+      return;
+    }
     try {
       const [walletData, txData, settleData] = await Promise.all([
         getWallet(),
@@ -64,7 +82,7 @@ export default function WalletScreen({navigation}: any) {
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [canUseProviderFinance]);
 
   useFocusEffect(
     useCallback(() => {
@@ -143,13 +161,13 @@ export default function WalletScreen({navigation}: any) {
           </View>
           {item.pilot_fee > 0 && (
             <View style={styles.settleRow}>
-              <Text style={styles.settleLabel}>飞手劳务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text>
+              <Text style={styles.settleLabel}>执行人员劳务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text>
               <Text style={[styles.settleValue, {color: theme.success}]}>{formatAmount(item.pilot_fee)}</Text>
             </View>
           )}
           {item.owner_fee > 0 && (
             <View style={styles.settleRow}>
-              <Text style={styles.settleLabel}>机主设备费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text>
+              <Text style={styles.settleLabel}>服务商设备费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text>
               <Text style={[styles.settleValue, {color: theme.success}]}>{formatAmount(item.owner_fee)}</Text>
             </View>
           )}
@@ -164,6 +182,19 @@ export default function WalletScreen({navigation}: any) {
       </TouchableOpacity>
     );
   };
+
+  if (!canUseProviderFinance) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商财务能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '服务商审核通过后，才能查看收入、结算和提现记录。' : '登录后才能查看服务商财务信息。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>

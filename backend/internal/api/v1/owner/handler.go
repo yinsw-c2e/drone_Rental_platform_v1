@@ -144,7 +144,7 @@ func (h *Handler) RecommendedDemands(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
-	demands, total, err := h.ownerService.ListRecommendedDemands(userID, page, pageSize)
+	demands, total, err := h.ownerService.ListRecommendedDemands(userID, page, pageSize, service.RecommendedDemandQuery{})
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return

@@ -5,12 +5,14 @@ type AssetSource = ImageSourcePropType;
 const asset = (path: string) => ({uri: new URL(path, import.meta.url).href}) as AssetSource;
 
 export const tabbarAssets = {
-  workbenchActive: asset('./tabbar/ic_tab_workbench_active.png'),
-  workbenchInactive: asset('./tabbar/ic_tab_workbench_inactive.png'),
-  messageActive: asset('./tabbar/ic_tab_message_active.png'),
-  messageInactive: asset('./tabbar/ic_tab_message_inactive.png'),
-  mineActive: asset('./tabbar/ic_tab_mine_active.png'),
-  mineInactive: asset('./tabbar/ic_tab_mine_inactive.png'),
+  workbenchActive: asset('./haul/customer-home/icon_tab_home_active.png'),
+  workbenchInactive: asset('./haul/customer-home/icon_tab_home_inactive.png'),
+  messageActive: asset('./haul/customer-home/icon_tab_message_active.png'),
+  messageInactive: asset('./haul/customer-home/icon_tab_message_inactive.png'),
+  orderActive: asset('./haul/customer-home/icon_tab_order_active.png'),
+  orderInactive: asset('./haul/customer-home/icon_tab_order_inactive.png'),
+  mineActive: asset('./haul/customer-home/icon_tab_profile_active.png'),
+  mineInactive: asset('./haul/customer-home/icon_tab_profile_inactive.png'),
 };
 
 export const loginAssets = {

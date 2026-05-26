@@ -190,7 +190,7 @@ func (h *Handler) SettlementList(c *gin.Context) {
 
 func (h *Handler) ExecuteSettlement(c *gin.Context) {
 	id := adminParamID(c)
-	if err := h.settlementService.ExecuteSettlement(id); err != nil {
+	if _, err := h.settlementService.FinalizeSettlement(id); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
@@ -643,7 +643,15 @@ func (h *Handler) DisputeList(c *gin.Context) {
 
 func (h *Handler) AdminLogList(c *gin.Context) {
 	page, pageSize := adminPagination(c)
-	items, total, err := h.opsService.AdminListLogs(c.Query("module"), c.Query("action"), page, pageSize)
+	items, total, err := h.opsService.AdminListLogs(
+		c.Query("module"),
+		c.Query("action"),
+		c.Query("target_type"),
+		adminQueryInt64(c, "target_id"),
+		adminQueryInt64(c, "admin_id"),
+		page,
+		pageSize,
+	)
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return

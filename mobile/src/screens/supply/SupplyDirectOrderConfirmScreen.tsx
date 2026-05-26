@@ -157,7 +157,7 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
   const [checkingDestinationAirspace, setCheckingDestinationAirspace] = useState(false);
 
   const estimatedAmount = supply.base_price_amount || 0;
-  const ownerLabel = supply.owner?.nickname || `机主 #${supply.owner_user_id}`;
+  const ownerLabel = supply.owner?.nickname || `服务商 #${supply.owner_user_id}`;
   const orderReady = canCreateOrder && (eligibility?.can_create_direct_order ?? true);
   const hasAirspaceHardBlock =
     isAirspaceHardBlocked(departureAirspace) || isAirspaceHardBlocked(destinationAirspace);
@@ -529,7 +529,7 @@ export default function SupplyDirectOrderConfirmScreen({route, navigation}: any)
             <Text style={styles.priceTotalLabel}>合计预付总额</Text>
             <Text style={styles.priceTotalValue}>¥{formatAmountYuan(estimatedAmount)}</Text>
           </View>
-          <Text style={styles.priceTip}>* 实际费用将以机主确认后的方案为准，保证金将在您确认签收后原路退回。</Text>
+          <Text style={styles.priceTip}>* 实际费用将以服务商确认后的方案为准，保证金将在您确认签收后原路退回。</Text>
         </View>
 
         {eligibilityLoading && (

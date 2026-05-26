@@ -16,6 +16,14 @@ export type DemandListParams = {
   page?: number;
   page_size?: number;
   status?: string;
+  service_type?: 'heavy_cargo_lift_transport' | string;
+  region?: string;
+  min_weight_kg?: number;
+  max_weight_kg?: number;
+  start_from?: string;
+  start_to?: string;
+  cargo_scene?: string;
+  sort?: 'distance' | 'price' | string;
 };
 
 export type DemandUpsertPayload = {

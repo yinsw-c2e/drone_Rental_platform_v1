@@ -10,9 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useSelector} from 'react-redux';
 
 import EmptyState from '../../components/business/EmptyState';
 import ObjectCard from '../../components/business/ObjectCard';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import SourceTag from '../../components/business/SourceTag';
 import StatusBadge from '../../components/business/StatusBadge';
 import { getObjectStatusMeta } from '../../components/business/visuals';
@@ -23,6 +25,8 @@ import {
   formatSupplyPricing,
   getSupplySceneLabel,
 } from '../../utils/supplyMeta';
+import {RootState} from '../../store/store';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import { useTheme } from '../../theme/ThemeContext';
 import type { AppTheme } from '../../theme/index';
 
@@ -50,6 +54,13 @@ const MY_SERVICE_HELP =
 export default function MyOffersScreen({ navigation }: any) {
   const { theme } = useTheme();
   const styles = getStyles(theme);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canManageServices = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply);
   const [offers, setOffers] = useState<SupplySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,6 +68,12 @@ export default function MyOffersScreen({ navigation }: any) {
   const [activeGroup, setActiveGroup] = useState<StatusGroupKey>('all');
 
   const fetchData = useCallback(async () => {
+    if (!canManageServices) {
+      setOffers([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const res = await ownerService.listMySupplies({
         page: 1,
@@ -69,7 +86,7 @@ export default function MyOffersScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [canManageServices]);
 
   useEffect(() => {
     fetchData();
@@ -90,6 +107,10 @@ export default function MyOffersScreen({ navigation }: any) {
 
   const handleStatusAction = useCallback(
     async (item: SupplySummary) => {
+      if (!canManageServices) {
+        Alert.alert('无法操作', '服务商设备能力审核通过后才能管理正式服务。');
+        return;
+      }
       const action = NEXT_STATUS_ACTIONS[item.status];
       if (!action) {
         return;
@@ -104,12 +125,25 @@ export default function MyOffersScreen({ navigation }: any) {
         setUpdatingId(null);
       }
     },
-    [fetchData],
+    [canManageServices, fetchData],
   );
 
   const showPageHelp = useCallback(() => {
     Alert.alert('我的服务', MY_SERVICE_HELP);
   }, []);
+
+  if (!canManageServices) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商设备能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '设备与关键资质审核通过后，才能查看、编辑和上架正式服务。' : '登录后才能查看服务商服务列表。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const renderItem = ({ item }: { item: SupplySummary }) => {
     const action = NEXT_STATUS_ACTIONS[item.status];

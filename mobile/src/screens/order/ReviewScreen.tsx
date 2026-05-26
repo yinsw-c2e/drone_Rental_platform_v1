@@ -73,7 +73,7 @@ const buildReviewTargets = (detail: V2OrderDetail | null, currentUserId: number)
 
   pushTarget(detail.participants.client, 'client', '客户');
   pushTarget(detail.participants.provider, 'owner', '承接方');
-  pushTarget(detail.participants.executor, 'pilot', '执行飞手');
+  pushTarget(detail.participants.executor, 'pilot', '执行人员');
 
   const unique = new Map<string, ReviewTarget>();
   targets.forEach(item => unique.set(`${item.role}:${item.userId}`, item));
@@ -204,7 +204,7 @@ export default function ReviewScreen({route, navigation: _navigation}: any) {
           <View style={styles.row}><Text style={styles.rowLabel}>当前状态</Text><Text style={styles.rowValue}>{formatOrderStatusLabel(detail.status)}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>客户</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.client, '客户')}</Text></View>
           <View style={styles.row}><Text style={styles.rowLabel}>承接方</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.provider, '承接方')}</Text></View>
-          <View style={styles.row}><Text style={styles.rowLabel}>执行飞手</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.executor, '执行飞手')}</Text></View>
+          <View style={styles.row}><Text style={styles.rowLabel}>执行人员</Text><Text style={styles.rowValue}>{buildTargetSummary(detail.participants?.executor, '执行人员')}</Text></View>
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>

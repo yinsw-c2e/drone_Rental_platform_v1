@@ -248,7 +248,7 @@ export default function PilotProfileScreen({ navigation }: any) {
       draftDirtyRef.current = false;
       setPilot(savedProfile);
       setDraft(buildDraftFromProfile(savedProfile));
-      Alert.alert('保存成功', '飞手设置已更新。');
+      Alert.alert('保存成功', '执行人员设置已更新。');
     } catch (e: any) {
       Alert.alert('保存失败', e?.message || '请稍后重试');
     } finally {
@@ -320,7 +320,7 @@ export default function PilotProfileScreen({ navigation }: any) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.loadingWrap}>
-          <Text style={styles.loadingText}>飞手档案加载中...</Text>
+          <Text style={styles.loadingText}>执行人员资料加载中...</Text>
         </View>
       </SafeAreaView>
     );
@@ -330,15 +330,15 @@ export default function PilotProfileScreen({ navigation }: any) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyTitle}>还没有飞手档案</Text>
+          <Text style={styles.emptyTitle}>还没有执行人员资料</Text>
           <Text style={styles.emptyDesc}>
-            先完成飞手认证，后面这里才会出现接单状态、服务区域和执行统计。
+            先完成执行人员认证，后面这里才会出现接单状态、服务区域和执行统计。
           </Text>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => navigation.navigate('PilotRegister')}
           >
-            <Text style={styles.primaryButtonText}>去做飞手认证</Text>
+            <Text style={styles.primaryButtonText}>去做执行人员认证</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -356,7 +356,7 @@ export default function PilotProfileScreen({ navigation }: any) {
         <View style={styles.headerHero}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.headerGreeting}>飞手工作台</Text>
+              <Text style={styles.headerGreeting}>执行人员工作台</Text>
               <Text style={styles.headerSubtitle}>执照、接单与飞行统计</Text>
             </View>
             <View style={styles.headerStatusRow}>
@@ -439,8 +439,8 @@ export default function PilotProfileScreen({ navigation }: any) {
               <Text style={styles.switchLabel}>正式派单接单开关</Text>
               <Text style={styles.switchSub}>
                 {canUpdateAvailability
-                  ? '开启后，机主和系统可直接向你指派任务。'
-                  : '完成飞手认证后解锁正式接单开关。'}
+                  ? '开启后，服务商和系统可直接向你指派任务。'
+                  : '完成执行人员认证后解锁正式接单开关。'}
               </Text>
             </View>
             <Switch
@@ -553,7 +553,7 @@ export default function PilotProfileScreen({ navigation }: any) {
               onPress={() => navigation.navigate('FlightLog')}
             />
             <EntryItem
-              title="绑定机主"
+              title="绑定服务商"
               icon="🤝"
               onPress={() => navigation.navigate('PilotOwnerBindings')}
             />

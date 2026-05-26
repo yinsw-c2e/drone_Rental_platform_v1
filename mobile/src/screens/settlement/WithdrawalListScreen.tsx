@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,11 @@ import {
   FlatList,
   RefreshControl,
 } from 'react-native';
+import {useSelector} from 'react-redux';
+import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import {listMyWithdrawals, WithdrawalRecord} from '../../services/settlement';
+import {RootState} from '../../store/store';
+import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
@@ -25,17 +29,25 @@ const METHOD_MAP: Record<string, string> = {
   wechat: '微信',
 };
 
-export default function WithdrawalListScreen() {
+export default function WithdrawalListScreen({navigation}: any) {
   const {theme} = useTheme();
   const styles = getStyles(theme);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary)),
+    [roleSummary],
+  );
+  const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [records, setRecords] = useState<WithdrawalRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!canUseProviderFinance) {
+      setRecords([]);
+      setRefreshing(false);
+      return;
+    }
     try {
       const result = await listMyWithdrawals(1, 50);
       setRecords(result.data || []);
@@ -44,7 +56,11 @@ export default function WithdrawalListScreen() {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [canUseProviderFinance]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const formatAmount = (fen: number) => (fen / 100).toFixed(2);
 
@@ -69,6 +85,19 @@ export default function WithdrawalListScreen() {
       </View>
     );
   };
+
+  if (!canUseProviderFinance) {
+    return (
+      <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
+        <ProviderAccessNotice
+          title={isAuthenticated ? '服务商财务能力未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '服务商审核通过后，才能查看提现记录。' : '登录后才能查看服务商提现记录。'}
+          actionText={isAuthenticated ? '查看服务商入驻' : undefined}
+          onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>

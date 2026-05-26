@@ -1,372 +1,511 @@
 // @ts-nocheck
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useState, useCallback } from 'react';
-import { Image, View, Text, ScrollView } from '@tarojs/components';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../../store/store';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { orderV2Service, confirmReceipt } from '../../../services/orderV2';
-import { V2OrderDetail } from '../../../types';
-import { getObjectStatusMeta } from '../../../utils';
-import heroBgImage from '../../../assets/order-detail/images/order_detail_hero_bg_750x360.jpg';
-import calendarIcon from '../../../assets/order-detail/icons/calendar_line.png';
-import chevronIcon from '../../../assets/order-detail/icons/chevron_right.png';
-import locationIcon from '../../../assets/order-detail/icons/location_line.png';
-import timelineClockIcon from '../../../assets/order-detail/icons/timeline_clock.png';
+import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
+import { store } from '../../../store/store';
 import './index.scss';
 
-const STATUS_LABELS: Record<string, string> = {
-  pending_provider_confirmation: '待机主确认', pending_payment: '待付款', paid: '已支付',
-  pending_dispatch: '待派单', assigned: '已分配', preparing: '准备中', in_transit: '运输中',
-  delivered: '已投送', completed: '已完成', cancelled: '已取消', provider_rejected: '机主已拒绝',
-};
+import iconBack from '../../../assets/haul/order-progress/icon_nav_back.png';
+import iconService from '../../../assets/haul/order-progress/icon_nav_service_headset.png';
+import iconAccepted from '../../../assets/haul/order-progress/icon_status_accepted_green.png';
+import logoProvider from '../../../assets/haul/order-progress/logo_provider_anyi.png';
+import iconWeight from '../../../assets/haul/order-progress/icon_summary_weight_gray.png';
+import iconPickup from '../../../assets/haul/order-progress/icon_pickup_pin_green.png';
+import iconDropoff from '../../../assets/haul/order-progress/icon_dropoff_pin_orange.png';
+import iconDrone from '../../../assets/haul/order-progress/icon_drone_service_blue.png';
+import iconTeam from '../../../assets/haul/order-progress/icon_team_blue.png';
+import iconChevron from '../../../assets/haul/order-progress/icon_summary_chevron_right.png';
+import iconTimelineCheck from '../../../assets/haul/order-progress/icon_timeline_check.png';
+import iconTimelineActive3 from '../../../assets/haul/order-progress/icon_timeline_active_3.png';
+import iconTimelinePending4 from '../../../assets/haul/order-progress/icon_timeline_pending_4.png';
+import iconTimelinePending5 from '../../../assets/haul/order-progress/icon_timeline_pending_5.png';
+import iconTimelinePending6 from '../../../assets/haul/order-progress/icon_timeline_pending_6.png';
+import iconPhone from '../../../assets/haul/order-progress/icon_phone_outline.png';
+import tabHome from '../../../assets/haul/order-progress/tab_home_inactive.png';
+import tabOrder from '../../../assets/haul/order-progress/tab_order_active.png';
+import tabMessage from '../../../assets/haul/order-progress/tab_message_inactive.png';
+import tabProfile from '../../../assets/haul/order-progress/tab_profile_inactive.png';
+import badgeMessage from '../../../assets/haul/order-progress/badge_message_red_3.png';
 
-const formatMoney = (v?: number | null) => `¥${(((v || 0) / 100)).toFixed(2)}`;
-const summarizeParty = (p: any, fb: string) => p?.nickname || (p?.user_id ? `${fb} #${p.user_id}` : fb);
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '-';
+const formatFullDateTime = (value?: string | null) => {
+  if (!value) return '--';
   const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${minute}`;
+  if (Number.isNaN(date.getTime())) return String(value).replace('T', ' ').slice(0, 16);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d} ${h}:${min}`;
 };
 
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  pending: '等待支付',
-  processing: '支付处理中',
-  paid: '支付成功',
-  failed: '支付失败',
-  refunded: '已退款',
+const formatMoney = (amount?: number | null) => {
+  const value = Number(amount || 0) / 100;
+  return `¥${value.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`;
 };
 
-const REFUND_STATUS_LABELS: Record<string, string> = {
-  pending: '退款处理中',
-  processing: '退款处理中',
-  completed: '已退款',
-  rejected: '退款被拒绝',
-  cancelled: '退款已取消',
+const settlementStatusLabelOf = (status?: string) => {
+  if (status === 'pending') return '待计算';
+  if (status === 'calculated') return '已计算';
+  if (status === 'confirmed') return '已确认';
+  if (status === 'settled') return '已入账';
+  if (status === 'disputed') return '争议中';
+  return '待生成';
 };
 
-const TIMELINE_SOURCE_LABELS: Record<string, string> = {
-  order: '订单',
-  payment: '支付',
-  refund: '退款',
-  dispatch: '执行',
-  dispatch_task: '执行',
-  dispute: '争议',
+const providerNameOf = (detail: any) =>
+  detail?.participants?.provider?.nickname ||
+  detail?.provider?.nickname ||
+  detail?.provider_nickname ||
+  '服务商待确认';
+
+const providerPhoneOf = (detail: any) =>
+  detail?.participants?.provider?.phone ||
+  detail?.provider?.phone ||
+  detail?.provider_phone ||
+  '';
+
+const customerPhoneOf = (detail: any) =>
+  detail?.participants?.client?.phone ||
+  detail?.client?.phone ||
+  detail?.client_phone ||
+  detail?.renter_phone ||
+  '';
+
+const participantUserIdOf = (detail: any, key: string) =>
+  Number(detail?.participants?.[key]?.user_id || detail?.participants?.[key]?.id || 0);
+
+const isCallablePhone = (phone?: string) =>
+  Boolean(phone && !String(phone).includes('*') && /^[\d+\-\s]{5,}$/.test(String(phone)));
+
+const sourceSupplyIdOf = (detail: any) =>
+  Number(detail?.source_info?.source_supply_id || detail?.source_supply_id || detail?.supply_id || 0);
+
+const cargoWeightTextOf = (detail: any) => {
+  const value = detail?.cargo_weight_kg || detail?.cargo_weight || detail?.payload_weight_kg || detail?.current_dispatch?.cargo_weight;
+  return value ? `${value}kg` : '--';
 };
 
-const looksLikeBackendCode = (value?: string) => /^[a-z0-9_:-]+$/i.test(String(value || '').trim());
-
-const getProgressInfo = (status: string, isClient: boolean, isProvider: boolean) => {
-  switch (status) {
-    case 'pending_provider_confirmation':
-      return {
-        eyebrow: isProvider ? '当前在等你' : '当前在等机主',
-        title: isProvider ? '请确认是否承接' : '机主正在确认是否承接',
-        desc: isProvider ? '确认后客户即可继续支付，订单会进入执行安排。' : '对方确认承接后，平台会继续推进合同与支付。',
-        eta: '等待确认',
-      };
-    case 'pending_payment':
-      return {
-        eyebrow: isClient ? '下一步是支付' : '等待客户支付',
-        title: isClient ? '请尽快支付' : '等待支付',
-        desc: '双方合同已确认完成，支付成功后平台会继续推进执行安排。',
-        eta: '支付后推进',
-      };
-    case 'delivered':
-      return {
-        eyebrow: isClient ? '当前在等你' : '等待客户确认签收',
-        title: isClient ? '请确认签收' : '已完成投送',
-        desc: isClient ? '确认无误后完成签收，订单会进入收尾归档。' : '客户确认签收后，本次订单会进入完成状态。',
-        eta: '等待签收',
-      };
-    case 'completed':
-      return {
-        eyebrow: '订单已完成',
-        title: '本次运输已经闭环完成',
-        desc: '合同、支付、执行留痕和评价都会继续保留在当前订单里。',
-        eta: '可随时查看记录',
-      };
-    case 'cancelled':
-    case 'provider_rejected':
-      return {
-        eyebrow: '订单已结束',
-        title: getObjectStatusMeta('order', status).label,
-        desc: '当前没有继续推进的动作，订单记录会保留在本页。',
-        eta: '无需额外操作',
-      };
-    default:
-      return {
-        eyebrow: '订单进度',
-        title: getObjectStatusMeta('order', status).label,
-        desc: '当前订单正在推进中，后续重要动作都会汇总在下方时间线里。',
-        eta: '查看订单时间线',
-      };
-  }
+const statusLabelOf = (status?: string) => {
+  if (status === 'pending_provider_confirmation') return '待服务商确认';
+  if (status === 'pending_payment') return '待支付';
+  if (status === 'pending_dispatch') return '待开始履约';
+  if (status === 'assigned') return '服务商已接单';
+  if (status === 'preparing') return '准备中';
+  if (status === 'loading') return '装载中';
+  if (status === 'in_transit') return '吊运中';
+  if (status === 'delivered') return '待确认收货';
+  if (status === 'completed') return '已完成';
+  if (status === 'cancelled') return '已取消';
+  return status || '状态已更新';
 };
 
-const getTimelineTitle = (item: any) => {
-  const sourceType = String(item.source_type || '').toLowerCase();
-  const rawTitle = String(item.title || '').trim();
-  const rawStatus = String(item.status || '').trim();
-  const fallbackTitle = rawTitle && !looksLikeBackendCode(rawTitle) ? rawTitle : '';
-
-  if (fallbackTitle) return fallbackTitle;
-
-  if (sourceType === 'payment') {
-    return PAYMENT_STATUS_LABELS[rawStatus.toLowerCase()] || '支付进度更新';
-  }
-  if (sourceType === 'refund') {
-    return REFUND_STATUS_LABELS[rawStatus.toLowerCase()] || '退款进度更新';
-  }
-  if (sourceType === 'dispatch' || sourceType === 'dispatch_task') {
-    return getObjectStatusMeta('dispatch_task', rawStatus).label;
-  }
-  if (sourceType === 'order') {
-    return getObjectStatusMeta('order', rawStatus).label;
-  }
-  const statusLabel = getObjectStatusMeta('order', rawStatus).label;
-  if (statusLabel !== rawStatus) return statusLabel;
-  return TIMELINE_SOURCE_LABELS[sourceType] ? `${TIMELINE_SOURCE_LABELS[sourceType]}更新` : '订单状态更新';
+const serviceLevelOf = (detail: any) => {
+  const weight = Number(String(cargoWeightTextOf(detail)).replace(/[^\d.]/g, '')) || 0;
+  if (detail?.estimated_service) return detail.estimated_service;
+  if (!weight) return '--';
+  if (weight <= 50) return '50kg 级服务';
+  if (weight <= 100) return '100kg 级服务';
+  if (weight <= 300) return '300kg 级服务';
+  return '300kg+ 级服务';
 };
 
-function SectionGlyph({ type }: { type: 'progress' | 'action' | 'task' }) {
-  if (type === 'action') {
-    return (
-      <View className="section-glyph section-glyph-action">
-        <View className="section-glyph-action-handle" />
-        <View className="section-glyph-action-body" />
-        <View className="section-glyph-action-lock" />
-      </View>
-    );
-  }
+const statusTitleOf = (status: string) => {
+  if (status === 'completed') return '订单已完成';
+  if (status === 'delivered') return '等待客户确认';
+  if (status === 'cancelled') return '订单已取消';
+  if (status === 'pending_provider_confirmation') return '等待服务商接单';
+  if (status === 'pending_payment') return '等待支付';
+  if (status === 'pending_dispatch') return '等待服务商开始履约';
+  if (['assigned', 'preparing'].includes(status)) return '服务商已接单';
+  if (['loading', 'in_transit'].includes(status)) return '吊运进行中';
+  if (!status) return '订单状态未知';
+  return '服务商已接单';
+};
 
-  return (
-    <View className={`section-glyph section-glyph-${type}`}>
-      {type === 'progress' && <View className="section-glyph-clip" />}
-      {type === 'task' && <View className="section-glyph-corner" />}
-      <View className="section-glyph-line section-glyph-line-a" />
-      <View className="section-glyph-line section-glyph-line-b" />
-      <View className="section-glyph-line section-glyph-line-c" />
-    </View>
-  );
-}
+const statusDescOf = (status: string) => {
+  if (status === 'completed') return '本次吊运服务已完成';
+  if (status === 'delivered') return '货物已送达，请确认完成';
+  if (status === 'cancelled') return '订单已结束';
+  if (status === 'pending_provider_confirmation') return '服务商正在确认方案，请耐心等待';
+  if (status === 'pending_payment') return '请完成支付后继续履约流程';
+  if (status === 'pending_dispatch') return '服务商待开始履约';
+  if (['loading', 'in_transit'].includes(status)) return '吊运作业正在进行';
+  if (!status) return '正在等待订单状态同步';
+  return '服务商正在安排准备，请耐心等待';
+};
 
-function DetailRow({ label, value, highlight, long, icon }: { label: string; value?: string; highlight?: boolean; long?: boolean; icon?: string }) {
-  return (
-    <View className={`detail-row${long ? ' detail-row-long' : ''}`}>
-      <View className="detail-row-label-wrap">
-        {icon ? <Image className="detail-row-icon" src={icon} mode="aspectFit" /> : null}
-        <Text className="detail-row-label">{label}</Text>
-      </View>
-      <Text className={`detail-row-value${highlight ? ' detail-row-value-highlight' : ''}`}>{value || '-'}</Text>
-    </View>
-  );
-}
+const getStepState = (detail: any) => {
+  const status = detail?.status || '';
+  if (['completed'].includes(status)) return 6;
+  if (['delivered'].includes(status)) return 5;
+  if (['in_transit'].includes(status)) return 5;
+  if (['preparing', 'assigned', 'pending_dispatch'].includes(status)) return 3;
+  if (['pending_payment', 'paid'].includes(status)) return 2;
+  return 1;
+};
 
-export default function OrderDetailPage() {
-  const user = useSelector((state: RootState) => state.auth.user);
+export default function OrderProgressPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
   const orderId = Number(params.orderId || params.id || 0);
-  const [detail, setDetail] = useState<V2OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [remoteDetail, setRemoteDetail] = useState<any | null>(null);
+  const [remoteTimeline, setRemoteTimeline] = useState<any[]>([]);
+  const [loading, setLoading] = useState(Boolean(orderId));
+  const [errorText, setErrorText] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-  const [scrollTarget, setScrollTarget] = useState('');
+  const [settlement, setSettlement] = useState<any | null>(null);
+  const [settlementLoading, setSettlementLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!orderId) { setLoading(false); return; }
+    if (!orderId) {
+      setRemoteDetail(null);
+      setSettlement(null);
+      setErrorText('缺少订单ID，无法展示订单进度');
+      setLoading(false);
+      return;
+    }
+    if (!store.getState().auth.accessToken) {
+      setRemoteDetail(null);
+      setSettlement(null);
+      setErrorText('请先登录后查看订单进度');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    try { setDetail(await orderV2Service.get(orderId) as any); } catch { setDetail(null); }
-    finally { setLoading(false); }
+    setErrorText('');
+    setSettlement(null);
+    try {
+      const res = await orderV2Service.get(orderId);
+      const detail = (res as any)?.data || res;
+      if (!detail || !detail.id) {
+        setRemoteDetail(null);
+        setRemoteTimeline([]);
+        setSettlement(null);
+        setErrorText('订单不存在或已不可查看');
+        return;
+      }
+      setRemoteDetail(detail);
+      if (String(detail.status) === 'completed') {
+        setSettlementLoading(true);
+        try {
+          const settlementRes = await orderFinanceV2Service.getSettlement(orderId);
+          setSettlement((settlementRes as any)?.data || settlementRes);
+        } catch {
+          setSettlement(null);
+        } finally {
+          setSettlementLoading(false);
+        }
+      }
+      try {
+        const timelineRes = await orderV2Service.getTimeline(orderId);
+        const timelineData = (timelineRes as any)?.data || timelineRes;
+        setRemoteTimeline(Array.isArray(timelineData?.items) ? timelineData.items : []);
+      } catch {
+        setRemoteTimeline(Array.isArray(detail?.timeline) ? detail.timeline : []);
+      }
+    } catch (error: any) {
+      setRemoteDetail(null);
+      setRemoteTimeline([]);
+      setSettlement(null);
+      setErrorText(error?.message || '订单加载失败，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
   }, [orderId]);
 
-  useDidShow(() => { load(); });
+  useDidShow(() => {
+    load();
+  });
 
-  if (loading) return <View style={{ padding: '60px', textAlign: 'center' }}><Text>加载中...</Text></View>;
-  if (!detail) return <View style={{ padding: '60px', textAlign: 'center' }}><Text>订单不存在</Text></View>;
+  const detail = useMemo(() => remoteDetail, [remoteDetail]);
+  const stepState = detail ? getStepState(detail) : 0;
+  const canConfirm = detail?.status === 'delivered';
+  const canPay = detail?.status === 'pending_payment';
+  const canReview = detail?.status === 'completed';
+  const needsContractSign = canPay && !detail?.payment_ready;
+  const providerPhone = detail ? providerPhoneOf(detail) : '';
+  const customerPhone = detail ? customerPhoneOf(detail) : '';
+  const currentUserId = Number(store.getState().auth.user?.id || 0);
+  const clientUserId = detail ? Number(
+    detail.client_user_id ||
+    detail.renter_id ||
+    participantUserIdOf(detail, 'client') ||
+    0,
+  ) : 0;
+  const providerUserIds = detail ? [
+    detail.provider_user_id,
+    detail.owner_id,
+    detail.drone_owner_user_id,
+    detail.executor_pilot_user_id,
+    participantUserIdOf(detail, 'provider'),
+    participantUserIdOf(detail, 'executor'),
+  ].map((id) => Number(id || 0)).filter(Boolean) : [];
+  const isProviderViewer = Boolean(currentUserId && providerUserIds.includes(currentUserId) && currentUserId !== clientUserId);
+  const contactTargetLabel = isProviderViewer ? '客户' : '服务商';
+  const contactPhone = isProviderViewer ? customerPhone : providerPhone;
+  const sourceSupplyId = detail ? sourceSupplyIdOf(detail) : 0;
+  const demandId = Number(detail?.source_info?.demand_id || detail?.demand_id || 0);
+  const orderNo = detail?.order_no || '';
+  const createdAt = formatFullDateTime(detail?.created_at);
+  const providerConfirmedAt = detail?.provider_confirmed_at
+    ? formatFullDateTime(detail.provider_confirmed_at)
+    : '等待确认';
+  const serviceStartedAt = detail?.updated_at ? formatFullDateTime(detail.updated_at) : '待开始';
 
-  const uid = Number(user?.id || 0);
-  const client = (detail as any).participants?.client || (detail as any).client;
-  const provider = (detail as any).participants?.provider || (detail as any).provider;
-  const isClient = uid > 0 && uid === Number(client?.user_id || 0);
-  const isProvider = uid > 0 && uid === Number(provider?.user_id || 0);
-  const status = detail.status || '';
-  const fin = (detail as any).financial_summary || {};
-  const progress = getProgressInfo(status, isClient, isProvider);
-  const canConfirmProvider = status === 'pending_provider_confirmation' && isProvider;
-  const canPay = status === 'pending_payment' && isClient;
-  const canConfirmReceipt = status === 'delivered' && isClient;
-  const canCancelOrder = !['completed', 'cancelled', 'provider_rejected', 'in_transit', 'delivered'].includes(status) && (isClient || isProvider);
-  const hasOrderActions = canConfirmProvider || canPay || canConfirmReceipt || canCancelOrder;
-  const timelineItems = ((detail as any).timeline || []);
-
-  const doAction = async (fn: () => Promise<any>, msg: string) => {
-    setActionLoading(true);
-    try { await fn(); Taro.showToast({ title: msg, icon: 'success' }); load(); }
-    catch (e: any) { Taro.showToast({ title: e.message, icon: 'none' }); }
-    finally { setActionLoading(false); }
+  const goBack = () => {
+    if (Taro.getCurrentPages().length > 1) Taro.navigateBack();
+    else Taro.switchTab({ url: '/pages/orders/index' });
   };
 
-  const handleConfirm = () => Taro.showModal({ title: '确认承接', content: '确认承接这笔订单？' }).then(r => r.confirm && doAction(() => orderV2Service.providerConfirm(orderId), '已确认'));
-  const handleReject = () => Taro.showModal({ title: '拒绝订单', content: '确认拒绝？' }).then(r => r.confirm && doAction(() => orderV2Service.providerReject(orderId, '机主拒绝'), '已拒绝'));
-  const handleCancel = () => Taro.showModal({ title: '取消订单', content: '确定取消？' }).then(r => r.confirm && doAction(() => orderV2Service.cancel(orderId, '用户取消'), '已取消'));
-  const handleReceipt = () => Taro.showModal({ title: '确认签收', content: '确认已收到货物？' }).then(r => r.confirm && doAction(() => confirmReceipt(orderId), '签收成功'));
-  const handleTimelineJump = () => {
-    if (!timelineItems.length) return;
-    setScrollTarget('');
-    setTimeout(() => setScrollTarget('order-timeline-section'), 0);
+  const openService = () => Taro.switchTab({ url: '/pages/messages/index' });
+
+  const viewPlan = () => {
+    if (sourceSupplyId) {
+      Taro.navigateTo({ url: `/pages/supply/detail/index?id=${sourceSupplyId}` });
+      return;
+    }
+    if (demandId) {
+      Taro.navigateTo({ url: `/pages/demand/detail/index?id=${demandId}` });
+      return;
+    }
+    Taro.showToast({ title: '暂无方案详情', icon: 'none' });
   };
+
+  const copyOrderNo = () => {
+    if (!orderNo) return;
+    Taro.setClipboardData({ data: orderNo });
+  };
+
+  const contactCounterparty = () => {
+    if (isCallablePhone(contactPhone)) {
+      Taro.makePhoneCall({ phoneNumber: contactPhone });
+      return;
+    }
+    Taro.showModal({
+      title: `联系${contactTargetLabel}`,
+      content: `当前${contactTargetLabel}暂无可直拨电话，可先通过消息联系客服。`,
+      confirmText: '去消息',
+      success: (res) => {
+        if (res.confirm) openService();
+      },
+    });
+  };
+
+  const submitConfirm = () => {
+    if (canPay) {
+      Taro.navigateTo({
+        url: needsContractSign
+          ? `/pages/orders/contract/index?orderId=${orderId}`
+          : `/pages/payment/index?orderId=${orderId}`,
+      });
+      return;
+    }
+    if (canReview) {
+      Taro.navigateTo({ url: `/pages/review/index?orderId=${orderId}` });
+      return;
+    }
+    if (!canConfirm) return;
+    Taro.showModal({
+      title: '确认完成',
+      content: '确认货物已完成吊运并签收？',
+      success: async (res) => {
+        if (!res.confirm || !orderId) return;
+        setActionLoading(true);
+        try {
+          await confirmReceipt(orderId);
+          Taro.showToast({ title: '已确认', icon: 'success' });
+          load();
+        } catch (e: any) {
+          Taro.showToast({ title: e?.message || '操作失败', icon: 'none' });
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  };
+
+  const switchMainTab = (url: string) => {
+    Taro.switchTab({ url });
+  };
+
+  const summaryRows = detail ? [
+    { key: 'provider', icon: logoProvider, label: '服务商', value: providerNameOf(detail), clickable: true },
+    { key: 'weight', icon: iconWeight, label: '货物重量', value: cargoWeightTextOf(detail) },
+    { key: 'pickup', icon: iconPickup, label: '起吊点', value: detail?.service_address || '-' },
+    { key: 'dropoff', icon: iconDropoff, label: '落放点', value: detail?.dest_address || '-' },
+    { key: 'service', icon: iconDrone, label: '预计服务', value: serviceLevelOf(detail) },
+    { key: 'team', icon: iconTeam, label: '服务商履约', value: stepState >= 3 ? '服务商已接单' : '等待服务商开始履约' },
+  ] : [];
+
+  const timeline = detail ? [
+    { idx: 1, title: '已提交吊运需求', time: createdAt, desc: '您已提交吊运需求', icon: iconTimelineCheck, done: stepState >= 1 },
+    { idx: 2, title: '服务商已确认方案', time: providerConfirmedAt, desc: '服务商已确认并提交方案', icon: iconTimelineCheck, done: stepState >= 2 },
+    { idx: 3, title: '服务商开始履约', time: serviceStartedAt, desc: stepState >= 3 ? '服务商已进入履约推进' : '待开始', icon: iconTimelineActive3, active: stepState === 3, done: stepState >= 3 },
+    { idx: 4, title: '到场安全评估', time: '服务商到达现场后进行', desc: '待开始', icon: iconTimelinePending4, done: stepState >= 4 },
+    { idx: 5, title: '开始吊运', time: '吊运作业进行中', desc: '待开始', icon: iconTimelinePending5, done: stepState >= 5 },
+    { idx: 6, title: '已完成，等待确认', time: '作业完成，请您确认', desc: stepState >= 6 ? '已完成' : '待完成', icon: iconTimelinePending6, done: stepState >= 6 },
+  ] : [];
+  const timelineRows = remoteTimeline.length > 0
+    ? remoteTimeline.slice(0, 6).map((event, index) => {
+        const status = event?.status || event?.payload?.status || '';
+        const desc = event?.description && event.description !== status
+          ? event.description
+          : statusLabelOf(status);
+        return {
+          idx: index + 1,
+          title: event?.title || statusLabelOf(status),
+          time: formatFullDateTime(event?.occurred_at || event?.created_at),
+          desc,
+          icon: index < 2 ? iconTimelineCheck : index === 2 ? iconTimelineActive3 : [iconTimelinePending4, iconTimelinePending5, iconTimelinePending6][Math.min(index - 3, 2)],
+          done: true,
+        };
+      })
+    : timeline;
+  const primaryActionText = needsContractSign
+    ? '签署合同'
+    : canPay
+        ? '去支付'
+      : canConfirm
+        ? (actionLoading ? '确认中...' : '确认完成')
+        : canReview
+          ? '评价订单'
+      : '完成后可确认';
+  const settlementRows = settlement?.id ? [
+    { label: '结算单号', value: settlement.settlement_no || '--' },
+    { label: '客户实付', value: formatMoney(settlement.final_amount || settlement.total_amount) },
+    { label: '平台服务费', value: formatMoney(settlement.platform_fee) },
+    { label: '履约服务费', value: formatMoney(settlement.pilot_fee) },
+    { label: '设备服务费', value: formatMoney(settlement.owner_fee) },
+    { label: '结算状态', value: settlementStatusLabelOf(settlement.status) },
+  ] : [];
 
   return (
-    <View className="order-detail-page">
-      <ScrollView scrollY scrollWithAnimation scrollIntoView={scrollTarget} className="order-detail-scroll">
-        {/* Hero */}
-        <View className="order-detail-hero">
-          <Image className="order-detail-hero-bg" src={heroBgImage} mode="aspectFill" />
-          <View className="order-detail-hero-top">
-            <Text className="order-detail-hero-no">{detail.order_no}</Text>
-            <Text className="order-detail-status-pill">
-              {STATUS_LABELS[status] || getObjectStatusMeta('order', status).label}
-            </Text>
-          </View>
-          <Text className="order-detail-hero-title">{detail.title}</Text>
-          <View className="order-detail-hero-route">
-            <View className="order-detail-hero-route-pin" />
-            <View className="order-detail-hero-route-texts">
-              <Text>{detail.service_address || '未设置起点'} →</Text>
-              <Text>{detail.dest_address || '未设置终点'}</Text>
-            </View>
-          </View>
-          <View className="order-detail-hero-divider" />
-          <View className="order-detail-hero-summary">
-            <View className="order-detail-hero-metric">
-              <Text className="order-detail-hero-metric-label">订单金额</Text>
-              <Text className="order-detail-hero-metric-value">{formatMoney(detail.total_amount)}</Text>
-            </View>
-          </View>
+    <View className="op5-page">
+      <View className="op5-top-bg" />
+      <View className="op5-nav">
+        <View className="op5-back-hit" onClick={goBack}>
+          <Image className="op5-back" src={iconBack} mode="aspectFit" />
         </View>
-
-        {/* Progress Focus */}
-        <View className="progress-focus-card">
-          <View className="progress-focus-header">
-            <View className="progress-focus-title-wrap">
-              <SectionGlyph type="progress" />
-              <Text className="section-title section-title-inline">订单进度</Text>
-            </View>
-            <View className="focus-eta-pill" onClick={handleTimelineJump}>
-              <Text className="focus-eta-text">查看订单时间线</Text>
-              <Image className="focus-eta-icon" src={chevronIcon} mode="aspectFit" />
-            </View>
-          </View>
-          <View className="progress-focus-main">
-            <Image className="progress-main-icon" src={timelineClockIcon} mode="aspectFit" />
-            <View className="progress-main-content">
-              <Text className="focus-title">{progress.title}</Text>
-              <Text className="focus-desc">{progress.desc}</Text>
-            </View>
-          </View>
+        <Text className="op5-nav-title">订单进度</Text>
+        <View className="op5-service-hit" onClick={openService}>
+          <Image className="op5-service-icon" src={iconService} mode="aspectFit" />
+          <Text className="op5-service-text">客服</Text>
         </View>
+      </View>
 
-        {/* Action buttons */}
-        {hasOrderActions && <View className="card action-card">
-          <View className="section-head-left">
-            <SectionGlyph type="action" />
-            <Text className="section-title section-title-inline">操作</Text>
-          </View>
-          <View className="order-action-list">
-            {canConfirmProvider && <View className="order-action-btn order-action-btn-primary" onClick={handleConfirm}><Text className="order-action-btn-text order-action-btn-text-primary">{actionLoading ? '处理中...' : '确认承接'}</Text></View>}
-            {canConfirmProvider && <View className="order-action-btn order-action-btn-danger" onClick={handleReject}><Text className="order-action-btn-text order-action-btn-text-danger">拒绝订单</Text></View>}
-            {canPay && <View className="order-action-btn order-action-btn-primary" onClick={() => Taro.navigateTo({ url: `/pages/payment/index?orderId=${orderId}` })}><Text className="order-action-btn-text order-action-btn-text-primary">去支付</Text></View>}
-            {canConfirmReceipt && <View className="order-action-btn order-action-btn-primary" onClick={handleReceipt}><Text className="order-action-btn-text order-action-btn-text-primary">确认签收</Text></View>}
-            {canCancelOrder && <View className="order-action-btn order-action-btn-danger" onClick={handleCancel}><Text className="order-action-btn-text order-action-btn-text-danger">取消订单</Text></View>}
-          </View>
-        </View>}
-
-        {/* Task info */}
-        <View className="card">
-          <View className="section-head-left">
-            <SectionGlyph type="task" />
-            <Text className="section-title section-title-inline">任务信息</Text>
-          </View>
-          <View className="detail-list">
-            <DetailRow label="起始地址" value={detail.service_address} icon={locationIcon} />
-            <DetailRow label="目的地址" value={detail.dest_address} icon={locationIcon} />
-            <DetailRow label="计划开始" value={formatDateTime(detail.start_time)} icon={calendarIcon} />
-            <DetailRow label="计划结束" value={formatDateTime(detail.end_time)} icon={calendarIcon} />
-          </View>
-        </View>
-
-        {/* Participants */}
-        <View className="card">
-          <Text className="section-title">参与方</Text>
-          <View className="participant-card">
-            <View className="participant-avatar participant-avatar-blue"><Text className="participant-avatar-text">{summarizeParty(client, '客').charAt(0)}</Text></View>
-            <View className="participant-body">
-              <Text className="participant-label">客户</Text>
-              <Text className="participant-name">{summarizeParty(client, '客户')}</Text>
-              <Text className="participant-meta">{isClient ? '当前账号 · 我' : '等待补充联系方式'}</Text>
+      <ScrollView scrollY className="op5-scroll" enhanced showScrollbar={false}>
+        <View className="op5-content">
+          {!detail ? (
+            <View className="op5-empty-card">
+              <Text className="op5-empty-title">{loading ? '正在同步订单信息' : '无法展示订单进度'}</Text>
+              <Text className="op5-empty-desc">{loading ? '请稍候，正在读取真实订单数据。' : errorText || '订单不存在或当前账号无权查看。'}</Text>
             </View>
-            <Image className="participant-chevron" src={chevronIcon} mode="aspectFit" />
-          </View>
-          <View className="participant-card">
-            <View className="participant-avatar participant-avatar-green"><Text className="participant-avatar-text">{summarizeParty(provider, '承').charAt(0)}</Text></View>
-            <View className="participant-body">
-              <Text className="participant-label">承接方</Text>
-              <Text className="participant-name">{summarizeParty(provider, '待确认机主')}</Text>
-              <Text className="participant-meta">{isProvider ? '当前账号 · 我' : '等待补充联系方式'}</Text>
+          ) : (
+            <>
+          <View className="op5-status-card">
+            <Image className="op5-status-icon" src={iconAccepted} mode="aspectFit" />
+            <Text className="op5-status-title">{statusTitleOf(detail?.status)}</Text>
+            <Text className="op5-status-desc">{loading ? '正在同步订单信息...' : statusDescOf(detail?.status)}</Text>
+            <View className="op5-plan-btn" onClick={viewPlan}>
+              <Text>查看方案</Text>
             </View>
-            <Image className="participant-chevron" src={chevronIcon} mode="aspectFit" />
-          </View>
-        </View>
-
-        {/* Cost */}
-        <View className="card">
-          <Text className="section-title">费用明细</Text>
-          <View className="cost-grid">
-            <View className="cost-row"><Text className="cost-label">运输服务费</Text><Text className="cost-value">{formatMoney(detail.total_amount)}</Text></View>
-            <View className="cost-row"><Text className="cost-label">履约保证金</Text><Text className="cost-value">{formatMoney(fin.deposit_amount || 0)}</Text></View>
-            <View className="cost-divider" />
-            <View className="cost-row"><Text className="cost-total-label">总计金额</Text><Text className="cost-total-value">{formatMoney(Number(detail.total_amount || 0) + Number(fin.deposit_amount || 0))}</Text></View>
-          </View>
-          <DetailRow label="已支付总额" value={formatMoney(fin.paid_amount)} highlight />
-          <DetailRow label="已退款金额" value={formatMoney(fin.refunded_amount)} />
-        </View>
-
-        {/* Timeline */}
-        {timelineItems.length > 0 && (
-          <View className="card timeline-card" id="order-timeline-section">
-            <View className="timeline-card-head">
-              <Text className="section-title section-title-inline">订单动态汇总</Text>
-              <Text className="timeline-count">{timelineItems.length} 条记录</Text>
+            <View className="op5-status-line" />
+            <Text className="op5-order-label">订单号</Text>
+            <Text className="op5-order-no">{orderNo}</Text>
+            <View className="op5-copy-btn" onClick={copyOrderNo}>
+              <Text>复制</Text>
             </View>
-            <View className="timeline-list">
-              {timelineItems.map((item: any, i: number) => {
-                const isCurrent = i === timelineItems.length - 1;
-                return (
-                <View key={i} className={`timeline-item ${isCurrent ? 'timeline-item-current' : ''}`}>
-                  <View className="timeline-axis">
-                    <View className={`timeline-dot ${isCurrent ? 'timeline-dot-current' : ''}`} />
-                    {i < (timelineItems.length - 1) && <View className="timeline-line" />}
-                  </View>
-                  <View className={`timeline-body ${isCurrent ? 'timeline-body-current' : ''}`}>
-                    <View className="timeline-title-row">
-                      <Text className="timeline-title">{getTimelineTitle(item)}</Text>
-                      <Text className="timeline-time">{formatDateTime(item.occurred_at || item.created_at)}</Text>
-                    </View>
-                    <View className="timeline-bottom-row">
-                      {(item.description || item.note) && <Text className="timeline-desc">{item.description || item.note}</Text>}
-                      {isCurrent && <Text className="timeline-current-pill">当前进度</Text>}
-                    </View>
-                  </View>
+            <Text className="op5-order-time">下单时间：{createdAt}</Text>
+          </View>
+
+          <View className="op5-summary-card">
+            <Text className="op5-card-title">订单摘要</Text>
+            <View className="op5-summary-table">
+              {summaryRows.map((row, index) => (
+                <View
+                  key={row.key}
+                  className={`op5-summary-row ${index === summaryRows.length - 1 ? 'op5-summary-row-last' : ''}`}
+                  onClick={row.clickable ? viewPlan : undefined}
+                >
+                  <Image className={`op5-summary-icon op5-summary-icon-${row.key}`} src={row.icon} mode="aspectFit" />
+                  <Text className="op5-summary-label">{row.label}</Text>
+                  <Text className="op5-summary-value" numberOfLines={1}>{row.value}</Text>
+                  {row.clickable ? <Image className="op5-summary-chevron" src={iconChevron} mode="aspectFit" /> : null}
                 </View>
-              )})}
+              ))}
             </View>
           </View>
-        )}
+
+          <View className="op5-progress-card">
+            <Text className="op5-card-title">订单进度</Text>
+            {stepState === 3 ? <View className="op5-timeline-highlight" /> : null}
+            <View className="op5-timeline-line" />
+            {timelineRows.map((item) => (
+              <View
+                key={item.idx}
+                className={`op5-timeline-row op5-timeline-row-${item.idx}`}
+              >
+                <Image className="op5-timeline-icon" src={item.icon} mode="aspectFit" />
+                <Text className="op5-timeline-title">{item.title}</Text>
+                <Text className="op5-timeline-time">{item.time}</Text>
+                <Text className={`op5-timeline-desc ${item.done ? 'op5-timeline-desc-done' : ''}`}>{item.desc}</Text>
+              </View>
+            ))}
+          </View>
+
+          {detail?.status === 'completed' ? (
+            <View className="op5-settlement-card">
+              <Text className="op5-card-title">结算明细</Text>
+              {settlementRows.length > 0 ? (
+                <View className="op5-settlement-table">
+                  {settlementRows.map((row, index) => (
+                    <View key={row.label} className={`op5-settlement-row ${index === settlementRows.length - 1 ? 'op5-settlement-row-last' : ''}`}>
+                      <Text className="op5-settlement-label">{row.label}</Text>
+                      <Text className="op5-settlement-value" numberOfLines={1}>{row.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="op5-settlement-empty">{settlementLoading ? '正在生成结算明细' : '暂未生成结算明细'}</Text>
+              )}
+            </View>
+          ) : null}
+            </>
+          )}
+        </View>
       </ScrollView>
+
+      {detail ? <View className="op5-actionbar">
+        <View className="op5-contact-btn" onClick={contactCounterparty}>
+          <Image className="op5-phone-icon" src={iconPhone} mode="aspectFit" />
+          <Text>联系{contactTargetLabel}</Text>
+        </View>
+        <View className={`op5-confirm-btn ${(canPay || canConfirm || canReview) ? 'op5-confirm-btn-enabled' : ''}`} onClick={submitConfirm}>
+          <Text>{primaryActionText}</Text>
+        </View>
+      </View> : null}
+
+      <View className="op5-tabbar">
+        <View className="op5-tab-item" onClick={() => switchMainTab('/pages/home/index')}>
+          <Image className="op5-tab-icon" src={tabHome} mode="aspectFit" />
+          <Text>首页</Text>
+        </View>
+        <View className="op5-tab-item op5-tab-current" onClick={() => switchMainTab('/pages/orders/index')}>
+          <Image className="op5-tab-icon" src={tabOrder} mode="aspectFit" />
+          <Text>订单</Text>
+        </View>
+        <View className="op5-tab-item op5-tab-message" onClick={() => switchMainTab('/pages/messages/index')}>
+          <Image className="op5-tab-icon" src={tabMessage} mode="aspectFit" />
+          <Image className="op5-tab-badge" src={badgeMessage} mode="aspectFit" />
+          <Text>消息</Text>
+        </View>
+        <View className="op5-tab-item" onClick={() => switchMainTab('/pages/profile/index')}>
+          <Image className="op5-tab-icon" src={tabProfile} mode="aspectFit" />
+          <Text>我的</Text>
+        </View>
+      </View>
     </View>
   );
 }

@@ -1,0 +1,25 @@
+$haul-navy: #082B66;
+$haul-navy-deep: #04205A;
+$haul-navy-soft: #52668E;
+$haul-primary: #0B5FE8;
+$haul-primary-deep: #003EA8;
+$haul-primary-soft: #EAF3FF;
+$haul-orange: #FF5A1F;
+$haul-orange-soft: #FFF3EC;
+$haul-blue-soft: #F3F8FF;
+$haul-bg: #F5F8FC;
+$haul-card: #FFFFFF;
+$haul-line: #E0E7F2;
+$haul-line-strong: #CAD5E6;
+$haul-success: #21B573;
+$haul-radius-sm: 10px;
+$haul-radius-md: 14px;
+$haul-radius-lg: 18px;
+$haul-shadow: 0 8px 22px rgba(14, 47, 111, 0.1);
+
+@mixin haul-card {
+  background: $haul-card;
+  border: 1px solid rgba(213, 222, 236, 0.72);
+  border-radius: $haul-radius-lg;
+  box-shadow: $haul-shadow;
+}

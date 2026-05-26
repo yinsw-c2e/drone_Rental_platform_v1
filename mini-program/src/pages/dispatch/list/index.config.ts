@@ -1,1 +1,1 @@
-export default definePageConfig({ navigationBarTitleText: '派单任务' });
+export default definePageConfig({ navigationBarTitleText: '历史履约入口' });

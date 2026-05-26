@@ -1,10 +1,14 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSelector } from 'react-redux';
 import { useTheme } from '../theme/ThemeContext';
 import TabGlyph from '../components/navigation/TabGlyph';
+import { RootState } from '../store/store';
 
-import HomeScreen from '../screens/home/HomeScreen';
+import ProviderWorkbenchScreen from '../screens/home/ProviderWorkbenchScreen';
+import CustomerHaulHomeScreen from '../screens/haul/CustomerHaulHomeScreen';
+import ProviderOnboardingScreen from '../screens/provider/ProviderOnboardingScreen';
 import MarketHubScreen from '../screens/market/MarketHubScreen';
 import OrderListScreen from '../screens/order/OrderListScreen';
 import OrderDetailScreen from '../screens/order/OrderDetailScreen';
@@ -104,8 +108,9 @@ function MessageStackScreen() {
 }
 
 const tabIcon = (name: string, focused: boolean) => {
-  const iconMap: Record<string, 'home' | 'messages' | 'profile'> = {
+  const iconMap: Record<string, 'home' | 'orders' | 'messages' | 'profile'> = {
     Home: 'home',
+    Orders: 'orders',
     Messages: 'messages',
     Profile: 'profile',
   };
@@ -113,8 +118,26 @@ const tabIcon = (name: string, focused: boolean) => {
   return <TabGlyph name={iconMap[name] || 'home'} focused={focused} />;
 };
 
+function RoleHomeScreen(props: any) {
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  if (selectedMode === 'provider') {
+    return <ProviderWorkbenchScreen {...props} />;
+  }
+  return <CustomerHaulHomeScreen {...props} />;
+}
+
+function RoleOrderScreen(props: any) {
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  if (selectedMode === 'provider') {
+    return <DemandListScreen {...props} />;
+  }
+  return <OrderListScreen {...props} />;
+}
+
 function MainTabs() {
   const { theme } = useTheme();
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  const isProviderMode = selectedMode === 'provider';
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -125,10 +148,10 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: theme.navBg,
           borderTopColor: theme.navBorder,
-          height: 66,
-          paddingTop: 6,
-          paddingBottom: 8,
-          borderTopWidth: 0,
+          height: 86,
+          paddingTop: 9,
+          paddingBottom: 15,
+          borderTopWidth: 1,
           shadowColor: '#142850',
           shadowOffset: {width: 0, height: -5},
           shadowOpacity: 0.07,
@@ -136,20 +159,25 @@ function MainTabs() {
           elevation: 12,
         },
         tabBarItemStyle: {
-          height: 55,
+          height: 62,
           justifyContent: 'center',
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '700',
-          marginTop: 2,
+          marginTop: 3,
         },
       })}
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
-        options={{ tabBarLabel: '工作台' }}
+        component={RoleHomeScreen}
+        options={{ tabBarLabel: isProviderMode ? '工作台' : '首页' }}
+      />
+      <Tab.Screen
+        name="Orders"
+        component={RoleOrderScreen}
+        options={{ tabBarLabel: isProviderMode ? '接单' : '订单' }}
       />
       <Tab.Screen
         name="Messages"
@@ -177,6 +205,11 @@ export default function MainNavigator() {
         name="PublishOffer"
         component={PublishOfferScreen}
         options={{ title: '服务草稿与上架' }}
+      />
+      <RootStack.Screen
+        name="ProviderOnboarding"
+        component={ProviderOnboardingScreen}
+        options={{ title: '服务商入驻' }}
       />
       <RootStack.Screen
         name="PublishDemand"
@@ -266,7 +299,7 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="OfferList"
         component={OfferListScreen}
-        options={{ title: '挑选推荐服务' }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="OfferDetail"
@@ -366,7 +399,7 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="Fulfillment"
         component={FulfillmentHubScreen}
-        options={{ title: '履约中心' }}
+        options={{ headerShown: false }}
       />
       <RootStack.Screen
         name="CreateDispatchTask"
@@ -426,12 +459,12 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="OwnerProfile"
         component={OwnerProfileScreen}
-        options={{ title: '机主档案' }}
+        options={{ title: '服务商资料' }}
       />
       <RootStack.Screen
         name="OwnerPilotBindings"
         component={OwnerPilotBindingsScreen}
-        options={{ title: '绑定飞手' }}
+        options={{ title: '绑定执行人员' }}
       />
       <RootStack.Screen
         name="Verification"
@@ -446,17 +479,17 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="PilotProfile"
         component={PilotProfileScreen}
-        options={{ title: '飞手中心' }}
+        options={{ title: '执行人员中心' }}
       />
       <RootStack.Screen
         name="PilotOwnerBindings"
         component={PilotOwnerBindingsScreen}
-        options={{ title: '绑定机主' }}
+        options={{ title: '绑定服务商' }}
       />
       <RootStack.Screen
         name="PilotRegister"
         component={PilotRegisterScreen}
-        options={{ title: '飞手认证' }}
+        options={{ title: '执行人员认证' }}
       />
       <RootStack.Screen
         name="CertificationUpload"

@@ -161,6 +161,58 @@ func (PricingConfig) TableName() string {
 	return "pricing_configs"
 }
 
+type FinanceAnomalyRecord struct {
+	ID             int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	AnomalyNo      string     `gorm:"type:varchar(50);uniqueIndex;not null" json:"anomaly_no"`
+	AnomalyType    string     `gorm:"type:varchar(50);not null;index" json:"anomaly_type"`
+	Severity       string     `gorm:"type:varchar(20);default:warning;index" json:"severity"`
+	Status         string     `gorm:"type:varchar(20);default:open;index" json:"status"`
+	Source         string     `gorm:"type:varchar(30);not null;index" json:"source"`
+	TargetType     string     `gorm:"type:varchar(30);not null;index:idx_finance_anomaly_target,priority:1" json:"target_type"`
+	TargetID       int64      `gorm:"index:idx_finance_anomaly_target,priority:2" json:"target_id"`
+	OrderID        int64      `gorm:"index" json:"order_id"`
+	SettlementID   int64      `gorm:"index" json:"settlement_id"`
+	WithdrawalID   int64      `gorm:"index" json:"withdrawal_id"`
+	UserID         int64      `gorm:"index" json:"user_id"`
+	Message        string     `gorm:"type:varchar(255);not null" json:"message"`
+	Detail         JSON       `gorm:"type:json" json:"detail"`
+	ResolvedBy     int64      `json:"resolved_by"`
+	ResolvedAt     *time.Time `json:"resolved_at"`
+	ResolutionNote string     `gorm:"type:varchar(255)" json:"resolution_note"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+func (FinanceAnomalyRecord) TableName() string {
+	return "finance_anomaly_records"
+}
+
+type FinanceManualActionRecord struct {
+	ID               int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	ActionNo         string     `gorm:"type:varchar(50);uniqueIndex;not null" json:"action_no"`
+	ActionType       string     `gorm:"type:varchar(50);not null;index" json:"action_type"`
+	Status           string     `gorm:"type:varchar(20);default:applied;index" json:"status"`
+	TargetType       string     `gorm:"type:varchar(30);not null;index:idx_finance_manual_action_target,priority:1" json:"target_type"`
+	TargetID         int64      `gorm:"index:idx_finance_manual_action_target,priority:2" json:"target_id"`
+	SettlementID     int64      `gorm:"index" json:"settlement_id"`
+	WithdrawalID     int64      `gorm:"index" json:"withdrawal_id"`
+	AnomalyID        int64      `gorm:"index" json:"anomaly_id"`
+	AdminID          int64      `gorm:"index" json:"admin_id"`
+	Reason           string     `gorm:"type:varchar(255)" json:"reason"`
+	BeforeSnapshot   JSON       `gorm:"type:json" json:"before_snapshot"`
+	AfterSnapshot    JSON       `gorm:"type:json" json:"after_snapshot"`
+	RollbackSnapshot JSON       `gorm:"type:json" json:"rollback_snapshot"`
+	RollbackBy       int64      `json:"rollback_by"`
+	RollbackAt       *time.Time `json:"rollback_at"`
+	RollbackNote     string     `gorm:"type:varchar(255)" json:"rollback_note"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+func (FinanceManualActionRecord) TableName() string {
+	return "finance_manual_action_records"
+}
+
 // ============================================================
 // ==================== 阶段六：信用评价与风控 ====================
 // ============================================================

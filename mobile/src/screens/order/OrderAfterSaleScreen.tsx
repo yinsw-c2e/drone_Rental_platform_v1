@@ -286,7 +286,7 @@ export default function OrderAfterSaleScreen({route}: any) {
             <EmptyState
               icon="🧾"
               title="当前状态不允许发起售后"
-              description="待机主确认、待支付等早期状态还没有进入可售后阶段。"
+              description="待服务商确认、待支付等早期状态还没有进入可售后阶段。"
             />
           ) : (
             <>
@@ -338,15 +338,15 @@ export default function OrderAfterSaleScreen({route}: any) {
         <ObjectCard style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>结算信息</Text>
           {!settlement ? (
-            <Text style={styles.emptyText}>订单完成并进入结算后，这里会显示平台费、机主收入、飞手收入等分账结果。</Text>
+            <Text style={styles.emptyText}>订单完成并进入结算后，这里会显示平台费、服务商收入、执行人员收入等分账结果。</Text>
           ) : (
             <>
               <View style={styles.row}><Text style={styles.rowLabel}>结算单号</Text><Text style={styles.rowValue}>{settlement.settlement_no}</Text></View>
               <View style={styles.row}><Text style={styles.rowLabel}>结算状态</Text><Text style={styles.rowValue}>{settlement.status || '-'}</Text></View>
               <View style={styles.row}><Text style={styles.rowLabel}>最终金额</Text><Text style={styles.rowValue}>{formatMoney(settlement.final_amount)}</Text></View>
               <View style={styles.row}><Text style={styles.rowLabel}>平台费用</Text><Text style={styles.rowValue}>{formatMoney(settlement.platform_fee)}</Text></View>
-              <View style={styles.row}><Text style={styles.rowLabel}>机主收入</Text><Text style={styles.rowValue}>{formatMoney(settlement.owner_fee)}</Text></View>
-              <View style={styles.row}><Text style={styles.rowLabel}>飞手收入</Text><Text style={styles.rowValue}>{formatMoney(settlement.pilot_fee)}</Text></View>
+              <View style={styles.row}><Text style={styles.rowLabel}>服务商收入</Text><Text style={styles.rowValue}>{formatMoney(settlement.owner_fee)}</Text></View>
+              <View style={styles.row}><Text style={styles.rowLabel}>执行人员收入</Text><Text style={styles.rowValue}>{formatMoney(settlement.pilot_fee)}</Text></View>
               <View style={styles.row}><Text style={styles.rowLabel}>结算时间</Text><Text style={styles.rowValue}>{formatDateTime(settlement.settled_at || settlement.calculated_at)}</Text></View>
             </>
           )}

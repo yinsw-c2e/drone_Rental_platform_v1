@@ -16,7 +16,7 @@ const RESULT_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 const CATEGORY_MAP: Record<string, string> = {
-  pilot: '飞手资质',
+  pilot: '履约资质',
   drone: '无人机合规',
   cargo: '载荷检查',
   airspace: '空域检查',
@@ -60,7 +60,7 @@ export default function CompliancePage() {
 
   const handleRunCheck = async () => {
     if (!pilotId || !droneId) {
-      Taro.showToast({ title: '缺少飞手或无人机信息', icon: 'none' });
+      Taro.showToast({ title: '缺少履约资质或无人机信息', icon: 'none' });
       return;
     }
     setRunning(true);

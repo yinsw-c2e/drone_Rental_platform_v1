@@ -104,6 +104,8 @@ function resolveWebPath(screen: string, params?: any): string | null {
       return '/add-drone';
     case 'PublishOffer':
       return '/publish-offer';
+    case 'ProviderOnboarding':
+      return '/provider-onboarding';
     case 'PublishDemand':
       return '/publish-demand';
     case 'PublishCargo':

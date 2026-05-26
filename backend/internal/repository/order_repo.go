@@ -9,6 +9,7 @@ import (
 	"wurenji-backend/internal/pkg/limits"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrderRepo struct {
@@ -69,6 +70,17 @@ func (r *OrderRepo) GetByOrderNo(orderNo string) (*model.Order, error) {
 	err := r.db.Preload("Demand").Preload("Drone").Preload("Owner").Preload("Pilot").Preload("Renter").
 		Where("order_no = ?", orderNo).First(&order).Error
 	return &order, err
+}
+
+func (r *OrderRepo) LockByID(id int64) (*model.Order, error) {
+	var order model.Order
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&order).Error
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
 }
 
 func (r *OrderRepo) Update(order *model.Order) error {
@@ -194,6 +206,15 @@ func orderOptionalColumns() []struct {
 	}{
 		{field: "FlightStartTime", column: "flight_start_time"},
 		{field: "FlightEndTime", column: "flight_end_time"},
+		{field: "OrderMode", column: "order_mode"},
+		{field: "ServiceClassCode", column: "service_class_code"},
+		{field: "EstimatedDistanceM", column: "estimated_distance_m"},
+		{field: "EstimatedDurationMin", column: "estimated_duration_min"},
+		{field: "PriceBreakdownJSON", column: "price_breakdown_json"},
+		{field: "BroadcastPoolID", column: "broadcast_pool_id"},
+		{field: "ReservedStartAt", column: "reserved_start_at"},
+		{field: "GrabbedAt", column: "grabbed_at"},
+		{field: "GrabbedByUserID", column: "grabbed_by_user_id"},
 		{field: "LoadingConfirmedAt", column: "loading_confirmed_at"},
 		{field: "LoadingConfirmedBy", column: "loading_confirmed_by"},
 		{field: "UnloadingConfirmedAt", column: "unloading_confirmed_at"},
@@ -308,6 +329,18 @@ func (r *OrderRepo) ListByUser(userID int64, role string, status string, page, p
 	return orders, total, err
 }
 
+func (r *OrderRepo) ListDueReservationOrders(cutoff time.Time, limit int) ([]model.Order, error) {
+	var orders []model.Order
+	limit = limits.NormalizeLimit(limit, 100, 1000)
+	err := r.db.Model(&model.Order{}).
+		Where("order_mode = ? AND status = ?", "reservation", "scheduled").
+		Where("(reserved_start_at IS NOT NULL AND reserved_start_at <= ?) OR (reserved_start_at IS NULL AND start_time <= ?)", cutoff, cutoff).
+		Order("COALESCE(reserved_start_at, start_time) ASC, id ASC").
+		Limit(limit).
+		Find(&orders).Error
+	return orders, err
+}
+
 func (r *OrderRepo) List(page, pageSize int, filters map[string]interface{}) ([]model.Order, int64, error) {
 	var orders []model.Order
 	var total int64
@@ -380,6 +413,19 @@ func (r *OrderRepo) GetLatestTimeline(orderID int64) (*model.OrderTimeline, erro
 		return nil, err
 	}
 	return &timeline, nil
+}
+
+func (r *OrderRepo) CreateSiteSafetyCheck(record *model.OrderSiteSafetyCheck) error {
+	return r.db.Create(record).Error
+}
+
+func (r *OrderRepo) GetLatestSiteSafetyCheck(orderID int64) (*model.OrderSiteSafetyCheck, error) {
+	var record model.OrderSiteSafetyCheck
+	err := r.db.Where("order_id = ?", orderID).Order("checked_at DESC, id DESC").First(&record).Error
+	if err != nil {
+		return nil, err
+	}
+	return &record, nil
 }
 
 func (r *OrderRepo) CountByStatus(status string) (int64, error) {
