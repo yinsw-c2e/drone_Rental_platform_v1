@@ -14,17 +14,44 @@ import (
 	"gorm.io/gorm"
 
 	"wurenji-backend/internal/model"
+	paymentpkg "wurenji-backend/internal/pkg/payment"
 	"wurenji-backend/internal/repository"
 )
 
+const (
+	defaultSettlementAdjustReviewThresholdPct = 20.0
+	defaultSettlementBroadcastTTL             = 120 * time.Second
+)
+
 type SettlementService struct {
-	settlementRepo *repository.SettlementRepo
-	orderRepo      *repository.OrderRepo
-	logger         *zap.Logger
+	settlementRepo      *repository.SettlementRepo
+	orderRepo           *repository.OrderRepo
+	paymentRepo         *repository.PaymentRepo
+	broadcastRepo       *repository.OrderBroadcastRepo
+	systemConfigService *SystemConfigService
+	logger              *zap.Logger
 }
 
 func NewSettlementService(settlementRepo *repository.SettlementRepo, orderRepo *repository.OrderRepo, logger *zap.Logger) *SettlementService {
 	return &SettlementService{settlementRepo: settlementRepo, orderRepo: orderRepo, logger: logger}
+}
+
+func (s *SettlementService) SetPaymentRepo(paymentRepo *repository.PaymentRepo) {
+	if s != nil {
+		s.paymentRepo = paymentRepo
+	}
+}
+
+func (s *SettlementService) SetBroadcastRepo(broadcastRepo *repository.OrderBroadcastRepo) {
+	if s != nil {
+		s.broadcastRepo = broadcastRepo
+	}
+}
+
+func (s *SettlementService) SetSystemConfigService(systemConfigService *SystemConfigService) {
+	if s != nil {
+		s.systemConfigService = systemConfigService
+	}
 }
 
 // ========== 定价引擎 ==========
@@ -72,6 +99,17 @@ type ReconciliationExportFilter struct {
 	StartAt   *time.Time
 	EndAt     *time.Time
 	Limit     int
+}
+
+type OrderTipResult struct {
+	Settlement *model.OrderSettlement `json:"settlement"`
+	Payment    *model.Payment         `json:"payment"`
+}
+
+type OrderPriceIncreaseResult struct {
+	Settlement *model.OrderSettlement `json:"settlement"`
+	Payment    *model.Payment         `json:"payment"`
+	Broadcast  *model.OrderBroadcast  `json:"broadcast"`
 }
 
 type FinanceAnomalyInput struct {
@@ -165,23 +203,36 @@ type FinanceManualActionOverview struct {
 }
 
 type settlementRollbackSnapshot struct {
-	ID                 int64      `json:"id"`
-	SettlementNo       string     `json:"settlement_no"`
-	OrderID            int64      `json:"order_id"`
-	OrderNo            string     `json:"order_no"`
-	FinalAmount        int64      `json:"final_amount"`
-	PlatformFee        int64      `json:"platform_fee"`
-	PilotFee           int64      `json:"pilot_fee"`
-	OwnerFee           int64      `json:"owner_fee"`
-	InsuranceDeduction int64      `json:"insurance_deduction"`
-	PilotUserID        int64      `json:"pilot_user_id"`
-	OwnerUserID        int64      `json:"owner_user_id"`
-	PayerUserID        int64      `json:"payer_user_id"`
-	Status             string     `json:"status"`
-	ConfirmedAt        *time.Time `json:"confirmed_at"`
-	SettledAt          *time.Time `json:"settled_at"`
-	SettledBy          string     `json:"settled_by"`
-	Notes              string     `json:"notes"`
+	ID                            int64      `json:"id"`
+	SettlementNo                  string     `json:"settlement_no"`
+	OrderID                       int64      `json:"order_id"`
+	OrderNo                       string     `json:"order_no"`
+	FinalAmount                   int64      `json:"final_amount"`
+	EstimatedAmount               int64      `json:"estimated_amount"`
+	ActualDistanceFee             int64      `json:"actual_distance_fee"`
+	ActualDurationFee             int64      `json:"actual_duration_fee"`
+	SurchargeAmount               int64      `json:"surcharge_amount"`
+	TipAmount                     int64      `json:"tip_amount"`
+	PartialHandoverAmount         int64      `json:"partial_handover_amount"`
+	PartialHandoverProviderUserID int64      `json:"partial_handover_provider_user_id"`
+	PartialHandoverSettledAt      *time.Time `json:"partial_handover_settled_at"`
+	PartialHandoverReason         string     `json:"partial_handover_reason"`
+	PriceAdjustReason             string     `json:"price_adjust_reason"`
+	AdjustReviewed                bool       `json:"adjust_reviewed"`
+	AdjustReviewedBy              int64      `json:"adjust_reviewed_by"`
+	AdjustReviewedAt              *time.Time `json:"adjust_reviewed_at"`
+	PlatformFee                   int64      `json:"platform_fee"`
+	PilotFee                      int64      `json:"pilot_fee"`
+	OwnerFee                      int64      `json:"owner_fee"`
+	InsuranceDeduction            int64      `json:"insurance_deduction"`
+	PilotUserID                   int64      `json:"pilot_user_id"`
+	OwnerUserID                   int64      `json:"owner_user_id"`
+	PayerUserID                   int64      `json:"payer_user_id"`
+	Status                        string     `json:"status"`
+	ConfirmedAt                   *time.Time `json:"confirmed_at"`
+	SettledAt                     *time.Time `json:"settled_at"`
+	SettledBy                     string     `json:"settled_by"`
+	Notes                         string     `json:"notes"`
 }
 
 type anomalyRollbackSnapshot struct {
@@ -480,6 +531,7 @@ func (s *SettlementService) calculateOrderSettlement(order *model.Order) (*model
 		OrderID:            order.ID,
 		OrderNo:            order.OrderNo,
 		TotalAmount:        finalAmount,
+		EstimatedAmount:    finalAmount,
 		FinalAmount:        finalAmount,
 		PlatformFeeRate:    platformRate,
 		PlatformFee:        platformFee,
@@ -506,7 +558,7 @@ func (s *SettlementService) ConfirmSettlement(id int64) error {
 	if err != nil {
 		return errors.New("结算记录不存在")
 	}
-	if settlement.Status != "calculated" {
+	if settlement.Status != "calculated" && settlement.Status != "partial_handover" {
 		return fmt.Errorf("结算状态不正确: %s", settlement.Status)
 	}
 
@@ -596,7 +648,10 @@ func (s *SettlementService) FinalizeSettlement(id int64) (*model.OrderSettlement
 	if settlement.Status == "disputed" {
 		return nil, fmt.Errorf("结算存在争议: %s", settlement.SettlementNo)
 	}
-	if settlement.Status == "" || settlement.Status == "pending" || settlement.Status == "calculated" {
+	if settlement.Status == "pending_review" {
+		return nil, fmt.Errorf("结算调价待复核: %s", settlement.SettlementNo)
+	}
+	if settlement.Status == "" || settlement.Status == "pending" || settlement.Status == "calculated" || settlement.Status == "partial_handover" {
 		if err := s.ConfirmSettlement(settlement.ID); err != nil {
 			return nil, err
 		}
@@ -605,6 +660,194 @@ func (s *SettlementService) FinalizeSettlement(id int64) (*model.OrderSettlement
 		return nil, err
 	}
 	return s.settlementRepo.GetSettlement(settlement.ID)
+}
+
+// AddOrderTip 记录客户小费并即时入账给服务商。它不修改 orders.total_amount 或 price_breakdown_json。
+func (s *SettlementService) AddOrderTip(orderID, payerUserID int64, amount int64, method string) (*OrderTipResult, error) {
+	if amount <= 0 {
+		return nil, errors.New("小费金额必须大于0")
+	}
+	method, err := normalizeImmediateSettlementPaymentMethod(method)
+	if err != nil {
+		return nil, err
+	}
+	if s == nil || s.settlementRepo == nil || s.orderRepo == nil {
+		return nil, errors.New("结算服务未初始化")
+	}
+	db := s.settlementRepo.DB()
+	if db == nil {
+		return nil, errors.New("结算数据库未初始化")
+	}
+
+	now := time.Now()
+	var result *OrderTipResult
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		orderRepo := repository.NewOrderRepo(tx)
+		settlementRepo := repository.NewSettlementRepo(tx)
+
+		order, err := orderRepo.LockByID(orderID)
+		if err != nil {
+			return errors.New("订单不存在")
+		}
+		if !isOrderPayer(order, payerUserID) {
+			return errors.New("无权给该订单加小费")
+		}
+		if !canAddOrderTip(order, now) {
+			return errors.New("当前订单状态不允许加小费")
+		}
+
+		settlement, err := s.ensureMutableSettlementForOrder(order, settlementRepo)
+		if err != nil {
+			return err
+		}
+		recipientUserID := resolveTipRecipient(order, settlement)
+		if recipientUserID <= 0 {
+			return errors.New("订单尚未确认服务商，无法加小费")
+		}
+
+		paymentRecord := newPaidSettlementPayment(order.ID, payerUserID, amount, method, "tip", now)
+		if err := tx.Create(paymentRecord).Error; err != nil {
+			return err
+		}
+
+		settlement.TipAmount += amount
+		if settlement.EstimatedAmount == 0 {
+			settlement.EstimatedAmount = firstPositiveInt64(settlement.TotalAmount, order.TotalAmount)
+		}
+		settlement.Notes = appendSystemSettlementNote(settlement.Notes, fmt.Sprintf("客户小费即时入账 %s", formatAmountFen(amount)))
+		if err := settlementRepo.UpdateSettlement(settlement); err != nil {
+			return err
+		}
+
+		if err := settlementRepo.AddWalletIncomeInCurrentTx(
+			recipientUserID,
+			amount,
+			order.ID,
+			settlement.ID,
+			fmt.Sprintf("订单%s客户小费%s", order.OrderNo, paymentRecord.PaymentNo),
+		); err != nil {
+			return err
+		}
+
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "tip_paid",
+			Note:         fmt.Sprintf("客户追加小费%s", formatAmountFen(amount)),
+			OperatorID:   payerUserID,
+			OperatorType: "client",
+		}); err != nil {
+			return err
+		}
+
+		result = &OrderTipResult{Settlement: settlement, Payment: paymentRecord}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// IncreaseOrderPrice 记录客户加价并刷新广播池展示金额，不修改 orders 金额快照。
+func (s *SettlementService) IncreaseOrderPrice(orderID, payerUserID int64, amount int64, reason string, method string) (*OrderPriceIncreaseResult, error) {
+	if amount <= 0 {
+		return nil, errors.New("加价金额必须大于0")
+	}
+	method, err := normalizeImmediateSettlementPaymentMethod(method)
+	if err != nil {
+		return nil, err
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "客户加价提升接单优先级"
+	}
+	if len(reason) > 255 {
+		reason = reason[:255]
+	}
+	if s == nil || s.settlementRepo == nil || s.orderRepo == nil || s.broadcastRepo == nil {
+		return nil, errors.New("结算调价依赖未初始化")
+	}
+	db := s.settlementRepo.DB()
+	if db == nil {
+		return nil, errors.New("结算数据库未初始化")
+	}
+
+	now := time.Now()
+	var result *OrderPriceIncreaseResult
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		orderRepo := repository.NewOrderRepo(tx)
+		settlementRepo := repository.NewSettlementRepo(tx)
+		broadcastRepo := repository.NewOrderBroadcastRepo(tx)
+
+		order, err := orderRepo.LockByID(orderID)
+		if err != nil {
+			return errors.New("订单不存在")
+		}
+		if !isOrderPayer(order, payerUserID) {
+			return errors.New("无权给该订单加价")
+		}
+		if normalizeOrderMode(order.OrderMode) != OrderModeInstant {
+			return errors.New("只有即时单支持抢单加价")
+		}
+		if order.Status != "pending_dispatch" || order.GrabbedByUserID != 0 || order.ProviderUserID != 0 {
+			return errors.New("订单已被服务商接单，不能继续加价")
+		}
+
+		broadcast, err := broadcastRepo.LockByOrderID(order.ID)
+		if err != nil {
+			return errors.New("订单广播池不存在")
+		}
+		if broadcast.Status != broadcastStatusOpen && broadcast.Status != broadcastStatusExpired {
+			return errors.New("当前广播状态不允许加价")
+		}
+
+		settlement, err := s.ensureMutableSettlementForOrder(order, settlementRepo)
+		if err != nil {
+			return err
+		}
+		paymentRecord := newPaidSettlementPayment(order.ID, payerUserID, amount, method, "price_adjustment", now)
+		if err := tx.Create(paymentRecord).Error; err != nil {
+			return err
+		}
+
+		settlement.SurchargeAmount += amount
+		settlement.PriceAdjustReason = mergeSettlementAdjustReason(settlement.PriceAdjustReason, reason)
+		if err := s.applySettlementAdjustmentPolicy(settlement); err != nil {
+			return err
+		}
+		settlement.Notes = appendSystemSettlementNote(settlement.Notes, fmt.Sprintf("客户加价%s：%s", formatAmountFen(amount), reason))
+		if err := settlementRepo.UpdateSettlement(settlement); err != nil {
+			return err
+		}
+
+		expiresAt := now.Add(s.settlementBroadcastTTL())
+		if err := broadcastRepo.UpdateFields(broadcast.ID, map[string]interface{}{
+			"status":                broadcastStatusOpen,
+			"estimated_total_cents": settlement.FinalAmount,
+			"expires_at":            expiresAt,
+			"updated_at":            now,
+		}); err != nil {
+			return err
+		}
+		broadcast.Status = broadcastStatusOpen
+		broadcast.EstimatedTotalCents = settlement.FinalAmount
+		broadcast.ExpiresAt = expiresAt
+
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "price_increased",
+			Note:         fmt.Sprintf("客户追加运费%s，广播池金额已刷新", formatAmountFen(amount)),
+			OperatorID:   payerUserID,
+			OperatorType: "client",
+		}); err != nil {
+			return err
+		}
+
+		result = &OrderPriceIncreaseResult{Settlement: settlement, Payment: paymentRecord, Broadcast: broadcast}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // MarkSettlementDisputed 将未入账结算标记为争议，阻止自动/手动入账。
@@ -737,6 +980,14 @@ func (s *SettlementService) GetWallet(userID int64) (*model.UserWallet, error) {
 // GetWalletTransactions 获取钱包流水
 func (s *SettlementService) GetWalletTransactions(userID int64, txType string, page, pageSize int) ([]model.WalletTransaction, int64, error) {
 	return s.settlementRepo.ListWalletTransactions(userID, txType, page, pageSize)
+}
+
+// GetPendingAmountForUser returns settlement income that is calculated but not yet available.
+func (s *SettlementService) GetPendingAmountForUser(userID int64) (int64, error) {
+	if s == nil || s.settlementRepo == nil || userID <= 0 {
+		return 0, nil
+	}
+	return s.settlementRepo.SumPendingForUser(userID)
 }
 
 // ========== 提现 ==========
@@ -1307,6 +1558,233 @@ func (s *SettlementService) ProcessPendingSettlements() (int, error) {
 
 // ========== Helpers ==========
 
+func (s *SettlementService) ensureMutableSettlementForOrder(order *model.Order, txRepo *repository.SettlementRepo) (*model.OrderSettlement, error) {
+	if order == nil || order.ID == 0 {
+		return nil, errors.New("订单不存在")
+	}
+	if txRepo == nil {
+		return nil, errors.New("结算依赖未初始化")
+	}
+	settlement, err := txRepo.LockSettlementByOrder(order.ID)
+	if err == nil {
+		if !canMutateSettlementAdjustment(settlement.Status) {
+			return nil, fmt.Errorf("结算状态不允许调整: %s", settlement.Status)
+		}
+		if settlement.EstimatedAmount == 0 {
+			settlement.EstimatedAmount = firstPositiveInt64(settlement.TotalAmount, order.TotalAmount)
+		}
+		if settlement.TotalAmount == 0 {
+			settlement.TotalAmount = order.TotalAmount
+		}
+		return settlement, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	settlement, err = s.calculateOrderSettlement(order)
+	if err != nil {
+		return nil, err
+	}
+	settlement.SettlementNo = generateSettlementNo()
+	if err := txRepo.CreateSettlement(settlement); err != nil {
+		return nil, err
+	}
+	return settlement, nil
+}
+
+func canMutateSettlementAdjustment(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "", "pending", "calculated", "pending_review", "partial_handover":
+		return true
+	default:
+		return false
+	}
+}
+
+func isOrderPayer(order *model.Order, userID int64) bool {
+	if order == nil || userID <= 0 {
+		return false
+	}
+	return order.ClientUserID == userID || order.RenterID == userID
+}
+
+func canAddOrderTip(order *model.Order, now time.Time) bool {
+	if order == nil {
+		return false
+	}
+	switch normalizeExecutionStatus(order.Status) {
+	case "in_transit":
+		return true
+	case "delivered":
+		deliveredAt := firstSettlementTime(order.UnloadingConfirmedAt, order.FlightEndTime, &order.UpdatedAt)
+		return deliveredAt != nil && !deliveredAt.IsZero() && !now.Before(*deliveredAt) && now.Sub(*deliveredAt) <= 24*time.Hour
+	default:
+		return false
+	}
+}
+
+func firstSettlementTime(values ...*time.Time) *time.Time {
+	for _, value := range values {
+		if value != nil && !value.IsZero() {
+			return value
+		}
+	}
+	return nil
+}
+
+func resolveTipRecipient(order *model.Order, settlement *model.OrderSettlement) int64 {
+	if settlement != nil {
+		if settlement.PilotUserID > 0 {
+			return settlement.PilotUserID
+		}
+		if settlement.OwnerUserID > 0 {
+			return settlement.OwnerUserID
+		}
+	}
+	return firstPositiveInt64(order.ProviderUserID, order.ExecutorPilotUserID, order.DroneOwnerUserID, order.OwnerID)
+}
+
+func normalizeImmediateSettlementPaymentMethod(method string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(method)) {
+	case "", "mock":
+		return "mock", nil
+	case "wechat", "alipay":
+		return "", errors.New("即时入账暂未接入真实支付回调，请使用 mock 支付")
+	default:
+		return "", errors.New("不支持的支付方式")
+	}
+}
+
+func newPaidSettlementPayment(orderID, userID, amount int64, method, paymentType string, now time.Time) *model.Payment {
+	paymentNo := paymentpkg.GeneratePaymentNo()
+	paidAt := now
+	return &model.Payment{
+		PaymentNo:     paymentNo,
+		OrderID:       orderID,
+		UserID:        userID,
+		PaymentType:   paymentType,
+		PaymentMethod: method,
+		Amount:        amount,
+		Status:        "paid",
+		ThirdPartyNo:  "MOCK_" + paymentNo,
+		PaidAt:        &paidAt,
+	}
+}
+
+func (s *SettlementService) applySettlementAdjustmentPolicy(settlement *model.OrderSettlement) error {
+	if settlement == nil {
+		return errors.New("结算记录不存在")
+	}
+	if settlement.EstimatedAmount <= 0 {
+		settlement.EstimatedAmount = firstPositiveInt64(settlement.TotalAmount, settlement.FinalAmount)
+	}
+	if settlement.EstimatedAmount <= 0 {
+		return errors.New("结算预估金额无效")
+	}
+
+	adjustedBase := settlement.EstimatedAmount + settlement.ActualDistanceFee + settlement.ActualDurationFee + settlement.SurchargeAmount - settlement.PartialHandoverAmount
+	if adjustedBase <= 0 {
+		return errors.New("调价后结算金额必须大于0")
+	}
+	settlement.FinalAmount = adjustedBase
+
+	platformRate := firstPositiveFloat64(settlement.PlatformFeeRate, s.getConfigFloat("split_platform_rate", 0.10))
+	pilotRate := firstPositiveFloat64(settlement.PilotFeeRate, s.getConfigFloat("split_pilot_rate", 0.45))
+	ownerRate := firstPositiveFloat64(settlement.OwnerFeeRate, s.getConfigFloat("split_owner_rate", 0.40))
+	insuranceRate := firstPositiveFloat64(settlement.InsuranceRate, s.getConfigFloat("split_insurance_rate", 0.05))
+	if pilotRate+ownerRate <= 0 {
+		return errors.New("服务商分账比例无效")
+	}
+
+	settlement.PlatformFeeRate = platformRate
+	settlement.PilotFeeRate = pilotRate
+	settlement.OwnerFeeRate = ownerRate
+	settlement.InsuranceRate = insuranceRate
+	settlement.PlatformFee = int64(math.Round(float64(settlement.FinalAmount) * platformRate))
+	settlement.InsuranceDeduction = int64(math.Round(float64(settlement.FinalAmount) * insuranceRate))
+	distributable := settlement.FinalAmount - settlement.PlatformFee - settlement.InsuranceDeduction
+	if distributable < 0 {
+		return errors.New("平台费用配置超过结算金额")
+	}
+	settlement.PilotFee = int64(math.Round(float64(distributable) * (pilotRate / (pilotRate + ownerRate))))
+	settlement.OwnerFee = distributable - settlement.PilotFee
+
+	adjustmentAmount := absInt64(settlement.ActualDistanceFee + settlement.ActualDurationFee + settlement.SurchargeAmount)
+	thresholdPct := s.settlementAdjustReviewThresholdPct()
+	adjustmentPct := float64(adjustmentAmount) * 100 / float64(settlement.EstimatedAmount)
+	if adjustmentPct > thresholdPct && !settlement.AdjustReviewed {
+		settlement.Status = "pending_review"
+		settlement.ConfirmedAt = nil
+		settlement.SettledAt = nil
+		settlement.SettledBy = ""
+		return nil
+	}
+	if settlement.Status == "" || settlement.Status == "pending" || settlement.Status == "calculated" || settlement.Status == "pending_review" || settlement.Status == "partial_handover" {
+		settlement.Status = "calculated"
+	}
+	return nil
+}
+
+func (s *SettlementService) settlementAdjustReviewThresholdPct() float64 {
+	value := defaultSettlementAdjustReviewThresholdPct
+	if s != nil && s.systemConfigService != nil {
+		value = s.systemConfigService.GetFloat("settlement.adjust_review_threshold_pct", value)
+	}
+	if value < 0 {
+		return defaultSettlementAdjustReviewThresholdPct
+	}
+	return value
+}
+
+func (s *SettlementService) settlementBroadcastTTL() time.Duration {
+	seconds := int(defaultSettlementBroadcastTTL.Seconds())
+	if s != nil && s.systemConfigService != nil {
+		seconds = s.systemConfigService.GetInt("broadcast.ttl_seconds", seconds)
+	}
+	if seconds <= 0 {
+		seconds = int(defaultSettlementBroadcastTTL.Seconds())
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func firstPositiveFloat64(values ...float64) float64 {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func absInt64(value int64) int64 {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func mergeSettlementAdjustReason(existing, next string) string {
+	existing = strings.TrimSpace(existing)
+	next = strings.TrimSpace(next)
+	if existing == "" {
+		return truncateString(next, 255)
+	}
+	if next == "" || strings.Contains(existing, next) {
+		return truncateString(existing, 255)
+	}
+	return truncateString(existing+"; "+next, 255)
+}
+
+func appendSystemSettlementNote(existing, detail string) string {
+	note := fmt.Sprintf("%s system: %s", time.Now().Format("2006-01-02 15:04:05"), strings.TrimSpace(detail))
+	existing = strings.TrimSpace(existing)
+	if existing == "" {
+		return note
+	}
+	return existing + "\n" + note
+}
+
 func (s *SettlementService) recordSettlementFinanceAnomaly(anomalyType, severity string, settlementID int64, settlement *model.OrderSettlement, cause error, extra map[string]interface{}) {
 	detail := map[string]interface{}{
 		"error":         cause.Error(),
@@ -1329,6 +1807,9 @@ func (s *SettlementService) recordSettlementFinanceAnomaly(anomalyType, severity
 		detail["order_id"] = settlement.OrderID
 		detail["order_no"] = settlement.OrderNo
 		detail["status"] = settlement.Status
+		detail["estimated_amount"] = settlement.EstimatedAmount
+		detail["surcharge_amount"] = settlement.SurchargeAmount
+		detail["tip_amount"] = settlement.TipAmount
 		detail["pilot_user_id"] = settlement.PilotUserID
 		detail["owner_user_id"] = settlement.OwnerUserID
 		detail["payer_user_id"] = settlement.PayerUserID
@@ -1457,23 +1938,36 @@ func snapshotSettlement(settlement *model.OrderSettlement) settlementRollbackSna
 		return settlementRollbackSnapshot{}
 	}
 	return settlementRollbackSnapshot{
-		ID:                 settlement.ID,
-		SettlementNo:       settlement.SettlementNo,
-		OrderID:            settlement.OrderID,
-		OrderNo:            settlement.OrderNo,
-		FinalAmount:        settlement.FinalAmount,
-		PlatformFee:        settlement.PlatformFee,
-		PilotFee:           settlement.PilotFee,
-		OwnerFee:           settlement.OwnerFee,
-		InsuranceDeduction: settlement.InsuranceDeduction,
-		PilotUserID:        settlement.PilotUserID,
-		OwnerUserID:        settlement.OwnerUserID,
-		PayerUserID:        settlement.PayerUserID,
-		Status:             settlement.Status,
-		ConfirmedAt:        settlement.ConfirmedAt,
-		SettledAt:          settlement.SettledAt,
-		SettledBy:          settlement.SettledBy,
-		Notes:              settlement.Notes,
+		ID:                            settlement.ID,
+		SettlementNo:                  settlement.SettlementNo,
+		OrderID:                       settlement.OrderID,
+		OrderNo:                       settlement.OrderNo,
+		FinalAmount:                   settlement.FinalAmount,
+		EstimatedAmount:               settlement.EstimatedAmount,
+		ActualDistanceFee:             settlement.ActualDistanceFee,
+		ActualDurationFee:             settlement.ActualDurationFee,
+		SurchargeAmount:               settlement.SurchargeAmount,
+		TipAmount:                     settlement.TipAmount,
+		PartialHandoverAmount:         settlement.PartialHandoverAmount,
+		PartialHandoverProviderUserID: settlement.PartialHandoverProviderUserID,
+		PartialHandoverSettledAt:      settlement.PartialHandoverSettledAt,
+		PartialHandoverReason:         settlement.PartialHandoverReason,
+		PriceAdjustReason:             settlement.PriceAdjustReason,
+		AdjustReviewed:                settlement.AdjustReviewed,
+		AdjustReviewedBy:              settlement.AdjustReviewedBy,
+		AdjustReviewedAt:              settlement.AdjustReviewedAt,
+		PlatformFee:                   settlement.PlatformFee,
+		PilotFee:                      settlement.PilotFee,
+		OwnerFee:                      settlement.OwnerFee,
+		InsuranceDeduction:            settlement.InsuranceDeduction,
+		PilotUserID:                   settlement.PilotUserID,
+		OwnerUserID:                   settlement.OwnerUserID,
+		PayerUserID:                   settlement.PayerUserID,
+		Status:                        settlement.Status,
+		ConfirmedAt:                   settlement.ConfirmedAt,
+		SettledAt:                     settlement.SettledAt,
+		SettledBy:                     settlement.SettledBy,
+		Notes:                         settlement.Notes,
 	}
 }
 
@@ -1588,6 +2082,20 @@ func settlementSnapshotMatches(current *model.OrderSettlement, snapshot settleme
 	}
 	return current.ID == snapshot.ID &&
 		current.Status == snapshot.Status &&
+		current.FinalAmount == snapshot.FinalAmount &&
+		current.EstimatedAmount == snapshot.EstimatedAmount &&
+		current.ActualDistanceFee == snapshot.ActualDistanceFee &&
+		current.ActualDurationFee == snapshot.ActualDurationFee &&
+		current.SurchargeAmount == snapshot.SurchargeAmount &&
+		current.TipAmount == snapshot.TipAmount &&
+		current.PartialHandoverAmount == snapshot.PartialHandoverAmount &&
+		current.PartialHandoverProviderUserID == snapshot.PartialHandoverProviderUserID &&
+		timePtrEqual(current.PartialHandoverSettledAt, snapshot.PartialHandoverSettledAt) &&
+		current.PartialHandoverReason == snapshot.PartialHandoverReason &&
+		current.PriceAdjustReason == snapshot.PriceAdjustReason &&
+		current.AdjustReviewed == snapshot.AdjustReviewed &&
+		current.AdjustReviewedBy == snapshot.AdjustReviewedBy &&
+		timePtrEqual(current.AdjustReviewedAt, snapshot.AdjustReviewedAt) &&
 		current.PlatformFee == snapshot.PlatformFee &&
 		current.PilotFee == snapshot.PilotFee &&
 		current.OwnerFee == snapshot.OwnerFee &&
@@ -1609,6 +2117,20 @@ func anomalySnapshotMatches(current *model.FinanceAnomalyRecord, snapshot anomal
 }
 
 func applySettlementSnapshot(current *model.OrderSettlement, snapshot settlementRollbackSnapshot) {
+	current.FinalAmount = snapshot.FinalAmount
+	current.EstimatedAmount = snapshot.EstimatedAmount
+	current.ActualDistanceFee = snapshot.ActualDistanceFee
+	current.ActualDurationFee = snapshot.ActualDurationFee
+	current.SurchargeAmount = snapshot.SurchargeAmount
+	current.TipAmount = snapshot.TipAmount
+	current.PartialHandoverAmount = snapshot.PartialHandoverAmount
+	current.PartialHandoverProviderUserID = snapshot.PartialHandoverProviderUserID
+	current.PartialHandoverSettledAt = snapshot.PartialHandoverSettledAt
+	current.PartialHandoverReason = snapshot.PartialHandoverReason
+	current.PriceAdjustReason = snapshot.PriceAdjustReason
+	current.AdjustReviewed = snapshot.AdjustReviewed
+	current.AdjustReviewedBy = snapshot.AdjustReviewedBy
+	current.AdjustReviewedAt = snapshot.AdjustReviewedAt
 	current.PlatformFee = snapshot.PlatformFee
 	current.PilotFee = snapshot.PilotFee
 	current.OwnerFee = snapshot.OwnerFee
@@ -1807,7 +2329,7 @@ func (s *SettlementService) refreshMutableSettlement(existing, expected *model.O
 	if existing == nil || expected == nil {
 		return false
 	}
-	if existing.Status != "" && existing.Status != "pending" && existing.Status != "calculated" {
+	if existing.Status != "" && existing.Status != "pending" && existing.Status != "calculated" && existing.Status != "partial_handover" {
 		return false
 	}
 
@@ -1833,7 +2355,13 @@ func (s *SettlementService) refreshMutableSettlement(existing, expected *model.O
 
 	assignString(&existing.OrderNo, expected.OrderNo)
 	assignInt64(&existing.TotalAmount, expected.TotalAmount)
-	assignInt64(&existing.FinalAmount, expected.FinalAmount)
+	if existing.EstimatedAmount == 0 {
+		assignInt64(&existing.EstimatedAmount, firstPositiveInt64(expected.EstimatedAmount, expected.TotalAmount))
+	}
+	hasAdjustment := existing.ActualDistanceFee != 0 || existing.ActualDurationFee != 0 || existing.SurchargeAmount != 0 || existing.PartialHandoverAmount != 0
+	if !hasAdjustment {
+		assignInt64(&existing.FinalAmount, expected.FinalAmount)
+	}
 	assignFloat64(&existing.PlatformFeeRate, expected.PlatformFeeRate)
 	assignInt64(&existing.PlatformFee, expected.PlatformFee)
 	assignFloat64(&existing.PilotFeeRate, expected.PilotFeeRate)
@@ -1856,6 +2384,12 @@ func (s *SettlementService) refreshMutableSettlement(existing, expected *model.O
 	if existing.Status == "" {
 		existing.Status = "calculated"
 		changed = true
+	}
+	if hasAdjustment {
+		before := snapshotSettlement(existing)
+		if err := s.applySettlementAdjustmentPolicy(existing); err == nil && !settlementSnapshotMatches(existing, before) {
+			changed = true
+		}
 	}
 	return changed
 }

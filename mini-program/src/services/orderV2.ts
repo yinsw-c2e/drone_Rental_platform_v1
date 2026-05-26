@@ -1,11 +1,16 @@
 import { apiV2 } from './api';
 import {
   V2DispatchActionResult,
+  V2EstimateOrderPayload,
   V2OrderMonitor,
   V2OrderDetail,
+  V2OrderLive,
   V2ListData,
   V2OrderSummary,
   V2PageMeta,
+  V2PlatformOrderResult,
+  V2PricingEstimate,
+  V2ServiceClass,
   V2SiteSafetyCheckSummary,
   V2SiteSafetyChecklistItem,
   V2OrderTimelineResponse,
@@ -19,6 +24,18 @@ export type OrderV2ListParams = {
 };
 
 export const orderV2Service = {
+  listServiceClasses: () =>
+    apiV2.get<V2ServiceClass[]>('/service-classes'),
+
+  estimate: (payload: V2EstimateOrderPayload) =>
+    apiV2.post<V2PricingEstimate>('/orders/estimate', payload),
+
+  createInstant: (payload: V2EstimateOrderPayload) =>
+    apiV2.post<V2PlatformOrderResult>('/orders/instant', payload),
+
+  createReservation: (payload: V2EstimateOrderPayload) =>
+    apiV2.post<V2PlatformOrderResult>('/orders/reservation', payload),
+
   list: (params?: OrderV2ListParams) =>
     apiV2.get<V2ListData<V2OrderSummary> & { meta: V2PageMeta }>('/orders', params),
 
@@ -30,6 +47,9 @@ export const orderV2Service = {
 
   getMonitor: (orderId: number) =>
     apiV2.get<V2OrderMonitor>(`/orders/${orderId}/monitor`),
+
+  getLive: (orderId: number) =>
+    apiV2.get<V2OrderLive>(`/orders/${orderId}/live`),
 
   confirmSiteSafety: (orderId: number, payload?: { note?: string }) =>
     apiV2.post<V2OrderSummary>(`/orders/${orderId}/site-safety-check`, payload || {}),
@@ -50,6 +70,21 @@ export const orderV2Service = {
 
   cancel: (orderId: number, reason?: string) =>
     apiV2.post<V2OrderSummary>(`/orders/${orderId}/cancel`, { reason }),
+
+  addTip: (orderId: number, amount: number) =>
+    apiV2.post(`/orders/${orderId}/tip`, { amount, payment_method: 'mock' }),
+
+  priceIncrease: (
+    orderId: number,
+    payload: { amount: number; reason?: string; method?: string; payment_method?: string },
+  ) =>
+    apiV2.post(`/orders/${orderId}/price-increase`, { ...payload, payment_method: payload.payment_method || 'mock' }),
+
+  increasePrice: (
+    orderId: number,
+    payload: { amount: number; reason?: string; method?: string; payment_method?: string },
+  ) =>
+    apiV2.post(`/orders/${orderId}/price-increase`, { ...payload, payment_method: payload.payment_method || 'mock' }),
 
   dispatch: (
     orderId: number,

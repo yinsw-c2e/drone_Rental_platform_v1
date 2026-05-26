@@ -1,79 +1,23 @@
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, ScrollView, Text, View } from '@tarojs/components';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input, ScrollView, Text, View } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { addressHistoryService } from '../../services/addressHistory';
-import { locationService } from '../../services/location';
+import { addressService } from '../../services/address';
 import { orderV2Service } from '../../services/orderV2';
-import { AddressData, V2OrderSummary } from '../../types';
-import bookingClipboardIcon from '../../assets/haul/customer-home/icon_booking_clipboard.png';
-import chevronRightIcon from '../../assets/haul/customer-home/icon_chevron_right.png';
-import clockIcon from '../../assets/haul/customer-home/icon_clock.png';
-import locationEndIcon from '../../assets/haul/customer-home/icon_location_end.png';
-import locationPinIcon from '../../assets/haul/customer-home/icon_location_pin.png';
-import locationStartIcon from '../../assets/haul/customer-home/icon_location_start.png';
-import navChatIcon from '../../assets/haul/customer-home/icon_nav_chat.png';
-import navChevronDownIcon from '../../assets/haul/customer-home/icon_nav_chevron_down.png';
-import starFilledIcon from '../../assets/haul/customer-home/icon_star_filled.png';
-import starOutlineIcon from '../../assets/haul/customer-home/icon_star_outline.png';
-import trustAirspaceIcon from '../../assets/haul/customer-home/icon_trust_airspace.png';
-import trustInsuranceIcon from '../../assets/haul/customer-home/icon_trust_insurance.png';
-import trustProviderIcon from '../../assets/haul/customer-home/icon_trust_provider.png';
-import weightKgIcon from '../../assets/haul/customer-home/icon_weight_kg.png';
+import {
+  AddressData,
+  V2EstimateOrderPayload,
+  V2OrderSummary,
+  V2PricingEstimate,
+  V2ServiceClass,
+} from '../../types';
 import './CustomerHaulHome.scss';
 
-type WeightOption = '50kg以下' | '50-100kg' | '100-300kg' | '300kg以上';
-type TimeOption = '尽快' | '今天' | '明天' | '预约';
 type AddressTarget = 'pickup' | 'dropoff';
-
-type SegmentOption<T extends string> = {
-  label: T;
-  x: string;
-  w: string;
-};
-
-const weightOptions: SegmentOption<WeightOption>[] = [
-  { label: '50kg以下', x: '70.4', w: '140.0' },
-  { label: '50-100kg', x: '228.0', w: '138.2' },
-  { label: '100-300kg', x: '385.6', w: '138.2' },
-  { label: '300kg以上', x: '542.3', w: '138.2' },
-];
-
-const timeOptions: SegmentOption<TimeOption>[] = [
-  { label: '尽快', x: '70.4', w: '140.0' },
-  { label: '今天', x: '228.0', w: '138.2' },
-  { label: '明天', x: '385.6', w: '138.2' },
-  { label: '预约', x: '542.3', w: '138.2' },
-];
-
-const trustItems = [
-  {
-    icon: trustAirspaceIcon,
-    iconClass: 'trust-icon-1',
-    titleClass: 'trust-title-1',
-    descClass: 'trust-desc-1',
-    title: '空域自动检测',
-    desc: '合规飞行更安全',
-  },
-  {
-    icon: trustProviderIcon,
-    iconClass: 'trust-icon-2',
-    titleClass: 'trust-title-2',
-    descClass: 'trust-desc-2',
-    title: '资质服务商',
-    desc: '平台严选更可靠',
-  },
-  {
-    icon: trustInsuranceIcon,
-    iconClass: 'trust-icon-3',
-    titleClass: 'trust-title-3',
-    descClass: 'trust-desc-3',
-    title: '保险保障',
-    desc: '货物保障更安心',
-  },
-];
+type TimeMode = 'now' | 'reservation';
 
 const ADDRESS_TARGET_STORAGE_KEY = 'customer_home_address_target';
 const QUICK_ORDER_PREFILL_STORAGE_KEY = 'customer_home_quick_order_prefill_v1';
@@ -81,11 +25,9 @@ const CITY_STORAGE_KEY = 'customer_home_city';
 const CITY_OPTIONS = ['深圳', '广州', '东莞', '惠州', '佛山', '珠海'];
 const SCHEDULE_TIME_OPTIONS = ['09:00', '10:30', '14:00', '16:00', '18:00'];
 
-const weightDraftValueMap: Record<WeightOption, string> = {
-  '50kg以下': '50',
-  '50-100kg': '80',
-  '100-300kg': '200',
-  '300kg以上': '300',
+const formatMoney = (cents?: number | null) => {
+  if (!cents || cents <= 0) return '--';
+  return `¥${Math.round(cents / 100).toLocaleString('zh-CN')}`;
 };
 
 const formatAddressTitle = (address?: AddressData | null) =>
@@ -93,19 +35,10 @@ const formatAddressTitle = (address?: AddressData | null) =>
 
 const formatAddressDetail = (address?: AddressData | null) => {
   if (!address) return '';
-  const detail = String(address.address || '').trim();
   const title = formatAddressTitle(address);
+  const detail = String(address.address || '').trim();
   if (detail && detail !== title) return detail;
   return [address.district, address.city].filter(Boolean).join('') || '已保存地址';
-};
-
-const getStoredAddressTarget = (): AddressTarget | null => {
-  try {
-    const target = Taro.getStorageSync(ADDRESS_TARGET_STORAGE_KEY);
-    return target === 'pickup' || target === 'dropoff' ? target : null;
-  } catch {
-    return null;
-  }
 };
 
 const normalizeSelectedAddress = (value: unknown): AddressData | null => {
@@ -118,6 +51,13 @@ const normalizeSelectedAddress = (value: unknown): AddressData | null => {
   } catch {
     return null;
   }
+};
+
+const normalizeAddressResponse = (response: unknown): AddressData[] => {
+  const data = response as any;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
 };
 
 const dedupeAddresses = (items: AddressData[]) => {
@@ -136,23 +76,13 @@ const dedupeAddresses = (items: AddressData[]) => {
   });
 };
 
-const normalizeAddressResponse = (response: unknown): AddressData[] => {
-  const data = response as any;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  return [];
-};
-
-const formatOrderDate = (value?: string | null) => {
-  if (!value) return '--';
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const h = String(date.getHours()).padStart(2, '0');
-  const mi = String(date.getMinutes()).padStart(2, '0');
-  return `${y}-${m}-${d} ${h}:${mi}`;
+const getStoredAddressTarget = (): AddressTarget | null => {
+  try {
+    const target = Taro.getStorageSync(ADDRESS_TARGET_STORAGE_KEY);
+    return target === 'pickup' || target === 'dropoff' ? target : null;
+  } catch {
+    return null;
+  }
 };
 
 const padDatePart = (value: number) => String(value).padStart(2, '0');
@@ -162,6 +92,15 @@ const formatDateKey = (date: Date) =>
 
 const formatScheduleLabel = (date: Date) =>
   `${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+
+const buildDefaultScheduleParts = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return {
+    date: formatDateKey(date),
+    time: '09:00',
+  };
+};
 
 const getScheduleDateOptions = () => {
   const today = new Date();
@@ -177,20 +116,26 @@ const getScheduleDateOptions = () => {
   });
 };
 
-const buildDefaultScheduleParts = () => {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return {
-    date: formatDateKey(date),
-    time: '09:00',
-  };
-};
-
 const parseScheduleDateTime = (dateValue: string, timeValue: string) => {
   const [hour = '09', minute = '00'] = timeValue.split(':');
   const date = new Date(`${dateValue.replace(/-/g, '/')} 00:00:00`);
   date.setHours(Number(hour), Number(minute), 0, 0);
   return date;
+};
+
+const buildServiceClassPayloadRange = (item: V2ServiceClass) => {
+  const min = Math.round(item.payload_min_kg || 0);
+  const max = Math.round(item.payload_max_kg || 0);
+  if (max > 0) return `${min}-${max}kg`;
+  return `${min}kg以上`;
+};
+
+const getDefaultWeight = (item?: V2ServiceClass | null) => {
+  if (!item) return '50';
+  const min = Number(item.payload_min_kg || 50);
+  const max = Number(item.payload_max_kg || 0);
+  if (max > 0) return String(Math.round(Math.min(max, Math.max(min, (min + max) / 2))));
+  return String(Math.round(min));
 };
 
 const getRecentOrderRoute = (order?: V2OrderSummary | null) => {
@@ -201,48 +146,57 @@ const getRecentOrderRoute = (order?: V2OrderSummary | null) => {
   return order.title || order.order_no || '最近一次吊运';
 };
 
-const getRecentOrderWeight = (order?: V2OrderSummary | null) => {
-  const raw = (order as any)?.cargo_weight_kg || (order as any)?.cargo_weight || (order as any)?.demand?.cargo_weight_kg;
-  return raw ? `${raw}kg` : '--';
-};
-
 const getRecentOrderStatus = (order?: V2OrderSummary | null) => {
   if (!order) return '暂无';
   const status = String(order.status || '').toLowerCase();
   const statusMap: Record<string, string> = {
-    completed: '已完成',
-    delivered: '待签收',
-    in_transit: '运输中',
-    loading: '装货中',
-    preparing: '准备中',
+    pending_dispatch: '等待服务商接单',
+    auto_assigning: '正在匹配服务商',
     assigned: '服务商已接单',
-    pending_dispatch: '待开始履约',
-    pending_payment: '待付款',
-    pending_provider_confirmation: '待确认',
+    preparing: '准备起飞',
+    in_transit: '飞行中',
+    delivered: '已送达',
+    completed: '已完成',
     cancelled: '已取消',
   };
   return statusMap[status] || '进行中';
 };
 
+const getOrderListItems = (response: unknown): V2OrderSummary[] => {
+  const data = response as any;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  return [];
+};
+
 export default function CustomerHaulHome() {
-  const initialSchedule = buildDefaultScheduleParts();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
-  const [weight, setWeight] = useState<WeightOption>('50kg以下');
-  const [time, setTime] = useState<TimeOption>('尽快');
-  const [scheduledStartAt, setScheduledStartAt] = useState('');
-  const [scheduledLabel, setScheduledLabel] = useState('');
-  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
-  const [pendingScheduleDate, setPendingScheduleDate] = useState(initialSchedule.date);
-  const [pendingScheduleTime, setPendingScheduleTime] = useState(initialSchedule.time);
+  const initialSchedule = useMemo(() => buildDefaultScheduleParts(), []);
   const [pickup, setPickup] = useState<AddressData | null>(null);
   const [dropoff, setDropoff] = useState<AddressData | null>(null);
   const [city, setCity] = useState('深圳');
   const [commonAddresses, setCommonAddresses] = useState<AddressData[]>([]);
   const [recentOrder, setRecentOrder] = useState<V2OrderSummary | null>(null);
-  const [navShift, setNavShift] = useState(0);
-  const [serviceLeft, setServiceLeft] = useState(632.9);
-  const [showService, setShowService] = useState(true);
+  const [serviceClasses, setServiceClasses] = useState<V2ServiceClass[]>([]);
+  const [selectedClassCode, setSelectedClassCode] = useState('');
+  const [cargoWeight, setCargoWeight] = useState('50');
+  const [timeMode, setTimeMode] = useState<TimeMode>('now');
+  const [scheduledStartAt, setScheduledStartAt] = useState('');
+  const [scheduledLabel, setScheduledLabel] = useState('');
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [pendingScheduleDate, setPendingScheduleDate] = useState(initialSchedule.date);
+  const [pendingScheduleTime, setPendingScheduleTime] = useState(initialSchedule.time);
+  const [estimate, setEstimate] = useState<V2PricingEstimate | null>(null);
+  const [estimateError, setEstimateError] = useState('');
+  const [estimating, setEstimating] = useState(false);
+  const [creating, setCreating] = useState(false);
   const pendingAddressTargetRef = useRef<AddressTarget | null>(null);
+  const estimateSeqRef = useRef(0);
+
+  const selectedClass = useMemo(
+    () => serviceClasses.find(item => item.code === selectedClassCode) || serviceClasses[0] || null,
+    [selectedClassCode, serviceClasses],
+  );
 
   const clearAddressSelection = useCallback(() => {
     pendingAddressTargetRef.current = null;
@@ -260,6 +214,7 @@ export default function CustomerHaulHome() {
       setCity(address.city);
       Taro.setStorageSync(CITY_STORAGE_KEY, address.city);
     }
+    addressHistoryService.addAddressHistory(address).catch(() => null);
   }, []);
 
   const consumeStoredAddress = useCallback(() => {
@@ -272,14 +227,17 @@ export default function CustomerHaulHome() {
   }, [applySelectedAddress, clearAddressSelection]);
 
   const refreshCommonAddresses = useCallback(async () => {
-    const localHistory = await addressHistoryService.loadAddressHistory().catch(() => []);
-    let savedAddresses: AddressData[] = [];
     if (isAuthenticated) {
-      savedAddresses = await locationService.getAddressList()
-        .then(normalizeAddressResponse)
-        .catch(() => []);
+      try {
+        const savedAddresses = await addressService.list().then(normalizeAddressResponse);
+        setCommonAddresses(dedupeAddresses(savedAddresses).slice(0, 3));
+        return;
+      } catch {
+        // 云端地址簿失败时保留本地最近地址作为降级。
+      }
     }
-    setCommonAddresses(dedupeAddresses([...savedAddresses, ...localHistory]).slice(0, 2));
+    const localHistory = await addressHistoryService.loadAddressHistory().catch(() => []);
+    setCommonAddresses(dedupeAddresses(localHistory).slice(0, 3));
   }, [isAuthenticated]);
 
   const refreshRecentOrder = useCallback(async () => {
@@ -289,12 +247,26 @@ export default function CustomerHaulHome() {
     }
     try {
       const response = await orderV2Service.list({ role: 'client', page: 1, page_size: 1 });
-      const latest = ((response as any).items || [])[0] as V2OrderSummary | undefined;
-      setRecentOrder(latest || null);
+      setRecentOrder(getOrderListItems(response)[0] || null);
     } catch {
       setRecentOrder(null);
     }
   }, [isAuthenticated]);
+
+  const refreshServiceClasses = useCallback(async () => {
+    try {
+      const items = await orderV2Service.listServiceClasses();
+      const list = Array.isArray(items) ? items : [];
+      setServiceClasses(list);
+      if (list.length > 0) {
+        setSelectedClassCode(prev => prev || list[0].code);
+        setCargoWeight(prev => prev || getDefaultWeight(list[0]));
+      }
+    } catch {
+      setServiceClasses([]);
+      setEstimateError('机型档加载失败，请稍后重试');
+    }
+  }, []);
 
   const refreshHomeData = useCallback(() => {
     const storedCity = Taro.getStorageSync(CITY_STORAGE_KEY);
@@ -302,7 +274,8 @@ export default function CustomerHaulHome() {
     consumeStoredAddress();
     refreshCommonAddresses();
     refreshRecentOrder();
-  }, [consumeStoredAddress, refreshCommonAddresses, refreshRecentOrder]);
+    refreshServiceClasses();
+  }, [consumeStoredAddress, refreshCommonAddresses, refreshRecentOrder, refreshServiceClasses]);
 
   useDidShow(() => {
     syncCustomTabBar(0);
@@ -323,34 +296,6 @@ export default function CustomerHaulHome() {
     };
   }, [applySelectedAddress, clearAddressSelection, refreshCommonAddresses]);
 
-  useEffect(() => {
-    try {
-      const menu = Taro.getMenuButtonBoundingClientRect();
-      const system = Taro.getSystemInfoSync();
-      const rpxRatio = 750 / system.windowWidth;
-      const menuTopRpx = menu.top * rpxRatio;
-      const menuLeftRpx = menu.left * rpxRatio;
-      const shift = Math.max(0, menuTopRpx - 95.1);
-      const maxServiceRight = menuLeftRpx - 16;
-      const nextServiceLeft = Math.min(632.9, Math.max(488, maxServiceRight - 88));
-      setNavShift(Number(shift.toFixed(1)));
-      setServiceLeft(Number(nextServiceLeft.toFixed(1)));
-      setShowService(maxServiceRight >= 700);
-    } catch (error) {
-      setNavShift(0);
-      setServiceLeft(632.9);
-      setShowService(true);
-    }
-  }, []);
-
-  const canvasStyle = {
-    '--nav-shift': `${navShift}rpx`,
-  } as React.CSSProperties;
-
-  const serviceStyle = {
-    left: `${serviceLeft}rpx`,
-  } as React.CSSProperties;
-
   const openAddressPicker = (target: AddressTarget) => {
     pendingAddressTargetRef.current = target;
     Taro.setStorageSync(ADDRESS_TARGET_STORAGE_KEY, target);
@@ -365,6 +310,69 @@ export default function CustomerHaulHome() {
     Taro.setStorageSync(CITY_STORAGE_KEY, nextCity);
   };
 
+  const selectServiceClass = (item: V2ServiceClass) => {
+    setSelectedClassCode(item.code);
+    setCargoWeight(getDefaultWeight(item));
+  };
+
+  const buildOrderPayload = useCallback((): V2EstimateOrderPayload | null => {
+    if (!pickup || !dropoff || !selectedClass) return null;
+    const weight = Number(cargoWeight);
+    if (!Number.isFinite(weight) || weight <= 0) return null;
+    const scheduled = scheduledStartAt || new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const pickupTitle = formatAddressTitle(pickup);
+    const dropoffTitle = formatAddressTitle(dropoff);
+    return {
+      origin: {
+        latitude: Number(pickup.latitude),
+        longitude: Number(pickup.longitude),
+        address: pickupTitle || formatAddressDetail(pickup),
+      },
+      destination: {
+        latitude: Number(dropoff.latitude),
+        longitude: Number(dropoff.longitude),
+        address: dropoffTitle || formatAddressDetail(dropoff),
+      },
+      cargo_weight_kg: weight,
+      scheduled_start_at: scheduled,
+      service_class_code: selectedClass.code,
+      cargo_scene: 'standard',
+      description: `${pickupTitle || '起吊点'} → ${dropoffTitle || '落放点'}`,
+      note: timeMode === 'reservation' && scheduledLabel ? `预约 ${scheduledLabel}` : '立即吊运',
+    };
+  }, [cargoWeight, dropoff, pickup, scheduledLabel, scheduledStartAt, selectedClass, timeMode]);
+
+  useEffect(() => {
+    const payload = buildOrderPayload();
+    const seq = estimateSeqRef.current + 1;
+    estimateSeqRef.current = seq;
+    setEstimate(null);
+    if (!payload) {
+      setEstimating(false);
+      setEstimateError('');
+      return;
+    }
+    setEstimating(true);
+    setEstimateError('');
+    const timer = setTimeout(() => {
+      orderV2Service.estimate(payload)
+        .then(next => {
+          if (estimateSeqRef.current !== seq) return;
+          setEstimate(next);
+          setEstimateError('');
+        })
+        .catch((error: any) => {
+          if (estimateSeqRef.current !== seq) return;
+          setEstimate(null);
+          setEstimateError(String(error?.message || '预估价获取失败'));
+        })
+        .finally(() => {
+          if (estimateSeqRef.current === seq) setEstimating(false);
+        });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [buildOrderPayload]);
+
   const openSchedulePicker = () => {
     if (!scheduledStartAt) {
       const next = buildDefaultScheduleParts();
@@ -374,42 +382,67 @@ export default function CustomerHaulHome() {
     setShowSchedulePicker(true);
   };
 
-  const selectTimeOption = (option: TimeOption) => {
-    if (option === '预约') {
-      openSchedulePicker();
-      return;
-    }
-    setTime(option);
-    setScheduledStartAt('');
-    setScheduledLabel('');
-  };
-
   const confirmSchedule = () => {
     const start = parseScheduleDateTime(pendingScheduleDate, pendingScheduleTime);
     if (start <= new Date()) {
-      Taro.showToast({ title: '请选择未来作业时间', icon: 'none' });
+      Taro.showToast({ title: '请选择未来时间', icon: 'none' });
       return;
     }
-    setTime('预约');
+    setTimeMode('reservation');
     setScheduledStartAt(start.toISOString());
     setScheduledLabel(formatScheduleLabel(start));
     setShowSchedulePicker(false);
   };
 
-  const requestPlan = () => {
-    if (!pickup || !dropoff) {
-      Taro.showToast({ title: '请先选择起吊点和落放点', icon: 'none' });
+  const switchToNow = () => {
+    setTimeMode('now');
+    setScheduledStartAt('');
+    setScheduledLabel('');
+  };
+
+  const openComplexService = () => {
+    if (pickup && dropoff) {
+      Taro.setStorageSync(QUICK_ORDER_PREFILL_STORAGE_KEY, {
+        pickupAddress: pickup,
+        deliveryAddress: dropoff,
+        cargoWeight,
+        timeOption: timeMode === 'reservation' ? '预约' : '尽快',
+        scheduledStartAt,
+        city,
+      });
+    }
+    Taro.navigateTo({ url: '/pages/publish/quick-order/index?from=customerHome' });
+  };
+
+  const createOrder = async () => {
+    if (!isAuthenticated) {
+      Taro.navigateTo({ url: '/pages/auth/login/index?roleMode=customer' });
       return;
     }
-    Taro.setStorageSync(QUICK_ORDER_PREFILL_STORAGE_KEY, {
-      pickupAddress: pickup,
-      deliveryAddress: dropoff,
-      cargoWeight: weightDraftValueMap[weight],
-      timeOption: time,
-      scheduledStartAt,
-      city,
-    });
-    Taro.navigateTo({ url: '/pages/publish/quick-order/index?from=customerHome' });
+    const payload = buildOrderPayload();
+    if (!payload) {
+      Taro.showToast({ title: '请补齐地址、机型档和重量', icon: 'none' });
+      return;
+    }
+    if (!estimate) {
+      Taro.showToast({ title: estimateError || '请等待预估价', icon: 'none' });
+      return;
+    }
+    try {
+      setCreating(true);
+      const result = timeMode === 'reservation'
+        ? await orderV2Service.createReservation(payload)
+        : await orderV2Service.createInstant(payload);
+      const orderId = result?.order?.id;
+      if (!orderId) {
+        throw new Error('订单创建成功但缺少订单号');
+      }
+      Taro.redirectTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
+    } catch (error: any) {
+      Taro.showToast({ title: String(error?.message || '下单失败'), icon: 'none' });
+    } finally {
+      setCreating(false);
+    }
   };
 
   const applyCommonPickup = (address?: AddressData) => {
@@ -418,9 +451,10 @@ export default function CustomerHaulHome() {
       return;
     }
     applySelectedAddress('pickup', address);
-    addressHistoryService.addAddressHistory(address)
-      .then(next => setCommonAddresses(dedupeAddresses(next).slice(0, 2)))
-      .catch(() => null);
+  };
+
+  const openAddressBook = () => {
+    Taro.navigateTo({ url: '/pages/address/book/index' });
   };
 
   const openRecentOrder = () => {
@@ -431,153 +465,168 @@ export default function CustomerHaulHome() {
     Taro.switchTab({ url: '/pages/orders/index' });
   };
 
-  const renderSegment = <T extends string>(
-    option: SegmentOption<T>,
-    y: string,
-    active: boolean,
-    onClick: () => void,
-  ) => (
-    <View
-      key={option.label}
-      className={`customer-home-segment ${active ? 'is-active' : ''}`}
-      style={{ left: `${option.x}rpx`, top: `${y}rpx`, width: `${option.w}rpx` }}
-      onClick={onClick}
-    >
-      <Text className={`customer-home-segment-text ${active ? 'is-active' : ''}`}>
-        {option.label}
-      </Text>
-    </View>
-  );
-
   const scheduleDateOptions = getScheduleDateOptions();
   const activeScheduleDate = scheduleDateOptions.find(item => item.value === pendingScheduleDate)?.label || pendingScheduleDate;
+  const ctaDisabled = creating || estimating || !estimate || !pickup || !dropoff || !selectedClass;
+  const ctaText = creating
+    ? '下单中...'
+    : estimating
+      ? '预估价计算中...'
+      : estimate
+        ? `预估价 ${formatMoney(estimate.total_estimated_cents)}  立即下单`
+        : '选择地址后立即下单';
 
   return (
     <View className='customer-home-page'>
       <ScrollView scrollY className='customer-home-scroll'>
-        <View className='customer-home-canvas' style={canvasStyle}>
-          <View className='customer-home-blue' />
-          <View className='customer-home-blue-curve' />
-
-          <View className='nav-city-hit' onClick={chooseCity} />
-          <Text className='nav-city'>{city}</Text>
-          <Image className='nav-chevron' src={navChevronDownIcon} mode='aspectFit' />
-          <Text className='nav-title'>预约无人机吊运</Text>
-          {showService && (
-            <View className='nav-service' style={serviceStyle}>
-              <Image className='nav-service-icon' src={navChatIcon} mode='aspectFit' />
-              <Text className='nav-service-text'>客服</Text>
-            </View>
-          )}
-
-          <View className='main-card' />
-          <Image className='main-title-icon' src={bookingClipboardIcon} mode='aspectFit' />
-          <Text className='main-title'>预约吊运</Text>
-          <View className='form-box' />
-
-          <View className='location-hit hit-start' onClick={() => openAddressPicker('pickup')} />
-          <Image className='start-icon' src={locationStartIcon} mode='aspectFit' />
-          <Text className='start-label'>起吊点</Text>
-          <Text className={`start-value ${pickup ? '' : 'is-placeholder'}`}>
-            {formatAddressTitle(pickup) || '请选择货物起吊位置'}
-          </Text>
-          <Image className='start-arrow' src={chevronRightIcon} mode='aspectFit' />
-          <View className='divider divider-start' />
-
-          <View className='location-hit hit-end' onClick={() => openAddressPicker('dropoff')} />
-          <Image className='end-icon' src={locationEndIcon} mode='aspectFit' />
-          <Text className='end-label'>落放点</Text>
-          <Text className={`end-value ${dropoff ? '' : 'is-placeholder'}`}>
-            {formatAddressTitle(dropoff) || '请选择货物落放位置'}
-          </Text>
-          <Image className='end-arrow' src={chevronRightIcon} mode='aspectFit' />
-          <View className='divider divider-end' />
-
-          <Image className='weight-icon' src={weightKgIcon} mode='aspectFit' />
-          <Text className='weight-title'>货物重量</Text>
-          {weightOptions.map(option =>
-            renderSegment(option, '578.3', weight === option.label, () => setWeight(option.label)),
-          )}
-          <View className='divider divider-weight' />
-
-          <Image className='time-icon' src={clockIcon} mode='aspectFit' />
-          <Text className='time-title'>作业时间</Text>
-          {timeOptions.map(option =>
-            renderSegment(option, '755.3', time === option.label, () => selectTimeOption(option.label)),
-          )}
-          {time === '预约' && scheduledLabel ? (
-            <Text className='schedule-selected-text'>已约 {scheduledLabel}</Text>
-          ) : null}
-
-          <View className='plan-button' onClick={requestPlan}>
-            <Text className='plan-button-text'>获取吊运方案</Text>
+        <View className='customer-home-header'>
+          <View className='customer-home-city' onClick={chooseCity}>
+            <Text>{city}</Text>
+            <Text className='customer-home-city-arrow'>⌄</Text>
           </View>
+          <Text className='customer-home-title'>立即吊运</Text>
+          <View className='customer-home-help' onClick={() => Taro.switchTab({ url: '/pages/messages/index' })}>客服</View>
+        </View>
 
-          <View className='trust-card' />
-          {trustItems.map(item => (
-            <React.Fragment key={item.title}>
-              <Image className={`trust-icon ${item.iconClass}`} src={item.icon} mode='aspectFit' />
-              <Text className={`trust-title ${item.titleClass}`}>{item.title}</Text>
-              <Text className={`trust-desc ${item.descClass}`}>{item.desc}</Text>
-            </React.Fragment>
-          ))}
-          <View className='trust-vline trust-vline-1' />
-          <View className='trust-vline trust-vline-2' />
+        <View className='customer-home-section customer-home-address-card'>
+          <View className='address-row' onClick={() => openAddressPicker('pickup')}>
+            <View className='address-dot address-dot-start'>起</View>
+            <View className='address-content'>
+              <Text className={`address-title ${pickup ? '' : 'is-placeholder'}`}>
+                {formatAddressTitle(pickup) || '从哪里起吊'}
+              </Text>
+              <Text className='address-subtitle'>{formatAddressDetail(pickup) || '请选择起吊位置'}</Text>
+            </View>
+            <Text className='address-arrow'>›</Text>
+          </View>
+          <View className='address-divider' />
+          <View className='address-row' onClick={() => openAddressPicker('dropoff')}>
+            <View className='address-dot address-dot-end'>终</View>
+            <View className='address-content'>
+              <Text className={`address-title ${dropoff ? '' : 'is-placeholder'}`}>
+                {formatAddressTitle(dropoff) || '送到哪里'}
+              </Text>
+              <Text className='address-subtitle'>{formatAddressDetail(dropoff) || '请选择落放位置'}</Text>
+            </View>
+            <Text className='address-arrow'>›</Text>
+          </View>
+        </View>
 
-          <View className='common-card' />
-          <Text className='common-title'>常用起吊点</Text>
-          <View className='common-action-hit' onClick={() => openAddressPicker('pickup')} />
-          <Text className='common-action'>查看全部</Text>
-          <Image className='common-action-arrow' src={chevronRightIcon} mode='aspectFit' />
-          <View className='common-row-hit common-row-hit-1' onClick={() => applyCommonPickup(commonAddresses[0])} />
-          <Image className='common-pin common-pin-1' src={locationPinIcon} mode='aspectFit' />
-          <Text className={`common-name common-name-1 ${commonAddresses[0] ? '' : 'is-placeholder'}`}>
-            {formatAddressTitle(commonAddresses[0]) || '暂无常用起吊点'}
-          </Text>
-          <Text className='common-address common-address-1'>
-            {formatAddressDetail(commonAddresses[0]) || '选点后自动记录'}
-          </Text>
-          {commonAddresses[0] && <Image className='common-star common-star-1' src={starFilledIcon} mode='aspectFit' />}
-          <View className='divider common-divider' />
-          <View className='common-row-hit common-row-hit-2' onClick={() => applyCommonPickup(commonAddresses[1])} />
-          <Image className='common-pin common-pin-2' src={locationPinIcon} mode='aspectFit' />
-          <Text className={`common-name common-name-2 ${commonAddresses[1] ? '' : 'is-placeholder'}`}>
-            {formatAddressTitle(commonAddresses[1]) || '地图选点'}
-          </Text>
-          <Text className='common-address common-address-2'>
-            {formatAddressDetail(commonAddresses[1]) || '保存为最近起吊点'}
-          </Text>
-          {commonAddresses[1] && <Image className='common-star common-star-2' src={starOutlineIcon} mode='aspectFit' />}
+        <View className='customer-home-section'>
+          <View className='section-head'>
+            <Text className='section-title'>机型档</Text>
+            <Text className='section-note'>按平台档位计价</Text>
+          </View>
+          <View className='service-class-grid'>
+            {serviceClasses.map(item => (
+              <View
+                key={item.code}
+                className={`service-class-card ${selectedClass?.code === item.code ? 'is-active' : ''}`}
+                onClick={() => selectServiceClass(item)}
+              >
+                <Text className='service-class-name'>{item.display_name}</Text>
+                <Text className='service-class-range'>载重 {buildServiceClassPayloadRange(item)}</Text>
+                <Text className='service-class-min'>{item.min_charge_cents ? `${formatMoney(item.min_charge_cents)}起` : '平台估价'}</Text>
+              </View>
+            ))}
+            {serviceClasses.length === 0 ? (
+              <View className='service-class-empty'>机型档加载中</View>
+            ) : null}
+          </View>
+        </View>
 
-          <View className='recent-card' />
-          <Text className='recent-title'>最近一次吊运</Text>
-          <View className='recent-action-hit' onClick={openRecentOrder} />
-          <Text className='recent-action'>查看详情</Text>
-          <Image className='recent-action-arrow' src={chevronRightIcon} mode='aspectFit' />
-          <View className='recent-card-hit' onClick={openRecentOrder} />
-          <View className='recent-inner' />
-          <View className={`done-badge ${recentOrder ? '' : 'is-empty'}`}>
-            <Text className={`done-badge-text ${recentOrder ? '' : 'is-empty'}`}>
-              {getRecentOrderStatus(recentOrder)}
+        <View className='customer-home-section customer-home-form-card'>
+          <View className='form-row'>
+            <Text className='form-label'>货物重量</Text>
+            <View className='weight-input-wrap'>
+              <Input
+                className='weight-input'
+                type='digit'
+                value={cargoWeight}
+                onInput={event => setCargoWeight(String(event.detail.value || '').replace(/[^\d.]/g, ''))}
+              />
+              <Text className='weight-unit'>kg</Text>
+            </View>
+          </View>
+          <View className='form-row'>
+            <Text className='form-label'>服务时间</Text>
+            <View className='time-switch'>
+              <View className={`time-chip ${timeMode === 'now' ? 'is-active' : ''}`} onClick={switchToNow}>
+                <Text>现在</Text>
+              </View>
+              <View className={`time-chip ${timeMode === 'reservation' ? 'is-active' : ''}`} onClick={openSchedulePicker}>
+                <Text>{scheduledLabel || '预约'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View className='customer-home-section customer-home-estimate-card'>
+          <View className='estimate-main'>
+            <View>
+              <Text className='estimate-label'>预估价</Text>
+              <Text className='estimate-hint'>服务商接单后按平台规则履约</Text>
+            </View>
+            <Text className='estimate-price'>
+              {estimating ? '计算中' : formatMoney(estimate?.total_estimated_cents)}
             </Text>
           </View>
-          <Text className={`recent-route ${recentOrder ? '' : 'is-placeholder'}`}>
-            {getRecentOrderRoute(recentOrder)}
-          </Text>
-          <Text className='recent-label weight-label'>货物重量</Text>
-          <Text className='recent-value weight-value'>{getRecentOrderWeight(recentOrder)}</Text>
-          <Text className='recent-label time-label'>作业时间</Text>
-          <Text className='recent-value time-value'>{formatOrderDate(recentOrder?.start_time)}</Text>
-          <Text className='recent-label order-label'>订单号</Text>
-          <Text className='recent-order-value'>{recentOrder?.order_no || '--'}</Text>
+          {estimate ? (
+            <View className='estimate-meta'>
+              <Text>{estimate.distance_km.toFixed(1)} km</Text>
+              <Text>约 {estimate.estimated_duration_min} 分钟</Text>
+              <Text>{estimate.service_class_name}</Text>
+            </View>
+          ) : (
+            <Text className='estimate-error'>{estimateError || '选择起点和终点后自动估价'}</Text>
+          )}
+        </View>
+
+        <View className='secondary-actions'>
+          <View className='secondary-action' onClick={openComplexService}>复杂服务 / 议价单</View>
+          <View className='secondary-action' onClick={() => Taro.switchTab({ url: '/pages/orders/index' })}>查看订单</View>
+        </View>
+
+        <View className='customer-home-section customer-home-common-card'>
+          <View className='section-head'>
+            <Text className='section-title'>常用起吊点</Text>
+            <Text className='section-link' onClick={openAddressBook}>管理</Text>
+          </View>
+          {commonAddresses.length > 0 ? commonAddresses.map((item, index) => (
+            <View key={`${item.id || item.address}-${index}`} className='common-row' onClick={() => applyCommonPickup(item)}>
+              <View className='common-index'>{index + 1}</View>
+              <View className='common-content'>
+                <Text className='common-title'>{formatAddressTitle(item)}</Text>
+                <Text className='common-address'>{formatAddressDetail(item)}</Text>
+              </View>
+            </View>
+          )) : (
+            <View className='empty-line'>暂无常用地址</View>
+          )}
+        </View>
+
+        <View className='customer-home-section customer-home-recent-card' onClick={openRecentOrder}>
+          <View className='section-head'>
+            <Text className='section-title'>最近一次吊运</Text>
+            <Text className='section-link'>查看</Text>
+          </View>
+          <Text className='recent-route'>{getRecentOrderRoute(recentOrder)}</Text>
+          <Text className='recent-status'>{getRecentOrderStatus(recentOrder)}</Text>
         </View>
         <View className='customer-home-scroll-spacer' />
       </ScrollView>
+
+      <View className='customer-home-bottom'>
+        <View className={`customer-home-cta ${ctaDisabled ? 'is-disabled' : ''}`} onClick={ctaDisabled ? undefined : createOrder}>
+          <Text>{ctaText}</Text>
+        </View>
+      </View>
+
       {showSchedulePicker ? (
         <View className='schedule-mask'>
           <View className='schedule-panel'>
             <View className='schedule-panel-header'>
-              <Text className='schedule-panel-title'>选择作业时间</Text>
+              <Text className='schedule-panel-title'>选择服务时间</Text>
               <Text className='schedule-panel-close' onClick={() => setShowSchedulePicker(false)}>取消</Text>
             </View>
             <Text className='schedule-panel-subtitle'>日期</Text>
@@ -585,31 +634,27 @@ export default function CustomerHaulHome() {
               {scheduleDateOptions.map(item => (
                 <View
                   key={item.value}
-                  className={`schedule-chip schedule-date-chip ${pendingScheduleDate === item.value ? 'is-active' : ''}`}
+                  className={`schedule-chip ${pendingScheduleDate === item.value ? 'is-active' : ''}`}
                   onClick={() => setPendingScheduleDate(item.value)}
                 >
-                  <Text className={`schedule-chip-text ${pendingScheduleDate === item.value ? 'is-active' : ''}`}>
-                    {item.label}
-                  </Text>
+                  <Text>{item.label}</Text>
                 </View>
               ))}
             </View>
-            <Text className='schedule-panel-subtitle schedule-time-subtitle'>时间</Text>
+            <Text className='schedule-panel-subtitle'>时间</Text>
             <View className='schedule-time-grid'>
               {SCHEDULE_TIME_OPTIONS.map(item => (
                 <View
                   key={item}
-                  className={`schedule-chip schedule-time-chip ${pendingScheduleTime === item ? 'is-active' : ''}`}
+                  className={`schedule-chip ${pendingScheduleTime === item ? 'is-active' : ''}`}
                   onClick={() => setPendingScheduleTime(item)}
                 >
-                  <Text className={`schedule-chip-text ${pendingScheduleTime === item ? 'is-active' : ''}`}>
-                    {item}
-                  </Text>
+                  <Text>{item}</Text>
                 </View>
               ))}
             </View>
             <View className='schedule-confirm' onClick={confirmSchedule}>
-              <Text className='schedule-confirm-text'>确认 {activeScheduleDate} {pendingScheduleTime}</Text>
+              <Text>确认 {activeScheduleDate} {pendingScheduleTime}</Text>
             </View>
           </View>
         </View>

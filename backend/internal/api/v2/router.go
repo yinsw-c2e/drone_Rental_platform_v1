@@ -110,7 +110,7 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Owner:        v2owner.NewHandler(ownerService, droneService),
 		Pilot:        v2pilot.NewHandler(pilotService, uploadService),
 		Provider:     v2provider.NewHandler(broadcastService),
-		Order:        v2order.NewHandler(orderService, dispatchService, flightService, pricingService),
+		Order:        v2order.NewHandler(orderService, dispatchService, flightService, pricingService, settlementService),
 		Dispatch:     v2dispatch.NewHandler(dispatchService, orderService),
 		Flight:       v2flight.NewHandler(flightService, orderService),
 		Message:      v2message.NewHandler(messageService),
@@ -129,6 +129,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 	api.Use(middleware.PaginationMiddleware(1, 20, 100))
 
 	api.GET("/status", h.Base.Status)
+	api.GET("/service-classes", h.Order.ListServiceClasses)
 	api.POST("/orders/estimate", h.Order.Estimate)
 	api.GET("/orders/:order_id/contract/pdf", h.Order.DownloadContractPDF)
 
@@ -263,6 +264,10 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			providerGroup.POST("/presence/heartbeat", h.Provider.Heartbeat)
 			providerGroup.GET("/broadcasts", h.Provider.ListBroadcasts)
 			providerGroup.POST("/broadcasts/:id/grab", h.Provider.GrabBroadcast)
+			providerGroup.GET("/broadcast-assignments", h.Provider.ListAssignments)
+			providerGroup.POST("/broadcast-assignments/:id/accept", h.Provider.AcceptAssignment)
+			providerGroup.POST("/broadcast-assignments/:id/decline", h.Provider.DeclineAssignment)
+			providerGroup.GET("/me/stats", h.Provider.MeStats)
 		}
 
 		pilotGroup := authenticated.Group("/pilot")
@@ -389,6 +394,9 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.GET("/:order_id/site-safety-checks/latest", h.Order.GetLatestSiteSafetyCheck)
 			orderGroup.POST("/:order_id/confirm-receipt", h.Order.ConfirmReceipt)
 			orderGroup.POST("/:order_id/execution-status", h.Order.UpdateExecutionStatus)
+			orderGroup.POST("/:order_id/tip", h.Order.AddTip)
+			orderGroup.POST("/:order_id/price-increase", h.Order.IncreasePrice)
+			orderGroup.GET("/:order_id/live", h.Order.Live)
 			orderGroup.GET("/:order_id/monitor", h.Order.Monitor)
 			orderGroup.GET("/:order_id/dev-flight-simulation", h.Order.GetDevelopmentFlightSimulation)
 			orderGroup.POST("/:order_id/dev-flight-simulation/start", h.Order.StartDevelopmentFlightSimulation)

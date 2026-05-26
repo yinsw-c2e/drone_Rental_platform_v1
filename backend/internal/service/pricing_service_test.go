@@ -86,6 +86,23 @@ func TestPricingEstimateCoversServiceClassesAndScenes(t *testing.T) {
 	}
 }
 
+func TestPricingServiceListServiceClasses(t *testing.T) {
+	pricing := seedPricingServiceClasses(t)
+	items, err := pricing.ListServiceClasses()
+	if err != nil {
+		t.Fatalf("list service classes failed: %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 service classes, got %d", len(items))
+	}
+	if items[0].Code != "light_heavy" || items[1].Code != "medium_heavy" || items[2].Code != "super_heavy" {
+		t.Fatalf("unexpected service class order: %#v", items)
+	}
+	if items[0].DisplayName == "" || items[0].PayloadMinKG <= 0 {
+		t.Fatalf("expected display fields for mini-program cards: %#v", items[0])
+	}
+}
+
 func TestPricingEstimateAppliesNightSurchargeAndMinimum(t *testing.T) {
 	pricing := seedPricingServiceClasses(t)
 	dayEstimate, err := pricing.Estimate(PricingEstimateInput{

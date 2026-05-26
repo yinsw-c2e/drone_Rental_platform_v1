@@ -89,6 +89,20 @@ func (s *UserService) GetProfile(userID int64) (*model.User, error) {
 	return s.userRepo.GetByID(userID)
 }
 
+func (s *UserService) GetProviderRating(userID int64) float64 {
+	if userID <= 0 {
+		return 4.5
+	}
+	return 4.5
+}
+
+func (s *UserService) GetProviderCompletionRate(userID int64) float64 {
+	if userID <= 0 {
+		return 1.0
+	}
+	return 1.0
+}
+
 func (s *UserService) GetMe(userID int64) (*MeSummary, error) {
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {

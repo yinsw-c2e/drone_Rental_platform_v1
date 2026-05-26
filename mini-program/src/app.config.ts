@@ -17,6 +17,7 @@ export default defineAppConfig({
     'pages/orders/detail/index',
     'pages/orders/anomaly-list/index',
     'pages/orders/contract/index',
+    'pages/orders/live/index',
     'pages/dispatch/list/index','pages/dispatch/detail/index','pages/dispatch/create/index',
     'pages/payment/index','pages/after-sale/index','pages/review/index',
     'pages/publish/demand/index','pages/publish/supply/index','pages/publish/cargo/index',
@@ -34,6 +35,7 @@ export default defineAppConfig({
     'pages/client/profile/index','pages/client/register/index',
     'pages/owner/bind-pilot/index','pages/pilot/bind-drone/index',
     'pages/address/index',
+    'pages/address/book/index',
     'pages/flight/trajectory/index',
     'pages/flight/multi-point/index',
     'pages/drone/add/index',
@@ -47,6 +49,12 @@ export default defineAppConfig({
     'pages/settlement/withdrawal-list/index',
   ],
   window: { backgroundTextStyle: 'light', navigationBarBackgroundColor: '#fff', navigationBarTitleText: '重载吊运', navigationBarTextStyle: 'black' },
+  permission: {
+    'scope.userLocation': {
+      desc: '上线接单时需要获取你的位置，向附近的客户展示',
+    },
+  },
+  requiredPrivateInfos: ['getLocation', 'chooseLocation'],
   tabBar: {
     custom: true,
     color: '#999999', selectedColor: '#1677ff', backgroundColor: '#ffffff', borderStyle: 'black',

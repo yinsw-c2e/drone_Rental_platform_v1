@@ -14,6 +14,15 @@ type OrderBroadcastRepo struct {
 	db *gorm.DB
 }
 
+type BroadcastStats struct {
+	TotalBroadcasts   int64   `json:"total_broadcasts"`
+	GrabbedCount      int64   `json:"grabbed_count"`
+	ExpiredCount      int64   `json:"expired_count"`
+	AutoAssignedCount int64   `json:"auto_assigned_count"`
+	AvgGrabSeconds    float64 `json:"avg_grab_seconds"`
+	UnmatchedRatePct  float64 `json:"unmatched_rate_pct"`
+}
+
 func NewOrderBroadcastRepo(db *gorm.DB) *OrderBroadcastRepo {
 	return &OrderBroadcastRepo{db: db}
 }
@@ -44,6 +53,17 @@ func (r *OrderBroadcastRepo) GetByOrderID(orderID int64) (*model.OrderBroadcast,
 	return &broadcast, nil
 }
 
+func (r *OrderBroadcastRepo) LockByOrderID(orderID int64) (*model.OrderBroadcast, error) {
+	var broadcast model.OrderBroadcast
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("order_id = ?", orderID).
+		First(&broadcast).Error
+	if err != nil {
+		return nil, err
+	}
+	return &broadcast, nil
+}
+
 func (r *OrderBroadcastRepo) LockByID(id int64) (*model.OrderBroadcast, error) {
 	var broadcast model.OrderBroadcast
 	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -61,6 +81,17 @@ func (r *OrderBroadcastRepo) ListOpen(now time.Time, limit int) ([]model.OrderBr
 	err := r.db.Preload("Order").
 		Where("status = ? AND expires_at > ?", "open", now).
 		Order("created_at ASC, id ASC").
+		Limit(limit).
+		Find(&items).Error
+	return items, err
+}
+
+func (r *OrderBroadcastRepo) ListAwaitingAutoAssign(now time.Time, attemptCutoff time.Time, limit int) ([]model.OrderBroadcast, error) {
+	var items []model.OrderBroadcast
+	limit = limits.NormalizeLimit(limit, 100, 500)
+	err := r.db.Preload("Order").
+		Where("status = ? AND expires_at > ? AND expires_at <= ?", "open", now, attemptCutoff).
+		Order("expires_at ASC, id ASC").
 		Limit(limit).
 		Find(&items).Error
 	return items, err
@@ -84,4 +115,55 @@ func (r *OrderBroadcastRepo) MarkExpired(now time.Time, limit int) (int64, error
 			"updated_at": now,
 		})
 	return result.RowsAffected, result.Error
+}
+
+func (r *OrderBroadcastRepo) StatsBetween(from, to time.Time) (*BroadcastStats, error) {
+	stats := &BroadcastStats{}
+	if r == nil || r.db == nil {
+		return stats, nil
+	}
+	var items []model.OrderBroadcast
+	if err := r.db.
+		Where("created_at >= ? AND created_at < ?", from, to).
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+
+	var grabSecondsTotal float64
+	var grabSecondsCount int64
+	for _, item := range items {
+		stats.TotalBroadcasts++
+		switch item.Status {
+		case "grabbed":
+			stats.GrabbedCount++
+			if item.GrabbedAt != nil {
+				grabSecondsTotal += item.GrabbedAt.Sub(item.CreatedAt).Seconds()
+				grabSecondsCount++
+			}
+		case "expired":
+			stats.ExpiredCount++
+		case "auto_assigning":
+			stats.AutoAssignedCount++
+		}
+	}
+	if grabSecondsCount > 0 {
+		stats.AvgGrabSeconds = grabSecondsTotal / float64(grabSecondsCount)
+	}
+	if stats.TotalBroadcasts > 0 {
+		stats.UnmatchedRatePct = float64(stats.ExpiredCount) / float64(stats.TotalBroadcasts) * 100
+	}
+	return stats, nil
+}
+
+func (r *OrderBroadcastRepo) ListRecent(limit int) ([]model.OrderBroadcast, error) {
+	var items []model.OrderBroadcast
+	if r == nil || r.db == nil {
+		return items, nil
+	}
+	limit = limits.NormalizeLimit(limit, 50, 200)
+	err := r.db.Preload("Order").
+		Order("created_at DESC, id DESC").
+		Limit(limit).
+		Find(&items).Error
+	return items, err
 }

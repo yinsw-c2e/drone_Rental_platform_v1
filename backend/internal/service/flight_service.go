@@ -17,6 +17,8 @@ import (
 	"wurenji-backend/internal/repository"
 )
 
+const defaultLiveCruiseSpeedKMH = 60.0
+
 // FlightService 飞行监控服务
 type FlightService struct {
 	flightRepo  *repository.FlightRepo
@@ -44,6 +46,26 @@ type FlightServiceConfig struct {
 	PositionReportInterval  int // 位置上报间隔(秒)
 	GeofenceAlertDistance   int // 围栏预警距离(米)
 	TrajectorySimpTolerance int // 轨迹简化容差(米)
+}
+
+type OrderLiveSnapshot struct {
+	ETASeconds   *int                  `json:"eta_seconds"`
+	ProgressPct  float64               `json:"progress_pct"`
+	LastPosition *LivePositionSnapshot `json:"last_position"`
+}
+
+type LivePositionSnapshot struct {
+	FlightRecordID *int64    `json:"flight_record_id,omitempty"`
+	Latitude       float64   `json:"latitude"`
+	Longitude      float64   `json:"longitude"`
+	Altitude       int       `json:"altitude"`
+	Speed          int       `json:"speed"`
+	Heading        int       `json:"heading"`
+	BatteryLevel   int       `json:"battery_level"`
+	SignalStrength int       `json:"signal_strength"`
+	RecordedAt     time.Time `json:"recorded_at"`
+	AgeSeconds     int       `json:"age_seconds"`
+	SignalWeak     bool      `json:"signal_weak"`
 }
 
 func NewFlightService(
@@ -1218,6 +1240,75 @@ func (s *FlightService) GetFlightStats(orderID int64) (map[string]interface{}, e
 	return s.flightRepo.GetFlightStats(orderID)
 }
 
+func (s *FlightService) GetOrderLive(order *model.Order) (*OrderLiveSnapshot, error) {
+	if order == nil || order.ID <= 0 {
+		return nil, errors.New("订单不能为空")
+	}
+	if s == nil || s.flightRepo == nil {
+		return nil, errors.New("飞行监控服务未初始化")
+	}
+
+	now := time.Now()
+	live := &OrderLiveSnapshot{}
+	if order.Status == "delivered" || order.Status == "completed" {
+		live.ProgressPct = 100
+		zero := 0
+		live.ETASeconds = &zero
+	}
+
+	position, err := s.flightRepo.GetLatestPosition(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if position != nil {
+		age := int(now.Sub(position.RecordedAt).Seconds())
+		if age < 0 {
+			age = 0
+		}
+		live.LastPosition = &LivePositionSnapshot{
+			FlightRecordID: position.FlightRecordID,
+			Latitude:       position.Latitude,
+			Longitude:      position.Longitude,
+			Altitude:       position.Altitude,
+			Speed:          position.Speed,
+			Heading:        position.Heading,
+			BatteryLevel:   position.BatteryLevel,
+			SignalStrength: position.SignalStrength,
+			RecordedAt:     position.RecordedAt,
+			AgeSeconds:     age,
+			SignalWeak:     age >= s.config.SignalLostTimeout || position.SignalStrength > 0 && position.SignalStrength < 30,
+		}
+	}
+
+	record, err := s.flightRepo.GetLatestFlightRecordByOrder(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	progress, remainingM, ok := s.estimateLiveProgress(order, position, record)
+	if ok {
+		live.ProgressPct = progress
+		if live.ETASeconds == nil {
+			speedMPS := s.resolveLiveSpeedMPS(order, position)
+			if speedMPS > 0 && remainingM >= 0 {
+				eta := int(math.Ceil(remainingM / speedMPS))
+				if eta < 0 {
+					eta = 0
+				}
+				live.ETASeconds = &eta
+			}
+		}
+	}
+	if live.ProgressPct < 0 {
+		live.ProgressPct = 0
+	}
+	if live.ProgressPct > 100 {
+		live.ProgressPct = 100
+	}
+	live.ProgressPct = math.Round(live.ProgressPct*10) / 10
+	return live, nil
+}
+
 func (s *FlightService) GetFlightRecordByID(flightID int64) (*model.FlightRecord, error) {
 	record, err := s.flightRepo.GetFlightRecordByID(flightID)
 	if err != nil {
@@ -1344,6 +1435,79 @@ func (s *FlightService) GetLatestPosition(orderID int64) (*model.FlightPosition,
 func (s *FlightService) GetPositionHistory(orderID int64, limit int) ([]model.FlightPosition, error) {
 	limit = limits.NormalizeLimit(limit, limits.DefaultPositionHistoryLimit, limits.MaxPositionHistoryLimit)
 	return s.flightRepo.GetPositionsByOrder(orderID, limit)
+}
+
+func (s *FlightService) estimateLiveProgress(order *model.Order, position *model.FlightPosition, record *model.FlightRecord) (progressPct float64, remainingM float64, ok bool) {
+	if order == nil {
+		return 0, 0, false
+	}
+	if order.Status == "delivered" || order.Status == "completed" {
+		return 100, 0, true
+	}
+
+	routeM := liveRouteDistanceM(order)
+	if routeM <= 0 {
+		if order.EstimatedDistanceM > 0 {
+			routeM = float64(order.EstimatedDistanceM)
+		}
+	}
+	if routeM <= 0 {
+		return 0, 0, false
+	}
+
+	if position != nil && hasOrderDestination(order) {
+		remainingM = haversineMeters(position.Latitude, position.Longitude, *order.DestLatitude, *order.DestLongitude)
+		progressPct = (1 - remainingM/routeM) * 100
+		return progressPct, math.Max(remainingM, 0), true
+	}
+
+	if record != nil && record.TotalDistanceM > 0 {
+		remainingM = math.Max(routeM-record.TotalDistanceM, 0)
+		progressPct = (record.TotalDistanceM / routeM) * 100
+		return progressPct, remainingM, true
+	}
+
+	if order.ActualFlightDistance > 0 {
+		actualM := float64(order.ActualFlightDistance)
+		remainingM = math.Max(routeM-actualM, 0)
+		progressPct = (actualM / routeM) * 100
+		return progressPct, remainingM, true
+	}
+
+	return 0, routeM, true
+}
+
+func (s *FlightService) resolveLiveSpeedMPS(order *model.Order, position *model.FlightPosition) float64 {
+	if position != nil && position.Speed > 0 {
+		return float64(position.Speed) / 100.0
+	}
+	speedKMH := defaultLiveCruiseSpeedKMH
+	if s != nil && s.flightRepo != nil && order != nil {
+		speedKMH = s.flightRepo.GetServiceClassCruiseSpeedKMH(order.ServiceClassCode, defaultLiveCruiseSpeedKMH)
+	}
+	return speedKMH * 1000 / 3600
+}
+
+func liveRouteDistanceM(order *model.Order) float64 {
+	if order == nil || !hasOrderOrigin(order) || !hasOrderDestination(order) {
+		return 0
+	}
+	return haversineMeters(order.ServiceLatitude, order.ServiceLongitude, *order.DestLatitude, *order.DestLongitude)
+}
+
+func hasOrderOrigin(order *model.Order) bool {
+	return order != nil && validLiveCoordinate(order.ServiceLatitude, order.ServiceLongitude)
+}
+
+func hasOrderDestination(order *model.Order) bool {
+	return order != nil && order.DestLatitude != nil && order.DestLongitude != nil && validLiveCoordinate(*order.DestLatitude, *order.DestLongitude)
+}
+
+func validLiveCoordinate(lat, lng float64) bool {
+	if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+		return false
+	}
+	return lat != 0 || lng != 0
 }
 
 // ==================== 辅助函数 ====================

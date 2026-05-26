@@ -1,10 +1,10 @@
 package service
 
 import (
-	"wurenji-backend/internal/model"
-	"wurenji-backend/internal/repository"
 	"errors"
 	"time"
+	"wurenji-backend/internal/model"
+	"wurenji-backend/internal/repository"
 )
 
 type CreditService struct {
@@ -60,9 +60,9 @@ func (s *CreditService) InitializePilotCredit(userID int64, hasLicense bool, isV
 	}
 
 	score.PilotQualification = qualificationScore
-	score.PilotService = 150    // 服务质量初始分(满分300)
-	score.PilotSafety = 200     // 安全记录初始分(满分300)
-	score.PilotActivity = 50    // 活跃度初始分(满分200)
+	score.PilotService = 150 // 服务质量初始分(满分300)
+	score.PilotSafety = 200  // 安全记录初始分(满分300)
+	score.PilotActivity = 50 // 活跃度初始分(满分200)
 
 	score.TotalScore = qualificationScore + score.PilotService + score.PilotSafety + score.PilotActivity
 	score.ScoreLevel = s.CalculateScoreLevel(score.TotalScore)
@@ -219,6 +219,44 @@ func (s *CreditService) UpdateCreditAfterOrder(userID int64, rating float64, isC
 		ScoreAfter:   score.TotalScore,
 		ScoreChange:  scoreChange,
 		OperatorType: "system",
+	})
+}
+
+// RecordProviderCancellation 记录服务商主动取消履约的信用扣减。
+func (s *CreditService) RecordProviderCancellation(userID, orderID int64) error {
+	if s == nil || s.creditRepo == nil || userID <= 0 {
+		return nil
+	}
+	score, err := s.creditRepo.GetOrCreateCreditScore(userID, "owner")
+	if err != nil {
+		return err
+	}
+
+	before := score.TotalScore
+	score.CancelledOrders++
+	if score.OwnerService == 0 && score.OwnerFulfillment == 0 && score.OwnerAttitude == 0 {
+		score.OwnerService = 150
+		score.OwnerFulfillment = 150
+		score.OwnerAttitude = 100
+	}
+	score.OwnerService = max(0, score.OwnerService-10)
+	score.OwnerFulfillment = max(0, score.OwnerFulfillment-15)
+	s.recalculateTotalScore(score)
+	now := time.Now()
+	score.LastCalculatedAt = &now
+	if err := s.creditRepo.UpdateCreditScore(score); err != nil {
+		return err
+	}
+	return s.creditRepo.CreateCreditScoreLog(&model.CreditScoreLog{
+		UserID:         userID,
+		ChangeType:     "provider_cancel",
+		ChangeReason:   "服务商取消履约",
+		Dimension:      "fulfillment",
+		ScoreBefore:    before,
+		ScoreAfter:     score.TotalScore,
+		ScoreChange:    score.TotalScore - before,
+		RelatedOrderID: orderID,
+		OperatorType:   "system",
 	})
 }
 

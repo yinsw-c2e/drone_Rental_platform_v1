@@ -1595,3 +1595,34 @@ mindmap
 `这套文档已经可以作为整个平台正式重构的业务真相源和实施基线。`
 
 后续工作的重点，不再是继续抽象业务模型，而是严格按照这套模型进入实现、迁移、校验和切流。
+
+## 14. 即时单链路（H 阶段重构后）
+
+> H10 原计划要求在附录补“§11 即时单链路”。本文档已有 §11-§13，因此本附录顺延为 §14，内容仍对应 H 阶段货拉拉式重构后的主链路。
+
+### 14.1 主流程
+
+1. 货主输入起点、终点、重量、机型档。
+2. 平台调用 `PricingService` 计算预估价。
+3. 货主一键下单，写入 `orders.order_mode = instant`。
+4. 系统写入 `order_broadcasts`，状态为 `open`，默认 TTL 为 120 秒。
+5. 在线服务商按位置、半径、机型档过滤后拉到广播订单。
+6. 服务商抢单，后端用数据库行锁兜底并推进 `orders.status = assigned`。
+7. 90 秒无人抢单时，`AttemptAutoAssign` 按距离、评分、完单率选择最优服务商主动指派。
+8. 服务商推进履约状态：`preparing -> in_transit -> delivered -> completed`。
+9. 结算进入平台规则，T+3 后按结算单入账。
+
+### 14.2 与议价单的区别
+
+- 议价单使用 `order_mode = negotiated`，依赖服务商报价，保留给非标、复杂和长时段场景。
+- 即时单与预约单使用 `order_mode = instant/reservation`，由平台自动算价，是货主端默认主路径。
+
+### 14.3 关键金融边界
+
+- `orders.total_amount` 是创建订单时的金额快照，后续不回写。
+- `orders.price_breakdown_json` 是创建订单时的计价快照，后续不回写。
+- 行程后的差额结算写入 `settlements` 表的实际距离费、实际时长费等字段。
+- 加价和小费写入 `settlements` 表的 `surcharge_amount`、`tip_amount` 等调整字段。
+- H9 后台改价只影响新订单；在途订单继续使用订单上的计价快照。
+
+关联任务书：[`docs/planning/HUOLALA_STYLE_REFACTOR_TASKBOOK.md`](../planning/HUOLALA_STYLE_REFACTOR_TASKBOOK.md)

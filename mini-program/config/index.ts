@@ -27,6 +27,7 @@ export default defineConfig({
   ],
   defineConstants: {
     __API_BASE__: JSON.stringify(apiBase),
+    __PRESENCE_DEBUG__: JSON.stringify(!isProductionBuild),
   },
   copy: {
     patterns: [

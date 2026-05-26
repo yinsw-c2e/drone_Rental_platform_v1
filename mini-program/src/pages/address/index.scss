@@ -1,3 +1,30 @@
 .address-picker-wrap {
   width: 100%;
 }
+
+.address-tabs {
+  display: flex;
+  align-items: center;
+  margin: 0 16px 10px;
+  padding: 3px;
+  border-radius: 8px;
+  background: #edf2f8;
+}
+
+.address-tab {
+  flex: 1;
+  height: 34px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.address-tab.is-active {
+  background: #fff;
+  color: #005bea;
+  box-shadow: 0 4px 12px rgba(11, 24, 54, 0.08);
+}

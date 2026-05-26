@@ -58,6 +58,13 @@ func NewSettlementRepo(db *gorm.DB) *SettlementRepo {
 	return &SettlementRepo{db: db}
 }
 
+func (r *SettlementRepo) DB() *gorm.DB {
+	if r == nil {
+		return nil
+	}
+	return r.db
+}
+
 func (r *SettlementRepo) Transaction(fn func(*SettlementRepo) error) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		return fn(NewSettlementRepo(tx))
@@ -79,6 +86,14 @@ func (r *SettlementRepo) GetSettlement(id int64) (*model.OrderSettlement, error)
 func (r *SettlementRepo) GetSettlementByOrder(orderID int64) (*model.OrderSettlement, error) {
 	var s model.OrderSettlement
 	err := r.db.Where("order_id = ?", orderID).First(&s).Error
+	return &s, err
+}
+
+func (r *SettlementRepo) LockSettlementByOrder(orderID int64) (*model.OrderSettlement, error) {
+	var s model.OrderSettlement
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("order_id = ?", orderID).
+		First(&s).Error
 	return &s, err
 }
 
@@ -195,6 +210,19 @@ func (r *SettlementRepo) SettledSettlementStats(startAt, endAt time.Time) (Settl
 	return stats, err
 }
 
+func (r *SettlementRepo) SumPendingForUser(userID int64) (int64, error) {
+	if r == nil || r.db == nil || userID <= 0 {
+		return 0, nil
+	}
+	var total int64
+	err := r.db.Model(&model.OrderSettlement{}).
+		Where("(pilot_user_id = ? OR owner_user_id = ? OR partial_handover_provider_user_id = ?)", userID, userID, userID).
+		Where("status IN ?", []string{"pending", "calculated", "pending_review"}).
+		Select("COALESCE(SUM(pilot_fee + owner_fee), 0)").
+		Scan(&total).Error
+	return total, err
+}
+
 // ========== UserWallet ==========
 
 func (r *SettlementRepo) GetOrCreateWallet(userID int64, walletType string) (*model.UserWallet, error) {
@@ -227,53 +255,62 @@ func (r *SettlementRepo) UpdateWallet(w *model.UserWallet) error {
 // AddWalletIncome 增加钱包收入(事务安全)
 func (r *SettlementRepo) AddWalletIncome(userID int64, amount int64, orderID, settlementID int64, description string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		var existing model.WalletTransaction
-		err := tx.Where(
-			"user_id = ? AND related_settlement_id = ? AND type = ? AND description = ?",
-			userID,
-			settlementID,
-			"income",
-			description,
-		).First(&existing).Error
-		if err == nil {
-			if existing.Amount != amount || existing.RelatedOrderID != orderID {
-				return fmt.Errorf("已存在结算入账流水但金额或订单不一致: settlement_id=%d user_id=%d", settlementID, userID)
-			}
-			return nil
-		}
-		if err != gorm.ErrRecordNotFound {
-			return err
-		}
-
-		wallet, err := r.getOrCreateWalletTx(tx, userID, "general")
-		if err != nil {
-			return err
-		}
-		if wallet.Status != "active" {
-			return fmt.Errorf("钱包状态异常: %s", wallet.Status)
-		}
-
-		balanceBefore := wallet.AvailableBalance
-		wallet.AvailableBalance += amount
-		wallet.TotalIncome += amount
-		if err := tx.Save(wallet).Error; err != nil {
-			return err
-		}
-
-		txRecord := &model.WalletTransaction{
-			TransactionNo:       generateTransactionNo(),
-			WalletID:            wallet.ID,
-			UserID:              userID,
-			Type:                "income",
-			Amount:              amount,
-			BalanceBefore:       balanceBefore,
-			BalanceAfter:        wallet.AvailableBalance,
-			RelatedOrderID:      orderID,
-			RelatedSettlementID: settlementID,
-			Description:         description,
-		}
-		return tx.Create(txRecord).Error
+		return r.addWalletIncomeTx(tx, userID, amount, orderID, settlementID, description)
 	})
+}
+
+// AddWalletIncomeInCurrentTx 增加钱包收入，调用方负责外层事务。
+func (r *SettlementRepo) AddWalletIncomeInCurrentTx(userID int64, amount int64, orderID, settlementID int64, description string) error {
+	return r.addWalletIncomeTx(r.db, userID, amount, orderID, settlementID, description)
+}
+
+func (r *SettlementRepo) addWalletIncomeTx(tx *gorm.DB, userID int64, amount int64, orderID, settlementID int64, description string) error {
+	var existing model.WalletTransaction
+	err := tx.Where(
+		"user_id = ? AND related_settlement_id = ? AND type = ? AND description = ?",
+		userID,
+		settlementID,
+		"income",
+		description,
+	).First(&existing).Error
+	if err == nil {
+		if existing.Amount != amount || existing.RelatedOrderID != orderID {
+			return fmt.Errorf("已存在结算入账流水但金额或订单不一致: settlement_id=%d user_id=%d", settlementID, userID)
+		}
+		return nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	wallet, err := r.getOrCreateWalletTx(tx, userID, "general")
+	if err != nil {
+		return err
+	}
+	if wallet.Status != "active" {
+		return fmt.Errorf("钱包状态异常: %s", wallet.Status)
+	}
+
+	balanceBefore := wallet.AvailableBalance
+	wallet.AvailableBalance += amount
+	wallet.TotalIncome += amount
+	if err := tx.Save(wallet).Error; err != nil {
+		return err
+	}
+
+	txRecord := &model.WalletTransaction{
+		TransactionNo:       generateTransactionNo(),
+		WalletID:            wallet.ID,
+		UserID:              userID,
+		Type:                "income",
+		Amount:              amount,
+		BalanceBefore:       balanceBefore,
+		BalanceAfter:        wallet.AvailableBalance,
+		RelatedOrderID:      orderID,
+		RelatedSettlementID: settlementID,
+		Description:         description,
+	}
+	return tx.Create(txRecord).Error
 }
 
 // FreezeWalletBalance 冻结余额(用于提现)

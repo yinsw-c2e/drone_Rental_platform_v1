@@ -7,6 +7,7 @@ import (
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/response"
+	"wurenji-backend/internal/repository"
 	"wurenji-backend/internal/service"
 )
 
@@ -27,6 +28,9 @@ type Handler struct {
 	insuranceService  *service.InsuranceService
 	reviewService     *service.ReviewService
 	contractService   *service.ContractService
+	serviceClassRepo  *repository.ServiceClassRepo
+	broadcastRepo     *repository.OrderBroadcastRepo
+	systemConfigSvc   *service.SystemConfigService
 }
 
 func NewHandler(
@@ -65,6 +69,15 @@ func NewHandler(
 		reviewService:     reviewService,
 		contractService:   contractService,
 	}
+}
+
+func (h *Handler) SetH9Dependencies(serviceClassRepo *repository.ServiceClassRepo, broadcastRepo *repository.OrderBroadcastRepo, systemConfigSvc *service.SystemConfigService) {
+	if h == nil {
+		return
+	}
+	h.serviceClassRepo = serviceClassRepo
+	h.broadcastRepo = broadcastRepo
+	h.systemConfigSvc = systemConfigSvc
 }
 
 func (h *Handler) Dashboard(c *gin.Context) {

@@ -2,10 +2,20 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { addressHistoryService } from '../../services/addressHistory';
+import { addressService } from '../../services/address';
 import { locationService } from '../../services/location';
 import { store } from '../../store/store';
 import { AddressData } from '../../types';
 import './index.scss';
+
+type AddressTab = 'cloud' | 'recent';
+
+const normalizeAddressResponse = (response: unknown): AddressData[] => {
+  const data = response as any;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+};
 
 export default function AddressPickerPage() {
   const [savedAddresses, setSavedAddresses] = useState<AddressData[]>([]);
@@ -13,6 +23,7 @@ export default function AddressPickerPage() {
   const [loadingSaved, setLoadingSaved] = useState(true);
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [locating, setLocating] = useState(false);
+  const [activeTab, setActiveTab] = useState<AddressTab>('cloud');
 
   const fetchSavedAddresses = async () => {
     if (!store.getState().auth.isAuthenticated) {
@@ -22,8 +33,8 @@ export default function AddressPickerPage() {
     }
     setLoadingSaved(true);
     try {
-      const res = await locationService.getAddressList();
-      setSavedAddresses((res as any).data || []);
+      const res = await addressService.list();
+      setSavedAddresses(normalizeAddressResponse(res));
     } catch {
       setSavedAddresses([]);
     } finally {
@@ -111,7 +122,7 @@ export default function AddressPickerPage() {
     const res = await Taro.showModal({ title: '删除地址', content: '确定删除该常用地址吗？' });
     if (res.confirm) {
       try {
-        await locationService.deleteAddress(id);
+        await addressService.remove(id);
         setSavedAddresses(prev => prev.filter(a => a.id !== id));
       } catch (e: any) {
         Taro.showToast({ title: '删除失败', icon: 'none' });
@@ -149,8 +160,17 @@ export default function AddressPickerPage() {
         </View>
       </View>
 
-      {/* ── 最近搜索区 ── */}
-      <View className="saved-section" style={{ backgroundColor: '#fff', marginBottom: '10px' }}>
+      <View className="address-tabs">
+        <View className={`address-tab ${activeTab === 'cloud' ? 'is-active' : ''}`} onClick={() => setActiveTab('cloud')}>
+          <Text>云端地址簿</Text>
+        </View>
+        <View className={`address-tab ${activeTab === 'recent' ? 'is-active' : ''}`} onClick={() => setActiveTab('recent')}>
+          <Text>最近使用</Text>
+        </View>
+      </View>
+
+      {activeTab === 'recent' ? (
+        <View className="saved-section" style={{ backgroundColor: '#fff' }}>
         <View className="section-header" style={{ padding: '12px 16px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E5E7EB' }}>
           <Text style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>最近搜索</Text>
           {recentAddresses.length > 0 && (
@@ -182,12 +202,14 @@ export default function AddressPickerPage() {
             </View>
           ))
         )}
-      </View>
-
-      {/* ── 常用地址区 ── */}
-      <View className="saved-section" style={{ backgroundColor: '#fff' }}>
+        </View>
+      ) : (
+        <View className="saved-section" style={{ backgroundColor: '#fff' }}>
         <View className="section-header" style={{ padding: '12px 16px', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #E5E7EB' }}>
           <Text style={{ fontSize: '14px', color: '#6B7280', fontWeight: '500' }}>常用地址</Text>
+          <View onClick={() => Taro.navigateTo({ url: '/pages/address/book/index' })}>
+            <Text style={{ fontSize: '13px', color: '#1677FF', fontWeight: '500' }}>管理云端地址</Text>
+          </View>
         </View>
 
         {loadingSaved ? (
@@ -217,12 +239,13 @@ export default function AddressPickerPage() {
                 <Text style={{ fontSize: '13px', color: '#6B7280', marginTop: '3px' }} numberOfLines={1}>{item.address}</Text>
               </View>
               <View onClick={(e) => { e.stopPropagation(); item.id && handleDeleteAddress(item.id); }} style={{ paddingLeft: '12px' }}>
-                <Text style={{ fontSize: '14px', color: '#D1D5DB' }}>✕</Text>
+                <Text style={{ fontSize: '14px', color: '#D1D5DB' }}>删除</Text>
               </View>
             </View>
           ))
         )}
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 }

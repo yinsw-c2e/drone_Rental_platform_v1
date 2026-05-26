@@ -178,3 +178,127 @@ func TestCurvedFlightCoordinateCreatesLoopForSamePoint(t *testing.T) {
 		t.Fatalf("expected midpoint to move away from origin, got (%f,%f)", latMid, lngMid)
 	}
 }
+
+func TestOrderLiveUsesCruiseSpeedFallbackWhenTelemetrySpeedMissing(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.FlightRecord{},
+		&model.FlightPosition{},
+	)
+
+	destLat, destLng := 23.000000, 113.100000
+	order := &model.Order{
+		OrderNo:          "WRJ-LIVE-001",
+		ServiceClassCode: "light_heavy",
+		ClientUserID:     11,
+		ProviderUserID:   31,
+		ServiceLatitude:  23.000000,
+		ServiceLongitude: 113.000000,
+		DestLatitude:     &destLat,
+		DestLongitude:    &destLng,
+		Status:           "in_transit",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if err := db.Create(&model.FlightPosition{
+		OrderID:        order.ID,
+		Latitude:       23.000000,
+		Longitude:      113.050000,
+		SignalStrength: 80,
+		RecordedAt:     time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("create position: %v", err)
+	}
+
+	flightSvc := NewFlightService(repository.NewFlightRepo(db), repository.NewOrderRepo(db), nil, nil)
+	live, err := flightSvc.GetOrderLive(order)
+	if err != nil {
+		t.Fatalf("get live: %v", err)
+	}
+	if live.LastPosition == nil {
+		t.Fatalf("expected last position")
+	}
+	if live.ETASeconds == nil {
+		t.Fatalf("expected ETA from fallback cruise speed")
+	}
+	if *live.ETASeconds < 250 || *live.ETASeconds > 380 {
+		t.Fatalf("expected fallback ETA around 5km/60kmh, got %d", *live.ETASeconds)
+	}
+	if live.ProgressPct < 45 || live.ProgressPct > 55 {
+		t.Fatalf("expected about halfway progress, got %.1f", live.ProgressPct)
+	}
+}
+
+func TestOrderLiveUsesTelemetrySpeedForETA(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.FlightRecord{},
+		&model.FlightPosition{},
+	)
+
+	destLat, destLng := 23.000000, 113.020000
+	order := &model.Order{
+		OrderNo:          "WRJ-LIVE-002",
+		ServiceClassCode: "light_heavy",
+		ClientUserID:     11,
+		ProviderUserID:   31,
+		ServiceLatitude:  23.000000,
+		ServiceLongitude: 113.000000,
+		DestLatitude:     &destLat,
+		DestLongitude:    &destLng,
+		Status:           "in_transit",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if err := db.Create(&model.FlightPosition{
+		OrderID:        order.ID,
+		Latitude:       23.000000,
+		Longitude:      113.010000,
+		Speed:          1000,
+		SignalStrength: 90,
+		RecordedAt:     time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("create position: %v", err)
+	}
+
+	flightSvc := NewFlightService(repository.NewFlightRepo(db), repository.NewOrderRepo(db), nil, nil)
+	live, err := flightSvc.GetOrderLive(order)
+	if err != nil {
+		t.Fatalf("get live: %v", err)
+	}
+	if live.ETASeconds == nil {
+		t.Fatalf("expected ETA from telemetry speed")
+	}
+	if *live.ETASeconds < 80 || *live.ETASeconds > 130 {
+		t.Fatalf("expected telemetry ETA around 1km/10mps, got %d", *live.ETASeconds)
+	}
+}
+
+func TestOrderLiveCompletedOrderReturnsTerminalProgress(t *testing.T) {
+	db := newServiceTestDB(t, &model.Order{}, &model.FlightRecord{}, &model.FlightPosition{})
+	order := &model.Order{
+		OrderNo:        "WRJ-LIVE-003",
+		ClientUserID:   11,
+		ProviderUserID: 31,
+		Status:         "completed",
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	flightSvc := NewFlightService(repository.NewFlightRepo(db), repository.NewOrderRepo(db), nil, nil)
+	live, err := flightSvc.GetOrderLive(order)
+	if err != nil {
+		t.Fatalf("get live: %v", err)
+	}
+	if live.ETASeconds == nil || *live.ETASeconds != 0 {
+		t.Fatalf("expected completed ETA=0, got %#v", live.ETASeconds)
+	}
+	if live.ProgressPct != 100 {
+		t.Fatalf("expected completed progress 100, got %.1f", live.ProgressPct)
+	}
+}

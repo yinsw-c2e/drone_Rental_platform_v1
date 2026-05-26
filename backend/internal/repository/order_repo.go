@@ -47,6 +47,20 @@ func (r *OrderRepo) Create(order *model.Order) error {
 	return tx.Create(order).Error
 }
 
+// CreateOmit creates an order while skipping selected columns so the database can
+// apply NULL/default values. This is used for platform-priced orders before a
+// concrete drone/pilot/owner has been assigned.
+func (r *OrderRepo) CreateOmit(order *model.Order, columns ...string) error {
+	if order == nil {
+		return nil
+	}
+	tx := omitUnsupportedOrderOptionalColumns(r.db)
+	if len(columns) > 0 {
+		tx = tx.Omit(columns...)
+	}
+	return tx.Create(order).Error
+}
+
 func (r *OrderRepo) GetByID(id int64) (*model.Order, error) {
 	var order model.Order
 	err := r.db.Preload("Demand").Preload("Drone").Preload("Owner").Preload("Pilot").Preload("Renter").
@@ -100,6 +114,31 @@ func (r *OrderRepo) UpdateFields(id int64, fields map[string]interface{}) error 
 
 func (r *OrderRepo) UpdateStatus(id int64, status string) error {
 	return r.db.Model(&model.Order{}).Where("id = ?", id).Update("status", status).Error
+}
+
+// CountTodayProviderOrders returns today's completed/delivered order count and income in cents.
+func (r *OrderRepo) CountTodayProviderOrders(providerUserID int64, since time.Time) (int, int64, error) {
+	var row struct {
+		Count       int64
+		TotalAmount int64
+	}
+	err := r.db.Model(&model.Order{}).
+		Select("COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS total_amount").
+		Where("provider_user_id = ? AND status IN ?", providerUserID, []string{"completed", "delivered"}).
+		Where("completed_at IS NOT NULL AND completed_at >= ?", since).
+		Scan(&row).Error
+	if err != nil {
+		return 0, 0, err
+	}
+	return int(row.Count), row.TotalAmount, nil
+}
+
+func (r *OrderRepo) CountCompletedProviderOrders(providerUserID int64) (int, error) {
+	var count int64
+	err := r.db.Model(&model.Order{}).
+		Where("provider_user_id = ? AND status = ?", providerUserID, "completed").
+		Count(&count).Error
+	return int(count), err
 }
 
 func (r *OrderRepo) UpdateStatusWithFields(orderID int64, pilotID int64, status string, extra map[string]interface{}) error {
@@ -171,26 +210,28 @@ func normalizeOrderNullableFields(fields map[string]interface{}) map[string]inte
 	if len(fields) == 0 {
 		return fields
 	}
-	if raw, ok := fields["pilot_id"]; ok {
-		switch v := raw.(type) {
-		case int:
-			if v == 0 {
-				fields["pilot_id"] = nil
+	for _, key := range []string{"drone_id", "pilot_id", "owner_id"} {
+		if raw, ok := fields[key]; ok {
+			switch v := raw.(type) {
+			case int:
+				if v == 0 {
+					fields[key] = nil
+				}
+			case int64:
+				if v == 0 {
+					fields[key] = nil
+				}
+			case uint:
+				if v == 0 {
+					fields[key] = nil
+				}
+			case uint64:
+				if v == 0 {
+					fields[key] = nil
+				}
+			case nil:
+				fields[key] = nil
 			}
-		case int64:
-			if v == 0 {
-				fields["pilot_id"] = nil
-			}
-		case uint:
-			if v == 0 {
-				fields["pilot_id"] = nil
-			}
-		case uint64:
-			if v == 0 {
-				fields["pilot_id"] = nil
-			}
-		case nil:
-			fields["pilot_id"] = nil
 		}
 	}
 	return fields
@@ -326,7 +367,44 @@ func (r *OrderRepo) ListByUser(userID int64, role string, status string, page, p
 	err := query.Preload("Demand").Preload("Drone").Preload("Owner").Preload("Pilot").Preload("Renter").
 		Offset((page - 1) * pageSize).Limit(pageSize).
 		Order("created_at DESC").Find(&orders).Error
+	if err == nil && role == "client" && len(orders) > 0 {
+		err = r.populateReviewedByUser(orders, userID)
+	}
 	return orders, total, err
+}
+
+func (r *OrderRepo) populateReviewedByUser(orders []model.Order, reviewerID int64) error {
+	if reviewerID <= 0 || len(orders) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(orders))
+	for i := range orders {
+		if orders[i].ID > 0 {
+			ids = append(ids, orders[i].ID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	var rows []struct {
+		OrderID int64
+	}
+	if err := r.db.Model(&model.Review{}).
+		Select("order_id").
+		Where("reviewer_id = ? AND order_id IN ?", reviewerID, ids).
+		Group("order_id").
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	reviewed := make(map[int64]bool, len(rows))
+	for _, row := range rows {
+		reviewed[row.OrderID] = true
+	}
+	for i := range orders {
+		orders[i].Reviewed = reviewed[orders[i].ID]
+	}
+	return nil
 }
 
 func (r *OrderRepo) ListDueReservationOrders(cutoff time.Time, limit int) ([]model.Order, error) {

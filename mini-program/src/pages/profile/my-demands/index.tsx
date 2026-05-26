@@ -117,7 +117,7 @@ export default function MyDemandsPage() {
                   <View className="md-stat-divider" />
                   <View className="md-stat-col">
                     <Text className="md-stat-num md-stat-num-orange">{d.candidate_pilot_count || 0}</Text>
-                    <Text className="md-stat-label">候选服务商</Text>
+                    <Text className="md-stat-label">已报名服务商</Text>
                   </View>
                   <View className="md-stat-divider" />
                   <View className="md-stat-col">

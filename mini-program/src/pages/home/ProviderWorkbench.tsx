@@ -4,12 +4,25 @@ import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { homeService } from '../../services/home';
 import { ownerService } from '../../services/owner';
+import { orderV2Service } from '../../services/orderV2';
+import { providerService } from '../../services/provider';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { formatAmountYuan } from '../../utils';
 import { canUseProviderWorkbench, getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
+import { useProviderPresence } from '../../hooks/useProviderPresence';
 import { RootState, useAppDispatch } from '../../store/store';
 import { setHaulRoleMode } from '../../store/slices/roleSlice';
-import { HomeDashboard, OwnerWorkbenchOrderItem, OwnerWorkbenchView } from '../../types';
+import { presenceConfigUpdated } from '../../store/slices/providerPresenceSlice';
+import {
+  HomeDashboard,
+  OwnerWorkbenchOrderItem,
+  OwnerWorkbenchView,
+  V2ProviderAssignmentView,
+  V2ProviderBroadcastOrderSummary,
+  V2ProviderBroadcastView,
+  V2ProviderStats,
+  V2ServiceClass,
+} from '../../types';
 import logoProvider from '../../assets/haul/provider-workbench/logo_provider_anyi_round_drone.png';
 import metricPendingIcon from '../../assets/haul/provider-workbench/icon_metric_pending_today_blue.png';
 import metricQuoteIcon from '../../assets/haul/provider-workbench/icon_metric_quote_orange.png';
@@ -57,6 +70,69 @@ type TodoItem = {
 const formatMoney = (amount: number) =>
   amount.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
 
+const PROVIDER_RADIUS_OPTIONS = [5, 10, 20, 30];
+
+const normalizeServiceClasses = (items: unknown): V2ServiceClass[] =>
+  Array.isArray(items) ? items.filter((item): item is V2ServiceClass => Boolean(item && (item as V2ServiceClass).code)) : [];
+
+const normalizeProviderItems = <T,>(res: unknown): T[] => {
+  const value = res as { items?: T[]; data?: { items?: T[] } } | null;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.data?.items)) return value.data.items;
+  return [];
+};
+
+const formatCompletionRate = (rate?: number) => {
+  const normalized = Number.isFinite(Number(rate)) ? Number(rate) : 1;
+  return `${Math.round(Math.max(0, Math.min(1, normalized)) * 100)}%`;
+};
+
+const formatBroadcastDistance = (km?: number | null) => {
+  const value = Number(km || 0);
+  if (!Number.isFinite(value) || value < 0) return '距你 --';
+  if (value < 0.05) return '距你 <0.1km';
+  return `距你 ${value.toFixed(value >= 10 ? 0 : 1)}km`;
+};
+
+const formatRouteDistance = (meters?: number | null) => {
+  const value = Number(meters || 0);
+  if (!Number.isFinite(value) || value <= 0) return '距离 --';
+  return `距离 ${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}km`;
+};
+
+const formatDuration = (minutes?: number | null) => {
+  const value = Number(minutes || 0);
+  if (!Number.isFinite(value) || value <= 0) return '时长 --';
+  return `约 ${Math.round(value)}分钟`;
+};
+
+const formatWeight = (kg?: number | null) => {
+  const value = Number(kg || 0);
+  if (!Number.isFinite(value) || value <= 0) return '--kg';
+  return `${Math.round(value)}kg`;
+};
+
+const getRemainingSeconds = (deadline?: string | null, fallback?: number | null) => {
+  const deadlineMs = deadline ? Date.parse(deadline) : NaN;
+  if (Number.isFinite(deadlineMs)) {
+    return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+  }
+  return Math.max(0, Math.ceil(Number(fallback || 0)));
+};
+
+const getBroadcastAmount = (item: V2ProviderBroadcastView | V2ProviderAssignmentView) => {
+  const broadcastAmount = 'estimated_total_cents' in item ? item.estimated_total_cents : item.broadcast?.estimated_total_cents;
+  return Number(broadcastAmount || item.order?.total_amount || 0);
+};
+
+const getOrderFromBroadcast = (item: V2ProviderBroadcastView | V2ProviderAssignmentView): V2ProviderBroadcastOrderSummary | null =>
+  item.order || null;
+
+const getOrderIdFromPayload = (payload: unknown, fallback: number) => {
+  const value = payload as { order?: { id?: number }; data?: { order?: { id?: number } } } | null;
+  return Number(value?.order?.id || value?.data?.order?.id || fallback || 0);
+};
+
 const firstFulfillmentOrderOf = (workbench?: OwnerWorkbenchView | null): OwnerWorkbenchOrderItem | null =>
   workbench?.pending_provider_confirmation_orders?.[0] ||
   workbench?.pending_dispatch_orders?.[0] ||
@@ -73,6 +149,251 @@ function safeNavigateTo(url: string) {
   });
 }
 
+function NearbyBroadcasts({ onGrabbed }: { onGrabbed?: (orderId: number) => void }) {
+  const [items, setItems] = useState<V2ProviderBroadcastView[]>([]);
+  const [tick, setTick] = useState(0);
+  const [grabbingId, setGrabbingId] = useState<number | null>(null);
+
+  const pullBroadcasts = useCallback(async () => {
+    try {
+      const res = await providerService.listBroadcasts(20);
+      setItems(normalizeProviderItems<V2ProviderBroadcastView>(res));
+    } catch {
+      // 网络抖动不打扰服务商，下一轮轮询自动恢复。
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const res = await providerService.listBroadcasts(20);
+        if (!cancelled) {
+          setItems(normalizeProviderItems<V2ProviderBroadcastView>(res));
+        }
+      } catch {
+        // 静默重试。
+      }
+    };
+    pull();
+    const timer = setInterval(pull, 5_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick(value => value + 1), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    void tick;
+    return items
+      .filter(item => getRemainingSeconds(item.expires_at, item.remaining_seconds) > 0)
+      .slice(0, 3);
+  }, [items, tick]);
+
+  const grab = useCallback(async (broadcast: V2ProviderBroadcastView) => {
+    if (grabbingId) return;
+    setGrabbingId(broadcast.id);
+    try {
+      const res = await providerService.grabBroadcast(broadcast.id);
+      const orderId = getOrderIdFromPayload(res, broadcast.order_id);
+      Taro.showToast({ title: '抢单成功', icon: 'success' });
+      if (orderId > 0) {
+        onGrabbed?.(orderId);
+      }
+    } catch (error: any) {
+      if (error?.statusCode === 409 || error?.errno === 409) {
+        Taro.showToast({ title: '已被其他服务商抢走', icon: 'none' });
+        pullBroadcasts();
+      } else {
+        Taro.showToast({ title: String(error?.message || '抢单失败'), icon: 'none' });
+      }
+    } finally {
+      setGrabbingId(null);
+    }
+  }, [grabbingId, onGrabbed, pullBroadcasts]);
+
+  return (
+    <View className="nearby-broadcast-section">
+      <View className="nearby-broadcast-header">
+        <Text className="nearby-broadcast-title">附近订单</Text>
+        <Text className="nearby-broadcast-subtitle">在线后自动刷新</Text>
+      </View>
+      {visibleItems.length > 0 ? (
+        <View className="nearby-broadcast-list">
+          {visibleItems.map((item) => {
+            const order = getOrderFromBroadcast(item);
+            const remaining = getRemainingSeconds(item.expires_at, item.remaining_seconds);
+            const isGrabbing = grabbingId === item.id;
+            return (
+              <View className="nearby-broadcast-item" key={item.id}>
+                <View className="nearby-broadcast-item-head">
+                  <Text className="nearby-broadcast-distance">{formatBroadcastDistance(item.distance_km)}</Text>
+                  <Text className="nearby-broadcast-countdown">剩 {remaining}s</Text>
+                </View>
+                <View className="nearby-broadcast-route">
+                  <Text className="nearby-route-start">{order?.service_address || '起点待确认'}</Text>
+                  <Text className="nearby-route-arrow">→</Text>
+                  <Text className="nearby-route-end">{order?.dest_address || '终点待确认'}</Text>
+                </View>
+                <View className="nearby-broadcast-meta">
+                  <Text>{formatWeight(order?.cargo_weight_kg || item.weight_kg)}</Text>
+                  <Text>{formatDuration(order?.estimated_duration_min)}</Text>
+                  <Text>{formatRouteDistance(order?.estimated_distance_m)}</Text>
+                </View>
+                <View className="nearby-broadcast-footer">
+                  <Text className="nearby-broadcast-price">{formatAmountYuan(getBroadcastAmount(item))}</Text>
+                  <View
+                    className={`nearby-broadcast-grab ${isGrabbing ? 'is-loading' : ''}`}
+                    onClick={() => {
+                      if (!isGrabbing) {
+                        grab(item);
+                      }
+                    }}
+                  >
+                    <Text>{isGrabbing ? '抢单中...' : '一键抢单'}</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <View className="nearby-broadcast-empty">
+          <Text>暂无附近订单，保持在线等待</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function AssignmentModal({ onAccepted }: { onAccepted?: (orderId: number) => void }) {
+  const [assignment, setAssignment] = useState<V2ProviderAssignmentView | null>(null);
+  const [responding, setResponding] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const res = await providerService.listAssignments(5);
+        const items = normalizeProviderItems<V2ProviderAssignmentView>(res)
+          .filter(item => item.status === 'pending_accept')
+          .sort((a, b) => b.attempt_seq - a.attempt_seq);
+        if (!cancelled) {
+          setAssignment(items[0] || null);
+        }
+      } catch {
+        // 静默重试。
+      }
+    };
+    pull();
+    const timer = setInterval(pull, 3_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick(value => value + 1), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const remaining = assignment
+    ? getRemainingSeconds(assignment.accept_deadline_at, assignment.remaining_seconds)
+    : 0;
+
+  useEffect(() => {
+    void tick;
+    if (assignment && remaining <= 0) {
+      setAssignment(null);
+    }
+  }, [assignment, remaining, tick]);
+
+  const accept = useCallback(async () => {
+    if (responding || !assignment) return;
+    setResponding(true);
+    try {
+      const res = await providerService.acceptAssignment(assignment.id);
+      const orderId = getOrderIdFromPayload(res, assignment.order_id);
+      Taro.showToast({ title: '已接受', icon: 'success' });
+      setAssignment(null);
+      if (orderId > 0) {
+        onAccepted?.(orderId);
+      }
+    } catch (error: any) {
+      if (error?.statusCode === 409 || error?.errno === 409) {
+        Taro.showToast({ title: '指派已失效或超时', icon: 'none' });
+        setAssignment(null);
+      } else {
+        Taro.showToast({ title: String(error?.message || '接受失败'), icon: 'none' });
+      }
+    } finally {
+      setResponding(false);
+    }
+  }, [assignment, onAccepted, responding]);
+
+  const decline = useCallback(async () => {
+    if (responding || !assignment) return;
+    const res = await Taro.showModal({
+      title: '确认拒绝指派',
+      content: '拒绝后系统会指派给其他服务商',
+      confirmText: '确认拒绝',
+      confirmColor: '#dc2626',
+    });
+    if (!res.confirm) return;
+    setResponding(true);
+    try {
+      await providerService.declineAssignment(assignment.id, '服务商主动拒绝');
+      Taro.showToast({ title: '已拒绝', icon: 'none' });
+      setAssignment(null);
+    } catch (error: any) {
+      Taro.showToast({ title: String(error?.message || '拒绝失败'), icon: 'none' });
+    } finally {
+      setResponding(false);
+    }
+  }, [assignment, responding]);
+
+  if (!assignment || remaining <= 0) return null;
+
+  const order = assignment.order;
+  return (
+    <View className="assignment-modal-mask">
+      <View className="assignment-modal-card">
+        <View className="assignment-modal-titlebar">
+          <Text>平台为你指派了订单 第 {assignment.attempt_seq} 轮</Text>
+        </View>
+        <Text className="assignment-modal-countdown">{remaining}s 内响应</Text>
+        <View className="assignment-modal-route">
+          <Text className="assignment-route-start">{order?.service_address || '起点待确认'}</Text>
+          <Text className="assignment-route-arrow">→</Text>
+          <Text className="assignment-route-end">{order?.dest_address || '终点待确认'}</Text>
+        </View>
+        <View className="assignment-modal-meta">
+          <Text>{formatBroadcastDistance(assignment.distance_km)}</Text>
+          <Text>{formatWeight(order?.cargo_weight_kg || assignment.broadcast?.weight_kg)}</Text>
+          <Text>{formatDuration(order?.estimated_duration_min)}</Text>
+          <Text>{formatRouteDistance(order?.estimated_distance_m)}</Text>
+        </View>
+        <Text className="assignment-modal-price">{formatAmountYuan(getBroadcastAmount(assignment))}</Text>
+        <View className="assignment-modal-actions">
+          <View className={`assignment-decline ${responding ? 'is-loading' : ''}`} onClick={decline}>
+            <Text>拒绝</Text>
+          </View>
+          <View className={`assignment-accept ${responding ? 'is-loading' : ''}`} onClick={accept}>
+            <Text>{responding ? '处理中...' : '接受'}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ProviderWorkbench() {
   const dispatch = useAppDispatch();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -83,6 +404,9 @@ export default function ProviderWorkbench() {
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [workbench, setWorkbench] = useState<OwnerWorkbenchView | null>(null);
   const [openedOnboardingOnce, setOpenedOnboardingOnce] = useState(false);
+  const [providerStats, setProviderStats] = useState<V2ProviderStats | null>(null);
+  const [serviceClasses, setServiceClasses] = useState<V2ServiceClass[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary), [roleSummary]);
   const providerCapabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
   const canUseProvider = canUseProviderWorkbench(effectiveRoleSummary);
@@ -90,6 +414,7 @@ export default function ProviderWorkbench() {
     const nickname = String(user?.nickname || '').trim();
     return nickname || '服务商工作台';
   }, [user?.nickname]);
+  const { presence, goOnline, goOffline } = useProviderPresence();
   const providerCertLabel = useMemo(() => {
     if (providerCapabilities.canSelfExecute) return '综合就绪';
     if (providerCapabilities.canPublishSupply) return '设备就绪';
@@ -100,7 +425,7 @@ export default function ProviderWorkbench() {
     if (!isAuthenticated) {
       return {
         title: '登录后进入接单工作台',
-        desc: '接单工作台只展示真实需求、履约订单和结算数据，请先登录服务商账号。',
+        desc: '接单工作台只展示真实服务机会、服务订单和结算数据，请先登录服务商账号。',
         primary: '去登录',
       };
     }
@@ -173,6 +498,66 @@ export default function ProviderWorkbench() {
     }).catch(() => null);
   }, [canUseProvider, isAuthenticated]);
 
+  const refreshProviderStats = useCallback(() => {
+    if (!isAuthenticated || !canUseProvider) {
+      setProviderStats(null);
+      return;
+    }
+    providerService.getStats()
+      .then(setProviderStats)
+      .catch(() => null);
+  }, [canUseProvider, isAuthenticated]);
+
+  const refreshServiceClasses = useCallback(() => {
+    orderV2Service.listServiceClasses()
+      .then(items => setServiceClasses(normalizeServiceClasses(items)))
+      .catch(() => setServiceClasses([]));
+  }, []);
+
+  const setMaxRadius = useCallback((km: number) => {
+    dispatch(presenceConfigUpdated({ maxRadiusKM: km }));
+  }, [dispatch]);
+
+  const toggleServiceClass = useCallback((code: string) => {
+    const current = presence.acceptedServiceClasses || [];
+    const next = current.includes(code)
+      ? current.filter(item => item !== code)
+      : [...current, code];
+    dispatch(presenceConfigUpdated({ acceptedServiceClasses: next }));
+  }, [dispatch, presence.acceptedServiceClasses]);
+
+  const togglePresence = useCallback(async () => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    try {
+      if (presence.online) {
+        await goOffline();
+        return;
+      }
+      if (!presence.acceptedServiceClasses?.length) {
+        Taro.showToast({ title: '请先选择至少一个可接机型', icon: 'none' });
+        return;
+      }
+      const ok = await goOnline({
+        acceptedClasses: presence.acceptedServiceClasses,
+        maxRadiusKM: presence.maxRadiusKM,
+      });
+      if (ok) {
+        refreshProviderStats();
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    actionLoading,
+    goOffline,
+    goOnline,
+    presence.acceptedServiceClasses,
+    presence.maxRadiusKM,
+    presence.online,
+    refreshProviderStats,
+  ]);
+
   useDidShow(() => {
     dispatch(setHaulRoleMode('provider'));
     syncCustomTabBar(0, 'provider');
@@ -182,7 +567,17 @@ export default function ProviderWorkbench() {
       return;
     }
     refreshDashboard();
+    refreshServiceClasses();
+    refreshProviderStats();
   });
+
+  useEffect(() => {
+    if (!presence.online) return undefined;
+    const timer = setInterval(() => {
+      refreshProviderStats();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [presence.online, refreshProviderStats]);
 
   useEffect(() => {
     try {
@@ -198,7 +593,7 @@ export default function ProviderWorkbench() {
     }
   }, []);
 
-  const stats = useMemo(() => {
+  const dashboardStats = useMemo(() => {
     const owner = dashboard?.role_views?.owner;
     const summary = dashboard?.summary;
     const workbenchSummary = workbench?.summary;
@@ -226,12 +621,18 @@ export default function ProviderWorkbench() {
 
   const openFulfillment = useCallback((orderId?: number) => {
     const nextOrderId = Number(orderId || firstFulfillmentOrder?.id || 0);
-    navigateWithAuth(nextOrderId ? `/pages/fulfillment/hub/index?orderId=${nextOrderId}` : '/pages/fulfillment/hub/index');
+    navigateWithAuth(nextOrderId ? `/pages/orders/detail/index?orderId=${nextOrderId}` : '/pages/orders/index');
   }, [firstFulfillmentOrder?.id, navigateWithAuth]);
 
   const openFulfillmentOrExecution = useCallback(() => {
     openFulfillment(firstFulfillmentOrder?.id);
   }, [firstFulfillmentOrder?.id, openFulfillment]);
+
+  const openGrabbedOrder = useCallback((orderId: number) => {
+    const nextOrderId = Number(orderId || 0);
+    if (nextOrderId <= 0) return;
+    safeNavigateTo(`/pages/orders/detail/index?orderId=${nextOrderId}`);
+  }, []);
 
   const openDeviceStaff = useCallback(() => {
     if (!isAuthenticated) {
@@ -258,23 +659,23 @@ export default function ProviderWorkbench() {
     {
       key: 'pending',
       label: '今日待处理',
-      value: String(stats.todayPending),
+      value: String(dashboardStats.todayPending),
       icon: metricPendingIcon,
       valueClass: 'provider-metric-value-blue',
       onClick: openFulfillmentOrExecution,
     },
     {
       key: 'quote',
-      label: '待报价需求',
-      value: String(stats.pendingQuote),
+      label: '待报价服务',
+      value: String(dashboardStats.pendingQuote),
       icon: metricQuoteIcon,
       valueClass: 'provider-metric-value-orange',
       onClick: openDemandTab,
     },
     {
       key: 'contract',
-      label: '待履约订单',
-      value: String(stats.pendingFulfillment),
+      label: '待服务订单',
+      value: String(dashboardStats.pendingFulfillment),
       icon: metricContractIcon,
       valueClass: 'provider-metric-value-green',
       onClick: openFulfillmentOrExecution,
@@ -282,7 +683,7 @@ export default function ProviderWorkbench() {
     {
       key: 'income',
       label: '本月收入',
-      value: formatAmountYuan(stats.monthIncome),
+      value: formatAmountYuan(dashboardStats.monthIncome),
       icon: metricIncomeIcon,
       valueClass: 'provider-metric-value-purple provider-metric-value-money',
       onClick: () => navigateWithAuth('/pages/settlement/wallet/index'),
@@ -425,9 +826,97 @@ export default function ProviderWorkbench() {
   return (
     <View className="provider-workbench-page">
       <ScrollView scrollY className="provider-workbench-scroll">
-        <View className="provider-workbench-canvas" style={canvasStyle}>
+        <View className={`provider-workbench-canvas ${presence.online ? 'provider-workbench-canvas-online' : ''}`} style={canvasStyle}>
           <View className="provider-header-bg" />
           <View className="provider-header-curve" />
+
+          <View className="presence-panel">
+            <View className="presence-header">
+              <View className={`presence-status-dot ${presence.online ? 'online' : 'offline'}`} />
+              <Text className="presence-status-text">
+                {presence.online ? '已上线，等待接单' : '已下线'}
+              </Text>
+            </View>
+
+            <View className="presence-metrics">
+              <View className="presence-metric">
+                <Text className="presence-metric-value">{providerStats?.today_order_count ?? '--'}</Text>
+                <Text className="presence-metric-label">今日接单</Text>
+              </View>
+              <View className="presence-metric">
+                <Text className="presence-metric-value">{formatAmountYuan(providerStats?.today_income_cents)}</Text>
+                <Text className="presence-metric-label">今日收入</Text>
+              </View>
+              <View className="presence-metric">
+                <Text className="presence-metric-value">{formatAmountYuan(providerStats?.pending_settlement_cents)}</Text>
+                <Text className="presence-metric-label">待结算</Text>
+              </View>
+              <View className="presence-metric">
+                <Text className="presence-metric-value">{formatCompletionRate(providerStats?.completion_rate)}</Text>
+                <Text className="presence-metric-label">完单率</Text>
+              </View>
+              <View className="presence-metric">
+                <Text className="presence-metric-value">{(providerStats?.rating ?? 4.5).toFixed(1)}</Text>
+                <Text className="presence-metric-label">评分</Text>
+              </View>
+            </View>
+
+            <View className="presence-config">
+              <View className="presence-config-row">
+                <Text className="presence-config-label">服务半径</Text>
+                <View className="presence-radius-chips">
+                  {PROVIDER_RADIUS_OPTIONS.map(km => (
+                    <View
+                      key={km}
+                      className={`presence-radius-chip ${presence.maxRadiusKM === km ? 'is-active' : ''}`}
+                      onClick={() => setMaxRadius(km)}
+                    >
+                      <Text>{km}km</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <View className="presence-config-row presence-config-row-classes">
+                <Text className="presence-config-label">可接机型</Text>
+                <View className="presence-class-chips">
+                  {serviceClasses.map(item => {
+                    const checked = (presence.acceptedServiceClasses || []).includes(item.code);
+                    return (
+                      <View
+                        key={item.code}
+                        className={`presence-class-chip ${checked ? 'is-active' : ''}`}
+                        onClick={() => toggleServiceClass(item.code)}
+                      >
+                        <Text>{item.display_name}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View
+              className={`presence-cta ${presence.online ? 'is-offline' : 'is-online'} ${actionLoading ? 'is-loading' : ''}`}
+              onClick={() => {
+                if (!actionLoading) {
+                  togglePresence();
+                }
+              }}
+            >
+              <Text>
+                {actionLoading ? '处理中...' : presence.online ? '下线接单' : '上线接单'}
+              </Text>
+            </View>
+
+            {presence.lastError ? (
+              <Text className="presence-error">{presence.lastError}</Text>
+            ) : null}
+          </View>
+
+          {presence.online ? (
+            <NearbyBroadcasts onGrabbed={openGrabbedOrder} />
+          ) : null}
 
           <View className="provider-brand" onClick={() => navigateWithAuth('/pages/profile/owner/index')}>
             <Image className="provider-brand-logo" src={logoProvider} mode="aspectFit" />
@@ -458,7 +947,7 @@ export default function ProviderWorkbench() {
 
           <Text className="provider-page-title">工作台</Text>
 
-          <View className="provider-metric-card">
+          <View className={`provider-metric-card ${presence.online ? 'provider-metric-card-online' : ''}`}>
             <View className="provider-metric-line-h" />
             <View className="provider-metric-line-v" />
             {metrics.map((item, index) => (
@@ -475,7 +964,7 @@ export default function ProviderWorkbench() {
             ))}
           </View>
 
-          <View className="provider-quick-card">
+          <View className={`provider-quick-card ${presence.online ? 'provider-quick-card-online' : ''}`}>
             <Text className="provider-section-title provider-quick-title">快捷入口</Text>
             {quickEntries.map((item, index) => (
               <View
@@ -491,7 +980,7 @@ export default function ProviderWorkbench() {
             ))}
           </View>
 
-          <View className="provider-todo-card">
+          <View className={`provider-todo-card ${presence.online ? 'provider-todo-card-online' : ''}`}>
             <View className="provider-todo-header">
               <Text className="provider-section-title">待处理事项</Text>
               <View className="provider-todo-all" onClick={openFulfillmentOrExecution}>
@@ -520,6 +1009,9 @@ export default function ProviderWorkbench() {
         </View>
         <View className="provider-tabbar-spacer" />
       </ScrollView>
+      {presence.online ? (
+        <AssignmentModal onAccepted={openGrabbedOrder} />
+      ) : null}
     </View>
   );
 }

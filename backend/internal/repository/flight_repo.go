@@ -27,6 +27,37 @@ func (r *FlightRepo) DB() *gorm.DB {
 	return r.db
 }
 
+func (r *FlightRepo) GetServiceClassCruiseSpeedKMH(code string, fallback float64) float64 {
+	code = strings.TrimSpace(code)
+	if r == nil || r.db == nil || code == "" {
+		return fallback
+	}
+
+	columns, err := r.db.Migrator().ColumnTypes("service_classes")
+	if err != nil {
+		return fallback
+	}
+	hasCruiseSpeed := false
+	for _, column := range columns {
+		if strings.EqualFold(column.Name(), "cruise_speed_kmh") {
+			hasCruiseSpeed = true
+			break
+		}
+	}
+	if !hasCruiseSpeed {
+		return fallback
+	}
+
+	var speed float64
+	if err := r.db.Table("service_classes").
+		Select("cruise_speed_kmh").
+		Where("code = ? AND status = ?", code, "active").
+		Scan(&speed).Error; err != nil || speed <= 0 {
+		return fallback
+	}
+	return speed
+}
+
 // GetDispatchTask 根据 ID 查询旧任务池 dispatch_pool_task（模拟飞行用）
 func (r *FlightRepo) GetDispatchTask(taskID int64) (*model.DispatchTask, error) {
 	var task model.DispatchTask

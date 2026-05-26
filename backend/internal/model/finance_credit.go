@@ -24,6 +24,21 @@ type OrderSettlement struct {
 	CouponDiscount int64 `json:"coupon_discount"` // 优惠券折扣(分)
 	FinalAmount    int64 `json:"final_amount"`    // 最终支付金额(分)
 
+	// ==================== H5 调整明细 ====================
+	EstimatedAmount               int64      `json:"estimated_amount"`        // 初始预估金额快照(分)
+	ActualDistanceFee             int64      `json:"actual_distance_fee"`     // 实际里程差额(分)
+	ActualDurationFee             int64      `json:"actual_duration_fee"`     // 实际时长差额(分)
+	SurchargeAmount               int64      `json:"surcharge_amount"`        // 客户加价金额(分)
+	TipAmount                     int64      `json:"tip_amount"`              // 客户小费(分)，即时入账，不参与T+N基础分账
+	PartialHandoverAmount         int64      `json:"partial_handover_amount"` // 改派前已履约部分结算金额(分)
+	PartialHandoverProviderUserID int64      `gorm:"index" json:"partial_handover_provider_user_id"`
+	PartialHandoverSettledAt      *time.Time `json:"partial_handover_settled_at"`
+	PartialHandoverReason         string     `gorm:"type:varchar(255)" json:"partial_handover_reason"`
+	PriceAdjustReason             string     `gorm:"type:varchar(255)" json:"price_adjust_reason"`
+	AdjustReviewed                bool       `gorm:"default:false" json:"adjust_reviewed"`
+	AdjustReviewedBy              int64      `json:"adjust_reviewed_by"`
+	AdjustReviewedAt              *time.Time `json:"adjust_reviewed_at"`
+
 	// ==================== 分账明细 ====================
 	PlatformFeeRate    float64 `gorm:"type:decimal(5,4)" json:"platform_fee_rate"` // 平台费率
 	PlatformFee        int64   `json:"platform_fee"`                               // 平台服务费(分)

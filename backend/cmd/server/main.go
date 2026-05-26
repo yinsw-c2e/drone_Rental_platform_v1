@@ -161,6 +161,7 @@ func main() {
 	serviceClassRepo := repository.NewServiceClassRepo(db)
 	providerPresenceRepo := repository.NewProviderPresenceRepo(db)
 	orderBroadcastRepo := repository.NewOrderBroadcastRepo(db)
+	broadcastAssignmentRepo := repository.NewBroadcastAssignmentRepo(db)
 
 	contractRepo := repository.NewContractRepo(db)
 
@@ -227,7 +228,8 @@ func main() {
 	ownerService := service.NewOwnerService(userRepo, droneRepo, pilotRepo, roleProfileRepo, ownerDomainRepo, demandDomainRepo)
 	orderService := service.NewOrderService(orderRepo, droneRepo, pilotRepo, demandRepo, paymentRepo, clientRepo, demandDomainRepo, ownerDomainRepo, orderArtifactRepo, cfg, zapLogger)
 	pricingService := service.NewPricingService(serviceClassRepo)
-	broadcastService := service.NewBroadcastService(providerPresenceRepo, orderBroadcastRepo, orderRepo, orderArtifactRepo, userService, zapLogger)
+	systemConfigService := service.NewSystemConfigService(db)
+	broadcastService := service.NewBroadcastService(providerPresenceRepo, orderBroadcastRepo, broadcastAssignmentRepo, orderRepo, orderArtifactRepo, userService, zapLogger)
 	demandService := service.NewDemandService(demandRepo, clientRepo)
 	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, clientRepo, ownerDomainRepo, demandDomainRepo, zapLogger)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, droneRepo, pilotRepo, orderArtifactRepo, paymentProvider, zapLogger)
@@ -264,10 +266,18 @@ func main() {
 	paymentService.SetDispatchService(dispatchService)
 	paymentService.SetEventService(eventService)
 	paymentService.SetContractRepo(contractRepo)
+	settlementService.SetPaymentRepo(paymentRepo)
+	settlementService.SetBroadcastRepo(orderBroadcastRepo)
+	settlementService.SetSystemConfigService(systemConfigService)
 	orderService.SetEventService(eventService)
 	orderService.SetPricingService(pricingService)
 	orderService.SetBroadcastService(broadcastService)
 	orderService.SetSettlementService(settlementService)
+	orderService.SetCreditService(creditService)
+	orderService.SetSystemConfigService(systemConfigService)
+	broadcastService.SetSystemConfigService(systemConfigService)
+	broadcastService.SetEventService(eventService)
+	broadcastService.SetSettlementService(settlementService)
 	dispatchService.SetEventService(eventService)
 	droneService.SetEventService(eventService)
 	contractService.SetEventService(eventService)
@@ -326,6 +336,7 @@ func main() {
 		Insurance:  longinsurance.NewHandler(insuranceService),
 		Analytics:  longanalytics.NewHandler(analyticsService),
 	}
+	longtailHandlers.Admin.SetH9Dependencies(serviceClassRepo, orderBroadcastRepo, systemConfigService)
 	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, pricingService, broadcastService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)

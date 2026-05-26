@@ -17,28 +17,33 @@ import (
 )
 
 type OrderService struct {
-	orderRepo         *repository.OrderRepo
-	droneRepo         *repository.DroneRepo
-	pilotRepo         *repository.PilotRepo
-	demandRepo        *repository.DemandRepo
-	paymentRepo       *repository.PaymentRepo
-	clientRepo        *repository.ClientRepo
-	pricingService    *PricingService
-	broadcastService  *BroadcastService
-	demandDomainRepo  *repository.DemandDomainRepo
-	ownerDomainRepo   *repository.OwnerDomainRepo
-	orderArtifactRepo *repository.OrderArtifactRepo
-	eventService      *EventService
-	contractService   *ContractService
-	settlementService *SettlementService
-	cfg               *config.Config
-	logger            *zap.Logger
+	orderRepo           *repository.OrderRepo
+	droneRepo           *repository.DroneRepo
+	pilotRepo           *repository.PilotRepo
+	demandRepo          *repository.DemandRepo
+	paymentRepo         *repository.PaymentRepo
+	clientRepo          *repository.ClientRepo
+	pricingService      *PricingService
+	broadcastService    *BroadcastService
+	demandDomainRepo    *repository.DemandDomainRepo
+	ownerDomainRepo     *repository.OwnerDomainRepo
+	orderArtifactRepo   *repository.OrderArtifactRepo
+	eventService        *EventService
+	contractService     *ContractService
+	settlementService   *SettlementService
+	creditService       *CreditService
+	systemConfigService *SystemConfigService
+	cfg                 *config.Config
+	logger              *zap.Logger
 }
 
 const (
 	OrderModeNegotiated  = "negotiated"
 	OrderModeInstant     = "instant"
 	OrderModeReservation = "reservation"
+
+	defaultCancelGraceWindowSeconds = 300
+	defaultClientCancelPenaltyRate  = 0.10
 )
 
 func NewOrderService(
@@ -87,6 +92,14 @@ func (s *OrderService) SetPricingService(pricingService *PricingService) {
 
 func (s *OrderService) SetBroadcastService(broadcastService *BroadcastService) {
 	s.broadcastService = broadcastService
+}
+
+func (s *OrderService) SetCreditService(creditService *CreditService) {
+	s.creditService = creditService
+}
+
+func (s *OrderService) SetSystemConfigService(systemConfigService *SystemConfigService) {
+	s.systemConfigService = systemConfigService
 }
 
 func (s *OrderService) CreateOrder(req *CreateOrderRequest) (*model.Order, error) {
@@ -581,7 +594,21 @@ func (s *OrderService) createPlatformPricedOrderWithRepos(
 		Status:                 status,
 	}
 
-	if err := orderRepo.Create(order); err != nil {
+	nullableRefOmits := make([]string, 0, 3)
+	if order.DroneID == 0 {
+		nullableRefOmits = append(nullableRefOmits, "DroneID", "drone_id")
+	}
+	if order.PilotID == 0 {
+		nullableRefOmits = append(nullableRefOmits, "PilotID", "pilot_id")
+	}
+	if order.OwnerID == 0 {
+		nullableRefOmits = append(nullableRefOmits, "OwnerID", "owner_id")
+	}
+	if len(nullableRefOmits) > 0 {
+		if err := orderRepo.CreateOmit(order, nullableRefOmits...); err != nil {
+			return nil, err
+		}
+	} else if err := orderRepo.Create(order); err != nil {
 		return nil, err
 	}
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
@@ -1353,6 +1380,42 @@ func (s *OrderService) paymentCommissionRate() float64 {
 	return float64(s.cfg.Payment.CommissionRate)
 }
 
+func (s *OrderService) cancelGraceWindow() time.Duration {
+	seconds := defaultCancelGraceWindowSeconds
+	if s != nil && s.systemConfigService != nil {
+		seconds = s.systemConfigService.GetInt("cancel.grace_window_seconds", seconds)
+	}
+	if seconds <= 0 {
+		seconds = defaultCancelGraceWindowSeconds
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func (s *OrderService) clientCancelPenaltyRate() float64 {
+	rate := defaultClientCancelPenaltyRate
+	if s != nil && s.systemConfigService != nil {
+		rate = s.systemConfigService.GetFloat("cancel.client_penalty_rate", rate)
+	}
+	if rate < 0 {
+		return defaultClientCancelPenaltyRate
+	}
+	if rate > 1 {
+		rate = rate / 100
+	}
+	return rate
+}
+
+func (s *OrderService) reassignBroadcastTTL() time.Duration {
+	seconds := int(defaultBroadcastTTL.Seconds())
+	if s != nil && s.systemConfigService != nil {
+		seconds = s.systemConfigService.GetInt("broadcast.ttl_seconds", seconds)
+	}
+	if seconds <= 0 {
+		seconds = int(defaultBroadcastTTL.Seconds())
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func ensureClientForOrder(userID int64, clientRepo *repository.ClientRepo) (*model.Client, error) {
 	if userID <= 0 {
 		return nil, errors.New("客户账号无效")
@@ -1405,10 +1468,29 @@ func buildPlatformPricedOrderTimelineNote(mode string, input *PlatformPricedOrde
 	return "即时单已创建，等待服务商接单"
 }
 
+type cancelOrderOutcome struct {
+	cancelled            bool
+	disputeOpened        bool
+	reassignBroadcastID  int64
+	providerCancelUserID int64
+	eventType            string
+	eventTitle           string
+	eventBody            string
+}
+
 func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) error {
 	db := s.orderRepo.DB()
+	var outcome cancelOrderOutcome
 	if db == nil {
-		if err := s.cancelOrderWithRepos(
+		broadcastRepo := (*repository.OrderBroadcastRepo)(nil)
+		if s.broadcastService != nil {
+			broadcastRepo = s.broadcastService.broadcastRepo
+		}
+		settlementRepo := (*repository.SettlementRepo)(nil)
+		if s.settlementService != nil {
+			settlementRepo = s.settlementService.settlementRepo
+		}
+		result, err := s.cancelOrderWithRepos(
 			orderID,
 			userID,
 			reason,
@@ -1419,19 +1501,15 @@ func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) e
 			s.orderArtifactRepo,
 			s.demandDomainRepo,
 			s.ownerDomainRepo,
-		); err != nil {
+			broadcastRepo,
+			settlementRepo,
+		)
+		if err != nil {
 			return err
 		}
-		if s.eventService != nil {
-			if order, err := s.orderRepo.GetByID(orderID); err == nil && order != nil {
-				s.eventService.NotifyOrderStatusChanged(order, "order_cancelled", "订单已取消", fmt.Sprintf("订单“%s”已取消。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
-			}
-		}
-		return nil
-	}
-
-	if err := db.Transaction(func(tx *gorm.DB) error {
-		return s.cancelOrderWithRepos(
+		outcome = result
+	} else if err := db.Transaction(func(tx *gorm.DB) error {
+		result, txErr := s.cancelOrderWithRepos(
 			orderID,
 			userID,
 			reason,
@@ -1442,13 +1520,42 @@ func (s *OrderService) CancelOrder(orderID, userID int64, reason, role string) e
 			repository.NewOrderArtifactRepo(tx),
 			repository.NewDemandDomainRepo(tx),
 			repository.NewOwnerDomainRepo(tx),
+			repository.NewOrderBroadcastRepo(tx),
+			repository.NewSettlementRepo(tx),
 		)
+		if txErr != nil {
+			return txErr
+		}
+		outcome = result
+		return nil
 	}); err != nil {
 		return err
 	}
+
+	if outcome.providerCancelUserID > 0 && s.creditService != nil {
+		if err := s.creditService.RecordProviderCancellation(outcome.providerCancelUserID, orderID); err != nil && s.logger != nil {
+			s.logger.Warn("failed to record provider cancellation credit penalty",
+				zap.Int64("order_id", orderID),
+				zap.Int64("provider_user_id", outcome.providerCancelUserID),
+				zap.Error(err),
+			)
+		}
+	}
+	if outcome.reassignBroadcastID > 0 && s.broadcastService != nil {
+		if err := s.broadcastService.AttemptAutoAssign(outcome.reassignBroadcastID); err != nil && s.logger != nil {
+			s.logger.Warn("failed to trigger auto assign after provider cancellation",
+				zap.Int64("order_id", orderID),
+				zap.Int64("broadcast_id", outcome.reassignBroadcastID),
+				zap.Error(err),
+			)
+		}
+	}
 	if s.eventService != nil {
 		if order, err := s.orderRepo.GetByID(orderID); err == nil && order != nil {
-			s.eventService.NotifyOrderStatusChanged(order, "order_cancelled", "订单已取消", fmt.Sprintf("订单“%s”已取消。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
+			eventType := firstNonEmpty(outcome.eventType, "order_cancelled")
+			title := firstNonEmpty(outcome.eventTitle, "订单已取消")
+			body := firstNonEmpty(outcome.eventBody, fmt.Sprintf("订单“%s”已取消。", firstNonEmpty(order.Title, order.OrderNo, "订单")))
+			s.eventService.NotifyOrderStatusChanged(order, eventType, title, body)
 		}
 	}
 	return nil
@@ -1463,76 +1570,509 @@ func (s *OrderService) cancelOrderWithRepos(
 	artifactRepo *repository.OrderArtifactRepo,
 	demandDomainRepo *repository.DemandDomainRepo,
 	ownerDomainRepo *repository.OwnerDomainRepo,
-) error {
-	order, err := orderRepo.GetByID(orderID)
+	broadcastRepo *repository.OrderBroadcastRepo,
+	settlementRepo *repository.SettlementRepo,
+) (cancelOrderOutcome, error) {
+	order, err := orderRepo.LockByID(orderID)
 	if err != nil {
-		return errors.New("订单不存在")
+		return cancelOrderOutcome{}, errors.New("订单不存在")
 	}
 
-	if order.Status == "completed" || order.Status == "cancelled" || order.Status == "refunded" {
-		return errors.New("该订单不能取消")
+	if isProviderCancelRole(role) && providerCanCancelCurrentOrder(order, userID) {
+		return s.reassignOrderAfterProviderCancel(order, userID, reason, role, orderRepo, artifactRepo, demandDomainRepo, ownerDomainRepo, broadcastRepo, settlementRepo)
 	}
-	if order.Status == "provider_rejected" {
-		return errors.New("该订单不能取消")
+
+	if isPlatformPricedOrder(order) {
+		return s.cancelPlatformPricedOrder(order, userID, reason, role, orderRepo, droneRepo, paymentRepo, artifactRepo, demandDomainRepo, ownerDomainRepo)
+	}
+
+	return s.cancelNegotiatedOrder(order, userID, reason, role, orderRepo, droneRepo, paymentRepo, artifactRepo, demandDomainRepo, ownerDomainRepo)
+}
+
+func (s *OrderService) cancelNegotiatedOrder(
+	order *model.Order,
+	userID int64,
+	reason, role string,
+	orderRepo *repository.OrderRepo,
+	droneRepo *repository.DroneRepo,
+	paymentRepo *repository.PaymentRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+) (cancelOrderOutcome, error) {
+	if order.Status == "completed" || order.Status == "cancelled" || order.Status == "refunded" || order.Status == "provider_rejected" {
+		return cancelOrderOutcome{}, errors.New("该订单不能取消")
 	}
 	if order.Status == "in_progress" {
-		return errors.New("服务已开始，无法取消。请在服务结束后协商解决")
+		return cancelOrderOutcome{}, errors.New("服务已开始，无法取消。请在服务结束后协商解决")
 	}
 
 	refundAmount, refundReason, err := s.calculateRefundPlan(order)
 	if err != nil {
-		return err
+		return cancelOrderOutcome{}, err
+	}
+	return s.finalizeCancelledOrder(order, userID, reason, role, refundAmount, refundReason, orderRepo, droneRepo, paymentRepo, artifactRepo, demandDomainRepo, ownerDomainRepo)
+}
+
+func (s *OrderService) cancelPlatformPricedOrder(
+	order *model.Order,
+	userID int64,
+	reason, role string,
+	orderRepo *repository.OrderRepo,
+	droneRepo *repository.DroneRepo,
+	paymentRepo *repository.PaymentRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+) (cancelOrderOutcome, error) {
+	status := normalizeCancelStatus(order.Status)
+	switch status {
+	case "cancelled", "refunded", "provider_rejected", "completed", "delivered":
+		return cancelOrderOutcome{}, errors.New("该订单不能取消")
+	case "in_transit":
+		if artifactRepo == nil {
+			return cancelOrderOutcome{}, errors.New("争议记录依赖未初始化")
+		}
+		summary := "客户在履约中申请取消，已转入平台争议处理"
+		if strings.TrimSpace(reason) != "" {
+			summary += "：" + strings.TrimSpace(reason)
+		}
+		if err := artifactRepo.CreateDispute(&model.DisputeRecord{
+			OrderID:         order.ID,
+			InitiatorUserID: userID,
+			DisputeType:     "cancel_request",
+			Status:          "open",
+			Summary:         summary,
+		}); err != nil {
+			return cancelOrderOutcome{}, err
+		}
+		if err := orderRepo.AddTimeline(&model.OrderTimeline{
+			OrderID:      order.ID,
+			Status:       "dispute_opened",
+			Note:         summary,
+			OperatorID:   userID,
+			OperatorType: role,
+		}); err != nil {
+			return cancelOrderOutcome{}, err
+		}
+		return cancelOrderOutcome{
+			disputeOpened: true,
+			eventType:     "order_cancel_disputed",
+			eventTitle:    "取消申请已转争议",
+			eventBody:     fmt.Sprintf("订单“%s”正在履约，取消申请已转平台处理。", firstNonEmpty(order.Title, order.OrderNo, "订单")),
+		}, nil
+	}
+
+	refundAmount, refundReason, err := s.calculatePlatformPricedCancelRefund(order, paymentRepo)
+	if err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	return s.finalizeCancelledOrder(order, userID, reason, role, refundAmount, refundReason, orderRepo, droneRepo, paymentRepo, artifactRepo, demandDomainRepo, ownerDomainRepo)
+}
+
+func (s *OrderService) finalizeCancelledOrder(
+	order *model.Order,
+	userID int64,
+	reason, role string,
+	refundAmount int64,
+	refundReason string,
+	orderRepo *repository.OrderRepo,
+	droneRepo *repository.DroneRepo,
+	paymentRepo *repository.PaymentRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+) (cancelOrderOutcome, error) {
+	if order == nil {
+		return cancelOrderOutcome{}, errors.New("订单不存在")
 	}
 
 	order.Status = "cancelled"
 	order.CancelReason = reason
 	order.CancelBy = role
 	if err := orderRepo.Update(order); err != nil {
-		return err
+		return cancelOrderOutcome{}, err
 	}
 
 	if refundAmount > 0 {
 		if paymentRepo == nil || artifactRepo == nil {
-			return errors.New("退款记录依赖未初始化")
+			return cancelOrderOutcome{}, errors.New("退款记录依赖未初始化")
 		}
 
-		payments, err := paymentRepo.GetByOrderID(orderID)
+		payments, err := paymentRepo.GetByOrderID(order.ID)
 		if err != nil {
-			return err
+			return cancelOrderOutcome{}, err
 		}
-		refundPlans, err := s.buildRefundPlans(orderID, refundAmount, reason, refundReason, payments)
+		refundPlans, err := s.buildRefundPlans(order.ID, refundAmount, reason, refundReason, payments)
 		if err != nil {
-			return err
+			return cancelOrderOutcome{}, err
 		}
 		for _, refund := range refundPlans {
 			if err := artifactRepo.CreateRefund(refund); err != nil {
-				return err
+				return cancelOrderOutcome{}, err
 			}
 		}
 	}
 
-	s.restoreDroneStatusIfNoActiveOrdersWithRepos(order.DroneID, orderID, orderRepo, droneRepo)
+	s.restoreDroneStatusIfNoActiveOrdersWithRepos(order.DroneID, order.ID, orderRepo, droneRepo)
 
 	note := "订单已取消: " + reason
 	if refundAmount > 0 {
-		note = fmt.Sprintf("%s；已生成退款记录，待处理金额 %d 分", note, refundAmount)
+		note = fmt.Sprintf("%s；%s，已生成退款记录，待处理金额 %d 分", note, firstNonEmpty(refundReason, "按取消规则退款"), refundAmount)
+	} else if refundReason != "" {
+		note = fmt.Sprintf("%s；%s", note, refundReason)
 	}
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
-		OrderID: orderID, Status: "cancelled", Note: note,
+		OrderID: order.ID, Status: "cancelled", Note: note,
 		OperatorID: userID, OperatorType: role,
 	}); err != nil {
-		return err
+		return cancelOrderOutcome{}, err
 	}
 
 	if refundAmount > 0 && s.logger != nil {
 		s.logger.Info("refund records created for cancelled order",
-			zap.Int64("order_id", orderID),
+			zap.Int64("order_id", order.ID),
 			zap.Int64("refund_amount", refundAmount),
 			zap.String("reason", refundReason),
 		)
 	}
 
-	return s.syncOrderSnapshots(order, artifactRepo, demandDomainRepo, ownerDomainRepo)
+	if err := s.syncOrderSnapshots(order, artifactRepo, demandDomainRepo, ownerDomainRepo); err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	return cancelOrderOutcome{
+		cancelled:  true,
+		eventType:  "order_cancelled",
+		eventTitle: "订单已取消",
+		eventBody:  fmt.Sprintf("订单“%s”已取消。", firstNonEmpty(order.Title, order.OrderNo, "订单")),
+	}, nil
+}
+
+func (s *OrderService) reassignOrderAfterProviderCancel(
+	order *model.Order,
+	userID int64,
+	reason, role string,
+	orderRepo *repository.OrderRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+	demandDomainRepo *repository.DemandDomainRepo,
+	ownerDomainRepo *repository.OwnerDomainRepo,
+	broadcastRepo *repository.OrderBroadcastRepo,
+	settlementRepo *repository.SettlementRepo,
+) (cancelOrderOutcome, error) {
+	if order == nil {
+		return cancelOrderOutcome{}, errors.New("订单不存在")
+	}
+	if !isPlatformPricedOrder(order) {
+		return cancelOrderOutcome{}, errors.New("议价订单暂不支持自动改派")
+	}
+	status := normalizeCancelStatus(order.Status)
+	switch status {
+	case "assigned", "preparing", "in_transit":
+	default:
+		return cancelOrderOutcome{}, errors.New("当前订单状态不允许服务商取消")
+	}
+	if broadcastRepo == nil {
+		return cancelOrderOutcome{}, errors.New("广播池依赖未初始化")
+	}
+
+	now := time.Now()
+	originalProviderID := firstPositiveInt64(order.ProviderUserID, order.GrabbedByUserID, order.ExecutorPilotUserID, order.DroneOwnerUserID, order.OwnerID, userID)
+	partialAmount, err := s.recordPartialHandoverIfNeeded(order, originalProviderID, reason, settlementRepo)
+	if err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	remainingAmount := order.TotalAmount - partialAmount
+	if remainingAmount < 0 {
+		remainingAmount = 0
+	}
+
+	updates := map[string]interface{}{
+		"status":                 "pending_dispatch",
+		"provider_user_id":       int64(0),
+		"owner_id":               nil,
+		"drone_owner_user_id":    int64(0),
+		"executor_pilot_user_id": int64(0),
+		"pilot_id":               nil,
+		"drone_id":               nil,
+		"grabbed_by_user_id":     int64(0),
+		"grabbed_at":             nil,
+		"provider_confirmed_at":  nil,
+		"needs_dispatch":         false,
+		"execution_mode":         "self_execute",
+		"updated_at":             now,
+	}
+	if err := orderRepo.UpdateFields(order.ID, updates); err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	order.Status = "pending_dispatch"
+	order.ProviderUserID = 0
+	order.OwnerID = 0
+	order.DroneOwnerUserID = 0
+	order.ExecutorPilotUserID = 0
+	order.PilotID = 0
+	order.GrabbedByUserID = 0
+	order.GrabbedAt = nil
+	order.ProviderConfirmedAt = nil
+	order.NeedsDispatch = false
+	order.ExecutionMode = "self_execute"
+
+	broadcast, err := s.reopenBroadcastForReassign(order, broadcastRepo, remainingAmount, now)
+	if err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"broadcast_pool_id": broadcast.ID,
+		"updated_at":        now,
+	}); err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	order.BroadcastPoolID = &broadcast.ID
+
+	timelineNote := "服务商无法继续履约，订单已回到接单池重新匹配"
+	if strings.TrimSpace(reason) != "" {
+		timelineNote += "：" + strings.TrimSpace(reason)
+	}
+	if partialAmount > 0 {
+		timelineNote += fmt.Sprintf("；已按当前进度给原服务商结算%s", formatAmountFen(partialAmount))
+	}
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      order.ID,
+		Status:       "pending_dispatch",
+		Note:         timelineNote,
+		OperatorID:   userID,
+		OperatorType: firstNonEmpty(role, "provider"),
+	}); err != nil {
+		return cancelOrderOutcome{}, err
+	}
+	if err := s.syncOrderSnapshots(order, artifactRepo, demandDomainRepo, ownerDomainRepo); err != nil {
+		return cancelOrderOutcome{}, err
+	}
+
+	return cancelOrderOutcome{
+		reassignBroadcastID:  broadcast.ID,
+		providerCancelUserID: originalProviderID,
+		eventType:            "order_reassigning",
+		eventTitle:           "订单重新匹配服务商",
+		eventBody:            fmt.Sprintf("订单“%s”的服务商无法继续履约，已重新进入接单池。", firstNonEmpty(order.Title, order.OrderNo, "订单")),
+	}, nil
+}
+
+func (s *OrderService) recordPartialHandoverIfNeeded(order *model.Order, providerUserID int64, reason string, settlementRepo *repository.SettlementRepo) (int64, error) {
+	partialAmount := estimatePartialHandoverAmount(order)
+	if partialAmount <= 0 {
+		return 0, nil
+	}
+	if providerUserID <= 0 {
+		return 0, errors.New("原服务商身份缺失，无法做改派部分结算")
+	}
+	if s.settlementService == nil || settlementRepo == nil {
+		return 0, errors.New("结算服务未初始化")
+	}
+	if partialAmount > order.TotalAmount {
+		partialAmount = order.TotalAmount
+	}
+
+	now := time.Now()
+	settlement, err := s.settlementService.ensureMutableSettlementForOrder(order, settlementRepo)
+	if err != nil {
+		return 0, err
+	}
+	settlement.PartialHandoverAmount += partialAmount
+	if settlement.PartialHandoverAmount > order.TotalAmount {
+		settlement.PartialHandoverAmount = order.TotalAmount
+	}
+	settlement.PartialHandoverProviderUserID = providerUserID
+	settlement.PartialHandoverSettledAt = &now
+	settlement.PartialHandoverReason = firstNonEmpty(strings.TrimSpace(reason), "服务商改派前已履约部分结算")
+	settlement.Status = "partial_handover"
+	settlement.Notes = appendSystemSettlementNote(settlement.Notes, fmt.Sprintf("改派部分结算给原服务商 %s", formatAmountFen(partialAmount)))
+	if err := settlementRepo.UpdateSettlement(settlement); err != nil {
+		return 0, err
+	}
+	if err := settlementRepo.AddWalletIncomeInCurrentTx(
+		providerUserID,
+		partialAmount,
+		order.ID,
+		settlement.ID,
+		fmt.Sprintf("订单%s改派前已履约部分结算", order.OrderNo),
+	); err != nil {
+		return 0, err
+	}
+	return partialAmount, nil
+}
+
+func (s *OrderService) reopenBroadcastForReassign(order *model.Order, broadcastRepo *repository.OrderBroadcastRepo, estimatedTotal int64, now time.Time) (*model.OrderBroadcast, error) {
+	if order == nil {
+		return nil, errors.New("订单不存在")
+	}
+	if estimatedTotal < 0 {
+		estimatedTotal = 0
+	}
+	expiresAt := now.Add(s.reassignBroadcastTTL())
+	broadcast, err := broadcastRepo.LockByOrderID(order.ID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		broadcast = &model.OrderBroadcast{
+			OrderID:             order.ID,
+			OriginLatitude:      order.ServiceLatitude,
+			OriginLongitude:     order.ServiceLongitude,
+			ServiceClassCode:    order.ServiceClassCode,
+			WeightKG:            order.CargoWeightKG,
+			EstimatedTotalCents: estimatedTotal,
+			Status:              broadcastStatusOpen,
+			ExpiresAt:           expiresAt,
+		}
+		if err := broadcastRepo.Create(broadcast); err != nil {
+			return nil, err
+		}
+		return broadcast, nil
+	}
+
+	if err := broadcastRepo.UpdateFields(broadcast.ID, map[string]interface{}{
+		"origin_latitude":       order.ServiceLatitude,
+		"origin_longitude":      order.ServiceLongitude,
+		"service_class_code":    order.ServiceClassCode,
+		"weight_kg":             order.CargoWeightKG,
+		"estimated_total_cents": estimatedTotal,
+		"status":                broadcastStatusOpen,
+		"expires_at":            expiresAt,
+		"grabbed_by_user_id":    int64(0),
+		"grabbed_at":            nil,
+		"updated_at":            now,
+	}); err != nil {
+		return nil, err
+	}
+	broadcast.EstimatedTotalCents = estimatedTotal
+	broadcast.Status = broadcastStatusOpen
+	broadcast.ExpiresAt = expiresAt
+	broadcast.GrabbedByUserID = 0
+	broadcast.GrabbedAt = nil
+	return broadcast, nil
+}
+
+func estimatePartialHandoverAmount(order *model.Order) int64 {
+	if order == nil || order.TotalAmount <= 0 {
+		return 0
+	}
+	ratio := 0.0
+	if order.EstimatedDistanceM > 0 && order.ActualFlightDistance > 0 {
+		ratio = math.Max(ratio, float64(order.ActualFlightDistance)/float64(order.EstimatedDistanceM))
+	}
+	if order.EstimatedDurationMin > 0 && order.ActualFlightDuration > 0 {
+		expectedSeconds := float64(order.EstimatedDurationMin * 60)
+		ratio = math.Max(ratio, float64(order.ActualFlightDuration)/expectedSeconds)
+	}
+	if ratio <= 0 {
+		return 0
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+	return int64(math.Round(float64(order.TotalAmount) * ratio))
+}
+
+func (s *OrderService) calculatePlatformPricedCancelRefund(order *model.Order, paymentRepo *repository.PaymentRepo) (int64, string, error) {
+	if order == nil {
+		return 0, "", errors.New("订单不存在")
+	}
+	if paymentRepo == nil {
+		return 0, "", errors.New("支付记录依赖未初始化")
+	}
+	payments, err := paymentRepo.GetByOrderID(order.ID)
+	if err != nil {
+		return 0, "", err
+	}
+	paidAmount := cancellablePaidAmount(payments)
+	if paidAmount <= 0 {
+		return 0, "订单未支付，无需退款", nil
+	}
+
+	status := normalizeCancelStatus(order.Status)
+	switch status {
+	case "pending_dispatch", "scheduled", "pending_payment", "created":
+		return paidAmount, "服务商接单前取消，全额退款", nil
+	case "assigned":
+		assignedAt := firstSettlementTime(order.GrabbedAt, order.ProviderConfirmedAt, &order.UpdatedAt)
+		if assignedAt == nil || time.Since(*assignedAt) <= s.cancelGraceWindow() {
+			return paidAmount, fmt.Sprintf("服务商接单后%d分钟内取消，全额退款", int(s.cancelGraceWindow().Minutes())), nil
+		}
+		return cancelRefundAfterPenalty(paidAmount, order.TotalAmount, s.clientCancelPenaltyRate(), "服务商接单超过免费取消期，扣预估价")
+	case "preparing":
+		return cancelRefundAfterPenalty(paidAmount, order.TotalAmount, s.clientCancelPenaltyRate(), "服务商已开始准备，扣预估价")
+	default:
+		return 0, "", errors.New("当前订单状态不允许取消")
+	}
+}
+
+func cancelRefundAfterPenalty(paidAmount, estimatedAmount int64, penaltyRate float64, reasonPrefix string) (int64, string, error) {
+	if penaltyRate < 0 {
+		penaltyRate = 0
+	}
+	base := firstPositiveInt64(estimatedAmount, paidAmount)
+	penalty := int64(math.Round(float64(base) * penaltyRate))
+	if penalty > paidAmount {
+		penalty = paidAmount
+	}
+	refund := paidAmount - penalty
+	return refund, fmt.Sprintf("%s%.0f%%，扣费%s", reasonPrefix, penaltyRate*100, formatAmountFen(penalty)), nil
+}
+
+func cancellablePaidAmount(payments []model.Payment) int64 {
+	total := int64(0)
+	for _, payment := range payments {
+		if payment.Status != "paid" {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(payment.PaymentType)) {
+		case "tip", "refund", "withdrawal":
+			continue
+		default:
+			total += payment.Amount
+		}
+	}
+	return total
+}
+
+func isPlatformPricedOrder(order *model.Order) bool {
+	if order == nil {
+		return false
+	}
+	mode := normalizeOrderMode(order.OrderMode)
+	return mode == OrderModeInstant || mode == OrderModeReservation
+}
+
+func normalizeCancelStatus(status string) string {
+	switch normalizeExecutionStatus(strings.TrimSpace(status)) {
+	case "in_progress":
+		return "in_transit"
+	default:
+		return normalizeExecutionStatus(strings.TrimSpace(status))
+	}
+}
+
+func isProviderCancelRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "provider", "owner", "pilot":
+		return true
+	default:
+		return false
+	}
+}
+
+func providerCanCancelCurrentOrder(order *model.Order, userID int64) bool {
+	if order == nil || userID <= 0 {
+		return false
+	}
+	if firstPositiveInt64(order.ProviderUserID, order.GrabbedByUserID, order.ExecutorPilotUserID, order.DroneOwnerUserID, order.OwnerID) == userID {
+		return true
+	}
+	return order.ProviderUserID == userID ||
+		order.GrabbedByUserID == userID ||
+		order.ExecutorPilotUserID == userID ||
+		order.DroneOwnerUserID == userID ||
+		order.OwnerID == userID
 }
 
 func (s *OrderService) StartOrder(orderID, ownerID int64) error {

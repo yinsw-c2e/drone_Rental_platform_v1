@@ -3,8 +3,10 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
+import { providerService } from '../../../services/provider';
 import { getWallet, getWalletTransactions, listMySettlements } from '../../../services/settlement';
 import { RootState } from '../../../store/store';
+import type { V2ProviderStats } from '../../../types';
 import { formatUnknownEnumLabel } from '../../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import './index.scss';
@@ -38,6 +40,7 @@ export default function WalletPage() {
   const [wallet, setWallet] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [settlements, setSettlements] = useState<any[]>([]);
+  const [providerStats, setProviderStats] = useState<V2ProviderStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -45,19 +48,22 @@ export default function WalletPage() {
       setWallet(null);
       setTransactions([]);
       setSettlements([]);
+      setProviderStats(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const [walletData, txData, settleData] = await Promise.all([
+      const [walletData, txData, settleData, statsData] = await Promise.all([
         getWallet().catch(() => null),
         getWalletTransactions({ page: 1, page_size: 50 }).catch(() => ({ data: [] })),
         listMySettlements({ page: 1, page_size: 50 }).catch(() => ({ data: [] })),
+        providerService.getStats().catch(() => null),
       ]);
       setWallet(walletData);
       setTransactions(txData.data || []);
       setSettlements(settleData.data || []);
+      setProviderStats(statsData);
     } catch (e) {
       console.error('加载失败', e);
     } finally {
@@ -83,6 +89,21 @@ export default function WalletPage() {
   const formatAmount = (amountFen: number) => {
     return ((amountFen || 0) / 100).toFixed(2);
   };
+
+  const renderHighlightCards = () => (
+    <View className="wallet-highlight">
+      <View className="wallet-highlight-card">
+        <Text className="wallet-highlight-label">今日预估收入</Text>
+        <Text className="wallet-highlight-value">¥{formatAmount(providerStats?.today_income_cents || 0)}</Text>
+        <Text className="wallet-highlight-hint">基于今日已完成订单，T+3 到账</Text>
+      </View>
+      <View className="wallet-highlight-card">
+        <Text className="wallet-highlight-label">待结算</Text>
+        <Text className="wallet-highlight-value">¥{formatAmount(providerStats?.pending_settlement_cents || 0)}</Text>
+        <Text className="wallet-highlight-hint">含进行中和等待 T+3 的结算单</Text>
+      </View>
+    </View>
+  );
 
   const renderWalletCard = () => {
     if (!wallet) return null;
@@ -161,6 +182,7 @@ export default function WalletPage() {
           <>
             {activeTab === 'overview' && (
               <View className="overview-container">
+                {renderHighlightCards()}
                 {renderWalletCard()}
                 <View className="quick-actions">
                   <View className="action-item" onClick={() => setActiveTab('transactions')}>

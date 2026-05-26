@@ -28,6 +28,10 @@ type presenceRequest struct {
 	MaxRadiusKM            float64  `json:"max_radius_km"`
 }
 
+type declineAssignmentRequest struct {
+	Reason string `json:"reason"`
+}
+
 func (h *Handler) Online(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -81,6 +85,15 @@ func (h *Handler) Offline(c *gin.Context) {
 	response.V2Success(c, gin.H{"online": false})
 }
 
+func (h *Handler) MeStats(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	response.V2Success(c, h.broadcastService.GetProviderStats(userID))
+}
+
 func (h *Handler) ListBroadcasts(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -123,6 +136,73 @@ func (h *Handler) GrabBroadcast(c *gin.Context) {
 	})
 }
 
+func (h *Handler) ListAssignments(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	limit := parseProviderLimit(c.Query("limit"), 50)
+	items, err := h.broadcastService.ListPendingAssignmentsForProvider(userID, limit)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{"items": buildAssignmentViews(items)})
+}
+
+func (h *Handler) AcceptAssignment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	assignmentID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || assignmentID <= 0 {
+		response.V2ValidationError(c, "invalid assignment id")
+		return
+	}
+
+	order, err := h.broadcastService.AcceptAssignment(assignmentID, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrBroadcastConflict) {
+			response.V2Conflict(c, err.Error())
+			return
+		}
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{"order": buildOrderSummary(order)})
+}
+
+func (h *Handler) DeclineAssignment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	assignmentID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || assignmentID <= 0 {
+		response.V2ValidationError(c, "invalid assignment id")
+		return
+	}
+
+	var req declineAssignmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req = declineAssignmentRequest{}
+	}
+	if err := h.broadcastService.DeclineAssignment(assignmentID, userID, req.Reason); err != nil {
+		if errors.Is(err, service.ErrBroadcastConflict) {
+			response.V2Conflict(c, err.Error())
+			return
+		}
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{"declined": true})
+}
+
 func buildPresenceResponse(presence *model.ProviderPresence) gin.H {
 	if presence == nil {
 		return nil
@@ -162,6 +242,48 @@ func buildBroadcastViews(items []service.ProviderBroadcastView) []gin.H {
 		})
 	}
 	return result
+}
+
+func buildAssignmentViews(items []service.ProviderAssignmentView) []gin.H {
+	result := make([]gin.H, 0, len(items))
+	for i := range items {
+		item := items[i]
+		if item.Assignment == nil {
+			continue
+		}
+		result = append(result, gin.H{
+			"id":                 item.Assignment.ID,
+			"broadcast_id":       item.Assignment.BroadcastID,
+			"order_id":           item.Assignment.OrderID,
+			"provider_user_id":   item.Assignment.ProviderUserID,
+			"attempt_seq":        item.Assignment.AttemptSeq,
+			"status":             item.Assignment.Status,
+			"distance_km":        item.Assignment.DistanceKM,
+			"score":              item.Assignment.Score,
+			"accept_deadline_at": item.Assignment.AcceptDeadlineAt,
+			"remaining_seconds":  item.RemainingSeconds,
+			"broadcast":          buildBroadcastSummary(item.Broadcast),
+			"order":              buildOrderSummary(item.Order),
+		})
+	}
+	return result
+}
+
+func buildBroadcastSummary(broadcast *model.OrderBroadcast) gin.H {
+	if broadcast == nil {
+		return nil
+	}
+	return gin.H{
+		"id":                    broadcast.ID,
+		"order_id":              broadcast.OrderID,
+		"service_class_code":    broadcast.ServiceClassCode,
+		"weight_kg":             broadcast.WeightKG,
+		"estimated_total_cents": broadcast.EstimatedTotalCents,
+		"status":                broadcast.Status,
+		"origin_latitude":       broadcast.OriginLatitude,
+		"origin_longitude":      broadcast.OriginLongitude,
+		"expires_at":            broadcast.ExpiresAt,
+	}
 }
 
 func buildOrderSummary(order *model.Order) gin.H {

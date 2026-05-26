@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/json"
 	"math"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"wurenji-backend/internal/config"
 	"wurenji-backend/internal/model"
@@ -310,6 +312,52 @@ func TestCreateInstantOrderUsesServerPricingAndStoresBreakdown(t *testing.T) {
 	}
 	if len(timelines) != 1 || timelines[0].Status != "pending_dispatch" {
 		t.Fatalf("expected pending_dispatch timeline, got %#v", timelines)
+	}
+}
+
+func TestCreateInstantOrderWithEmptyDroneIDPersistsAsNullable(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Client{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+	)
+	service := NewOrderService(
+		repository.NewOrderRepo(db),
+		nil,
+		nil,
+		nil,
+		nil,
+		repository.NewClientRepo(db),
+		nil,
+		nil,
+		repository.NewOrderArtifactRepo(db),
+		&config.Config{Payment: config.PaymentConfig{CommissionRate: 10}},
+		zap.NewNop(),
+	)
+	service.SetPricingService(seedPricingServiceClasses(t))
+
+	result, err := service.CreateInstantOrder(13800000004, &PlatformPricedOrderInput{
+		Origin:           PricingPoint{Latitude: 22.5431, Longitude: 114.0579, Address: "深圳市龙岗区坂田仓库"},
+		Destination:      PricingPoint{Latitude: 22.6283, Longitude: 114.3612, Address: "深圳市坪山区施工点"},
+		CargoWeightKG:    80,
+		ScheduledStartAt: time.Date(2026, 6, 1, 10, 0, 0, 0, time.Local),
+		ServiceClassCode: "light_heavy",
+		CargoScene:       "施工物料吊运",
+	})
+	if err != nil {
+		t.Fatalf("create instant order: %v", err)
+	}
+
+	var droneID, pilotID, ownerID sql.NullInt64
+	row := db.Raw("SELECT drone_id, pilot_id, owner_id FROM orders WHERE id = ?", result.Order.ID).Row()
+	if err := row.Scan(&droneID, &pilotID, &ownerID); err != nil {
+		t.Fatalf("scan nullable refs: %v", err)
+	}
+	if droneID.Valid || pilotID.Valid || ownerID.Valid {
+		t.Fatalf("expected nullable refs to persist as SQL NULL, got drone=%#v pilot=%#v owner=%#v", droneID, pilotID, ownerID)
 	}
 }
 
@@ -703,6 +751,7 @@ func TestConfirmReceiptFinalizesSettlementWalletIncome(t *testing.T) {
 		&model.Order{},
 		&model.OrderTimeline{},
 		&model.OrderSettlement{},
+		&model.PricingConfig{},
 		&model.UserWallet{},
 		&model.WalletTransaction{},
 		&model.Message{},
@@ -899,7 +948,7 @@ func TestCancelOrderWithRefundCreatesRefundRecord(t *testing.T) {
 	paymentRepo := repository.NewPaymentRepo(db)
 	artifactRepo := repository.NewOrderArtifactRepo(db)
 
-	if err := service.cancelOrderWithRepos(
+	if _, err := service.cancelOrderWithRepos(
 		order.ID,
 		order.ClientUserID,
 		"客户改期",
@@ -908,6 +957,8 @@ func TestCancelOrderWithRefundCreatesRefundRecord(t *testing.T) {
 		droneRepo,
 		paymentRepo,
 		artifactRepo,
+		nil,
+		nil,
 		nil,
 		nil,
 	); err != nil {
@@ -946,4 +997,310 @@ func TestCancelOrderWithRefundCreatesRefundRecord(t *testing.T) {
 	if timeline.Status != "cancelled" || !strings.Contains(timeline.Note, "退款记录") {
 		t.Fatalf("expected cancelled timeline with refund note, got %#v", timeline)
 	}
+}
+
+func TestPlatformPricedCancelGraceBoundary(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.Payment{},
+		&model.Refund{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+	)
+
+	now := time.Now()
+	service := &OrderService{
+		orderRepo:         repository.NewOrderRepo(db),
+		paymentRepo:       repository.NewPaymentRepo(db),
+		orderArtifactRepo: repository.NewOrderArtifactRepo(db),
+		logger:            zap.NewNop(),
+	}
+
+	cases := []struct {
+		name           string
+		elapsed        time.Duration
+		expectedRefund int64
+	}{
+		{name: "within_grace_4m59s", elapsed: 4*time.Minute + 59*time.Second, expectedRefund: 10000},
+		{name: "after_grace_5m01s", elapsed: 5*time.Minute + time.Second, expectedRefund: 9000},
+	}
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			grabbedAt := now.Add(-tc.elapsed)
+			paidAt := now.Add(-10 * time.Minute)
+			order := &model.Order{
+				OrderNo:              "WRJ-H6-CANCEL-" + tc.name,
+				OrderType:            "cargo",
+				OrderMode:            OrderModeInstant,
+				OrderSource:          OrderModeInstant,
+				ClientUserID:         int64(6000 + i),
+				ProviderUserID:       7000,
+				GrabbedByUserID:      7000,
+				GrabbedAt:            &grabbedAt,
+				ProviderConfirmedAt:  &grabbedAt,
+				Title:                "H6 取消边界测试",
+				ServiceType:          defaultDemandServiceType,
+				StartTime:            now,
+				EndTime:              now.Add(time.Hour),
+				ServiceLatitude:      22.5431,
+				ServiceLongitude:     114.0579,
+				ServiceAddress:       "起点",
+				DestAddress:          "终点",
+				TotalAmount:          10000,
+				Status:               "assigned",
+				EstimatedDistanceM:   10000,
+				EstimatedDurationMin: 30,
+				PaidAt:               &paidAt,
+			}
+			if err := db.Create(order).Error; err != nil {
+				t.Fatalf("create order: %v", err)
+			}
+			if err := db.Create(&model.Payment{
+				PaymentNo:     "PAY-H6-CANCEL-" + tc.name,
+				OrderID:       order.ID,
+				UserID:        order.ClientUserID,
+				PaymentType:   "order",
+				PaymentMethod: "mock",
+				Amount:        order.TotalAmount,
+				Status:        "paid",
+				PaidAt:        &paidAt,
+			}).Error; err != nil {
+				t.Fatalf("create payment: %v", err)
+			}
+
+			if err := service.CancelOrder(order.ID, order.ClientUserID, "客户取消", "client"); err != nil {
+				t.Fatalf("cancel order: %v", err)
+			}
+			var refund model.Refund
+			if err := db.Where("order_id = ?", order.ID).First(&refund).Error; err != nil {
+				t.Fatalf("load refund: %v", err)
+			}
+			if refund.Amount != tc.expectedRefund {
+				t.Fatalf("expected refund %d, got %d (%s)", tc.expectedRefund, refund.Amount, refund.Reason)
+			}
+		})
+	}
+}
+
+func TestProviderCancelTriggersAutoReassign(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+		&model.OrderBroadcast{},
+		&model.BroadcastAssignment{},
+		&model.ProviderPresence{},
+		&model.SystemConfig{},
+		&model.CreditScore{},
+		&model.CreditScoreLog{},
+	)
+	orderService, broadcastService := newH6OrderBroadcastServices(db)
+	now := time.Now()
+	grabbedAt := now.Add(-2 * time.Minute)
+	order := &model.Order{
+		OrderNo:              "WRJ-H6-REASSIGN-001",
+		OrderType:            "cargo",
+		OrderMode:            OrderModeInstant,
+		OrderSource:          OrderModeInstant,
+		ClientUserID:         6101,
+		ProviderUserID:       7101,
+		OwnerID:              7101,
+		DroneOwnerUserID:     7101,
+		ExecutorPilotUserID:  7101,
+		GrabbedByUserID:      7101,
+		GrabbedAt:            &grabbedAt,
+		ProviderConfirmedAt:  &grabbedAt,
+		Title:                "服务商取消自动重派",
+		ServiceType:          defaultDemandServiceType,
+		StartTime:            now,
+		EndTime:              now.Add(time.Hour),
+		ServiceLatitude:      22.5431,
+		ServiceLongitude:     114.0579,
+		ServiceAddress:       "起点",
+		DestAddress:          "终点",
+		ServiceClassCode:     "light_heavy",
+		CargoWeightKG:        80,
+		TotalAmount:          120000,
+		Status:               "assigned",
+		EstimatedDistanceM:   10000,
+		EstimatedDurationMin: 30,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	grabbed := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      order.ServiceLatitude,
+		OriginLongitude:     order.ServiceLongitude,
+		ServiceClassCode:    order.ServiceClassCode,
+		WeightKG:            order.CargoWeightKG,
+		EstimatedTotalCents: order.TotalAmount,
+		Status:              broadcastStatusGrabbed,
+		ExpiresAt:           now.Add(2 * time.Minute),
+		GrabbedByUserID:     7101,
+		GrabbedAt:           &grabbedAt,
+	}
+	if err := db.Create(grabbed).Error; err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+	if err := db.Model(order).Update("broadcast_pool_id", grabbed.ID).Error; err != nil {
+		t.Fatalf("link broadcast: %v", err)
+	}
+	seedProviderPresence(t, broadcastService, 7201, 22.5435, 114.0580, []string{"light_heavy"}, 20)
+
+	if err := orderService.CancelOrder(order.ID, 7101, "设备临时故障", "provider"); err != nil {
+		t.Fatalf("provider cancel: %v", err)
+	}
+
+	var updated model.Order
+	if err := db.First(&updated, order.ID).Error; err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	if updated.Status != "pending_dispatch" || updated.ProviderUserID != 0 || updated.GrabbedByUserID != 0 {
+		t.Fatalf("expected order back to pending dispatch without provider, got status=%s provider=%d grabbed=%d", updated.Status, updated.ProviderUserID, updated.GrabbedByUserID)
+	}
+	var assignment model.BroadcastAssignment
+	if err := db.Where("broadcast_id = ? AND status = ?", grabbed.ID, assignmentStatusPendingAccept).First(&assignment).Error; err != nil {
+		t.Fatalf("expected pending auto assignment: %v", err)
+	}
+	if assignment.ProviderUserID != 7201 {
+		t.Fatalf("expected assignment to provider 7201, got %d", assignment.ProviderUserID)
+	}
+	var credit model.CreditScore
+	if err := db.Where("user_id = ?", int64(7101)).First(&credit).Error; err != nil {
+		t.Fatalf("load credit: %v", err)
+	}
+	if credit.CancelledOrders != 1 {
+		t.Fatalf("expected provider cancel count 1, got %d", credit.CancelledOrders)
+	}
+}
+
+func TestProviderCancelInTransitCreatesPartialHandoverSettlement(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+		&model.OrderBroadcast{},
+		&model.BroadcastAssignment{},
+		&model.ProviderPresence{},
+		&model.SystemConfig{},
+		&model.OrderSettlement{},
+		&model.UserWallet{},
+		&model.WalletTransaction{},
+		&model.CreditScore{},
+		&model.CreditScoreLog{},
+	)
+	orderService, broadcastService := newH6OrderBroadcastServices(db)
+	now := time.Now()
+	grabbedAt := now.Add(-12 * time.Minute)
+	order := &model.Order{
+		OrderNo:              "WRJ-H6-HANDOVER-001",
+		OrderType:            "cargo",
+		OrderMode:            OrderModeInstant,
+		OrderSource:          OrderModeInstant,
+		ClientUserID:         6201,
+		ProviderUserID:       7301,
+		OwnerID:              7301,
+		DroneOwnerUserID:     7301,
+		ExecutorPilotUserID:  7301,
+		GrabbedByUserID:      7301,
+		GrabbedAt:            &grabbedAt,
+		ProviderConfirmedAt:  &grabbedAt,
+		Title:                "改派部分结算",
+		ServiceType:          defaultDemandServiceType,
+		StartTime:            now.Add(-10 * time.Minute),
+		EndTime:              now.Add(time.Hour),
+		ServiceLatitude:      22.5431,
+		ServiceLongitude:     114.0579,
+		ServiceAddress:       "起点",
+		DestAddress:          "终点",
+		ServiceClassCode:     "light_heavy",
+		CargoWeightKG:        80,
+		TotalAmount:          100000,
+		Status:               "in_transit",
+		EstimatedDistanceM:   10000,
+		EstimatedDurationMin: 30,
+		ActualFlightDistance: 5000,
+		ActualFlightDuration: 600,
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	grabbed := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      order.ServiceLatitude,
+		OriginLongitude:     order.ServiceLongitude,
+		ServiceClassCode:    order.ServiceClassCode,
+		WeightKG:            order.CargoWeightKG,
+		EstimatedTotalCents: order.TotalAmount,
+		Status:              broadcastStatusGrabbed,
+		ExpiresAt:           now.Add(2 * time.Minute),
+		GrabbedByUserID:     7301,
+		GrabbedAt:           &grabbedAt,
+	}
+	if err := db.Create(grabbed).Error; err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+	if err := db.Model(order).Update("broadcast_pool_id", grabbed.ID).Error; err != nil {
+		t.Fatalf("link broadcast: %v", err)
+	}
+	seedProviderPresence(t, broadcastService, 7401, 22.5436, 114.0581, []string{"light_heavy"}, 20)
+
+	if err := orderService.CancelOrder(order.ID, 7301, "无法继续履约", "provider"); err != nil {
+		t.Fatalf("provider cancel in transit: %v", err)
+	}
+
+	var settlement model.OrderSettlement
+	if err := db.Where("order_id = ?", order.ID).First(&settlement).Error; err != nil {
+		t.Fatalf("load settlement: %v", err)
+	}
+	if settlement.Status != "partial_handover" {
+		t.Fatalf("expected partial_handover status, got %s", settlement.Status)
+	}
+	if settlement.PartialHandoverAmount != 50000 {
+		t.Fatalf("expected partial handover 50000, got %d", settlement.PartialHandoverAmount)
+	}
+	if settlement.PartialHandoverProviderUserID != 7301 {
+		t.Fatalf("expected original provider 7301, got %d", settlement.PartialHandoverProviderUserID)
+	}
+	var wallet model.UserWallet
+	if err := db.Where("user_id = ?", int64(7301)).First(&wallet).Error; err != nil {
+		t.Fatalf("load wallet: %v", err)
+	}
+	if wallet.AvailableBalance != 50000 {
+		t.Fatalf("expected wallet income 50000, got %d", wallet.AvailableBalance)
+	}
+	var reopened model.OrderBroadcast
+	if err := db.First(&reopened, grabbed.ID).Error; err != nil {
+		t.Fatalf("load broadcast: %v", err)
+	}
+	if reopened.EstimatedTotalCents != 50000 {
+		t.Fatalf("expected remaining broadcast amount 50000, got %d", reopened.EstimatedTotalCents)
+	}
+}
+
+func newH6OrderBroadcastServices(db *gorm.DB) (*OrderService, *BroadcastService) {
+	orderRepo := repository.NewOrderRepo(db)
+	artifactRepo := repository.NewOrderArtifactRepo(db)
+	broadcastRepo := repository.NewOrderBroadcastRepo(db)
+	presenceRepo := repository.NewProviderPresenceRepo(db)
+	assignmentRepo := repository.NewBroadcastAssignmentRepo(db)
+	settlementRepo := repository.NewSettlementRepo(db)
+	broadcastService := NewBroadcastService(presenceRepo, broadcastRepo, assignmentRepo, orderRepo, artifactRepo, nil, zap.NewNop())
+	orderService := &OrderService{
+		orderRepo:         orderRepo,
+		paymentRepo:       repository.NewPaymentRepo(db),
+		orderArtifactRepo: artifactRepo,
+		broadcastService:  broadcastService,
+		settlementService: NewSettlementService(settlementRepo, orderRepo, zap.NewNop()),
+		creditService:     NewCreditService(repository.NewCreditRepository(db)),
+		logger:            zap.NewNop(),
+	}
+	return orderService, broadcastService
 }

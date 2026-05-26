@@ -147,7 +147,7 @@ type Payment struct {
 	PaymentNo     string     `gorm:"type:varchar(50);uniqueIndex;not null" json:"payment_no"`
 	OrderID       int64      `gorm:"index;not null" json:"order_id"`
 	UserID        int64      `gorm:"index;not null" json:"user_id"`
-	PaymentType   string     `gorm:"type:varchar(20)" json:"payment_type"`   // order, deposit, refund, withdrawal
+	PaymentType   string     `gorm:"type:varchar(30)" json:"payment_type"`   // order, deposit, refund, withdrawal, tip, price_adjustment
 	PaymentMethod string     `gorm:"type:varchar(20)" json:"payment_method"` // wechat, alipay, mock
 	Amount        int64      `json:"amount"`
 	Status        string     `gorm:"type:varchar(20);default:pending" json:"status"` // pending, paid, failed, refunded

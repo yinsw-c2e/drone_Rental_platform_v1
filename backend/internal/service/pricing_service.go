@@ -71,6 +71,13 @@ func NewPricingService(serviceClassRepo *repository.ServiceClassRepo) *PricingSe
 	}
 }
 
+func (s *PricingService) ListServiceClasses() ([]model.ServiceClass, error) {
+	if s == nil || s.serviceClassRepo == nil {
+		return nil, errors.New("计价服务未初始化")
+	}
+	return s.serviceClassRepo.ListActive()
+}
+
 func (s *PricingService) Estimate(input PricingEstimateInput) (*PricingEstimate, error) {
 	if s == nil || s.serviceClassRepo == nil {
 		return nil, errors.New("计价服务未初始化")

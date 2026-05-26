@@ -22,11 +22,12 @@ import (
 )
 
 type Handler struct {
-	orderService    *service.OrderService
-	dispatchService *service.DispatchService
-	flightService   *service.FlightService
-	pricingService  *service.PricingService
-	contractService *service.ContractService
+	orderService      *service.OrderService
+	dispatchService   *service.DispatchService
+	flightService     *service.FlightService
+	pricingService    *service.PricingService
+	settlementService *service.SettlementService
+	contractService   *service.ContractService
 }
 
 type aggregatedOrderTimelineEvent struct {
@@ -43,12 +44,13 @@ type aggregatedOrderTimelineEvent struct {
 	Payload      gin.H     `json:"payload,omitempty"`
 }
 
-func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService) *Handler {
+func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, settlementService *service.SettlementService) *Handler {
 	return &Handler{
-		orderService:    orderService,
-		dispatchService: dispatchService,
-		flightService:   flightService,
-		pricingService:  pricingService,
+		orderService:      orderService,
+		dispatchService:   dispatchService,
+		flightService:     flightService,
+		pricingService:    pricingService,
+		settlementService: settlementService,
 	}
 }
 
@@ -109,6 +111,19 @@ func (h *Handler) Estimate(c *gin.Context) {
 		return
 	}
 	response.V2Success(c, estimate)
+}
+
+func (h *Handler) ListServiceClasses(c *gin.Context) {
+	if h.pricingService == nil {
+		response.V2InternalError(c, "计价服务未初始化")
+		return
+	}
+	items, err := h.pricingService.ListServiceClasses()
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, items)
 }
 
 func (h *Handler) CreateInstant(c *gin.Context) {
@@ -561,6 +576,35 @@ func (h *Handler) Monitor(c *gin.Context) {
 	response.V2Success(c, monitor)
 }
 
+func (h *Handler) Live(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	if h.flightService == nil {
+		response.V2InternalError(c, "飞行监控服务未初始化")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	live, err := h.flightService.GetOrderLive(order)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, live)
+}
+
 func (h *Handler) Timeline(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -780,6 +824,13 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 	data["dispute_count"] = len(disputes)
 	data["timeline"] = buildTimelineList(timeline)
 	data["site_safety_check"] = buildSiteSafetyCheckSummary(siteSafetyCheck)
+	if h.flightService != nil {
+		live, err := h.flightService.GetOrderLive(order)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		data["live"] = live
+	}
 	return data, nil
 }
 
@@ -920,6 +971,7 @@ func buildOrderSummary(order *model.Order) gin.H {
 		"demand_id":              nullableInt64(order.DemandID),
 		"source_supply_id":       nullableInt64(order.SourceSupplyID),
 		"status":                 order.Status,
+		"reviewed":               order.Reviewed,
 		"needs_dispatch":         order.NeedsDispatch,
 		"execution_mode":         order.ExecutionMode,
 		"provider_user_id":       nullableInt64(order.ProviderUserID),
@@ -1300,6 +1352,36 @@ func buildPaymentSummary(payment *model.Payment) gin.H {
 	}
 }
 
+func buildSettlementAdjustmentSummary(settlement *model.OrderSettlement) gin.H {
+	if settlement == nil {
+		return nil
+	}
+	return gin.H{
+		"id":                                settlement.ID,
+		"settlement_no":                     settlement.SettlementNo,
+		"order_id":                          settlement.OrderID,
+		"status":                            settlement.Status,
+		"estimated_amount":                  settlement.EstimatedAmount,
+		"final_amount":                      settlement.FinalAmount,
+		"actual_distance_fee":               settlement.ActualDistanceFee,
+		"actual_duration_fee":               settlement.ActualDurationFee,
+		"surcharge_amount":                  settlement.SurchargeAmount,
+		"tip_amount":                        settlement.TipAmount,
+		"partial_handover_amount":           settlement.PartialHandoverAmount,
+		"partial_handover_provider_user_id": settlement.PartialHandoverProviderUserID,
+		"partial_handover_settled_at":       settlement.PartialHandoverSettledAt,
+		"partial_handover_reason":           settlement.PartialHandoverReason,
+		"price_adjust_reason":               settlement.PriceAdjustReason,
+		"adjust_reviewed":                   settlement.AdjustReviewed,
+		"adjust_reviewed_by":                settlement.AdjustReviewedBy,
+		"adjust_reviewed_at":                settlement.AdjustReviewedAt,
+		"platform_fee":                      settlement.PlatformFee,
+		"pilot_fee":                         settlement.PilotFee,
+		"owner_fee":                         settlement.OwnerFee,
+		"insurance_deduction":               settlement.InsuranceDeduction,
+	}
+}
+
 func buildRefundSummary(refund *model.Refund) gin.H {
 	if refund == nil {
 		return nil
@@ -1673,6 +1755,91 @@ func (h *Handler) ConfirmReceipt(c *gin.Context) {
 	}
 
 	response.V2Success(c, gin.H{"message": "已确认签收"})
+}
+
+type orderTipRequest struct {
+	Amount        int64  `json:"amount" binding:"required"`
+	PaymentMethod string `json:"payment_method"`
+	Method        string `json:"method"`
+}
+
+func (h *Handler) AddTip(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+	if h.settlementService == nil {
+		response.V2InternalError(c, "结算服务未初始化")
+		return
+	}
+
+	var req orderTipRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid tip payload")
+		return
+	}
+	method := strings.TrimSpace(firstEstimateString(req.PaymentMethod, req.Method, "mock"))
+	result, err := h.settlementService.AddOrderTip(orderID, userID, req.Amount, method)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, gin.H{
+		"payment":    buildPaymentSummary(result.Payment),
+		"settlement": buildSettlementAdjustmentSummary(result.Settlement),
+	})
+}
+
+type orderPriceIncreaseRequest struct {
+	Amount        int64  `json:"amount" binding:"required"`
+	Reason        string `json:"reason"`
+	PaymentMethod string `json:"payment_method"`
+	Method        string `json:"method"`
+}
+
+func (h *Handler) IncreasePrice(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+	if h.settlementService == nil {
+		response.V2InternalError(c, "结算服务未初始化")
+		return
+	}
+
+	var req orderPriceIncreaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid price increase payload")
+		return
+	}
+	method := strings.TrimSpace(firstEstimateString(req.PaymentMethod, req.Method, "mock"))
+	result, err := h.settlementService.IncreaseOrderPrice(orderID, userID, req.Amount, req.Reason, method)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+
+	response.V2Success(c, gin.H{
+		"payment":    buildPaymentSummary(result.Payment),
+		"settlement": buildSettlementAdjustmentSummary(result.Settlement),
+		"broadcast": gin.H{
+			"id":                    result.Broadcast.ID,
+			"status":                result.Broadcast.Status,
+			"estimated_total_cents": result.Broadcast.EstimatedTotalCents,
+			"expires_at":            result.Broadcast.ExpiresAt,
+		},
+	})
 }
 
 // ─── 合同 API ─────────────────────────────────────────

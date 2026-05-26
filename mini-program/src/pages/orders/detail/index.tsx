@@ -147,6 +147,83 @@ const getStepState = (detail: any) => {
   return 1;
 };
 
+const normalizedStatus = (order?: any) => String(order?.status || '').toLowerCase();
+const normalizedMode = (order?: any) => String(order?.order_mode || '').toLowerCase();
+const cancelStatuses = ['pending_dispatch', 'scheduled', 'assigned', 'preparing'];
+const contactVisibleStatuses = ['assigned', 'preparing', 'in_transit', 'delivered'];
+const terminalOnlyStatuses = ['cancelled', 'provider_rejected'];
+
+const orderAgeSeconds = (value?: string) => {
+  if (!value) return 0;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+};
+
+const within24Hours = (value?: string | null) => {
+  if (!value) return true;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return true;
+  return Date.now() - date.getTime() <= 24 * 60 * 60 * 1000;
+};
+
+const formatEta = (seconds?: number | null) => {
+  if (seconds === 0) return '即将到达';
+  if (seconds === null || seconds === undefined || !Number.isFinite(Number(seconds))) return '等待实时位置';
+  const safe = Math.max(0, Math.round(Number(seconds)));
+  const min = Math.floor(safe / 60);
+  const sec = safe % 60;
+  if (min <= 0) return `约 ${sec} 秒到达`;
+  return `约 ${min} 分 ${sec} 秒到达`;
+};
+
+const orderStatusBadgeOf = (order: any) => {
+  const status = normalizedStatus(order);
+  if (status === 'pending_dispatch' || status === 'auto_assigning') return '等待服务商';
+  if (status === 'assigned') return '服务商已接单';
+  if (status === 'preparing') return '准备起飞';
+  if (status === 'in_transit') return '飞行中';
+  if (status === 'delivered') return '等待签收';
+  if (status === 'completed') return '已完成';
+  if (status === 'cancelled') return '已取消';
+  if (status === 'provider_rejected') return '服务未确认';
+  if (status === 'pending_payment') return '待支付';
+  if (status === 'scheduled') return '已预约';
+  return '服务推进中';
+};
+
+const orderStatusToneOf = (order: any) => {
+  const status = normalizedStatus(order);
+  if (['completed', 'delivered'].includes(status)) return 'success';
+  if (['cancelled', 'provider_rejected'].includes(status)) return 'muted';
+  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'scheduled'].includes(status)) return 'warning';
+  return 'primary';
+};
+
+const detailProviderNameOf = (detail: any) => {
+  const direct = detail?.provider_snapshot?.nickname || detail?.provider_snapshot?.name || providerNameOf(detail);
+  if (direct && direct !== '服务商待确认') return direct;
+  const id = Number(detail?.provider_user_id || detail?.participants?.provider?.user_id || 0);
+  if (id > 0) return `服务商 ${String(id).slice(-4)}`;
+  return '服务商待确认';
+};
+
+const canCancelOrder = (order: any) => cancelStatuses.includes(normalizedStatus(order));
+const canIncreaseOrderPrice = (order: any) =>
+  normalizedMode(order) === 'instant' &&
+  normalizedStatus(order) === 'pending_dispatch' &&
+  orderAgeSeconds(order?.created_at) >= 90;
+const canAddOrderTip = (order: any) => {
+  const mode = normalizedMode(order);
+  const status = normalizedStatus(order);
+  if (!['instant', 'reservation'].includes(mode)) return false;
+  if (status === 'in_transit') return true;
+  return status === 'delivered' && within24Hours(order?.updated_at || order?.completed_at || order?.created_at);
+};
+const canContactOrderProvider = (order: any) => contactVisibleStatuses.includes(normalizedStatus(order));
+const canReviewOrder = (order: any) => normalizedStatus(order) === 'completed' && !order?.reviewed;
+const isTerminalOnlyOrder = (order: any) => terminalOnlyStatuses.includes(normalizedStatus(order));
+
 export default function OrderProgressPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
   const orderId = Number(params.orderId || params.id || 0);
@@ -224,6 +301,8 @@ export default function OrderProgressPage() {
   const canConfirm = detail?.status === 'delivered';
   const canPay = detail?.status === 'pending_payment';
   const canReview = detail?.status === 'completed';
+  const canViewLive = ['instant', 'reservation'].includes(String(detail?.order_mode || ''))
+    && ['assigned', 'preparing', 'in_transit', 'delivered'].includes(String(detail?.status || ''));
   const needsContractSign = canPay && !detail?.payment_ready;
   const providerPhone = detail ? providerPhoneOf(detail) : '';
   const customerPhone = detail ? customerPhoneOf(detail) : '';
@@ -273,6 +352,11 @@ export default function OrderProgressPage() {
     Taro.showToast({ title: '暂无方案详情', icon: 'none' });
   };
 
+  const viewLive = () => {
+    if (!orderId) return;
+    Taro.navigateTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
+  };
+
   const copyOrderNo = () => {
     if (!orderNo) return;
     Taro.setClipboardData({ data: orderNo });
@@ -291,6 +375,69 @@ export default function OrderProgressPage() {
         if (res.confirm) openService();
       },
     });
+  };
+
+  const cancelOrder = async () => {
+    if (!detail || !orderId) return;
+    const res = await Taro.showModal({
+      title: '确认取消订单？',
+      content: '取消后订单将停止继续匹配或服务。',
+      confirmText: '确认取消',
+    });
+    if (!res.confirm) return;
+    setActionLoading(true);
+    try {
+      await orderV2Service.cancel(orderId, '客户主动取消');
+      Taro.showToast({ title: '已取消', icon: 'success' });
+      load();
+    } catch (error: any) {
+      Taro.showToast({ title: String(error?.message || '取消失败'), icon: 'none' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const increasePrice = async () => {
+    if (!detail || !orderId) return;
+    const res = await Taro.showModal({
+      title: '附近运力紧张',
+      content: '加价 ¥20 提升接单优先级？',
+      confirmText: '确认加价',
+    });
+    if (!res.confirm) return;
+    setActionLoading(true);
+    try {
+      await orderV2Service.priceIncrease(orderId, { amount: 2000, reason: '加价提升接单' });
+      Taro.showToast({ title: '加价成功，已通知服务商', icon: 'success' });
+      load();
+    } catch (error: any) {
+      Taro.showToast({ title: String(error?.message || '加价失败'), icon: 'none' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const addTip = async () => {
+    if (!detail || !orderId) return;
+    const sheet = await Taro.showActionSheet({ itemList: ['¥5', '¥10', '¥20'] }).catch(() => null);
+    if (!sheet || typeof sheet.tapIndex !== 'number') return;
+    const amount = [500, 1000, 2000][sheet.tapIndex] || 500;
+    const res = await Taro.showModal({
+      title: '给服务商小费',
+      content: `给服务商小费 ¥${amount / 100}？`,
+      confirmText: '确认支付',
+    });
+    if (!res.confirm) return;
+    setActionLoading(true);
+    try {
+      await orderV2Service.addTip(orderId, amount);
+      Taro.showToast({ title: '小费已支付', icon: 'success' });
+      load();
+    } catch (error: any) {
+      Taro.showToast({ title: String(error?.message || '小费支付失败'), icon: 'none' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const submitConfirm = () => {
@@ -372,6 +519,9 @@ export default function OrderProgressPage() {
         : canReview
           ? '评价订单'
       : '完成后可确认';
+  const showProviderCardRow = detail && ['assigned', 'preparing', 'in_transit', 'delivered', 'completed'].includes(normalizedStatus(detail));
+  const showEtaRow = normalizedStatus(detail) === 'in_transit';
+  const showTerminalOnlyAction = detail && isTerminalOnlyOrder(detail);
   const settlementRows = settlement?.id ? [
     { label: '结算单号', value: settlement.settlement_no || '--' },
     { label: '客户实付', value: formatMoney(settlement.final_amount || settlement.total_amount) },
@@ -404,20 +554,102 @@ export default function OrderProgressPage() {
             </View>
           ) : (
             <>
-          <View className="op5-status-card">
-            <Image className="op5-status-icon" src={iconAccepted} mode="aspectFit" />
-            <Text className="op5-status-title">{statusTitleOf(detail?.status)}</Text>
-            <Text className="op5-status-desc">{loading ? '正在同步订单信息...' : statusDescOf(detail?.status)}</Text>
-            <View className="op5-plan-btn" onClick={viewPlan}>
-              <Text>查看方案</Text>
+          <View className="op5-lala-card">
+            <View className="op5-lala-head">
+              <View className={`op5-lala-badge op5-lala-badge-${orderStatusToneOf(detail)}`}>
+                <Text>{orderStatusBadgeOf(detail)}</Text>
+              </View>
+              <View className="op5-lala-copy" onClick={copyOrderNo}>
+                <Text>复制单号</Text>
+              </View>
             </View>
-            <View className="op5-status-line" />
-            <Text className="op5-order-label">订单号</Text>
-            <Text className="op5-order-no">{orderNo}</Text>
-            <View className="op5-copy-btn" onClick={copyOrderNo}>
-              <Text>复制</Text>
+
+            <View className="op5-lala-route">
+              <View className="op5-lala-route-row">
+                <View className="op5-lala-route-dot op5-lala-route-start" />
+                <Text>{detail?.service_address || '起点待确认'}</Text>
+              </View>
+              <View className="op5-lala-route-row">
+                <View className="op5-lala-route-dot op5-lala-route-end" />
+                <Text>{detail?.dest_address || '终点待确认'}</Text>
+              </View>
             </View>
-            <Text className="op5-order-time">下单时间：{createdAt}</Text>
+
+            {showProviderCardRow ? (
+              <View className="op5-lala-provider">
+                <View className="op5-lala-avatar" />
+                <View className="op5-lala-provider-main">
+                  <Text className="op5-lala-provider-name">{detailProviderNameOf(detail)}</Text>
+                  <Text className="op5-lala-provider-rating">评分 5.0</Text>
+                </View>
+                {canContactOrderProvider(detail) ? (
+                  <View className="op5-lala-phone" onClick={contactCounterparty}>
+                    <Text>☎</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {showEtaRow ? (
+              <View className="op5-lala-eta">
+                <Text>预计到达</Text>
+                <Text>{formatEta(detail?.live?.eta_seconds)}</Text>
+              </View>
+            ) : null}
+
+            <View className="op5-lala-meta">
+              <View>
+                <Text className="op5-lala-order-no">{orderNo}</Text>
+                <Text className="op5-lala-order-time">下单时间：{createdAt}</Text>
+              </View>
+              <Text className="op5-lala-amount">{formatMoney(detail?.total_amount)}</Text>
+            </View>
+
+            <View className="op5-lala-actions">
+              {showTerminalOnlyAction ? (
+                <View className="op5-lala-button op5-lala-button-muted" onClick={() => Taro.switchTab({ url: '/pages/home/index' })}>
+                  <Text>重新下单</Text>
+                </View>
+              ) : (
+                <>
+                  {canCancelOrder(detail) ? (
+                    <View className="op5-lala-button op5-lala-button-ghost" onClick={cancelOrder}>
+                      <Text>取消订单</Text>
+                    </View>
+                  ) : null}
+                  {canIncreaseOrderPrice(detail) ? (
+                    <View className="op5-lala-button op5-lala-button-warn" onClick={increasePrice}>
+                      <Text>附近运力紧张？加价</Text>
+                    </View>
+                  ) : null}
+                  {canAddOrderTip(detail) ? (
+                    <View className="op5-lala-button op5-lala-button-ghost" onClick={addTip}>
+                      <Text>给个小费</Text>
+                    </View>
+                  ) : null}
+                  {canViewLive ? (
+                    <View className="op5-lala-button op5-lala-button-primary" onClick={viewLive}>
+                      <Text>查看实时位置</Text>
+                    </View>
+                  ) : null}
+                  {canContactOrderProvider(detail) ? (
+                    <View className="op5-lala-button op5-lala-button-ghost" onClick={contactCounterparty}>
+                      <Text>拨打电话</Text>
+                    </View>
+                  ) : null}
+                  {canPay ? (
+                    <View className="op5-lala-button op5-lala-button-primary" onClick={submitConfirm}>
+                      <Text>去支付</Text>
+                    </View>
+                  ) : null}
+                  {canReviewOrder(detail) ? (
+                    <View className="op5-lala-button op5-lala-button-primary" onClick={() => Taro.navigateTo({ url: `/pages/review/index?orderId=${orderId}` })}>
+                      <Text>评价服务</Text>
+                    </View>
+                  ) : null}
+                </>
+              )}
+            </View>
           </View>
 
           <View className="op5-summary-card">
@@ -476,16 +708,6 @@ export default function OrderProgressPage() {
           )}
         </View>
       </ScrollView>
-
-      {detail ? <View className="op5-actionbar">
-        <View className="op5-contact-btn" onClick={contactCounterparty}>
-          <Image className="op5-phone-icon" src={iconPhone} mode="aspectFit" />
-          <Text>联系{contactTargetLabel}</Text>
-        </View>
-        <View className={`op5-confirm-btn ${(canPay || canConfirm || canReview) ? 'op5-confirm-btn-enabled' : ''}`} onClick={submitConfirm}>
-          <Text>{primaryActionText}</Text>
-        </View>
-      </View> : null}
 
       <View className="op5-tabbar">
         <View className="op5-tab-item" onClick={() => switchMainTab('/pages/home/index')}>

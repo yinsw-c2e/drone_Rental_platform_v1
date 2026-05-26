@@ -152,10 +152,6 @@ export default function OrderAnomalyListPage() {
   };
 
   const openAnomaly = (item: V2OrderAnomaly) => {
-    if (roleFilter === 'pilot' && item.dispatch_task_id) {
-      Taro.navigateTo({ url: `/pages/dispatch/detail/index?id=${item.dispatch_task_id}` });
-      return;
-    }
     if (item.order_id) {
       Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${item.order_id}` });
       return;

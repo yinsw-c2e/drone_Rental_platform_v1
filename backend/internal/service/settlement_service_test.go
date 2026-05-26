@@ -19,6 +19,7 @@ func newSettlementServiceTest(t *testing.T) (*SettlementService, *repository.Ord
 	db := newServiceTestDB(
 		t,
 		&model.Order{},
+		&model.OrderTimeline{},
 		&model.OrderSettlement{},
 		&model.PricingConfig{},
 		&model.Review{},
@@ -126,6 +127,7 @@ func TestFinalizeOrderSettlementCreditsWalletsOnce(t *testing.T) {
 	db := newServiceTestDB(
 		t,
 		&model.Order{},
+		&model.OrderTimeline{},
 		&model.OrderSettlement{},
 		&model.UserWallet{},
 		&model.WalletTransaction{},
@@ -335,6 +337,7 @@ func TestSettlementDisputeResolutionAllowsManualFeeAdjustment(t *testing.T) {
 	db := newServiceTestDB(
 		t,
 		&model.Order{},
+		&model.OrderTimeline{},
 		&model.OrderSettlement{},
 		&model.UserWallet{},
 		&model.WalletTransaction{},
@@ -1020,6 +1023,206 @@ func TestFinanceOperationsOverviewAggregatesRiskQueues(t *testing.T) {
 	}
 	if overview.ManualAction.Applied != 1 || overview.ManualAction.RolledBackToday != 1 {
 		t.Fatalf("unexpected manual action stats: %#v", overview.ManualAction)
+	}
+}
+
+func TestAddOrderTipCreditsProviderWalletImmediately(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSettlement{},
+		&model.Payment{},
+		&model.UserWallet{},
+		&model.WalletTransaction{},
+		&model.PricingConfig{},
+		&model.Review{},
+		&model.FinanceManualActionRecord{},
+	)
+	orderRepo := repository.NewOrderRepo(db)
+	settlementRepo := repository.NewSettlementRepo(db)
+	service := NewSettlementService(settlementRepo, orderRepo, zap.NewNop())
+	service.SetPaymentRepo(repository.NewPaymentRepo(db))
+
+	order := &model.Order{
+		OrderNo:             "ORD-H5-TIP-001",
+		OrderType:           "cargo",
+		OrderMode:           OrderModeInstant,
+		OrderSource:         "instant",
+		Status:              "in_transit",
+		TotalAmount:         100000,
+		PriceBreakdownJSON:  model.JSON([]byte(`{"total_estimated_cents":100000}`)),
+		ProviderUserID:      7,
+		ExecutorPilotUserID: 7,
+		DroneOwnerUserID:    7,
+		ClientUserID:        4,
+		RenterID:            4,
+		ExecutionMode:       "self_execute",
+		CargoWeightKG:       20,
+	}
+	if err := orderRepo.Create(order); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+
+	result, err := service.AddOrderTip(order.ID, 4, 1200, "mock")
+	if err != nil {
+		t.Fatalf("add tip: %v", err)
+	}
+	if result.Payment == nil || result.Payment.PaymentType != "tip" || result.Payment.Status != "paid" || result.Payment.Amount != 1200 {
+		t.Fatalf("unexpected tip payment: %#v", result.Payment)
+	}
+	if result.Settlement == nil || result.Settlement.TipAmount != 1200 || result.Settlement.FinalAmount != 100000 {
+		t.Fatalf("unexpected settlement after tip: %#v", result.Settlement)
+	}
+
+	var wallet model.UserWallet
+	if err := db.Where("user_id = ?", int64(7)).First(&wallet).Error; err != nil {
+		t.Fatalf("load provider wallet: %v", err)
+	}
+	if wallet.AvailableBalance != 1200 || wallet.TotalIncome != 1200 {
+		t.Fatalf("expected immediate tip income 1200, got %#v", wallet)
+	}
+
+	var stored model.Order
+	if err := db.First(&stored, order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if stored.TotalAmount != 100000 || string(stored.PriceBreakdownJSON) != `{"total_estimated_cents":100000}` {
+		t.Fatalf("order pricing snapshot mutated: total=%d breakdown=%s", stored.TotalAmount, string(stored.PriceBreakdownJSON))
+	}
+}
+
+func TestIncreaseOrderPriceRefreshesBroadcastWithoutMutatingOrderSnapshot(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSettlement{},
+		&model.Payment{},
+		&model.OrderBroadcast{},
+		&model.PricingConfig{},
+		&model.Review{},
+		&model.FinanceManualActionRecord{},
+	)
+	orderRepo := repository.NewOrderRepo(db)
+	settlementRepo := repository.NewSettlementRepo(db)
+	broadcastRepo := repository.NewOrderBroadcastRepo(db)
+	service := NewSettlementService(settlementRepo, orderRepo, zap.NewNop())
+	service.SetPaymentRepo(repository.NewPaymentRepo(db))
+	service.SetBroadcastRepo(broadcastRepo)
+
+	order := &model.Order{
+		OrderNo:            "ORD-H5-PRICE-001",
+		OrderType:          "cargo",
+		OrderMode:          OrderModeInstant,
+		OrderSource:        "instant",
+		Status:             "pending_dispatch",
+		TotalAmount:        10000,
+		PriceBreakdownJSON: model.JSON([]byte(`{"total_estimated_cents":10000}`)),
+		ClientUserID:       4,
+		RenterID:           4,
+		CargoWeightKG:      20,
+	}
+	if err := orderRepo.Create(order); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	oldExpiresAt := time.Now().Add(-time.Minute)
+	broadcast := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      22.55,
+		OriginLongitude:     114.05,
+		ServiceClassCode:    "light_heavy",
+		WeightKG:            20,
+		EstimatedTotalCents: 10000,
+		Status:              "expired",
+		ExpiresAt:           oldExpiresAt,
+	}
+	if err := broadcastRepo.Create(broadcast); err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+
+	result, err := service.IncreaseOrderPrice(order.ID, 4, 2000, "附近运力紧张", "mock")
+	if err != nil {
+		t.Fatalf("increase price: %v", err)
+	}
+	if result.Payment == nil || result.Payment.PaymentType != "price_adjustment" || result.Payment.Amount != 2000 || result.Payment.Status != "paid" {
+		t.Fatalf("unexpected price adjustment payment: %#v", result.Payment)
+	}
+	if result.Settlement.SurchargeAmount != 2000 || result.Settlement.FinalAmount != 12000 || result.Settlement.Status != "calculated" {
+		t.Fatalf("unexpected settlement adjustment: %#v", result.Settlement)
+	}
+	if result.Broadcast.Status != "open" || result.Broadcast.EstimatedTotalCents != 12000 || !result.Broadcast.ExpiresAt.After(oldExpiresAt) {
+		t.Fatalf("broadcast was not refreshed: %#v", result.Broadcast)
+	}
+
+	var stored model.Order
+	if err := db.First(&stored, order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if stored.TotalAmount != 10000 || string(stored.PriceBreakdownJSON) != `{"total_estimated_cents":10000}` {
+		t.Fatalf("order pricing snapshot mutated: total=%d breakdown=%s", stored.TotalAmount, string(stored.PriceBreakdownJSON))
+	}
+}
+
+func TestIncreaseOrderPriceOverThresholdRequiresSettlementReview(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSettlement{},
+		&model.Payment{},
+		&model.OrderBroadcast{},
+		&model.PricingConfig{},
+		&model.SystemConfig{},
+		&model.Review{},
+		&model.FinanceManualActionRecord{},
+	)
+	orderRepo := repository.NewOrderRepo(db)
+	broadcastRepo := repository.NewOrderBroadcastRepo(db)
+	service := NewSettlementService(repository.NewSettlementRepo(db), orderRepo, zap.NewNop())
+	service.SetPaymentRepo(repository.NewPaymentRepo(db))
+	service.SetBroadcastRepo(broadcastRepo)
+	service.SetSystemConfigService(NewSystemConfigService(db))
+	if err := db.Create(&model.SystemConfig{
+		ConfigKey:   "settlement.adjust_review_threshold_pct",
+		ConfigValue: "10",
+		Description: "test threshold",
+	}).Error; err != nil {
+		t.Fatalf("seed system config: %v", err)
+	}
+
+	order := &model.Order{
+		OrderNo:       "ORD-H5-REVIEW-001",
+		OrderType:     "cargo",
+		OrderMode:     OrderModeInstant,
+		OrderSource:   "instant",
+		Status:        "pending_dispatch",
+		TotalAmount:   10000,
+		ClientUserID:  4,
+		RenterID:      4,
+		CargoWeightKG: 20,
+	}
+	if err := orderRepo.Create(order); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	if err := broadcastRepo.Create(&model.OrderBroadcast{
+		OrderID:             order.ID,
+		EstimatedTotalCents: 10000,
+		Status:              "open",
+		ExpiresAt:           time.Now().Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+
+	result, err := service.IncreaseOrderPrice(order.ID, 4, 1500, "超过复核阈值", "mock")
+	if err != nil {
+		t.Fatalf("increase price: %v", err)
+	}
+	if result.Settlement.Status != "pending_review" {
+		t.Fatalf("expected pending_review, got %#v", result.Settlement)
+	}
+	if _, err := service.FinalizeSettlement(result.Settlement.ID); err == nil || !strings.Contains(err.Error(), "待复核") {
+		t.Fatalf("expected pending review to block finalization, got %v", err)
 	}
 }
 

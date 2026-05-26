@@ -124,7 +124,7 @@ export default function DemandDetailPage() {
           )}
           {canCandidate && (
             <View className={`btn ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-outline' : 'btn-warning'}`} onClick={handleCandidateToggle}>
-              <Text className={`btn-text ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-text-outline' : ''}`}>{(demand as any)?.my_candidate?.status === 'active' ? '取消候选' : '报名候选'}</Text>
+              <Text className={`btn-text ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-text-outline' : ''}`}>{(demand as any)?.my_candidate?.status === 'active' ? '撤回报名' : '报名承接'}</Text>
             </View>
           )}
         </View>
@@ -146,7 +146,7 @@ export default function DemandDetailPage() {
           </View>
           <View className="stat-box">
             <Text className="stat-num stat-orange">{demand.candidate_pilot_count || 0}</Text>
-            <Text className="stat-label">候选服务商</Text>
+            <Text className="stat-label">已报名服务商</Text>
           </View>
         </View>
       </View>

@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -16,26 +17,29 @@ type EventService struct {
 }
 
 var pushEventAllowlist = map[string]struct{}{
-	"direct_order_created":         {},
-	"direct_order_confirmed":       {},
-	"direct_order_rejected":        {},
-	"contract_client_signed":       {},
-	"contract_provider_signed":     {},
-	"contract_fully_signed":        {},
-	"order_paid":                   {},
-	"order_preparing":              {},
-	"order_in_transit":             {},
-	"order_delivered":              {},
-	"settlement_settled":           {},
-	"dispatch_created":             {},
-	"dispatch_accepted":            {},
-	"dispatch_reassigned":          {},
-	"dispatch_manual_required":     {},
-	"pilot_verification_result":    {},
-	"drone_certification_reviewed": {},
-	"drone_uom_reviewed":           {},
-	"drone_insurance_reviewed":     {},
-	"drone_airworthiness_reviewed": {},
+	"direct_order_created":            {},
+	"direct_order_confirmed":          {},
+	"direct_order_rejected":           {},
+	"contract_client_signed":          {},
+	"contract_provider_signed":        {},
+	"contract_fully_signed":           {},
+	"order_paid":                      {},
+	"order_preparing":                 {},
+	"order_in_transit":                {},
+	"order_delivered":                 {},
+	"settlement_settled":              {},
+	"broadcast_auto_assigned":         {},
+	"broadcast_auto_assign_timeout":   {},
+	"broadcast_auto_assign_exhausted": {},
+	"dispatch_created":                {},
+	"dispatch_accepted":               {},
+	"dispatch_reassigned":             {},
+	"dispatch_manual_required":        {},
+	"pilot_verification_result":       {},
+	"drone_certification_reviewed":    {},
+	"drone_uom_reviewed":              {},
+	"drone_insurance_reviewed":        {},
+	"drone_airworthiness_reviewed":    {},
 }
 
 func NewEventService(messageService *MessageService, pushService push.PushService, logger *zap.Logger) *EventService {
@@ -131,6 +135,54 @@ func (s *EventService) NotifyDirectOrderCreated(order *model.Order) {
 			"order_source":  order.OrderSource,
 			"status":        order.Status,
 			"business_type": "order",
+		},
+	)
+}
+
+func (s *EventService) NotifyBroadcastAutoAssigned(order *model.Order, providerUserID int64, deadline time.Time) {
+	if order == nil || providerUserID <= 0 {
+		return
+	}
+	s.notifyUsers([]int64{providerUserID}, "broadcast_auto_assigned", "收到自动指派订单",
+		fmt.Sprintf("订单“%s”已自动指派给您，请在时窗内确认是否承接。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+		map[string]interface{}{
+			"order_id":           order.ID,
+			"order_no":           order.OrderNo,
+			"order_source":       order.OrderSource,
+			"order_mode":         order.OrderMode,
+			"status":             order.Status,
+			"accept_deadline_at": deadline,
+			"business_type":      "broadcast_assignment",
+		},
+	)
+}
+
+func (s *EventService) NotifyBroadcastAutoAssignTimeoutForProvider(providerUserID int64, orderID int64) {
+	if providerUserID <= 0 || orderID <= 0 {
+		return
+	}
+	s.notifyUsers([]int64{providerUserID}, "broadcast_auto_assign_timeout", "自动指派已超时",
+		"您未在时窗内确认自动指派订单，系统已继续匹配其他服务商。",
+		map[string]interface{}{
+			"order_id":      orderID,
+			"business_type": "broadcast_assignment",
+		},
+	)
+}
+
+func (s *EventService) NotifyBroadcastAutoAssignExhausted(order *model.Order) {
+	if order == nil {
+		return
+	}
+	s.notifyUsers(orderClientReceivers(order), "broadcast_auto_assign_exhausted", "暂未匹配到服务商",
+		fmt.Sprintf("订单“%s”附近暂无可承接服务商，平台将继续关注运力情况。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+		map[string]interface{}{
+			"order_id":      order.ID,
+			"order_no":      order.OrderNo,
+			"order_source":  order.OrderSource,
+			"order_mode":    order.OrderMode,
+			"status":        order.Status,
+			"business_type": "broadcast_assignment",
 		},
 	)
 }

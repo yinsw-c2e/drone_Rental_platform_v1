@@ -226,6 +226,9 @@ async function request<T = any>(opts: RequestOptions): Promise<T> {
     }
 
     // 网络错误
+    if (error?.statusCode || error?.errno) {
+      throw error;
+    }
     const msg = error?.errMsg || error?.message || '网络请求失败';
     throw new Error(msg);
   }
