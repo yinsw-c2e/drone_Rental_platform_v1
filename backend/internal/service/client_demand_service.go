@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -50,6 +51,12 @@ type SelectProviderResult struct {
 	OrderID int64  `json:"order_id"`
 	OrderNo string `json:"order_no"`
 	Status  string `json:"status"`
+}
+
+type SuggestedDemandPriceResult struct {
+	AmountCents int64  `json:"amount_cents"`
+	Yuan        int64  `json:"yuan"`
+	Source      string `json:"source"`
 }
 
 type DemandViewerState struct {
@@ -163,7 +170,7 @@ func (s *ClientService) CancelDemand(userID, demandID int64) (*model.Demand, err
 	var updated *model.Demand
 	err := db.Transaction(func(tx *gorm.DB) error {
 		repo := repository.NewDemandDomainRepo(tx)
-		demand, err := repo.GetDemandByID(demandID)
+		demand, err := repo.LockDemandByID(demandID)
 		if err != nil {
 			return errors.New("需求不存在")
 		}
@@ -323,6 +330,46 @@ func (s *ClientService) GetDemandDetail(userID, demandID int64) (*model.Demand, 
 	return demand, nil
 }
 
+func (s *ClientService) SuggestDemandPrice(userID, demandID int64) (*SuggestedDemandPriceResult, error) {
+	if s == nil || s.demandDomainRepo == nil || s.orderService == nil || s.orderService.pricingService == nil {
+		return nil, errors.New("需求定价服务未初始化")
+	}
+	demand, err := s.GetDemandDetail(userID, demandID)
+	if err != nil {
+		return nil, err
+	}
+	origin := firstDemandPricePoint(
+		parseAddressSnapshot(demand.DepartureAddressSnapshot),
+		parseAddressSnapshot(demand.ServiceAddressSnapshot),
+	)
+	destination := firstDemandPricePoint(
+		parseAddressSnapshot(demand.DestinationAddressSnapshot),
+		parseAddressSnapshot(demand.ServiceAddressSnapshot),
+	)
+	if origin == nil || destination == nil {
+		return nil, errors.New("需求缺少起终点经纬度，无法推荐报价")
+	}
+	startAt := time.Now()
+	if demand.ScheduledStartAt != nil {
+		startAt = *demand.ScheduledStartAt
+	}
+	estimate, err := s.orderService.pricingService.Estimate(PricingEstimateInput{
+		Origin:           *origin,
+		Destination:      *destination,
+		CargoWeightKG:    demand.CargoWeightKG,
+		ScheduledStartAt: startAt,
+		CargoScene:       demand.CargoScene,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &SuggestedDemandPriceResult{
+		AmountCents: estimate.TotalEstimatedCents,
+		Yuan:        int64(math.Round(float64(estimate.TotalEstimatedCents) / 100)),
+		Source:      "pricing_service",
+	}, nil
+}
+
 func (s *ClientService) ListDemandQuotes(userID, demandID int64) ([]model.DemandQuote, error) {
 	if s.demandDomainRepo == nil {
 		return nil, errors.New("需求域仓储未初始化")
@@ -421,12 +468,39 @@ func (s *ClientService) SelectProvider(userID, demandID, quoteID int64) (*Select
 		artifactRepo := repository.NewOrderArtifactRepo(tx)
 		ownerRepo := repository.NewOwnerDomainRepo(tx)
 
-		demand, err := demandRepo.GetDemandByID(demandID)
+		demand, err := demandRepo.LockDemandByID(demandID)
 		if err != nil {
 			return errors.New("需求不存在")
 		}
 		if demand.ClientUserID != userID {
 			return errors.New("无权操作该需求")
+		}
+
+		quote, err := demandRepo.LockDemandQuoteByID(quoteID)
+		if err != nil {
+			return errors.New("报价不存在")
+		}
+		if quote.DemandID != demand.ID {
+			return errors.New("报价不属于当前需求")
+		}
+		if quote.PriceAmount <= 0 {
+			return errors.New("报价金额无效")
+		}
+		if demand.SelectedQuoteID > 0 && demand.SelectedQuoteID != quote.ID {
+			return errors.New("该需求已选定其它报价")
+		}
+		if existing, err := orderRepo.FindDemandMarketOrderByDemandID(demand.ID); err == nil && existing != nil && existing.ID > 0 {
+			result = &SelectProviderResult{
+				OrderID: existing.ID,
+				OrderNo: existing.OrderNo,
+				Status:  existing.Status,
+			}
+			return nil
+		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if demand.ExpiresAt != nil && demand.ExpiresAt.Before(time.Now()) {
+			return errors.New("需求已过期，无法继续转单")
 		}
 		if demand.Status == "converted_to_order" {
 			return errors.New("该需求已转为订单")
@@ -434,22 +508,8 @@ func (s *ClientService) SelectProvider(userID, demandID, quoteID int64) (*Select
 		if demand.Status != "published" && demand.Status != "quoting" && demand.Status != "selected" {
 			return errors.New("当前需求状态不允许选择机主")
 		}
-		if demand.ExpiresAt != nil && demand.ExpiresAt.Before(time.Now()) {
-			return errors.New("需求已过期，无法继续转单")
-		}
-
-		quote, err := demandRepo.GetDemandQuoteByID(quoteID)
-		if err != nil {
-			return errors.New("报价不存在")
-		}
-		if quote.DemandID != demand.ID {
-			return errors.New("报价不属于当前需求")
-		}
 		if quote.Status != "submitted" && quote.Status != "selected" {
 			return errors.New("当前报价不可被选定")
-		}
-		if quote.PriceAmount <= 0 {
-			return errors.New("报价金额无效")
 		}
 		if err := s.validateDemandAirspace(demand); err != nil {
 			return err
@@ -775,6 +835,23 @@ func parseAddressSnapshot(snapshot model.JSON) addressSnapshotPayload {
 	var payload addressSnapshotPayload
 	_ = json.Unmarshal(snapshot, &payload)
 	return payload
+}
+
+func firstDemandPricePoint(items ...addressSnapshotPayload) *PricingPoint {
+	for _, item := range items {
+		if item.Latitude == nil || item.Longitude == nil {
+			continue
+		}
+		point := PricingPoint{
+			Latitude:  *item.Latitude,
+			Longitude: *item.Longitude,
+			Address:   strings.TrimSpace(item.Text),
+		}
+		if validCoordinate(point.Latitude, point.Longitude) {
+			return &point
+		}
+	}
+	return nil
 }
 
 func normalizeDemandServiceType(value string) string {

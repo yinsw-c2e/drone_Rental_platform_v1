@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"wurenji-backend/internal/model"
 	"wurenji-backend/internal/pkg/limits"
@@ -23,6 +24,17 @@ func (r *DemandDomainRepo) UpdateDemand(demand *model.Demand) error {
 		return nil
 	}
 	return r.db.Save(demand).Error
+}
+
+func (r *DemandDomainRepo) LockDemandByID(id int64) (*model.Demand, error) {
+	var demand model.Demand
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&demand).Error
+	if err != nil {
+		return nil, err
+	}
+	return &demand, nil
 }
 
 func (r *DemandDomainRepo) UpdateDemandFields(id int64, fields map[string]interface{}) error {
@@ -212,6 +224,19 @@ func (r *DemandDomainRepo) CreateDemandQuote(quote *model.DemandQuote) error {
 func (r *DemandDomainRepo) GetDemandQuoteByID(id int64) (*model.DemandQuote, error) {
 	var quote model.DemandQuote
 	err := r.db.Preload("Owner").Preload("Drone").Where("id = ?", id).First(&quote).Error
+	if err != nil {
+		return nil, err
+	}
+	return &quote, nil
+}
+
+func (r *DemandDomainRepo) LockDemandQuoteByID(id int64) (*model.DemandQuote, error) {
+	var quote model.DemandQuote
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Preload("Owner").
+		Preload("Drone").
+		Where("id = ?", id).
+		First(&quote).Error
 	if err != nil {
 		return nil, err
 	}

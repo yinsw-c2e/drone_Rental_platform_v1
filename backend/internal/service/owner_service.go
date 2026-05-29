@@ -916,7 +916,7 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 	var result *model.DemandQuote
 	err = db.Transaction(func(tx *gorm.DB) error {
 		demandRepo := repository.NewDemandDomainRepo(tx)
-		demand, err := demandRepo.GetDemandByID(demandID)
+		demand, err := demandRepo.LockDemandByID(demandID)
 		if err != nil {
 			return errors.New("需求不存在")
 		}
