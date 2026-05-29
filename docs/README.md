@@ -50,6 +50,8 @@
 
 ### 运维与部署
 
+- [构建脚本说明](./build.md)
+- [部署与实测前检查](./deploy.md)
 - [部署检查清单](./operations/DEPLOY_CHECKLIST.md)
 
 ## 保留在根目录的特殊文件
