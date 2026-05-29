@@ -1,5 +1,5 @@
 import Taro from '@tarojs/taro';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../store/store';
@@ -41,8 +41,10 @@ const roleOptions: RoleOption[] = [
 
 export default function ModeSelectionPage() {
   const [brandTop, setBrandTop] = useState(109);
+  const hasRedirectedRef = useRef(false);
   const dispatch = useDispatch();
   const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
 
   useEffect(() => {
     try {
@@ -58,6 +60,17 @@ export default function ModeSelectionPage() {
       setBrandTop(109);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || hasRedirectedRef.current) {
+      return;
+    }
+
+    hasRedirectedRef.current = true;
+    Taro.switchTab({ url: '/pages/home/index' }).catch(() => {
+      Taro.reLaunch({ url: '/pages/home/index' });
+    });
+  }, [isAuthenticated]);
 
   const selectMode = (mode: HaulRoleMode) => {
     dispatch(setHaulRoleMode(mode));
@@ -115,7 +128,7 @@ export default function ModeSelectionPage() {
             onClick={openRegister}
             className='mode-primary-button'
           >
-            <Text className='mode-primary-text'>手机号登录 / 注册</Text>
+            <Text className='mode-primary-text'>新账号注册</Text>
           </View>
 
           <View className='mode-login-row'>

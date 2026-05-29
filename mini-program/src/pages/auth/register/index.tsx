@@ -45,6 +45,12 @@ export default function RegisterPage() {
         roleSummary: (res as any).role_summary || null,
       }));
       Taro.showToast({ title: '注册成功', icon: 'success' });
+      if (routeRoleMode === 'provider') {
+        Taro.redirectTo({ url: '/pages/provider/onboarding/index?from=register' }).catch(() => {
+          Taro.navigateTo({ url: '/pages/provider/onboarding/index?from=register' }).catch(() => null);
+        });
+        return;
+      }
       Taro.switchTab({ url: '/pages/home/index' });
     } catch (e: any) {
       Taro.showToast({ title: e.message || '注册失败', icon: 'none' });
@@ -91,7 +97,13 @@ export default function RegisterPage() {
       </View>
       <Text
         style={{ color: '#1677ff', fontSize: '13px', textAlign: 'center', marginTop: '20px', display: 'block' }}
-        onClick={() => Taro.navigateBack()}
+        onClick={() => {
+          const url = `/pages/auth/login/index${routeRoleMode ? `?roleMode=${routeRoleMode}` : ''}`;
+          // 用 redirectTo 替换当前页，避免 register/login 反复 push 撑栈
+          Taro.redirectTo({ url }).catch(() => {
+            Taro.navigateTo({ url }).catch(() => null);
+          });
+        }}
       >
         已有账号？去登录
       </Text>

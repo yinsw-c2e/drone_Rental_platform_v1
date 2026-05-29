@@ -23,6 +23,7 @@ type ApiEnvelope<T = any> = Partial<V2ApiResponse<T>> & {
 };
 
 type RequestError = Error & {
+  code?: number | string;
   statusCode?: number;
   errno?: number;
 };
@@ -72,8 +73,11 @@ function hasOwn(value: Record<string, any>, key: string) {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function createRequestError(message: string, statusCode?: number): RequestError {
+function createRequestError(message: string, statusCode?: number, code?: number | string): RequestError {
   const error = new Error(message) as RequestError;
+  if (code !== undefined) {
+    error.code = code;
+  }
   if (statusCode) {
     error.statusCode = statusCode;
     error.errno = statusCode;
@@ -103,7 +107,7 @@ function unwrapResponseBody<T = any>(body: any): T {
       return body as T;
     }
     const numericCode = typeof envelope.code === 'number' ? envelope.code : undefined;
-    throw createRequestError(envelope.message || envelope.error || '请求失败', numericCode);
+    throw createRequestError(envelope.message || envelope.error || '请求失败', numericCode, envelope.code);
   }
 
   // 兼容部分旧形态响应：HTTP 2xx 已成功，但响应体没有 code，只包了一层 data。
@@ -166,7 +170,7 @@ async function request<T = any>(opts: RequestOptions): Promise<T> {
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw createRequestError(getResponseMessage(body, `请求失败(${res.statusCode})`), res.statusCode);
+      throw createRequestError(getResponseMessage(body, `请求失败(${res.statusCode})`), res.statusCode, isRecord(body) ? body.code : undefined);
     }
 
     return unwrapResponseBody<T>(body);

@@ -6,11 +6,7 @@ import { User } from '../types';
 import { apiV2 } from './api';
 
 const getAccessToken = () => {
-  const token = store.getState().auth.accessToken;
-  if (token) {
-    return token;
-  }
-  return Taro.getStorageSync('token') || '';
+  return store.getState().auth.accessToken || '';
 };
 
 const parseUploadResponse = (raw: string) => {

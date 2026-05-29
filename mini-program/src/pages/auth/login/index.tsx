@@ -231,7 +231,13 @@ export default function LoginPage() {
             </Text>
             <Text
               className="login-link"
-              {...bindPress(() => Taro.navigateTo({ url: `/pages/auth/register/index?roleMode=${activeMode}` }))}
+              {...bindPress(() => {
+                const url = `/pages/auth/register/index?roleMode=${activeMode}`;
+                // 用 redirectTo 替换当前 login，避免反复 push 撑栈
+                Taro.redirectTo({ url }).catch(() => {
+                  Taro.navigateTo({ url }).catch(() => null);
+                });
+              })}
             >
               注册新账号
             </Text>
