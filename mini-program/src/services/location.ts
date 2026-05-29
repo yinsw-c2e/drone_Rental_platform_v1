@@ -1,6 +1,16 @@
 import { apiV2 } from './api';
 import { ApiResponse, AddressData, POIItem, ReverseGeoResult } from '../types';
 
+const normalizeLocationError = (error: any) => {
+  if (error?.code === 'AMAP_NOT_CONFIGURED' || error?.message === '地图服务暂未配置，请联系平台') {
+    throw Object.assign(new Error('地址服务暂不可用，请联系平台'), {
+      code: 'AMAP_NOT_CONFIGURED',
+      statusCode: error?.statusCode,
+    });
+  }
+  throw error;
+};
+
 export const locationService = {
   // === 位置搜索 ===
 
@@ -10,7 +20,8 @@ export const locationService = {
 
   /** 逆地理编码: 坐标 -> 地址 */
   reverseGeoCode: (lng: number, lat: number) =>
-    apiV2.get<ApiResponse<ReverseGeoResult>>('/location/regeocode', {lng, lat}),
+    apiV2.get<ApiResponse<ReverseGeoResult>>('/location/regeocode', {lng, lat})
+      .catch(normalizeLocationError),
 
   /** 周边POI搜索 */
   searchNearby: (params: {lng: number; lat: number; radius?: number; keyword?: string; page?: number; page_size?: number}) =>
