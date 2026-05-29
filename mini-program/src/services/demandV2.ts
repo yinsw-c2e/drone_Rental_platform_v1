@@ -71,6 +71,9 @@ export const demandV2Service = {
   createQuote: (demandId: number, payload: DemandQuoteInput) =>
     apiV2.post<DemandQuoteSummary>(`/demands/${demandId}/quotes`, payload),
 
+  getSuggestedPrice: (demandId: number) =>
+    apiV2.post<{ amount_cents: number; yuan: number; source: string }>(`/demands/${demandId}/suggested-price`, {}),
+
   selectProvider: (demandId: number, quoteId: number) =>
     apiV2.post<DemandSelectProviderResult>(`/demands/${demandId}/select-provider`, { quote_id: quoteId }),
 

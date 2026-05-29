@@ -168,14 +168,16 @@ export default function DemandDetailPage() {
                     {quote.execution_plan ? ` · ${quote.execution_plan}` : ''}
                   </Text>
                 </View>
-                <Text className="quote-price">¥{((quote.price_amount || 0) / 100).toFixed(2)}</Text>
-                {quote.status === 'submitted' ? (
-                  <View className={`quote-select ${submitting ? 'disabled' : ''}`} onClick={() => handleSelectQuote(quote)}>
-                    <Text className="quote-select-text">{submitting ? '处理中' : '选定'}</Text>
-                  </View>
-                ) : (
-                  <Text className="quote-status">{getObjectStatusMeta('quote', quote.status).label || quote.status}</Text>
-                )}
+                <View className="quote-side">
+                  <Text className="quote-price">¥{((quote.price_amount || 0) / 100).toFixed(2)}</Text>
+                  {quote.status === 'submitted' ? (
+                    <View className={`quote-select ${submitting ? 'disabled' : ''}`} onClick={() => handleSelectQuote(quote)}>
+                      <Text className="quote-select-text">{submitting ? '处理中' : '选定'}</Text>
+                    </View>
+                  ) : (
+                    <Text className="quote-status">{getObjectStatusMeta('quote', quote.status).label || quote.status}</Text>
+                  )}
+                </View>
               </View>
             ))
           )}

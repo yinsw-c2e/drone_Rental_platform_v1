@@ -94,8 +94,8 @@ export default function DemandQuotePage() {
         <Text className="hero-title">{demandTitle}</Text>
         <Text className="hero-desc">
           {isQuickQuote
-            ? '已按平台预算预填报价，确认无人机并提交后才会生成真实报价。'
-            : '服务商报价只针对需求撮合，不会在这里混入订单信息。客户选定您的方案后，才会进入订单履约环节。'}
+            ? '已按平台推荐价预填，确认机型后一键提交即可。'
+            : '提交方案后，客户会对比所有报价并挑一家。被选中后才会正式建单。'}
         </Text>
       </View>
 

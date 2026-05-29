@@ -4,11 +4,10 @@ import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { demandV2Service, DemandListParams } from '../../../services/demandV2';
 import { DemandSummary } from '../../../types';
-import { getDemandSceneLabel } from '../../../utils';
+import { CARGO_SCENE_LABELS, getDemandSceneLabel } from '../../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import { syncCustomTabBar } from '../../../utils/tabBar';
-import { RootState, useAppDispatch } from '../../../store/store';
-import { setHaulRoleMode } from '../../../store/slices/roleSlice';
+import { RootState } from '../../../store/store';
 import filterChevronIcon from '../../../assets/haul/provider-demand-list/icon_filter_chevron_down.png';
 import locationPinIcon from '../../../assets/haul/provider-demand-list/icon_location_pin_blue.png';
 import weightIcon from '../../../assets/haul/provider-demand-list/icon_metric_weight_blue.png';
@@ -16,7 +15,6 @@ import clockIcon from '../../../assets/haul/provider-demand-list/icon_metric_clo
 import sceneIcon from '../../../assets/haul/provider-demand-list/icon_metric_scene_green.png';
 import priceIcon from '../../../assets/haul/provider-demand-list/icon_metric_price_purple.png';
 import airspaceIcon from '../../../assets/haul/provider-demand-list/icon_airspace_status_green.png';
-import chevronRightIcon from '../../../assets/haul/provider-demand-list/icon_chevron_right.png';
 import headerMessageIcon from '../../../assets/haul/provider-demand-list/icon_header_message_outline.png';
 import messageDotIcon from '../../../assets/haul/provider-demand-list/badge_message_red_dot.png';
 import './index.scss';
@@ -32,7 +30,7 @@ type VisualDemand = {
   distanceSort: number | null;
   coverageLabel: string;
   arrivalLabel: string;
-  responseLabel: string;
+  region: string;
   weight: string;
   weightKg: number | null;
   schedule: string;
@@ -47,26 +45,31 @@ type VisualDemand = {
   suggestedPriceYuan: number | null;
 };
 
-const PAGE_SIZE = 20;
-const RATIO = 0.79702444;
+type ProviderCapabilityCopy = {
+  title: string;
+  desc: string;
+};
 
-const filterMeta: Array<{ key: FilterKey; label: string; options: string[] }> = [
-  { key: 'region', label: '区域', options: ['全部区域', '龙岗区', '南山区', '宝安区', '坪山区'] },
+const PAGE_SIZE = 20;
+
+const baseFilterMeta: Array<{ key: FilterKey; label: string; options: string[] }> = [
+  { key: 'region', label: '区域', options: ['全部区域'] },
   { key: 'weight', label: '货物重量', options: ['全部重量', '50kg以下', '50-100kg', '100-300kg', '300kg以上'] },
-  { key: 'time', label: '作业时间', options: ['全部时间', '今天', '明天', '预约时间'] },
-  { key: 'scene', label: '场景类型', options: ['全部场景', '施工物料吊运', '楼顶设备吊装', '应急物资转运'] },
+  { key: 'time', label: '作业时间', options: ['全部时间', '今天', '明天', '后天及以后'] },
+  { key: 'scene', label: '场景类型', options: ['全部场景'] },
 ];
 
-const sceneQueryByLabel: Record<string, string> = {
+const sceneQueryByLabel: Record<string, string> = Object.entries(CARGO_SCENE_LABELS).reduce((acc, [code, label]) => {
+  acc[label] = code;
+  return acc;
+}, {
   施工物料吊运: 'power_grid',
   楼顶设备吊装: 'other_heavy_lift',
   应急物资转运: 'emergency_relief',
-};
-
-const toRpx = (value: number) => `${Number((value * RATIO).toFixed(3))}rpx`;
+} as Record<string, string>);
 
 const formatYuan = (amount?: number | null) =>
-  `¥ ${Math.round(Number(amount || 0) / 100).toLocaleString('zh-CN')}`;
+  `¥${Math.round(Number(amount || 0) / 100).toLocaleString('zh-CN')}`;
 
 const formatYuanCompact = (amount?: number | null) =>
   `¥${Math.round(Number(amount || 0) / 100).toLocaleString('zh-CN')}`;
@@ -78,6 +81,28 @@ const formatPrice = (min?: number | null, max?: number | null) => {
   if (hi > 0) return `${formatYuan(hi)}以内`;
   if (lo > 0) return `${formatYuan(lo)}起`;
   return '待报价';
+};
+
+const providerCapabilityCopyOf = (canQuote: boolean, canSelfExecute: boolean): ProviderCapabilityCopy | null => {
+  if (!canQuote && !canSelfExecute) {
+    return {
+      title: '设备和履约资质都未开通',
+      desc: '议价报价需先通过设备资质审核，即时抢单还需要补充履约资质。',
+    };
+  }
+  if (!canQuote) {
+    return {
+      title: '议价报价需先通过设备资质审核',
+      desc: '设备资质通过后才能查看可报价需求。',
+    };
+  }
+  if (!canSelfExecute) {
+    return {
+      title: '可议价报价；即时抢单需补履约资质',
+      desc: '当前可查看需求并报价，即时抢单还需要补充履约资质。',
+    };
+  }
+  return null;
 };
 
 const parseDate = (value?: string | null) => {
@@ -108,6 +133,45 @@ const compactAddress = (value?: string | null) => {
 const snapshotAddressText = (value: any) =>
   value?.name || value?.address || value?.text || '';
 
+const demandRegionLabel = (item: DemandSummary) => {
+  const anyItem = item as any;
+  const snapshots = [
+    anyItem.departure_address,
+    anyItem.service_address,
+    anyItem.destination_address,
+  ].filter(Boolean);
+
+  for (const snapshot of snapshots) {
+    const district = String(snapshot?.district || '').trim();
+    if (district) return district;
+  }
+  for (const snapshot of snapshots) {
+    const city = String(snapshot?.city || '').trim();
+    if (city) return city;
+  }
+
+  const text = [
+    snapshotAddressText(anyItem.departure_address),
+    anyItem.service_address_text,
+    snapshotAddressText(anyItem.service_address),
+    snapshotAddressText(anyItem.destination_address),
+  ].filter(Boolean).join(' ');
+  const matches = text.match(/[\u4e00-\u9fa5]{2,}(?:区|县|市|镇|乡|街道)/g) || [];
+  return matches.find(value => /(?:区|县)$/.test(value)) || matches.find(value => /市$/.test(value)) || '';
+};
+
+const uniqueOptions = (values: string[], max = 5) => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  values.forEach((value) => {
+    const text = String(value || '').trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    result.push(text);
+  });
+  return result.slice(0, max);
+};
+
 const positiveNumber = (value: unknown) => {
   const next = Number(value || 0);
   return Number.isFinite(next) && next > 0 ? next : null;
@@ -124,16 +188,6 @@ const arrivalLabelOf = (minutes?: number | null) => {
   const value = Number(minutes || 0);
   if (!Number.isFinite(value) || value <= 0) return '';
   return `约${Math.ceil(value)}分`;
-};
-
-const responseLabelOf = (seconds?: number | null) => {
-  const value = Number(seconds || 0);
-  if (!Number.isFinite(value) || value < 0) return '';
-  const minutes = Math.max(1, Math.round(value / 60));
-  if (minutes < 60) return `已响应${minutes}分`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `已响应${hours}小时`;
-  return `已响应${Math.round(hours / 24)}天`;
 };
 
 const airspaceMetaOf = (value?: string | null): Pick<VisualDemand, 'airspace' | 'airspaceTone'> => {
@@ -167,10 +221,10 @@ const mapDemand = (item: DemandSummary): VisualDemand => {
   const distanceKm = positiveNumber(anyItem.distance_km);
   const coverageLabel = distanceKm ? coverageLabelOf(anyItem.service_coverage_status) : '';
   const arrivalLabel = arrivalLabelOf(anyItem.estimated_arrival_minutes);
-  const responseLabel = responseLabelOf(anyItem.quote_response_seconds);
   const scheduleDate = parseDate(item.scheduled_start_at);
   const priceSort = positiveNumber(item.budget_min) || positiveNumber(item.budget_max);
   const airspace = airspaceMetaOf(anyItem.airspace_status);
+  const region = demandRegionLabel(item);
 
   return {
     id: item.id,
@@ -180,7 +234,7 @@ const mapDemand = (item: DemandSummary): VisualDemand => {
     distanceSort: distanceKm,
     coverageLabel,
     arrivalLabel,
-    responseLabel,
+    region,
     weight: weightKg ? `${weightKg} kg` : '重量待补',
     weightKg,
     schedule: formatSchedule(item.scheduled_start_at),
@@ -226,7 +280,7 @@ const applyTimeFilter = (params: DemandListParams, value: string) => {
     params.start_from = startOfLocalDay(1).toISOString();
     params.start_to = startOfLocalDay(2).toISOString();
   }
-  if (value === '预约时间') {
+  if (value === '后天及以后') {
     params.start_from = startOfLocalDay(2).toISOString();
   }
 };
@@ -252,7 +306,7 @@ const buildDemandQuery = (
 };
 
 const matchesFilters = (item: VisualDemand, filters: Record<FilterKey, string>) => {
-  if (filters.region !== '区域' && !item.route.includes(filters.region) && !item.title.includes(filters.region)) {
+  if (filters.region !== '区域' && item.region !== filters.region && !item.route.includes(filters.region) && !item.title.includes(filters.region)) {
     return false;
   }
   if (filters.weight !== '货物重量') {
@@ -271,7 +325,7 @@ const matchesFilters = (item: VisualDemand, filters: Record<FilterKey, string>) 
     tomorrow.setDate(today.getDate() + 1);
     if (filters.time === '今天' && !isSameDay(date, today)) return false;
     if (filters.time === '明天' && !isSameDay(date, tomorrow)) return false;
-    if (filters.time === '预约时间' && (isSameDay(date, today) || isSameDay(date, tomorrow))) return false;
+    if (filters.time === '后天及以后' && (isSameDay(date, today) || isSameDay(date, tomorrow))) return false;
   }
   if (filters.scene !== '场景类型') {
     const sceneQuery = sceneQueryByLabel[filters.scene];
@@ -280,8 +334,7 @@ const matchesFilters = (item: VisualDemand, filters: Record<FilterKey, string>) 
   return true;
 };
 
-export default function DemandListPage() {
-  const dispatch = useAppDispatch();
+export default function DemandListPage({ headerExtra }: { headerExtra?: React.ReactNode } = {}) {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const [demands, setDemands] = useState<DemandSummary[]>([]);
@@ -290,16 +343,24 @@ export default function DemandListPage() {
   const [hasMore, setHasMore] = useState(false);
   const [fetchError, setFetchError] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('distance');
-  const [headerActionRight, setHeaderActionRight] = useState(toRpx(176));
+  const [headerTopRpx, setHeaderTopRpx] = useState(132);
+  const [headerActionTopRpx, setHeaderActionTopRpx] = useState(132);
   const [filters, setFilters] = useState<Record<FilterKey, string>>({
     region: '区域',
     weight: '货物重量',
     time: '作业时间',
     scene: '场景类型',
   });
+  // 长选项的自定义底部弹层（绕开微信 showActionSheet 6 项硬上限）
+  const [filterSheet, setFilterSheet] = useState<{ key: FilterKey; options: string[] } | null>(null);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary), [roleSummary]);
   const providerCapabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
   const canQuoteAsProvider = providerCapabilities.canPublishSupply;
+  const canSelfExecuteAsProvider = providerCapabilities.canSelfExecute;
+  const providerCapabilityCopy = useMemo(
+    () => providerCapabilityCopyOf(canQuoteAsProvider, canSelfExecuteAsProvider),
+    [canQuoteAsProvider, canSelfExecuteAsProvider],
+  );
 
   const fetchDemands = useCallback(async (
     nextPage = 1,
@@ -310,7 +371,7 @@ export default function DemandListPage() {
     if (!isAuthenticated || !canQuoteAsProvider) {
       setDemands([]);
       setHasMore(false);
-      setFetchError(isAuthenticated ? '服务商设备能力未开通，审核通过后才能查看可报价需求。' : '请先登录服务商账号后查看可接需求。');
+      setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '议价报价需先通过设备资质审核') : '请先登录服务商账号后查看可接需求。');
       setLoading(false);
       return;
     }
@@ -329,16 +390,16 @@ export default function DemandListPage() {
     } finally {
       setLoading(false);
     }
-  }, [canQuoteAsProvider, filters, isAuthenticated, sortKey]);
+  }, [canQuoteAsProvider, filters, isAuthenticated, providerCapabilityCopy?.title, sortKey]);
 
   useDidShow(() => {
-    dispatch(setHaulRoleMode('provider'));
-    syncCustomTabBar(1, 'provider');
+    // 仅同步 TabBar 选中态，不强制改写全局角色身份。
+    syncCustomTabBar(1);
     setPage(1);
     if (!isAuthenticated || !canQuoteAsProvider) {
       setDemands([]);
       setHasMore(false);
-      setFetchError(isAuthenticated ? '服务商设备能力未开通，审核通过后才能查看可报价需求。' : '请先登录服务商账号后查看可接需求。');
+      setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '议价报价需先通过设备资质审核') : '请先登录服务商账号后查看可接需求。');
       setLoading(false);
       return;
     }
@@ -347,27 +408,41 @@ export default function DemandListPage() {
 
   useEffect(() => {
     try {
+      const sys = Taro.getSystemInfoSync();
+      const ratio = 750 / (sys.windowWidth || 375);
+      const statusBarRpx = Math.round(((sys.statusBarHeight || 20) + 12) * ratio);
+      setHeaderTopRpx(statusBarRpx);
       const menu = Taro.getMenuButtonBoundingClientRect();
-      const system = Taro.getSystemInfoSync();
-      const windowWidth = system.windowWidth || 375;
-      const rpxRatio = 750 / windowWidth;
-
-      if (menu?.left) {
-        const capsuleRight = (windowWidth - menu.left) * rpxRatio;
-        setHeaderActionRight(`${Math.max(146, Math.round(capsuleRight + 38))}rpx`);
+      if (menu?.top) {
+        setHeaderActionTopRpx(Math.round(menu.top * ratio));
+      } else {
+        setHeaderActionTopRpx(statusBarRpx);
       }
     } catch {
-      setHeaderActionRight(toRpx(176));
+      setHeaderTopRpx(132);
+      setHeaderActionTopRpx(132);
     }
   }, []);
 
+  const allVisualDemands = useMemo(() => demands.map(mapDemand), [demands]);
+
+  const filterMeta = useMemo(() => baseFilterMeta.map((item) => {
+    if (item.key === 'region') {
+      return { ...item, options: ['全部区域', ...uniqueOptions(allVisualDemands.map(demand => demand.region))] };
+    }
+    if (item.key === 'scene') {
+      return { ...item, options: ['全部场景', ...uniqueOptions(allVisualDemands.map(demand => demand.scene).filter(scene => scene !== '场景待补'))] };
+    }
+    return item;
+  }), [allVisualDemands]);
+
   const visualDemands = useMemo(() => {
-    const source = demands.map(mapDemand).filter(item => matchesFilters(item, filters));
+    const source = allVisualDemands.filter(item => matchesFilters(item, filters));
     if (sortKey === 'price') {
       return [...source].sort((a, b) => (a.priceSort ?? Number.MAX_SAFE_INTEGER) - (b.priceSort ?? Number.MAX_SAFE_INTEGER));
     }
     return [...source].sort((a, b) => (a.distanceSort ?? Number.MAX_SAFE_INTEGER) - (b.distanceSort ?? Number.MAX_SAFE_INTEGER));
-  }, [demands, filters, sortKey]);
+  }, [allVisualDemands, filters, sortKey]);
 
   const loadMore = () => {
     if (!hasMore || loading || !demands.length) return;
@@ -376,16 +451,24 @@ export default function DemandListPage() {
     fetchDemands(nextPage, false, filters, sortKey);
   };
 
+  const applyFilterChoice = (key: FilterKey, value: string) => {
+    if (!value) return;
+    const meta = filterMeta.find(item => item.key === key);
+    const nextValue = value.startsWith('全部') ? meta?.label || filters[key] : value;
+    const nextFilters = { ...filters, [key]: nextValue };
+    setFilters(nextFilters);
+    setPage(1);
+    fetchDemands(1, true, nextFilters, sortKey);
+  };
+
   const openFilter = (key: FilterKey, options: string[]) => {
+    // 微信 showActionSheet itemList 最多 6 项，超过会直接 fail
+    if (options.length > 6) {
+      setFilterSheet({ key, options });
+      return;
+    }
     Taro.showActionSheet({ itemList: options }).then((res) => {
-      const value = options[res.tapIndex];
-      if (!value) return;
-      const meta = filterMeta.find(item => item.key === key);
-      const nextValue = value.startsWith('全部') ? meta?.label || filters[key] : value;
-      const nextFilters = { ...filters, [key]: nextValue };
-      setFilters(nextFilters);
-      setPage(1);
-      fetchDemands(1, true, nextFilters, sortKey);
+      applyFilterChoice(key, options[res.tapIndex]);
     }).catch(() => null);
   };
 
@@ -402,171 +485,257 @@ export default function DemandListPage() {
     });
   };
 
-  const goQuote = (item: VisualDemand) => {
-    if (!canQuoteAsProvider) {
-      Taro.showToast({ title: '设备服务能力未开通', icon: 'none' });
-      return;
-    }
-    const priceParam = item.suggestedPriceYuan ? `&priceYuan=${item.suggestedPriceYuan}` : '';
-    Taro.navigateTo({
-      url: `/pages/demand/quote/index?id=${item.id}&demandTitle=${encodeURIComponent(item.title)}${priceParam}`,
-    }).catch(() => Taro.showToast({ title: '报价页暂不可用', icon: 'none' }));
-  };
-
   const openMessages = () => {
     Taro.switchTab({ url: '/pages/messages/index' }).catch(() => null);
   };
 
-  const openQuickQuote = (item: VisualDemand) => {
-    const priceParam = item.suggestedPriceYuan ? `&priceYuan=${item.suggestedPriceYuan}` : '';
+  const goProviderOnboarding = () => {
+    Taro.navigateTo({ url: '/pages/provider/onboarding/index?from=demand-list' }).catch(() => {
+      Taro.showToast({ title: '入驻页暂不可用', icon: 'none' });
+    });
+  };
+
+  const goBack = () => {
+    if (Taro.getCurrentPages().length > 1) {
+      Taro.navigateBack();
+    } else {
+      Taro.switchTab({ url: '/pages/home/index' }).catch(() => null);
+    }
+  };
+
+  const openQuickQuote = async (item: VisualDemand) => {
+    let suggestedPriceYuan = item.suggestedPriceYuan || null;
+    try {
+      const res = await demandV2Service.getSuggestedPrice(item.id);
+      const yuan = Number((res as any)?.yuan || (res as any)?.data?.yuan || 0);
+      if (Number.isFinite(yuan) && yuan > 0) {
+        suggestedPriceYuan = yuan;
+      }
+    } catch {
+      // 后端推荐价不可用时保留预算均值兜底，不阻断快速报价。
+    }
+    const priceParam = suggestedPriceYuan ? `&priceYuan=${suggestedPriceYuan}` : '';
     Taro.navigateTo({
       url: `/pages/demand/quote/index?id=${item.id}&quick=1&demandTitle=${encodeURIComponent(item.title)}${priceParam}`,
     }).catch(() => Taro.showToast({ title: '报价页暂不可用', icon: 'none' }));
   };
 
-  const emptyTop = 398;
-  const baseCanvasHeight = Math.max(1672, emptyTop + Math.max(visualDemands.length, 1) * 411 + 80);
-  const canvasHeight = toRpx(baseCanvasHeight);
-
   return (
-    <View className="provider-demand-page">
+    <View className='pd-page'>
+      <View
+        className='pd-header'
+        style={{ paddingTop: `${headerTopRpx}rpx` }}
+      >
+        <View
+          className='pd-header-back'
+          style={{ top: `${headerActionTopRpx}rpx` }}
+          onClick={goBack}
+        >
+          <View className='pd-header-back-arrow' />
+        </View>
+        <Text className='pd-header-title'>可接吊运需求</Text>
+        <View
+          className='pd-header-action'
+          style={{ top: `${headerActionTopRpx}rpx` }}
+          onClick={openMessages}
+        >
+          <Image className='pd-header-action-icon' src={headerMessageIcon} mode='aspectFit' />
+          <Image className='pd-header-action-dot' src={messageDotIcon} mode='aspectFit' />
+        </View>
+      </View>
+
       <ScrollView
         scrollY
         enhanced
         showScrollbar={false}
-        className="provider-demand-scroll"
+        className='pd-scroll'
         lowerThreshold={80}
         onScrollToLower={loadMore}
       >
-        <View
-          className="provider-demand-canvas"
-          style={{ height: canvasHeight } as any}
-        >
-          <View className="pd-header-bg" />
-          <View className="pd-content-curve" />
-          <Text className="pd-nav-title">可接吊运需求</Text>
-          <View
-            className="pd-header-message-entry"
-            style={{ right: headerActionRight }}
-            onClick={openMessages}
-          >
-            <Image className="pd-header-message" src={headerMessageIcon} mode="aspectFit" />
-            <Image className="pd-header-message-dot" src={messageDotIcon} mode="aspectFit" />
+        {headerExtra ? (
+          <View className='pd-segment-host'>{headerExtra}</View>
+        ) : null}
+        {providerCapabilityCopy && isAuthenticated ? (
+          <View className='pd-capability-notice'>
+            <View className='pd-capability-copy'>
+              <Text className='pd-capability-title'>{providerCapabilityCopy.title}</Text>
+              <Text className='pd-capability-desc'>{providerCapabilityCopy.desc}</Text>
+            </View>
+            <View className='pd-capability-action' onClick={goProviderOnboarding}>
+              <Text>去完善</Text>
+            </View>
           </View>
-
-          <View className="pd-filter-row">
+        ) : null}
+        <View className='pd-filter-area'>
+          <View className='pd-filter-row'>
             {filterMeta.map(item => (
               <View
                 key={item.key}
-                className={`pd-filter-chip pd-filter-${item.key}`}
+                className='pd-filter-chip'
                 onClick={() => openFilter(item.key, item.options)}
               >
-                <Text className="pd-filter-text">{filters[item.key]}</Text>
-                <Image className="pd-filter-chevron" src={filterChevronIcon} mode="aspectFit" />
+                <Text className='pd-filter-text'>{filters[item.key]}</Text>
+                <Image className='pd-filter-chevron' src={filterChevronIcon} mode='aspectFit' />
               </View>
             ))}
           </View>
 
-          <View className="pd-sort-row">
-            <View className={`pd-sort-chip ${sortKey === 'distance' ? 'active' : ''}`} onClick={() => changeSort('distance')}>
-              <Text className={`pd-sort-text ${sortKey === 'distance' ? 'active' : ''}`}>距离最近</Text>
+          <View className='pd-sort-row'>
+            <View
+              className={`pd-sort-chip ${sortKey === 'distance' ? 'is-active' : ''}`}
+              onClick={() => changeSort('distance')}
+            >
+              <Text>距离最近</Text>
             </View>
-            <View className="pd-sort-price" onClick={() => changeSort('price')}>
-              <Text className={`pd-sort-price-text ${sortKey === 'price' ? 'active' : ''}`}>价格优先</Text>
+            <View
+              className={`pd-sort-chip ${sortKey === 'price' ? 'is-active' : ''}`}
+              onClick={() => changeSort('price')}
+            >
+              <Text>价格优先</Text>
             </View>
           </View>
-
-          {visualDemands.map((item, index) => (
-            <View
-              key={`${item.id}-${index}`}
-              className="pd-demand-card"
-              style={{ top: toRpx(398 + index * 411) }}
-              onClick={() => goDetail(item)}
-            >
-              <Image className="pd-route-pin" src={locationPinIcon} mode="aspectFit" />
-              <Text className="pd-route-title" numberOfLines={1}>{item.route}</Text>
-              <Text className="pd-distance">{item.distance}</Text>
-              <View className="pd-card-line pd-card-line-top" />
-              <View className="pd-card-line pd-card-line-bottom" />
-
-              <View className="pd-metrics">
-                <View className="pd-metric pd-metric-weight">
-                  <Image className="pd-metric-icon pd-metric-icon-weight" src={weightIcon} mode="aspectFit" />
-                  <Text className="pd-metric-label">货物重量</Text>
-                  <Text className="pd-metric-value">{item.weight}</Text>
-                </View>
-                <View className="pd-metric pd-metric-time">
-                  <Image className="pd-metric-icon pd-metric-icon-time" src={clockIcon} mode="aspectFit" />
-                <Text className="pd-metric-label">{item.responseLabel || '作业时间'}</Text>
-                <Text className="pd-metric-value pd-metric-time-value">{item.schedule}</Text>
-                </View>
-                <View className="pd-metric pd-metric-scene">
-                  <Image className="pd-metric-icon pd-metric-icon-scene" src={sceneIcon} mode="aspectFit" />
-                  <Text className="pd-metric-label">场景类型</Text>
-                  <Text className="pd-metric-value pd-metric-scene-value">{item.scene}</Text>
-                </View>
-                <View className="pd-metric pd-metric-price">
-                  <Image className="pd-metric-icon pd-metric-icon-price" src={priceIcon} mode="aspectFit" />
-                  <Text className="pd-metric-label">平台预估价</Text>
-                  <Text className="pd-metric-value pd-price-value">{item.price}</Text>
-                </View>
-              </View>
-
-              <Image className="pd-airspace-icon" src={airspaceIcon} mode="aspectFit" />
-              <Text className="pd-airspace-label">空域状态</Text>
-              <Text className={`pd-airspace-value pd-airspace-${item.airspaceTone}`}>{item.airspace}</Text>
-              <Image className="pd-card-chevron" src={chevronRightIcon} mode="aspectFit" />
-
-              <View
-                className="pd-button pd-quick-button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openQuickQuote(item);
-                }}
-              >
-                <Text className="pd-quick-button-text">{item.hasQuoted ? '更新报价' : '快速报价'}</Text>
-              </View>
-              <View
-                className="pd-button pd-view-button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  goQuote(item);
-                }}
-              >
-                <Text className="pd-view-button-text">查看并报价</Text>
-              </View>
-            </View>
-          ))}
-
-          {loading && demands.length === 0 ? (
-            <View className="pd-empty-card" style={{ top: toRpx(emptyTop) }}>
-              <Text className="pd-empty-title">正在同步真实需求</Text>
-              <Text className="pd-empty-desc">请稍候，正在读取服务商可接需求。</Text>
-            </View>
-          ) : null}
-
-          {!loading && fetchError ? (
-            <View className="pd-empty-card" style={{ top: toRpx(emptyTop) }}>
-              <Text className="pd-empty-title">无法加载真实需求</Text>
-              <Text className="pd-empty-desc">{fetchError}</Text>
-            </View>
-          ) : null}
-
-          {!loading && !fetchError && visualDemands.length === 0 ? (
-            <View className="pd-empty-card" style={{ top: toRpx(emptyTop) }}>
-              <Text className="pd-empty-title">{demands.length ? '暂无符合筛选的需求' : '暂无可接需求'}</Text>
-              <Text className="pd-empty-desc">{demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '后端当前没有返回真实可报价需求。'}</Text>
-            </View>
-          ) : null}
-
-          {loading && demands.length > 0 ? (
-            <View className="pd-loading" style={{ top: toRpx(398 + visualDemands.length * 411) }}>
-              <Text className="pd-loading-text">加载中...</Text>
-            </View>
-          ) : null}
         </View>
+
+        {visualDemands.map((item) => (
+          <View
+            key={item.id}
+            className='pd-demand-card'
+            onClick={() => goDetail(item)}
+          >
+            <View className='pd-route'>
+              <Image className='pd-route-pin' src={locationPinIcon} mode='aspectFit' />
+              <Text className='pd-route-title'>{item.route}</Text>
+              <Text className='pd-distance'>{item.distance}</Text>
+            </View>
+
+            <View className='pd-metrics'>
+              <View className='pd-metric'>
+                <Image className='pd-metric-icon' src={weightIcon} mode='aspectFit' />
+                <View className='pd-metric-body'>
+                  <Text className='pd-metric-label'>货物重量</Text>
+                  <Text className='pd-metric-value'>{item.weight}</Text>
+                </View>
+              </View>
+              <View className='pd-metric'>
+                <Image className='pd-metric-icon' src={clockIcon} mode='aspectFit' />
+                <View className='pd-metric-body'>
+                  <Text className='pd-metric-label'>作业时间</Text>
+                  <Text className='pd-metric-value'>{item.schedule}</Text>
+                </View>
+              </View>
+              <View className='pd-metric'>
+                <Image className='pd-metric-icon' src={sceneIcon} mode='aspectFit' />
+                <View className='pd-metric-body'>
+                  <Text className='pd-metric-label'>场景类型</Text>
+                  <Text className='pd-metric-value'>{item.scene}</Text>
+                </View>
+              </View>
+              <View className='pd-metric'>
+                <Image className='pd-metric-icon' src={priceIcon} mode='aspectFit' />
+                <View className='pd-metric-body'>
+                  <Text className='pd-metric-label'>平台预估价</Text>
+                  <Text className='pd-metric-value pd-metric-value-price'>{item.price}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View className='pd-card-foot'>
+              <View className='pd-airspace'>
+                <Image className='pd-airspace-icon' src={airspaceIcon} mode='aspectFit' />
+                <View className='pd-airspace-text'>
+                  <Text className='pd-airspace-label'>空域状态</Text>
+                  <Text className={`pd-airspace-value pd-airspace-${item.airspaceTone}`}>{item.airspace}</Text>
+                </View>
+              </View>
+              <View className='pd-buttons'>
+                <View
+                  className='pd-button pd-button-quick'
+                  onClick={(event: any) => {
+                    event.stopPropagation && event.stopPropagation();
+                    openQuickQuote(item);
+                  }}
+                >
+                  <Text>{item.hasQuoted ? '更新报价' : '快速报价'}</Text>
+                </View>
+                <View
+                  className='pd-button pd-button-primary'
+                  onClick={(event: any) => {
+                    event.stopPropagation && event.stopPropagation();
+                    goDetail(item);
+                  }}
+                >
+                  <Text>查看详情</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        ))}
+
+        {loading && demands.length === 0 ? (
+          <View className='pd-empty-card'>
+            <Text className='pd-empty-title'>正在同步真实需求</Text>
+            <Text className='pd-empty-desc'>请稍候，正在读取服务商可接需求。</Text>
+          </View>
+        ) : null}
+
+        {!loading && fetchError ? (
+          <View className='pd-empty-card'>
+            <Text className='pd-empty-title'>无法加载真实需求</Text>
+            <Text className='pd-empty-desc'>{fetchError}</Text>
+            {isAuthenticated ? (
+              <View className='pd-empty-action' onClick={goProviderOnboarding}>
+                <Text>去完善</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {!loading && !fetchError && visualDemands.length === 0 ? (
+          <View className='pd-empty-card'>
+            <Text className='pd-empty-title'>{demands.length ? '暂无符合筛选的需求' : '暂无可接需求'}</Text>
+            <Text className='pd-empty-desc'>{demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '后端当前没有返回真实可报价需求。'}</Text>
+          </View>
+        ) : null}
+
+        {loading && demands.length > 0 ? (
+          <View className='pd-loading'>
+            <Text className='pd-loading-text'>加载中…</Text>
+          </View>
+        ) : null}
+
+        <View className='pd-scroll-spacer' />
       </ScrollView>
 
+      {filterSheet ? (
+        <View className='pd-filter-mask' onClick={() => setFilterSheet(null)}>
+          <View className='pd-filter-panel' onClick={(e: any) => e.stopPropagation && e.stopPropagation()}>
+            <View className='pd-filter-panel-head'>
+              <Text className='pd-filter-panel-title'>
+                {filterMeta.find(m => m.key === filterSheet.key)?.label || '选择'}
+              </Text>
+              <Text className='pd-filter-panel-close' onClick={() => setFilterSheet(null)}>取消</Text>
+            </View>
+            <ScrollView scrollY className='pd-filter-panel-list'>
+              {filterSheet.options.map(option => {
+                const active = filters[filterSheet.key] === option
+                  || (option.startsWith('全部') && filters[filterSheet.key] === filterMeta.find(m => m.key === filterSheet.key)?.label);
+                return (
+                  <View
+                    key={option}
+                    className={`pd-filter-panel-item ${active ? 'is-active' : ''}`}
+                    onClick={() => {
+                      applyFilterChoice(filterSheet.key, option);
+                      setFilterSheet(null);
+                    }}
+                  >
+                    <Text>{option}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
