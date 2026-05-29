@@ -281,3 +281,49 @@
 - 修复内容：新增议价链路 service 测试，覆盖 quote amount -> order total -> settlement final 的金额一致性；覆盖无 verified pilot 时 `orders.pilot_id` 保持 SQL `NULL`；覆盖选定后其它 quote 变 `rejected`。
 - 待验证点：真实议价单完成后结算金额与报价一致，服务商无飞手资质时不会触发 FK 1452。
 - 验证结果：`go test ./internal/...` 通过；`go build ./...` 通过。
+
+## 修复批次 V：退款链路 - 2026-05-29
+
+### REF-001 退款/资金回滚审计落档
+
+- 修复文件：`docs/testing/refund_flow_audit.md`
+- 修复内容：梳理 `wallet_transactions` 类型、`order_settlements` 状态机、支付/取消/退款/结算/加价/小费全部资金写库点，并按 A-I 模式标注风险。
+- 待验证点：后续退款手测按文档逐项核对，不再只看订单状态。
+- 验证结果：文档已落档。
+
+### REF-002 退款与收入冲正追溯
+
+- 修复文件：`backend/migrations/127_wallet_refund_traceability.sql`、`backend/internal/model/finance_credit.go`、`backend/internal/model/order_misc.go`、`backend/internal/repository/settlement_repo.go`
+- 修复内容：新增 `related_transaction_id`；新增 `income_reversal` 负向冲正流水，指向原 `income`，重复冲正同一原流水幂等返回。
+- 待验证点：如果未来出现已入账后人工退款/冲正，钱包流水能追溯到原入账记录，且正负金额代数和为 0。
+- 验证结果：`go test ./internal/repository -run TestReverseWalletIncomeCreatesTraceableNegativeTransaction -count=1` 通过。
+
+### REF-003 退款处理幂等与取消退款矩阵
+
+- 修复文件：`backend/internal/service/payment_service.go`、`backend/internal/service/payment_service_test.go`、`backend/internal/service/order_service_test.go`
+- 修复内容：`RefundPayment` 包事务；订单已 `refunded` 且所有退款记录 `success` 时直接成功返回，不重复写 timeline；新增已支付平台价订单取消矩阵覆盖 `pending_dispatch/dispatch_failed/scheduled/preparing/in_transit`。
+- 待验证点：客户重复点击退款处理不会重复写状态；履约中取消只进入争议，不直接退钱。
+- 验证结果：`go test ./internal/service -run 'TestRefundPaymentIsIdempotent|TestPlatformPricedPaidCancelRefundMatrix' -count=1` 通过。
+
+## 修复批次 VI：改派链路 - 2026-05-29
+
+### REDISPATCH-001 改派/自动重派审计落档
+
+- 修复文件：`docs/testing/redispatch_flow_audit.md`
+- 修复内容：梳理 `order_broadcasts`、`broadcast_assignments` 状态机，列出 decline、timeout、accept、候选耗尽、手动抢单、服务商取消改派全部写库点，并按 A-I 模式标注风险。
+- 待验证点：后续重派手测按文档核对“谁被排除、订单状态怎么展示”。
+- 验证结果：文档已落档。
+
+### REDISPATCH-002 decline/timeout 排除同一服务商
+
+- 修复文件：`backend/internal/service/broadcast_service.go`、`backend/internal/service/broadcast_service_test.go`
+- 修复内容：自动指派被拒绝写入 `order_broadcast_exclusions(reason=assignment_declined)`；超时未响应写入 `order_broadcast_exclusions(reason=assignment_timeout)`；同一服务商不会再次被列表、手动抢单或自动指派命中同一单。
+- 待验证点：号 X/Y 多服务商轮换测试时，拒绝/超时服务商不再回到同一订单候选池。
+- 验证结果：`go test ./internal/service -run 'TestAutoAssignDeclineTriggersNextAttempt|TestAutoAssignAcceptDeadlinePassedTransitionsToExpiredAssignment' -count=1` 通过。
+
+### REDISPATCH-003 派单耗尽后的明确订单状态
+
+- 修复文件：`backend/internal/service/broadcast_service.go`、`mini-program/src/pages/orders/detail/index.tsx`、`mini-program/src/pages/orders/index.tsx`、`mini-program/src/pages/home/CustomerHaulHome.tsx`、`mini-program/src/utils/index.ts`
+- 修复内容：自动指派达到上限或无候选时把订单置为 `dispatch_failed`；前端新增“暂无服务商/暂未匹配到合适服务商”文案，并保留客户取消入口。
+- 待验证点：客户不再长期看到 `pending_dispatch`；匹配失败后可取消订单。
+- 验证结果：`go test ./internal/service -run TestAutoAssignExpiresAfterMaxAttempts -count=1` 通过；`npm run build:weapp` 待本批最终构建验证。
