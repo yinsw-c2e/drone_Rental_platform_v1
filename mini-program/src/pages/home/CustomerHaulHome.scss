@@ -40,14 +40,45 @@ page {
   line-height: 56rpx;
   font-size: 26rpx;
   font-weight: 600;
+  z-index: 20;
 }
 
 .customer-home-city {
   left: 30rpx;
   display: flex;
   align-items: center;
-  gap: 6rpx;
-  max-width: 160rpx;
+  gap: 8rpx;
+  min-width: 126rpx;
+  max-width: 220rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.32);
+  border-radius: 999rpx;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 6rpx 16rpx rgba(0, 28, 74, 0.16);
+}
+
+.customer-home-city:active {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.customer-home-city-pin {
+  width: 12rpx;
+  height: 12rpx;
+  border: 4rpx solid #ffffff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  flex: 0 0 12rpx;
+}
+
+.customer-home-city-text {
+  display: block;
+  min-width: 0;
+  max-width: 126rpx;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .customer-home-city-arrow {
@@ -81,7 +112,7 @@ page {
 }
 
 .customer-home-address-card {
-  margin-top: -14rpx;
+  margin-top: 20rpx;
   padding: 12rpx 24rpx;
   border-radius: 18rpx;
 }
@@ -438,39 +469,128 @@ page {
 }
 
 .customer-home-bottom {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
-  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
-  border-top: 1rpx solid #e4eaf2;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 -8rpx 24rpx rgba(15, 35, 65, 0.08);
+  bottom: 164rpx;
+  z-index: 900;
+  padding: 12rpx 24rpx 14rpx;
+  background: #ffffff;
+  box-shadow: 0 -8rpx 22rpx rgba(15, 35, 65, 0.08);
 }
 
 .customer-home-cta {
-  height: 92rpx;
+  height: 86rpx;
   border-radius: 14rpx;
   color: #ffffff;
-  font-size: 32rpx;
-  line-height: 92rpx;
+  font-size: 30rpx;
+  line-height: 86rpx;
   text-align: center;
   font-weight: 900;
   background: linear-gradient(135deg, #ff7a1a 0%, #ff4f0f 100%);
+  box-shadow: 0 10rpx 22rpx rgba(255, 91, 24, 0.22);
 }
 
 .customer-home-cta.is-disabled {
-  opacity: 0.55;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ffad7f 0%, #ff8d65 100%);
+  box-shadow: none;
 }
 
 .customer-home-scroll-spacer {
-  height: 150rpx;
+  height: 276rpx;
+}
+
+.city-sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(5, 16, 35, 0.42);
+}
+
+.city-sheet-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 164rpx;
+  max-height: calc(80vh - 164rpx);
+  padding: 28rpx 28rpx 26rpx;
+  border-top-left-radius: 28rpx;
+  border-top-right-radius: 28rpx;
+  background: #ffffff;
+  box-shadow: 0 -14rpx 34rpx rgba(8, 30, 70, 0.16);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.city-sheet-title {
+  display: block;
+  margin-bottom: 20rpx;
+  color: #061e4f;
+  font-size: 32rpx;
+  line-height: 44rpx;
+  font-weight: 800;
+  text-align: center;
+}
+
+.city-sheet-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: 50vh;
+  margin-bottom: 18rpx;
+}
+
+.city-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  padding-bottom: 4rpx;
+}
+
+.city-sheet-chip {
+  height: 74rpx;
+  border: 1rpx solid #d7e0ef;
+  border-radius: 14rpx;
+  color: #213653;
+  font-size: 28rpx;
+  line-height: 74rpx;
+  text-align: center;
+  font-weight: 700;
+  background: #f8fbff;
+}
+
+.city-sheet-chip.is-active {
+  border-color: #1268f4;
+  color: #1268f4;
+  background: #edf5ff;
+}
+
+.city-sheet-map,
+.city-sheet-cancel {
+  height: 82rpx;
+  margin-top: 18rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  line-height: 82rpx;
+  text-align: center;
+  font-weight: 800;
+}
+
+.city-sheet-map {
+  color: #ffffff;
+  background: #1268f4;
+}
+
+.city-sheet-cancel {
+  color: #5c6a80;
+  background: #f1f5fb;
 }
 
 .schedule-mask {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 1200;
   background: rgba(5, 16, 35, 0.45);
 }
 
@@ -478,11 +598,14 @@ page {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
-  padding: 30rpx 28rpx calc(32rpx + env(safe-area-inset-bottom));
+  bottom: 164rpx;
+  max-height: calc(80vh - 164rpx);
+  padding: 30rpx 28rpx 32rpx;
   border-top-left-radius: 24rpx;
   border-top-right-radius: 24rpx;
   background: #ffffff;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .schedule-panel-header {

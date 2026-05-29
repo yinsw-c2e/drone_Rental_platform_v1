@@ -393,8 +393,8 @@ export interface V2ProviderPresence {
 }
 
 export interface V2ProviderStats {
-  rating: number;
-  completion_rate: number;
+  rating: number | null;
+  completion_rate: number | null;
   today_order_count: number;
   today_income_cents: number;
   total_completed_orders: number;
@@ -856,6 +856,7 @@ export interface V2EstimateOrderPayload {
   origin: V2PricingPoint;
   destination: V2PricingPoint;
   cargo_weight_kg: number;
+  client_request_id?: string;
   scheduled_at?: string;
   scheduled_start_at?: string;
   service_class_code?: string;
@@ -984,6 +985,7 @@ export interface V2LivePosition {
 }
 
 export interface V2OrderLive {
+  status?: string;
   eta_seconds: number | null;
   progress_pct: number;
   last_position: V2LivePosition | null;

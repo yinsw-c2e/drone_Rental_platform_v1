@@ -6,6 +6,7 @@ import { RootState } from '../../store/store';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { addressHistoryService } from '../../services/addressHistory';
 import { addressService } from '../../services/address';
+import { locationService } from '../../services/location';
 import { orderV2Service } from '../../services/orderV2';
 import {
   AddressData,
@@ -22,13 +23,17 @@ type TimeMode = 'now' | 'reservation';
 const ADDRESS_TARGET_STORAGE_KEY = 'customer_home_address_target';
 const QUICK_ORDER_PREFILL_STORAGE_KEY = 'customer_home_quick_order_prefill_v1';
 const CITY_STORAGE_KEY = 'customer_home_city';
-const CITY_OPTIONS = ['深圳', '广州', '东莞', '惠州', '佛山', '珠海'];
+const DEFAULT_CITY_OPTIONS = ['深圳', '广州', '佛山', '东莞', '惠州', '珠海'];
+const CITY_MAP_PICKER_OPTION = '从地图选择城市';
 const SCHEDULE_TIME_OPTIONS = ['09:00', '10:30', '14:00', '16:00', '18:00'];
 
 const formatMoney = (cents?: number | null) => {
   if (!cents || cents <= 0) return '--';
   return `¥${Math.round(cents / 100).toLocaleString('zh-CN')}`;
 };
+
+const generateClientRequestId = () =>
+  `mini_${Date.now()}_${Math.random().toString(16).slice(2, 10)}_${Math.random().toString(16).slice(2, 10)}`;
 
 const formatAddressTitle = (address?: AddressData | null) =>
   String(address?.name || address?.address || '').trim();
@@ -58,6 +63,34 @@ const normalizeAddressResponse = (response: unknown): AddressData[] => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   return [];
+};
+
+const normalizeCityLabel = (value?: string | null) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.replace(/市$/, '');
+};
+
+const inferCityFromText = (value?: string | null) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const match = text.match(/([\u4e00-\u9fa5]{2,})市/);
+  return normalizeCityLabel(match?.[1] || '');
+};
+
+const cityFromAddress = (address?: AddressData | null) =>
+  normalizeCityLabel(address?.city) || inferCityFromText(address?.address) || inferCityFromText(address?.name);
+
+const uniqueTextList = (items: string[]) => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  items.forEach((item) => {
+    const text = String(item || '').trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    result.push(text);
+  });
+  return result;
 };
 
 const dedupeAddresses = (items: AddressData[]) => {
@@ -184,19 +217,42 @@ export default function CustomerHaulHome() {
   const [scheduledStartAt, setScheduledStartAt] = useState('');
   const [scheduledLabel, setScheduledLabel] = useState('');
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [showCitySheet, setShowCitySheet] = useState(false);
   const [pendingScheduleDate, setPendingScheduleDate] = useState(initialSchedule.date);
   const [pendingScheduleTime, setPendingScheduleTime] = useState(initialSchedule.time);
   const [estimate, setEstimate] = useState<V2PricingEstimate | null>(null);
   const [estimateError, setEstimateError] = useState('');
   const [estimating, setEstimating] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [clientRequestId, setClientRequestId] = useState(generateClientRequestId);
+  const [topInsetRpx, setTopInsetRpx] = useState(132);
   const pendingAddressTargetRef = useRef<AddressTarget | null>(null);
   const estimateSeqRef = useRef(0);
+
+  useEffect(() => {
+    try {
+      const sys = Taro.getSystemInfoSync();
+      const ratio = 750 / (sys.windowWidth || 375);
+      const statusBarRpx = Math.round(((sys.statusBarHeight || 20) + 12) * ratio);
+      setTopInsetRpx(statusBarRpx);
+    } catch {
+      setTopInsetRpx(132);
+    }
+  }, []);
 
   const selectedClass = useMemo(
     () => serviceClasses.find(item => item.code === selectedClassCode) || serviceClasses[0] || null,
     [selectedClassCode, serviceClasses],
   );
+
+  // 去重后保留全部候选城市；弹层用 ScrollView 滚动展示，不再 slice 截断
+  const cityOptions = useMemo(() => uniqueTextList([
+    city,
+    cityFromAddress(pickup),
+    cityFromAddress(dropoff),
+    ...commonAddresses.map(cityFromAddress),
+    ...DEFAULT_CITY_OPTIONS,
+  ]), [city, commonAddresses, dropoff, pickup]);
 
   const clearAddressSelection = useCallback(() => {
     pendingAddressTargetRef.current = null;
@@ -210,9 +266,10 @@ export default function CustomerHaulHome() {
     } else {
       setDropoff(address);
     }
-    if (address.city) {
-      setCity(address.city);
-      Taro.setStorageSync(CITY_STORAGE_KEY, address.city);
+    const nextCity = cityFromAddress(address);
+    if (nextCity) {
+      setCity(nextCity);
+      Taro.setStorageSync(CITY_STORAGE_KEY, nextCity);
     }
     addressHistoryService.addAddressHistory(address).catch(() => null);
   }, []);
@@ -302,12 +359,34 @@ export default function CustomerHaulHome() {
     Taro.navigateTo({ url: '/pages/address/index' });
   };
 
-  const chooseCity = async () => {
-    const res = await Taro.showActionSheet({ itemList: CITY_OPTIONS }).catch(() => null);
-    if (!res || typeof res.tapIndex !== 'number') return;
-    const nextCity = CITY_OPTIONS[res.tapIndex] || city;
+  const chooseCity = () => {
+    setShowCitySheet(true);
+  };
+
+  const selectCity = (selected?: string) => {
+    const nextCity = selected || city;
     setCity(nextCity);
     Taro.setStorageSync(CITY_STORAGE_KEY, nextCity);
+    setShowCitySheet(false);
+  };
+
+  const pickCityFromMap = async () => {
+    try {
+      const picked = await Taro.chooseLocation({});
+      if (!picked) return;
+      const reverse = await locationService.reverseGeoCode(Number(picked.longitude), Number(picked.latitude)).catch(() => null);
+      const nextCity = normalizeCityLabel((reverse as any)?.data?.city) || inferCityFromText(String((picked as any).address || (picked as any).name || ''));
+      if (nextCity) {
+        selectCity(nextCity);
+      } else {
+        Taro.showToast({ title: '未识别到城市', icon: 'none' });
+      }
+    } catch (error: any) {
+      const message = String(error?.errMsg || '');
+      if (!message.includes('cancel')) {
+        Taro.showToast({ title: '地图选点失败', icon: 'none' });
+      }
+    }
   };
 
   const selectServiceClass = (item: V2ServiceClass) => {
@@ -415,6 +494,7 @@ export default function CustomerHaulHome() {
   };
 
   const createOrder = async () => {
+    if (creating) return;
     if (!isAuthenticated) {
       Taro.navigateTo({ url: '/pages/auth/login/index?roleMode=customer' });
       return;
@@ -430,13 +510,19 @@ export default function CustomerHaulHome() {
     }
     try {
       setCreating(true);
+      const requestId = clientRequestId || generateClientRequestId();
+      if (!clientRequestId) {
+        setClientRequestId(requestId);
+      }
+      const orderPayload = { ...payload, client_request_id: requestId };
       const result = timeMode === 'reservation'
-        ? await orderV2Service.createReservation(payload)
-        : await orderV2Service.createInstant(payload);
+        ? await orderV2Service.createReservation(orderPayload)
+        : await orderV2Service.createInstant(orderPayload);
       const orderId = result?.order?.id;
       if (!orderId) {
         throw new Error('订单创建成功但缺少订单号');
       }
+      setClientRequestId(generateClientRequestId());
       Taro.redirectTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
     } catch (error: any) {
       Taro.showToast({ title: String(error?.message || '下单失败'), icon: 'none' });
@@ -479,13 +565,25 @@ export default function CustomerHaulHome() {
   return (
     <View className='customer-home-page'>
       <ScrollView scrollY className='customer-home-scroll'>
-        <View className='customer-home-header'>
-          <View className='customer-home-city' onClick={chooseCity}>
-            <Text>{city}</Text>
+        <View
+          className='customer-home-header'
+          style={{ paddingTop: `${topInsetRpx}rpx` }}
+        >
+          <View
+            className='customer-home-city'
+            style={{ top: `${topInsetRpx}rpx` }}
+            onClick={() => chooseCity()}
+          >
+            <View className='customer-home-city-pin' />
+            <Text className='customer-home-city-text'>{city}</Text>
             <Text className='customer-home-city-arrow'>⌄</Text>
           </View>
           <Text className='customer-home-title'>立即吊运</Text>
-          <View className='customer-home-help' onClick={() => Taro.switchTab({ url: '/pages/messages/index' })}>客服</View>
+          <View
+            className='customer-home-help'
+            style={{ top: `${topInsetRpx}rpx` }}
+            onClick={() => Taro.switchTab({ url: '/pages/messages/index' })}
+          >客服</View>
         </View>
 
         <View className='customer-home-section customer-home-address-card'>
@@ -621,6 +719,33 @@ export default function CustomerHaulHome() {
           <Text>{ctaText}</Text>
         </View>
       </View>
+
+      {showCitySheet ? (
+        <View className='city-sheet-mask' onClick={() => setShowCitySheet(false)}>
+          <View className='city-sheet-panel' onClick={event => event.stopPropagation()}>
+            <Text className='city-sheet-title'>选择服务城市</Text>
+            <ScrollView scrollY className='city-sheet-scroll'>
+              <View className='city-sheet-grid'>
+                {cityOptions.map(item => (
+                  <View
+                    key={item}
+                    className={`city-sheet-chip ${item === city ? 'is-active' : ''}`}
+                    onClick={() => selectCity(item)}
+                  >
+                    <Text>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+            <View className='city-sheet-map' onClick={pickCityFromMap}>
+              <Text>{CITY_MAP_PICKER_OPTION}</Text>
+            </View>
+            <View className='city-sheet-cancel' onClick={() => setShowCitySheet(false)}>
+              <Text>取消</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       {showSchedulePicker ? (
         <View className='schedule-mask'>
