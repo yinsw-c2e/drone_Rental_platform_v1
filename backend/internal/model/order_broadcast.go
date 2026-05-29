@@ -24,6 +24,19 @@ func (OrderBroadcast) TableName() string {
 	return "order_broadcasts"
 }
 
+type OrderBroadcastExclusion struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID        int64     `gorm:"uniqueIndex:uk_broadcast_exclusion_order_provider;index;not null" json:"order_id"`
+	BroadcastID    int64     `gorm:"index;not null" json:"broadcast_id"`
+	ProviderUserID int64     `gorm:"uniqueIndex:uk_broadcast_exclusion_order_provider;index;not null" json:"provider_user_id"`
+	Reason         string    `gorm:"type:varchar(64);not null;default:''" json:"reason"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (OrderBroadcastExclusion) TableName() string {
+	return "order_broadcast_exclusions"
+}
+
 type BroadcastAssignment struct {
 	ID               int64      `gorm:"primaryKey;autoIncrement" json:"id"`
 	BroadcastID      int64      `gorm:"index;not null" json:"broadcast_id"`

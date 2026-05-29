@@ -1092,6 +1092,7 @@ func TestProviderCancelTriggersAutoReassign(t *testing.T) {
 		&model.OrderSnapshot{},
 		&model.Review{},
 		&model.OrderBroadcast{},
+		&model.OrderBroadcastExclusion{},
 		&model.BroadcastAssignment{},
 		&model.ProviderPresence{},
 		&model.SystemConfig{},
@@ -1150,6 +1151,7 @@ func TestProviderCancelTriggersAutoReassign(t *testing.T) {
 	if err := db.Model(order).Update("broadcast_pool_id", grabbed.ID).Error; err != nil {
 		t.Fatalf("link broadcast: %v", err)
 	}
+	seedProviderPresence(t, broadcastService, 7101, 22.5432, 114.05795, []string{"light_heavy"}, 20)
 	seedProviderPresence(t, broadcastService, 7201, 22.5435, 114.0580, []string{"light_heavy"}, 20)
 
 	if err := orderService.CancelOrder(order.ID, 7101, "设备临时故障", "provider"); err != nil {
@@ -1170,6 +1172,13 @@ func TestProviderCancelTriggersAutoReassign(t *testing.T) {
 	if assignment.ProviderUserID != 7201 {
 		t.Fatalf("expected assignment to provider 7201, got %d", assignment.ProviderUserID)
 	}
+	excluded, err := repository.NewOrderBroadcastRepo(db).IsProviderExcluded(order.ID, grabbed.ID, 7101)
+	if err != nil {
+		t.Fatalf("check original provider exclusion: %v", err)
+	}
+	if !excluded {
+		t.Fatal("expected original cancelling provider to be excluded from reopened broadcast")
+	}
 	var credit model.CreditScore
 	if err := db.Where("user_id = ?", int64(7101)).First(&credit).Error; err != nil {
 		t.Fatalf("load credit: %v", err)
@@ -1187,6 +1196,7 @@ func TestProviderCancelInTransitCreatesPartialHandoverSettlement(t *testing.T) {
 		&model.OrderSnapshot{},
 		&model.Review{},
 		&model.OrderBroadcast{},
+		&model.OrderBroadcastExclusion{},
 		&model.BroadcastAssignment{},
 		&model.ProviderPresence{},
 		&model.SystemConfig{},

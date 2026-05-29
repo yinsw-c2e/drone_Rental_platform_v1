@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -90,17 +91,110 @@ func (s *UserService) GetProfile(userID int64) (*model.User, error) {
 }
 
 func (s *UserService) GetProviderRating(userID int64) float64 {
-	if userID <= 0 {
+	rating := s.GetProviderRatingNullable(userID)
+	if rating == nil {
 		return 4.5
 	}
-	return 4.5
+	return *rating
 }
 
 func (s *UserService) GetProviderCompletionRate(userID int64) float64 {
-	if userID <= 0 {
+	rate := s.GetProviderCompletionRateNullable(userID)
+	if rate == nil {
 		return 1.0
 	}
-	return 1.0
+	return *rate
+}
+
+func (s *UserService) GetProviderRatingNullable(userID int64) *float64 {
+	if s == nil || s.userRepo == nil || s.userRepo.DB() == nil || userID <= 0 {
+		return nil
+	}
+	var avg sql.NullFloat64
+	if err := s.userRepo.DB().Model(&model.Review{}).
+		Where("reviewee_id = ?", userID).
+		Where("(target_type = '' OR target_type IN ? OR target_type IS NULL)", []string{"user", "owner", "pilot", "provider"}).
+		Select("AVG(rating)").
+		Scan(&avg).Error; err != nil || !avg.Valid {
+		return nil
+	}
+	value := avg.Float64
+	return &value
+}
+
+func (s *UserService) GetProviderCompletionRateNullable(userID int64) *float64 {
+	if s == nil || s.userRepo == nil || s.userRepo.DB() == nil || userID <= 0 {
+		return nil
+	}
+	db := s.userRepo.DB().Model(&model.Order{}).
+		Where("(provider_user_id = ? OR owner_id = ?)", userID, userID)
+
+	var completed int64
+	if err := db.Session(&gorm.Session{}).
+		Where("status = ?", "completed").
+		Count(&completed).Error; err != nil {
+		return nil
+	}
+
+	var failed int64
+	if err := db.Session(&gorm.Session{}).
+		Where("(status = ? OR (status = ? AND cancel_by IN ?))", "provider_rejected", "cancelled", []string{"provider", "owner"}).
+		Count(&failed).Error; err != nil {
+		return nil
+	}
+
+	total := completed + failed
+	if total <= 0 {
+		return nil
+	}
+	value := float64(completed) / float64(total)
+	return &value
+}
+
+func (s *UserService) GetTodayProviderIncomeCents(userID int64, today time.Time) (int64, error) {
+	if s == nil || s.userRepo == nil || s.userRepo.DB() == nil || userID <= 0 {
+		return 0, nil
+	}
+	if today.IsZero() {
+		now := time.Now()
+		today = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	}
+	db := s.userRepo.DB()
+	// 优先按 wallet_transactions 今日 income 流水统计服务商净收入。
+	if db.Migrator().HasTable(&model.WalletTransaction{}) {
+		var income sql.NullInt64
+		if err := db.Model(&model.WalletTransaction{}).
+			Where("user_id = ?", userID).
+			Where("type = ?", "income").
+			Where("created_at >= ?", today).
+			Select("COALESCE(SUM(amount), 0)").
+			Scan(&income).Error; err == nil {
+			if income.Valid {
+				return income.Int64, nil
+			}
+			return 0, nil
+		}
+	}
+	return s.getTodayProviderSettlementIncomeCents(userID, today)
+}
+
+func (s *UserService) getTodayProviderSettlementIncomeCents(userID int64, today time.Time) (int64, error) {
+	var income sql.NullInt64
+	// wallet_transactions 不可用时按 order_settlements 的 today 净分账兜底。
+	err := s.userRepo.DB().Model(&model.OrderSettlement{}).
+		Where("status = ?", "settled").
+		Where("settled_at IS NOT NULL AND settled_at >= ?", today).
+		Where("(pilot_user_id = ? OR owner_user_id = ? OR partial_handover_provider_user_id = ?)", userID, userID, userID).
+		Select(`COALESCE(SUM(
+			CASE WHEN pilot_user_id = ? THEN pilot_fee ELSE 0 END +
+			CASE WHEN owner_user_id = ? THEN owner_fee ELSE 0 END +
+			CASE WHEN partial_handover_provider_user_id = ? THEN partial_handover_amount ELSE 0 END
+		), 0)`, userID, userID, userID).
+		Scan(&income).Error
+	if err != nil || !income.Valid {
+		return 0, err
+	}
+	return income.Int64, nil
 }
 
 func (s *UserService) GetMe(userID int64) (*MeSummary, error) {

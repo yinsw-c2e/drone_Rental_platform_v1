@@ -19,6 +19,7 @@ func newBroadcastTestService(t *testing.T) (*BroadcastService, *gormDBHandles) {
 		t,
 		&model.ProviderPresence{},
 		&model.OrderBroadcast{},
+		&model.OrderBroadcastExclusion{},
 		&model.BroadcastAssignment{},
 		&model.Order{},
 		&model.OrderTimeline{},
@@ -116,6 +117,42 @@ func TestBroadcastGrabAssignsOrderWithoutRepricing(t *testing.T) {
 	}
 	if len(timelines) != 1 {
 		t.Fatalf("expected one assigned timeline, got %#v", timelines)
+	}
+}
+
+func TestBroadcastExclusionFiltersListAndGrab(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-EXCLUDE", "light_heavy", 22.5431, 114.0579, 168000)
+	broadcast, err := service.CreateForOrder(order)
+	if err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, broadcast.ID, 7007, "provider_cancel"); err != nil {
+		t.Fatalf("exclude provider: %v", err)
+	}
+	seedProviderPresence(t, service, 7007, 22.5432, 114.0580, []string{"light_heavy"}, 20)
+	seedProviderPresence(t, service, 7008, 22.5432, 114.0580, []string{"light_heavy"}, 20)
+
+	views, err := service.ListOpenForProvider(7007, 20)
+	if err != nil {
+		t.Fatalf("list excluded provider broadcasts: %v", err)
+	}
+	if len(views) != 0 {
+		t.Fatalf("expected excluded provider to see no broadcasts, got %#v", views)
+	}
+	if _, err := service.Grab(broadcast.ID, 7007); !errors.Is(err, ErrBroadcastConflict) {
+		t.Fatalf("expected excluded provider grab conflict, got %v", err)
+	}
+
+	views, err = service.ListOpenForProvider(7008, 20)
+	if err != nil {
+		t.Fatalf("list allowed provider broadcasts: %v", err)
+	}
+	if len(views) != 1 || views[0].Broadcast.ID != broadcast.ID {
+		t.Fatalf("expected allowed provider to see broadcast %d, got %#v", broadcast.ID, views)
+	}
+	if _, err := service.Grab(broadcast.ID, 7008); err != nil {
+		t.Fatalf("allowed provider grab: %v", err)
 	}
 }
 
@@ -563,8 +600,8 @@ func TestGetProviderStatsAggregates(t *testing.T) {
 	if stats.TotalCompletedOrders != 3 {
 		t.Fatalf("expected total_completed_orders=3, got %d", stats.TotalCompletedOrders)
 	}
-	if stats.Rating != 4.5 || stats.CompletionRate != 1.0 {
-		t.Fatalf("expected default rating/completion, got %#v", stats)
+	if stats.Rating != nil || stats.CompletionRate != nil {
+		t.Fatalf("expected empty rating/completion without user service, got %#v", stats)
 	}
 }
 

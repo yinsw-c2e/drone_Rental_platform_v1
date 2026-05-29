@@ -128,6 +128,10 @@ func (h *Handler) GrabBroadcast(c *gin.Context) {
 			response.V2Conflict(c, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrProviderNotSelfExecutable) {
+			response.V2Forbidden(c, err.Error())
+			return
+		}
 		v2common.HandleServiceError(c, err)
 		return
 	}
@@ -168,6 +172,10 @@ func (h *Handler) AcceptAssignment(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, service.ErrBroadcastConflict) {
 			response.V2Conflict(c, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrProviderNotSelfExecutable) {
+			response.V2Forbidden(c, err.Error())
 			return
 		}
 		v2common.HandleServiceError(c, err)

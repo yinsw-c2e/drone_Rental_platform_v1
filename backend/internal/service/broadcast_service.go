@@ -45,7 +45,10 @@ const (
 	defaultAutoAssignCompletionWeight = 0.2
 )
 
-var ErrBroadcastConflict = errors.New("广播单已被抢或已失效")
+var (
+	ErrBroadcastConflict         = errors.New("广播单已被抢或已失效")
+	ErrProviderNotSelfExecutable = errors.New("provider_not_self_executable")
+)
 
 type BroadcastService struct {
 	presenceRepo        *repository.ProviderPresenceRepo
@@ -82,12 +85,12 @@ type ProviderAssignmentView struct {
 }
 
 type ProviderStats struct {
-	Rating                 float64 `json:"rating"`
-	CompletionRate         float64 `json:"completion_rate"`
-	TodayOrderCount        int     `json:"today_order_count"`
-	TodayIncomeCents       int64   `json:"today_income_cents"`
-	TotalCompletedOrders   int     `json:"total_completed_orders"`
-	PendingSettlementCents int64   `json:"pending_settlement_cents"`
+	Rating                 *float64 `json:"rating"`
+	CompletionRate         *float64 `json:"completion_rate"`
+	TodayOrderCount        int      `json:"today_order_count"`
+	TodayIncomeCents       int64    `json:"today_income_cents"`
+	TotalCompletedOrders   int      `json:"total_completed_orders"`
+	PendingSettlementCents int64    `json:"pending_settlement_cents"`
 }
 
 func NewBroadcastService(
@@ -129,26 +132,30 @@ func (s *BroadcastService) SetSettlementService(settlementService *SettlementSer
 }
 
 func (s *BroadcastService) GetProviderStats(userID int64) *ProviderStats {
-	stats := &ProviderStats{
-		Rating:         4.5,
-		CompletionRate: 1.0,
-	}
+	stats := &ProviderStats{}
 	if s == nil || userID <= 0 {
 		return stats
 	}
 	if s.userService != nil {
-		stats.Rating = s.userService.GetProviderRating(userID)
-		stats.CompletionRate = s.userService.GetProviderCompletionRate(userID)
+		stats.Rating = s.userService.GetProviderRatingNullable(userID)
+		stats.CompletionRate = s.userService.GetProviderCompletionRateNullable(userID)
 	}
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	if s.orderRepo != nil {
-		now := time.Now()
-		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		if count, income, err := s.orderRepo.CountTodayProviderOrders(userID, today); err == nil {
+		if count, legacyGrossIncome, err := s.orderRepo.CountTodayProviderOrders(userID, today); err == nil {
 			stats.TodayOrderCount = count
-			stats.TodayIncomeCents = income
+			if s.userService == nil {
+				stats.TodayIncomeCents = legacyGrossIncome
+			}
 		}
 		if completed, err := s.orderRepo.CountCompletedProviderOrders(userID); err == nil {
 			stats.TotalCompletedOrders = completed
+		}
+	}
+	if s.userService != nil {
+		if income, err := s.userService.GetTodayProviderIncomeCents(userID, today); err == nil {
+			stats.TodayIncomeCents = income
 		}
 	}
 	if s.settlementService != nil {
@@ -313,6 +320,13 @@ func (s *BroadcastService) ListOpenForProvider(userID int64, limit int) ([]Provi
 		}
 		distanceKM := haversineKM(presence.LastLatitude, presence.LastLongitude, item.OriginLatitude, item.OriginLongitude)
 		if radius > 0 && distanceKM > radius {
+			continue
+		}
+		excluded, err := s.broadcastRepo.IsProviderExcluded(item.OrderID, item.ID, userID)
+		if err != nil {
+			return nil, err
+		}
+		if excluded {
 			continue
 		}
 		remaining := int64(math.Max(0, item.ExpiresAt.Sub(now).Seconds()))
@@ -769,7 +783,7 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 	for _, attempt := range attempts {
 		attempted[attempt.ProviderUserID] = struct{}{}
 	}
-	candidate, ok, err := s.selectAutoAssignCandidate(broadcast, attempted, now)
+	candidate, ok, err := s.selectAutoAssignCandidate(broadcast, attempted, now, broadcastRepo)
 	if err != nil {
 		return outcome, err
 	}
@@ -966,7 +980,7 @@ func (s *BroadcastService) expireBroadcastWithTimeline(
 	})
 }
 
-func (s *BroadcastService) selectAutoAssignCandidate(broadcast *model.OrderBroadcast, attempted map[int64]struct{}, now time.Time) (autoAssignCandidate, bool, error) {
+func (s *BroadcastService) selectAutoAssignCandidate(broadcast *model.OrderBroadcast, attempted map[int64]struct{}, now time.Time, broadcastRepo *repository.OrderBroadcastRepo) (autoAssignCandidate, bool, error) {
 	if s == nil || s.presenceRepo == nil {
 		return autoAssignCandidate{}, false, errors.New("服务商在线状态依赖未初始化")
 	}
@@ -1014,7 +1028,16 @@ func (s *BroadcastService) selectAutoAssignCandidate(broadcast *model.OrderBroad
 	}
 	for i := 0; i < maxChecked; i++ {
 		candidate := candidates[i]
-		if err := s.requireProviderWorkbenchAccess(candidate.presence.UserID); err != nil {
+		if broadcastRepo != nil {
+			excluded, err := broadcastRepo.IsProviderExcluded(broadcast.OrderID, broadcast.ID, candidate.presence.UserID)
+			if err != nil {
+				return autoAssignCandidate{}, false, err
+			}
+			if excluded {
+				continue
+			}
+		}
+		if err := s.requireProviderSelfExecutableAccess(candidate.presence.UserID); err != nil {
 			continue
 		}
 		radius := normalizeProviderRadius(candidate.presence.MaxRadiusKM)
@@ -1112,6 +1135,21 @@ func (s *BroadcastService) requireProviderWorkbenchAccess(userID int64) error {
 	return nil
 }
 
+func (s *BroadcastService) requireProviderSelfExecutableAccess(userID int64) error {
+	if s == nil || s.userService == nil {
+		return nil
+	}
+	summary, err := s.userService.GetRoleSummary(userID)
+	if err != nil {
+		return err
+	}
+	// CanSelfExecute 由 UserService 基于合规无人机和履约执行人资质统一计算。
+	if summary == nil || !summary.Provider.CanSelfExecute {
+		return ErrProviderNotSelfExecutable
+	}
+	return nil
+}
+
 func (s *BroadcastService) createForOrderWithRepos(
 	order *model.Order,
 	orderRepo *repository.OrderRepo,
@@ -1192,6 +1230,16 @@ func (s *BroadcastService) grabWithRepos(
 	}
 	if !canBroadcastOrderBeGrabbed(order) {
 		return nil, fmt.Errorf("%w: 订单当前状态不可抢", ErrBroadcastConflict)
+	}
+	excluded, err := broadcastRepo.IsProviderExcluded(broadcast.OrderID, broadcast.ID, providerUserID)
+	if err != nil {
+		return nil, err
+	}
+	if excluded {
+		return nil, fmt.Errorf("%w: 已取消过该订单，不能再次抢单", ErrBroadcastConflict)
+	}
+	if err := s.requireProviderSelfExecutableAccess(providerUserID); err != nil {
+		return nil, err
 	}
 	if !skipPresenceCheck && !providerCanGrabBroadcast(presence, broadcast) {
 		return nil, errors.New("当前服务商不在接单范围或不支持该机型档")

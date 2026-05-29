@@ -424,6 +424,7 @@ type PlatformPricedOrderInput struct {
 	Origin           PricingPoint `json:"origin"`
 	Destination      PricingPoint `json:"destination"`
 	CargoWeightKG    float64      `json:"cargo_weight_kg"`
+	ClientRequestID  string       `json:"client_request_id"`
 	ScheduledStartAt time.Time    `json:"scheduled_start_at"`
 	ServiceClassCode string       `json:"service_class_code"`
 	CargoScene       string       `json:"cargo_scene"`
@@ -434,6 +435,22 @@ type PlatformPricedOrderInput struct {
 type PlatformPricedOrderResult struct {
 	Order    *model.Order     `json:"order"`
 	Estimate *PricingEstimate `json:"estimate"`
+}
+
+func normalizeClientRequestID(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 64 {
+		return value[:64]
+	}
+	return value
+}
+
+func isDuplicateClientRequestError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate") && strings.Contains(msg, "client_request")
 }
 
 func (s *OrderService) CreateInstantOrder(clientUserID int64, input *PlatformPricedOrderInput) (*PlatformPricedOrderResult, error) {
@@ -461,6 +478,7 @@ func (s *OrderService) createPlatformPricedOrder(clientUserID int64, mode string
 	if input.ScheduledStartAt.IsZero() {
 		input.ScheduledStartAt = time.Now()
 	}
+	input.ClientRequestID = normalizeClientRequestID(input.ClientRequestID)
 	if mode == OrderModeReservation && !input.ScheduledStartAt.After(time.Now()) {
 		return nil, errors.New("预约时间必须晚于当前时间")
 	}
@@ -481,6 +499,16 @@ func (s *OrderService) createPlatformPricedOrder(clientUserID int64, mode string
 	}
 
 	db := s.orderRepo.DB()
+	if input.ClientRequestID != "" && db != nil {
+		existing, lookupErr := s.orderRepo.FindByClientRequestID(clientUserID, input.ClientRequestID)
+		if lookupErr == nil {
+			return &PlatformPricedOrderResult{Order: existing, Estimate: estimate}, nil
+		}
+		if !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+			return nil, lookupErr
+		}
+	}
+
 	if db == nil {
 		broadcastRepo := (*repository.OrderBroadcastRepo)(nil)
 		if s.broadcastService != nil {
@@ -558,6 +586,7 @@ func (s *OrderService) createPlatformPricedOrderWithRepos(
 		RelatedID:              0,
 		OrderSource:            mode,
 		OrderMode:              mode,
+		ClientRequestID:        normalizeClientRequestID(input.ClientRequestID),
 		ServiceClassCode:       estimate.ServiceClassCode,
 		DemandID:               0,
 		SourceSupplyID:         0,
@@ -604,12 +633,20 @@ func (s *OrderService) createPlatformPricedOrderWithRepos(
 	if order.OwnerID == 0 {
 		nullableRefOmits = append(nullableRefOmits, "OwnerID", "owner_id")
 	}
+	var createErr error
 	if len(nullableRefOmits) > 0 {
-		if err := orderRepo.CreateOmit(order, nullableRefOmits...); err != nil {
-			return nil, err
+		createErr = orderRepo.CreateOmit(order, nullableRefOmits...)
+	} else {
+		createErr = orderRepo.Create(order)
+	}
+	if createErr != nil {
+		if order.ClientRequestID != "" && isDuplicateClientRequestError(createErr) {
+			existing, lookupErr := orderRepo.FindByClientRequestID(clientUserID, order.ClientRequestID)
+			if lookupErr == nil {
+				return existing, nil
+			}
 		}
-	} else if err := orderRepo.Create(order); err != nil {
-		return nil, err
+		return nil, createErr
 	}
 	if err := orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      order.ID,
@@ -1819,6 +1856,11 @@ func (s *OrderService) reassignOrderAfterProviderCancel(
 	broadcast, err := s.reopenBroadcastForReassign(order, broadcastRepo, remainingAmount, now)
 	if err != nil {
 		return cancelOrderOutcome{}, err
+	}
+	if originalProviderID > 0 {
+		if err := broadcastRepo.ExcludeProvider(order.ID, broadcast.ID, originalProviderID, "provider_cancel"); err != nil {
+			return cancelOrderOutcome{}, err
+		}
 	}
 	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
 		"broadcast_pool_id": broadcast.ID,

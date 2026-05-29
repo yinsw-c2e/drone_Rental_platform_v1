@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -99,6 +100,41 @@ func (r *OrderBroadcastRepo) ListAwaitingAutoAssign(now time.Time, attemptCutoff
 
 func (r *OrderBroadcastRepo) UpdateFields(id int64, fields map[string]interface{}) error {
 	return r.db.Model(&model.OrderBroadcast{}).Where("id = ?", id).Updates(fields).Error
+}
+
+func (r *OrderBroadcastRepo) ExcludeProvider(orderID, broadcastID, providerUserID int64, reason string) error {
+	if r == nil || r.db == nil || orderID <= 0 || broadcastID <= 0 || providerUserID <= 0 {
+		return nil
+	}
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.OrderBroadcastExclusion{
+		OrderID:        orderID,
+		BroadcastID:    broadcastID,
+		ProviderUserID: providerUserID,
+		Reason:         strings.TrimSpace(reason),
+		CreatedAt:      time.Now(),
+	}).Error
+}
+
+func (r *OrderBroadcastRepo) IsProviderExcluded(orderID, broadcastID, providerUserID int64) (bool, error) {
+	if r == nil || r.db == nil || providerUserID <= 0 {
+		return false, nil
+	}
+	query := r.db.Model(&model.OrderBroadcastExclusion{}).Where("provider_user_id = ?", providerUserID)
+	switch {
+	case orderID > 0 && broadcastID > 0:
+		query = query.Where("(order_id = ? OR broadcast_id = ?)", orderID, broadcastID)
+	case orderID > 0:
+		query = query.Where("order_id = ?", orderID)
+	case broadcastID > 0:
+		query = query.Where("broadcast_id = ?", broadcastID)
+	default:
+		return false, nil
+	}
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *OrderBroadcastRepo) MarkExpired(now time.Time, limit int) (int64, error) {
