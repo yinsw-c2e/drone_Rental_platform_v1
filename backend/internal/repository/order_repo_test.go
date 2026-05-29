@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
@@ -55,6 +56,71 @@ func TestUnsupportedOrderOptionalColumnOmissions(t *testing.T) {
 	for _, missing := range []string{"FlightEndTime", "flight_end_time", "OrderMode", "order_mode", "PriceBreakdownJSON", "price_breakdown_json", "LoadingConfirmedBy", "loading_confirmed_by"} {
 		if !omitted[missing] {
 			t.Fatalf("expected missing optional column to be omitted: %s (all=%#v)", missing, omissions)
+		}
+	}
+}
+
+func TestUpdatePreservesNullableOrderReferences(t *testing.T) {
+	db := newRepositoryTestDB(t, &model.Order{})
+	repo := NewOrderRepo(db)
+	now := time.Now().Round(time.Second)
+
+	orderNo := "ORD-null-ref-update"
+	if err := db.Exec(`
+			INSERT INTO orders (
+				order_no, order_type, order_mode, order_source,
+				client_user_id, service_type,
+				start_time, end_time, service_address, dest_address,
+				total_amount, status, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, orderNo, "cargo", "instant", "instant", 46, "heavy_cargo_lift_transport", now, now.Add(time.Hour), "佛山市禅城区起点", "佛山市南海区终点", 108400, "pending_dispatch", now, now).Error; err != nil {
+		t.Fatalf("insert order with nullable refs: %v", err)
+	}
+	var order model.Order
+	if err := db.Where("order_no = ?", orderNo).First(&order).Error; err != nil {
+		t.Fatalf("reload seeded order: %v", err)
+	}
+
+	var loaded model.Order
+	if err := db.First(&loaded, order.ID).Error; err != nil {
+		t.Fatalf("load order: %v", err)
+	}
+	if loaded.DroneID != 0 || loaded.OwnerID != 0 || loaded.PilotID != 0 || loaded.RenterID != 0 {
+		t.Fatalf("expected Go zero values for SQL NULL refs, got drone=%d owner=%d pilot=%d renter=%d", loaded.DroneID, loaded.OwnerID, loaded.PilotID, loaded.RenterID)
+	}
+	loaded.Status = "cancelled"
+	loaded.CancelReason = "客户取消"
+	loaded.CancelBy = "client"
+	if err := repo.Update(&loaded); err != nil {
+		t.Fatalf("update order: %v", err)
+	}
+
+	var droneID, ownerID, pilotID, renterID sql.NullInt64
+	var clientRequestID sql.NullString
+	var status, cancelReason, cancelBy string
+	row := db.Raw("SELECT drone_id, owner_id, pilot_id, renter_id, client_request_id, status, cancel_reason, cancel_by FROM orders WHERE id = ?", order.ID).Row()
+	if err := row.Scan(&droneID, &ownerID, &pilotID, &renterID, &clientRequestID, &status, &cancelReason, &cancelBy); err != nil {
+		t.Fatalf("scan updated refs: %v", err)
+	}
+	if droneID.Valid || ownerID.Valid || pilotID.Valid || renterID.Valid {
+		t.Fatalf("expected SQL NULL refs after update, got drone=%#v owner=%#v pilot=%#v renter=%#v", droneID, ownerID, pilotID, renterID)
+	}
+	if clientRequestID.Valid {
+		t.Fatalf("expected SQL NULL client_request_id after update, got %#v", clientRequestID)
+	}
+	if status != "cancelled" || cancelReason != "客户取消" || cancelBy != "client" {
+		t.Fatalf("expected cancel fields to persist, got status=%q reason=%q by=%q", status, cancelReason, cancelBy)
+	}
+}
+
+func TestOrderNullableForeignKeyColumnsIncludeAllSchemaFKs(t *testing.T) {
+	got := map[string]bool{}
+	for _, column := range nullableOrderForeignKeyColumns() {
+		got[column] = true
+	}
+	for _, column := range []string{"drone_id", "owner_id", "pilot_id", "renter_id"} {
+		if !got[column] {
+			t.Fatalf("expected nullable foreign key column %s to be normalized/omitted, got %#v", column, got)
 		}
 	}
 }

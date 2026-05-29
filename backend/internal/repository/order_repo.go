@@ -41,8 +41,8 @@ func (r *OrderRepo) Create(order *model.Order) error {
 		return nil
 	}
 	tx := omitUnsupportedOrderOptionalColumns(r.db)
-	if order.PilotID == 0 {
-		tx = tx.Omit("PilotID", "pilot_id")
+	if omits := zeroNullableOrderOmits(order); len(omits) > 0 {
+		tx = tx.Omit(omits...)
 	}
 	return tx.Create(order).Error
 }
@@ -86,6 +86,26 @@ func (r *OrderRepo) GetByOrderNo(orderNo string) (*model.Order, error) {
 	return &order, err
 }
 
+func (r *OrderRepo) FindByClientRequestID(clientUserID int64, requestID string) (*model.Order, error) {
+	var order model.Order
+	err := r.db.Preload("Demand").Preload("Drone").Preload("Owner").Preload("Pilot").Preload("Renter").
+		Where("client_request_id = ?", strings.TrimSpace(requestID)).
+		Where("(client_user_id = ? OR renter_id = ?)", clientUserID, clientUserID).
+		First(&order).Error
+	return &order, err
+}
+
+func (r *OrderRepo) FindDemandMarketOrderByDemandID(demandID int64) (*model.Order, error) {
+	var order model.Order
+	err := r.db.Preload("Demand").Preload("Drone").Preload("Owner").Preload("Pilot").Preload("Renter").
+		Where("demand_id = ?", demandID).
+		Where("order_source = ?", "demand_market").
+		Where("order_mode = ?", "negotiated").
+		Order("id ASC").
+		First(&order).Error
+	return &order, err
+}
+
 func (r *OrderRepo) LockByID(id int64) (*model.Order, error) {
 	var order model.Order
 	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -102,8 +122,8 @@ func (r *OrderRepo) Update(order *model.Order) error {
 		return nil
 	}
 	tx := omitUnsupportedOrderOptionalColumns(r.db)
-	if order.PilotID == 0 {
-		tx = tx.Omit("PilotID", "pilot_id")
+	if omits := zeroNullableOrderOmits(order); len(omits) > 0 {
+		tx = tx.Omit(omits...)
 	}
 	return tx.Save(order).Error
 }
@@ -210,7 +230,7 @@ func normalizeOrderNullableFields(fields map[string]interface{}) map[string]inte
 	if len(fields) == 0 {
 		return fields
 	}
-	for _, key := range []string{"drone_id", "pilot_id", "owner_id"} {
+	for _, key := range nullableOrderForeignKeyColumns() {
 		if raw, ok := fields[key]; ok {
 			switch v := raw.(type) {
 			case int:
@@ -234,7 +254,53 @@ func normalizeOrderNullableFields(fields map[string]interface{}) map[string]inte
 			}
 		}
 	}
+	if raw, ok := fields["client_request_id"]; ok {
+		if value, isString := raw.(string); isString && strings.TrimSpace(value) == "" {
+			fields["client_request_id"] = nil
+		}
+	}
 	return fields
+}
+
+type nullableOrderForeignKeyRef struct {
+	field       string
+	column      string
+	association string
+	value       func(*model.Order) int64
+}
+
+func nullableOrderForeignKeyRefs() []nullableOrderForeignKeyRef {
+	return []nullableOrderForeignKeyRef{
+		{field: "DroneID", column: "drone_id", association: "Drone", value: func(order *model.Order) int64 { return order.DroneID }},
+		{field: "OwnerID", column: "owner_id", association: "Owner", value: func(order *model.Order) int64 { return order.OwnerID }},
+		{field: "PilotID", column: "pilot_id", association: "Pilot", value: func(order *model.Order) int64 { return order.PilotID }},
+		{field: "RenterID", column: "renter_id", association: "Renter", value: func(order *model.Order) int64 { return order.RenterID }},
+	}
+}
+
+func nullableOrderForeignKeyColumns() []string {
+	refs := nullableOrderForeignKeyRefs()
+	columns := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		columns = append(columns, ref.column)
+	}
+	return columns
+}
+
+func zeroNullableOrderOmits(order *model.Order) []string {
+	if order == nil {
+		return nil
+	}
+	omits := make([]string, 0, len(nullableOrderForeignKeyRefs())*3+2)
+	for _, ref := range nullableOrderForeignKeyRefs() {
+		if ref.value(order) == 0 {
+			omits = append(omits, ref.field, ref.column, ref.association)
+		}
+	}
+	if strings.TrimSpace(order.ClientRequestID) == "" {
+		omits = append(omits, "ClientRequestID", "client_request_id")
+	}
+	return omits
 }
 
 func orderOptionalColumns() []struct {

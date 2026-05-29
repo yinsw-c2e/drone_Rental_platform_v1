@@ -13,6 +13,7 @@ type Order struct {
 	RelatedID              int64          `json:"related_id"`
 	OrderSource            string         `gorm:"type:varchar(30);default:demand_market;index" json:"order_source"`
 	OrderMode              string         `gorm:"type:varchar(20);default:negotiated;index" json:"order_mode"` // negotiated, instant, reservation
+	ClientRequestID        string         `gorm:"type:varchar(64);default:null;uniqueIndex:idx_orders_client_request_id" json:"client_request_id,omitempty"`
 	ServiceClassCode       string         `gorm:"type:varchar(50);index" json:"service_class_code"`
 	DemandID               int64          `gorm:"index" json:"demand_id"`
 	SourceSupplyID         int64          `gorm:"index" json:"source_supply_id"`
