@@ -3,12 +3,11 @@ import Taro, { useDidHide, useDidShow } from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Map, Text, View } from '@tarojs/components';
 import { orderV2Service } from '../../../services/orderV2';
-import { V2OrderDetail, V2OrderLive, V2LivePosition } from '../../../types';
+import { V2OrderDetail, V2OrderLive } from '../../../types';
 import './index.scss';
 
 import pinStart from '../../../assets/quick-order/icons/pin_start.png';
 import pinEnd from '../../../assets/quick-order/icons/pin_end.png';
-import markerDrone from '../../../assets/haul/order-progress/icon_drone_service_blue.png';
 
 type MapPoint = {
   latitude: number;
@@ -231,7 +230,7 @@ export default function OrderLivePage() {
   const loadInitial = useCallback(async () => {
     if (!orderId) {
       setLoading(false);
-      setErrorText('缺少订单ID，无法查看实时位置');
+      setErrorText('缺少订单ID，无法查看订单进度');
       return;
     }
     setLoading(true);
@@ -247,7 +246,7 @@ export default function OrderLivePage() {
       if (shouldStopPolling(nextStatus, detail?.live || null)) stopPolling();
       else startPolling();
     } catch (error: any) {
-      setErrorText(error?.message || '实时位置加载失败');
+      setErrorText(error?.message || '订单进度加载失败');
     } finally {
       setLoading(false);
     }
@@ -272,13 +271,8 @@ export default function OrderLivePage() {
 
   const origin = useMemo(() => resolvePoint(order, 'origin'), [order]);
   const destination = useMemo(() => resolvePoint(order, 'destination'), [order]);
-  const currentPosition = live?.last_position || null;
-  const currentPoint = currentPosition ? {
-    latitude: Number(currentPosition.latitude),
-    longitude: Number(currentPosition.longitude),
-  } : null;
 
-  const includePoints = useMemo(() => [origin, destination, currentPoint].filter(isValidPoint), [origin, destination, currentPoint]);
+  const includePoints = useMemo(() => [origin, destination].filter(isValidPoint), [origin, destination]);
 
   useEffect(() => {
     refreshMapBounds(includePoints);
@@ -326,29 +320,9 @@ export default function OrderLivePage() {
         },
       });
     }
-    if (currentPosition && isValidPoint(currentPoint)) {
-      items.push({
-        id: 3,
-        latitude: currentPoint.latitude,
-        longitude: currentPoint.longitude,
-        iconPath: markerDrone,
-        width: 34,
-        height: 34,
-        rotate: Number(currentPosition.heading || 0),
-        alpha: currentPosition.signal_weak ? 0.45 : 1,
-        callout: {
-          content: '服务商执行中',
-          color: '#0b1836',
-          fontSize: 12,
-          borderRadius: 6,
-          bgColor: '#ffffff',
-          padding: 6,
-          display: 'ALWAYS',
-        },
-      });
-    }
+    // TODO: 等设备端位置上报接入后恢复实时地图卡片。
     return items;
-  }, [currentPoint, currentPosition, destination, origin]);
+  }, [destination, origin]);
 
   const polyline = useMemo(() => {
     if (!origin || !destination) return [];
@@ -361,11 +335,11 @@ export default function OrderLivePage() {
     }];
   }, [destination, origin]);
 
-  const mapCenter = currentPoint || origin || destination || { latitude: 22.543096, longitude: 114.057865 };
+  const mapCenter = origin || destination || { latitude: 22.543096, longitude: 114.057865 };
   const activeStep = statusStepOf(status);
   const progress = progressOf(live?.progress_pct);
-  const lastPosition = live?.last_position as V2LivePosition | null | undefined;
   const canSuggestPriceIncrease =
+    !!order &&
     String(order.order_mode || '') === 'instant' &&
     status === 'pending_dispatch' &&
     orderAgeSeconds(order.created_at) >= 90;
@@ -396,7 +370,7 @@ export default function OrderLivePage() {
   if (loading && !order) {
     return (
       <View className="order-live-page order-live-empty-page">
-        <Text className="order-live-empty-title">正在同步实时位置</Text>
+        <Text className="order-live-empty-title">正在同步订单进度</Text>
       </View>
     );
   }
@@ -404,7 +378,7 @@ export default function OrderLivePage() {
   if (!order) {
     return (
       <View className="order-live-page order-live-empty-page">
-        <Text className="order-live-empty-title">无法查看实时位置</Text>
+        <Text className="order-live-empty-title">无法查看订单进度</Text>
         <Text className="order-live-empty-desc">{errorText || '订单不存在或当前账号无权查看。'}</Text>
       </View>
     );
@@ -444,12 +418,6 @@ export default function OrderLivePage() {
           })}
         </View>
 
-        {lastPosition?.signal_weak ? (
-          <View className="order-live-signal">
-            <Text>信号弱，定位可能延迟</Text>
-          </View>
-        ) : null}
-
         {!destination ? (
           <View className="order-live-hint">
             <Text>终点信息缺失</Text>
@@ -484,14 +452,7 @@ export default function OrderLivePage() {
         </View>
 
         <View className="order-live-meta">
-          {lastPosition ? (
-            <>
-              <Text>最近上报 {formatRecordedAt(lastPosition.recorded_at)}</Text>
-              <Text>{Number(lastPosition.age_seconds || 0)} 秒前</Text>
-            </>
-          ) : (
-            <Text>等待开始飞行</Text>
-          )}
+          <Text>设备端位置上报接入后，将在此显示服务实时轨迹。</Text>
         </View>
       </View>
     </View>

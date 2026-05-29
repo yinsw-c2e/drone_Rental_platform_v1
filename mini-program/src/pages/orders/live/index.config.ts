@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '实时位置',
+  navigationBarTitleText: '订单进度',
   disableScroll: true,
   onReachBottomDistance: 0,
 });
