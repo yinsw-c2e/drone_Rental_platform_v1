@@ -1,6 +1,6 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useMemo } from 'react';
-import { ScrollView, Text, View } from '@tarojs/components';
+import { Text, View } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState, useAppDispatch } from '../../../store/store';
 import { setHaulRoleMode } from '../../../store/slices/roleSlice';
@@ -88,8 +88,8 @@ export default function ProviderOnboardingPage() {
   const executorMeta = statusMetaOf(capabilities.executorStatus);
 
   useDidShow(() => {
-    dispatch(setHaulRoleMode('provider'));
-    syncCustomTabBar(0, 'provider');
+    // 仅同步当前 TabBar 选中态，不强制写全局身份。
+    syncCustomTabBar(0);
   });
 
   const headerCopy = useMemo(() => {
@@ -161,9 +161,11 @@ export default function ProviderOnboardingPage() {
       return;
     }
     if (capabilities.canUseWorkbench) {
+      // 用户显式点击"进入工作台"——此处属于明确的角色切换意图，
+      // 等同 mode-selection 的用户主动选择，所以可以 dispatch。
       dispatch(setHaulRoleMode('provider'));
       Taro.switchTab({ url: '/pages/home/index' })
-        .then(() => syncCustomTabBar(0, 'provider'))
+        .then(() => syncCustomTabBar(0))
         .catch(() => null);
       return;
     }
@@ -175,15 +177,14 @@ export default function ProviderOnboardingPage() {
   const openExecutorRegister = () => safeNavigateTo('/pages/pilot/register/index');
   const openVerification = () => safeNavigateTo('/pages/verification/index');
   const openAccountProfile = () => {
-    dispatch(setHaulRoleMode('provider'));
     Taro.switchTab({ url: '/pages/profile/index' })
-      .then(() => syncCustomTabBar(3, 'provider'))
+      .then(() => syncCustomTabBar(3))
       .catch(() => null);
   };
 
   return (
     <View className="provider-onboarding-page">
-      <ScrollView scrollY className="provider-onboarding-scroll">
+      <View className="provider-onboarding-scroll">
         <View className="provider-onboarding-content">
           <View className="provider-onboarding-hero">
             <View className={`provider-onboarding-status provider-onboarding-status-${headerCopy.tone}`}>
@@ -286,7 +287,7 @@ export default function ProviderOnboardingPage() {
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }

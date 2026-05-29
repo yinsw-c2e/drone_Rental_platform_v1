@@ -15,7 +15,9 @@ page {
 }
 
 .orders-page-content {
-  padding: 28rpx 24rpx 48rpx;
+  /* 顶部 padding 通过 inline style 用 JS 算出的 statusBarHeight 注入，
+     这里保留水平内边距和底部留白 */
+  padding: 132rpx 24rpx 220rpx;
 }
 
 .orders-page-title {
@@ -32,6 +34,33 @@ page {
   flex-direction: row;
   gap: 14rpx;
   margin-bottom: 22rpx;
+}
+
+.provider-order-segment {
+  display: flex;
+  flex-direction: row;
+  padding: 8rpx;
+  margin-bottom: 22rpx;
+  border: 1rpx solid #dbe6f5;
+  border-radius: 18rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(15, 35, 65, 0.04);
+}
+
+.provider-order-segment-item {
+  flex: 1;
+  height: 64rpx;
+  border-radius: 14rpx;
+  color: #5f6d82;
+  font-size: 27rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-weight: 800;
+}
+
+.provider-order-segment-item.is-active {
+  color: #005bea;
+  background: #edf5ff;
 }
 
 .orders-filter-chip {
@@ -204,14 +233,28 @@ page {
 }
 
 .order-provider-phone {
+  position: relative;
   width: 58rpx;
   height: 58rpx;
   border-radius: 50%;
-  color: #005bea;
-  font-size: 30rpx;
-  line-height: 58rpx;
-  text-align: center;
   background: #eaf2ff;
+  flex-shrink: 0;
+}
+
+.order-provider-phone-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24rpx;
+  height: 24rpx;
+  margin-left: -12rpx;
+  margin-top: -12rpx;
+  border: 4rpx solid #005bea;
+  border-top: 8rpx solid #005bea;
+  border-left: 8rpx solid #005bea;
+  border-radius: 6rpx;
+  box-sizing: border-box;
+  transform: rotate(-45deg);
 }
 
 .order-eta-row {

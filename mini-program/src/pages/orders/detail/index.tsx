@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { orderV2Service, confirmReceipt } from '../../../services/orderV2';
 import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
@@ -23,11 +23,6 @@ import iconTimelinePending4 from '../../../assets/haul/order-progress/icon_timel
 import iconTimelinePending5 from '../../../assets/haul/order-progress/icon_timeline_pending_5.png';
 import iconTimelinePending6 from '../../../assets/haul/order-progress/icon_timeline_pending_6.png';
 import iconPhone from '../../../assets/haul/order-progress/icon_phone_outline.png';
-import tabHome from '../../../assets/haul/order-progress/tab_home_inactive.png';
-import tabOrder from '../../../assets/haul/order-progress/tab_order_active.png';
-import tabMessage from '../../../assets/haul/order-progress/tab_message_inactive.png';
-import tabProfile from '../../../assets/haul/order-progress/tab_profile_inactive.png';
-import badgeMessage from '../../../assets/haul/order-progress/badge_message_red_3.png';
 
 const formatFullDateTime = (value?: string | null) => {
   if (!value) return '--';
@@ -88,18 +83,67 @@ const cargoWeightTextOf = (detail: any) => {
   return value ? `${value}kg` : '--';
 };
 
+const STATUS_LABEL_MAP: Record<string, string> = {
+  // 订单状态
+  created: '已创建',
+  pending_provider_confirmation: '待服务商确认',
+  pending_payment: '待支付',
+  pending_dispatch: '待开始履约',
+  auto_assigning: '匹配中',
+  assigned: '服务商已接单',
+  preparing: '准备中',
+  loading: '装载中',
+  in_transit: '吊运中',
+  in_progress: '进行中',
+  delivered: '待确认收货',
+  completed: '已完成',
+  cancelled: '已取消',
+  scheduled: '已预约',
+  rejected: '已拒绝',
+  provider_rejected: '服务未确认',
+  // 空域
+  airspace_applying: '空域申请中',
+  airspace_approved: '空域已批',
+  airspace_rejected: '空域被拒',
+  // 支付/结算
+  paid: '已支付',
+  refunded: '已退款',
+  settled: '已入账',
+  calculated: '已计算',
+  confirmed: '已确认',
+  disputed: '争议中',
+  pending: '待处理',
+  settlement_failed: '结算失败',
+  // 飞行/调度
+  dispatched: '已派单',
+  takeoff: '已起飞',
+  landed: '已降落',
+  aborted: '已中止',
+  failed: '失败',
+  success: '成功',
+};
+
 const statusLabelOf = (status?: string) => {
-  if (status === 'pending_provider_confirmation') return '待服务商确认';
-  if (status === 'pending_payment') return '待支付';
-  if (status === 'pending_dispatch') return '待开始履约';
-  if (status === 'assigned') return '服务商已接单';
-  if (status === 'preparing') return '准备中';
-  if (status === 'loading') return '装载中';
-  if (status === 'in_transit') return '吊运中';
-  if (status === 'delivered') return '待确认收货';
-  if (status === 'completed') return '已完成';
-  if (status === 'cancelled') return '已取消';
-  return status || '状态已更新';
+  if (!status) return '状态已更新';
+  const key = String(status).toLowerCase();
+  return STATUS_LABEL_MAP[key] || status;
+};
+
+// 判断是不是 raw 英文 status（疑似可翻译，区别于中文/业务编号）
+const looksLikeRawStatus = (value?: string) => {
+  if (!value) return false;
+  const text = String(value).trim();
+  if (!text) return false;
+  if (/[一-龥]/.test(text)) return false;
+  return /^[a-z0-9_\-]+$/i.test(text) && text.length <= 40;
+};
+
+// 给 timeline 描述/标题用：raw status 翻译，其它原样返回
+const translateMaybeStatus = (value?: string) => {
+  if (!value) return '';
+  if (!looksLikeRawStatus(value)) return value;
+  const key = String(value).toLowerCase();
+  return STATUS_LABEL_MAP[key] || value;
 };
 
 const serviceLevelOf = (detail: any) => {
@@ -137,14 +181,17 @@ const statusDescOf = (status: string) => {
   return '服务商正在安排准备，请耐心等待';
 };
 
+// 5 步固定进度条 — 删除了原"到场安全评估"虚步骤（后端无对应 status，
+// 把它放进流程里会出现"in_transit 时 step 4 被错标 done"的逻辑漏洞）。
+// stepState 语义：5 步以内 === 当前 active 步；6 表示全部完成、无 active。
 const getStepState = (detail: any) => {
-  const status = detail?.status || '';
-  if (['completed'].includes(status)) return 6;
-  if (['delivered'].includes(status)) return 5;
-  if (['in_transit'].includes(status)) return 5;
-  if (['preparing', 'assigned', 'pending_dispatch'].includes(status)) return 3;
-  if (['pending_payment', 'paid'].includes(status)) return 2;
-  return 1;
+  const status = String(detail?.status || '').toLowerCase();
+  if (status === 'completed') return 6;                                    // 全 done
+  if (status === 'delivered') return 5;                                    // step 5 active (等客户确认)
+  if (status === 'in_transit') return 4;                                   // step 4 active (吊运中)
+  if (['preparing', 'assigned'].includes(status)) return 3;                // step 3 active (开始履约)
+  if (['pending_dispatch', 'paid', 'pending_payment'].includes(status)) return 2; // step 2 active (服务商确认/等履约)
+  return 1;                                                                // 默认 step 1 active (已下单)
 };
 
 const normalizedStatus = (order?: any) => String(order?.status || '').toLowerCase();
@@ -169,7 +216,7 @@ const within24Hours = (value?: string | null) => {
 
 const formatEta = (seconds?: number | null) => {
   if (seconds === 0) return '即将到达';
-  if (seconds === null || seconds === undefined || !Number.isFinite(Number(seconds))) return '等待实时位置';
+  if (seconds === null || seconds === undefined || !Number.isFinite(Number(seconds))) return '等待开始飞行';
   const safe = Math.max(0, Math.round(Number(seconds)));
   const min = Math.floor(safe / 60);
   const sec = safe % 60;
@@ -224,6 +271,20 @@ const canContactOrderProvider = (order: any) => contactVisibleStatuses.includes(
 const canReviewOrder = (order: any) => normalizedStatus(order) === 'completed' && !order?.reviewed;
 const isTerminalOnlyOrder = (order: any) => terminalOnlyStatuses.includes(normalizedStatus(order));
 
+const providerAdvanceActionOf = (order: any) => {
+  const status = normalizedStatus(order);
+  if (status === 'pending_dispatch' || status === 'assigned') {
+    return { label: '开始准备', run: () => orderV2Service.startPreparing(Number(order?.id || 0)) };
+  }
+  if (status === 'preparing') {
+    return { label: '开始飞行', run: () => orderV2Service.startFlight(Number(order?.id || 0)) };
+  }
+  if (status === 'in_transit') {
+    return { label: '确认送达', run: () => orderV2Service.confirmDelivery(Number(order?.id || 0)) };
+  }
+  return null;
+};
+
 export default function OrderProgressPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
   const orderId = Number(params.orderId || params.id || 0);
@@ -232,8 +293,21 @@ export default function OrderProgressPage() {
   const [loading, setLoading] = useState(Boolean(orderId));
   const [errorText, setErrorText] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [providerAdvanceLoading, setProviderAdvanceLoading] = useState(false);
   const [settlement, setSettlement] = useState<any | null>(null);
   const [settlementLoading, setSettlementLoading] = useState(false);
+  const [navTopRpx, setNavTopRpx] = useState(132);
+
+  useEffect(() => {
+    try {
+      const sys = Taro.getSystemInfoSync();
+      const ratio = 750 / (sys.windowWidth || 375);
+      const statusBarRpx = Math.round(((sys.statusBarHeight || 20) + 12) * ratio);
+      setNavTopRpx(statusBarRpx);
+    } catch {
+      setNavTopRpx(132);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     if (!orderId) {
@@ -298,12 +372,6 @@ export default function OrderProgressPage() {
 
   const detail = useMemo(() => remoteDetail, [remoteDetail]);
   const stepState = detail ? getStepState(detail) : 0;
-  const canConfirm = detail?.status === 'delivered';
-  const canPay = detail?.status === 'pending_payment';
-  const canReview = detail?.status === 'completed';
-  const canViewLive = ['instant', 'reservation'].includes(String(detail?.order_mode || ''))
-    && ['assigned', 'preparing', 'in_transit', 'delivered'].includes(String(detail?.status || ''));
-  const needsContractSign = canPay && !detail?.payment_ready;
   const providerPhone = detail ? providerPhoneOf(detail) : '';
   const customerPhone = detail ? customerPhoneOf(detail) : '';
   const currentUserId = Number(store.getState().auth.user?.id || 0);
@@ -322,6 +390,13 @@ export default function OrderProgressPage() {
     participantUserIdOf(detail, 'executor'),
   ].map((id) => Number(id || 0)).filter(Boolean) : [];
   const isProviderViewer = Boolean(currentUserId && providerUserIds.includes(currentUserId) && currentUserId !== clientUserId);
+  const canConfirm = !isProviderViewer && detail?.status === 'delivered';
+  const canPay = !isProviderViewer && detail?.status === 'pending_payment';
+  const canReview = !isProviderViewer && detail?.status === 'completed';
+  const canViewLive = ['instant', 'reservation'].includes(String(detail?.order_mode || ''))
+    && ['pending_dispatch', 'assigned', 'preparing', 'in_transit', 'delivered', 'completed'].includes(String(detail?.status || ''));
+  const providerAdvanceAction = isProviderViewer ? providerAdvanceActionOf(detail) : null;
+  const needsContractSign = canPay && !detail?.payment_ready;
   const contactTargetLabel = isProviderViewer ? '客户' : '服务商';
   const contactPhone = isProviderViewer ? customerPhone : providerPhone;
   const sourceSupplyId = detail ? sourceSupplyIdOf(detail) : 0;
@@ -353,7 +428,10 @@ export default function OrderProgressPage() {
   };
 
   const viewLive = () => {
-    if (!orderId) return;
+    if (!orderId) {
+      Taro.showToast({ title: '缺少订单ID，无法查看进度', icon: 'none' });
+      return;
+    }
     Taro.navigateTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
   };
 
@@ -378,18 +456,26 @@ export default function OrderProgressPage() {
   };
 
   const cancelOrder = async () => {
-    if (!detail || !orderId) return;
+    if (!detail || !orderId || actionLoading || providerAdvanceLoading) return;
+    const providerCancel = isProviderViewer;
     const res = await Taro.showModal({
-      title: '确认取消订单？',
-      content: '取消后订单将停止继续匹配或服务。',
+      title: providerCancel ? '确认取消接单？' : '确认取消订单？',
+      content: providerCancel ? '取消后订单将回到待匹配状态，你将不再负责本单。' : '取消后订单将停止继续匹配或服务。',
       confirmText: '确认取消',
     });
     if (!res.confirm) return;
     setActionLoading(true);
     try {
-      await orderV2Service.cancel(orderId, '客户主动取消');
-      Taro.showToast({ title: '已取消', icon: 'success' });
-      load();
+      await orderV2Service.cancel(orderId, providerCancel ? '服务商取消接单' : '客户主动取消');
+      Taro.showToast({ title: providerCancel ? '已取消接单' : '已取消', icon: 'success' });
+      if (providerCancel) {
+        Taro.setStorageSync('provider_orders_default_segment', 'mine');
+        setTimeout(() => {
+          Taro.switchTab({ url: '/pages/orders/index' });
+        }, 500);
+      } else {
+        await load();
+      }
     } catch (error: any) {
       Taro.showToast({ title: String(error?.message || '取消失败'), icon: 'none' });
     } finally {
@@ -440,6 +526,20 @@ export default function OrderProgressPage() {
     }
   };
 
+  const advanceProviderOrder = async () => {
+    if (!providerAdvanceAction || !orderId || actionLoading || providerAdvanceLoading) return;
+    setProviderAdvanceLoading(true);
+    try {
+      await providerAdvanceAction.run();
+      Taro.showToast({ title: '已推进', icon: 'success' });
+      await load();
+    } catch (error: any) {
+      Taro.showToast({ title: String(error?.message || '推进失败'), icon: 'none' });
+    } finally {
+      setProviderAdvanceLoading(false);
+    }
+  };
+
   const submitConfirm = () => {
     if (canPay) {
       Taro.navigateTo({
@@ -473,10 +573,6 @@ export default function OrderProgressPage() {
     });
   };
 
-  const switchMainTab = (url: string) => {
-    Taro.switchTab({ url });
-  };
-
   const summaryRows = detail ? [
     { key: 'provider', icon: logoProvider, label: '服务商', value: providerNameOf(detail), clickable: true },
     { key: 'weight', icon: iconWeight, label: '货物重量', value: cargoWeightTextOf(detail) },
@@ -486,30 +582,37 @@ export default function OrderProgressPage() {
     { key: 'team', icon: iconTeam, label: '服务商履约', value: stepState >= 3 ? '服务商已接单' : '等待服务商开始履约' },
   ] : [];
 
-  const timeline = detail ? [
-    { idx: 1, title: '已提交吊运需求', time: createdAt, desc: '您已提交吊运需求', icon: iconTimelineCheck, done: stepState >= 1 },
-    { idx: 2, title: '服务商已确认方案', time: providerConfirmedAt, desc: '服务商已确认并提交方案', icon: iconTimelineCheck, done: stepState >= 2 },
-    { idx: 3, title: '服务商开始履约', time: serviceStartedAt, desc: stepState >= 3 ? '服务商已进入履约推进' : '待开始', icon: iconTimelineActive3, active: stepState === 3, done: stepState >= 3 },
-    { idx: 4, title: '到场安全评估', time: '服务商到达现场后进行', desc: '待开始', icon: iconTimelinePending4, done: stepState >= 4 },
-    { idx: 5, title: '开始吊运', time: '吊运作业进行中', desc: '待开始', icon: iconTimelinePending5, done: stepState >= 5 },
-    { idx: 6, title: '已完成，等待确认', time: '作业完成，请您确认', desc: stepState >= 6 ? '已完成' : '待完成', icon: iconTimelinePending6, done: stepState >= 6 },
-  ] : [];
-  const timelineRows = remoteTimeline.length > 0
-    ? remoteTimeline.slice(0, 6).map((event, index) => {
-        const status = event?.status || event?.payload?.status || '';
-        const desc = event?.description && event.description !== status
-          ? event.description
-          : statusLabelOf(status);
-        return {
-          idx: index + 1,
-          title: event?.title || statusLabelOf(status),
-          time: formatFullDateTime(event?.occurred_at || event?.created_at),
-          desc,
-          icon: index < 2 ? iconTimelineCheck : index === 2 ? iconTimelineActive3 : [iconTimelinePending4, iconTimelinePending5, iconTimelinePending6][Math.min(index - 3, 2)],
-          done: true,
-        };
-      })
-    : timeline;
+  // 固定 5 步流程进度条（删除了无后端跟踪的"到场安全评估"虚步骤）
+  const stageDefs: Array<{ idx: number; title: string; time: string; doneDesc: string; pendingDesc: string }> = [
+    { idx: 1, title: '已提交吊运需求', time: createdAt, doneDesc: '您已提交吊运需求', pendingDesc: '等待提交' },
+    { idx: 2, title: '服务商已确认方案', time: providerConfirmedAt, doneDesc: '服务商已确认并提交方案', pendingDesc: '等待服务商确认' },
+    { idx: 3, title: '服务商开始履约', time: serviceStartedAt, doneDesc: '服务商进入履约推进', pendingDesc: '等待服务商开始' },
+    { idx: 4, title: '开始吊运', time: '吊运作业进行中', doneDesc: '吊运作业已进行', pendingDesc: '等待开始吊运' },
+    { idx: 5, title: '已完成，等待确认', time: '作业完成，请您确认', doneDesc: '订单已完成', pendingDesc: '等待客户确认完成' },
+  ];
+
+  const pickPendingIcon = (idx: number) => {
+    if (idx === 4) return iconTimelinePending5;  // 开始吊运
+    if (idx === 5) return iconTimelinePending6;  // 已完成
+    return iconTimelinePending4;
+  };
+
+  const timelineRows = detail ? stageDefs.map((stage) => {
+    // stepState 6 表示"全部完成"——所有步骤 done、没有 active
+    const isActive = stepState === stage.idx && stepState <= 5;
+    const isDone = stepState > stage.idx;
+    const icon = isActive ? iconTimelineActive3 : isDone ? iconTimelineCheck : pickPendingIcon(stage.idx);
+    const desc = isDone ? stage.doneDesc : isActive ? '进行中' : stage.pendingDesc;
+    return {
+      idx: stage.idx,
+      title: stage.title,
+      time: stage.time,
+      desc,
+      icon,
+      active: isActive,
+      done: isDone || isActive,
+    };
+  }) : [];
   const primaryActionText = needsContractSign
     ? '签署合同'
     : canPay
@@ -532,202 +635,206 @@ export default function OrderProgressPage() {
   ] : [];
 
   return (
-    <View className="op5-page">
-      <View className="op5-top-bg" />
-      <View className="op5-nav">
-        <View className="op5-back-hit" onClick={goBack}>
-          <Image className="op5-back" src={iconBack} mode="aspectFit" />
+    <View className="op-page">
+      <View className="op-nav" style={{ paddingTop: `${navTopRpx}rpx` }}>
+        <View className="op-nav-back" onClick={goBack}>
+          <Image className="op-nav-back-icon" src={iconBack} mode="aspectFit" />
         </View>
-        <Text className="op5-nav-title">订单进度</Text>
-        <View className="op5-service-hit" onClick={openService}>
-          <Image className="op5-service-icon" src={iconService} mode="aspectFit" />
-          <Text className="op5-service-text">客服</Text>
+        <Text className="op-nav-title">订单进度</Text>
+        <View className="op-nav-service" onClick={openService}>
+          <Image className="op-nav-service-icon" src={iconService} mode="aspectFit" />
+          <Text className="op-nav-service-text">客服</Text>
         </View>
       </View>
 
-      <ScrollView scrollY className="op5-scroll" enhanced showScrollbar={false}>
-        <View className="op5-content">
-          {!detail ? (
-            <View className="op5-empty-card">
-              <Text className="op5-empty-title">{loading ? '正在同步订单信息' : '无法展示订单进度'}</Text>
-              <Text className="op5-empty-desc">{loading ? '请稍候，正在读取真实订单数据。' : errorText || '订单不存在或当前账号无权查看。'}</Text>
-            </View>
-          ) : (
-            <>
-          <View className="op5-lala-card">
-            <View className="op5-lala-head">
-              <View className={`op5-lala-badge op5-lala-badge-${orderStatusToneOf(detail)}`}>
-                <Text>{orderStatusBadgeOf(detail)}</Text>
-              </View>
-              <View className="op5-lala-copy" onClick={copyOrderNo}>
-                <Text>复制单号</Text>
-              </View>
-            </View>
-
-            <View className="op5-lala-route">
-              <View className="op5-lala-route-row">
-                <View className="op5-lala-route-dot op5-lala-route-start" />
-                <Text>{detail?.service_address || '起点待确认'}</Text>
-              </View>
-              <View className="op5-lala-route-row">
-                <View className="op5-lala-route-dot op5-lala-route-end" />
-                <Text>{detail?.dest_address || '终点待确认'}</Text>
-              </View>
-            </View>
-
-            {showProviderCardRow ? (
-              <View className="op5-lala-provider">
-                <View className="op5-lala-avatar" />
-                <View className="op5-lala-provider-main">
-                  <Text className="op5-lala-provider-name">{detailProviderNameOf(detail)}</Text>
-                  <Text className="op5-lala-provider-rating">评分 5.0</Text>
+      <ScrollView scrollY enhanced showScrollbar={false} className="op-scroll">
+        {!detail ? (
+          <View className="op-empty">
+            <Text className="op-empty-title">{loading ? '正在同步订单信息' : '无法展示订单进度'}</Text>
+            <Text className="op-empty-desc">{loading ? '请稍候，正在读取真实订单数据。' : errorText || '订单不存在或当前账号无权查看。'}</Text>
+          </View>
+        ) : (
+          <View className="op-content">
+            {/* Hero */}
+            <View className="op-hero-card">
+              <View className="op-hero-head">
+                <View className={`op-badge op-badge-${orderStatusToneOf(detail)}`}>
+                  <Text>{orderStatusBadgeOf(detail)}</Text>
                 </View>
-                {canContactOrderProvider(detail) ? (
-                  <View className="op5-lala-phone" onClick={contactCounterparty}>
-                    <Text>☎</Text>
+                <View className="op-copy" onClick={copyOrderNo}>
+                  <Text>复制单号</Text>
+                </View>
+              </View>
+
+              <View className="op-route">
+                <View className="op-route-row">
+                  <View className="op-route-dot op-route-dot-start" />
+                  <Text className="op-route-text">{detail?.service_address || '起点待确认'}</Text>
+                </View>
+                <View className="op-route-row">
+                  <View className="op-route-dot op-route-dot-end" />
+                  <Text className="op-route-text">{detail?.dest_address || '终点待确认'}</Text>
+                </View>
+              </View>
+
+              {showProviderCardRow ? (
+                <View className="op-provider">
+                  <View className="op-provider-avatar" />
+                  <View className="op-provider-main">
+                    <Text className="op-provider-name">{detailProviderNameOf(detail)}</Text>
+                    <Text className="op-provider-rating">评分 5.0</Text>
                   </View>
-                ) : null}
-              </View>
-            ) : null}
-
-            {showEtaRow ? (
-              <View className="op5-lala-eta">
-                <Text>预计到达</Text>
-                <Text>{formatEta(detail?.live?.eta_seconds)}</Text>
-              </View>
-            ) : null}
-
-            <View className="op5-lala-meta">
-              <View>
-                <Text className="op5-lala-order-no">{orderNo}</Text>
-                <Text className="op5-lala-order-time">下单时间：{createdAt}</Text>
-              </View>
-              <Text className="op5-lala-amount">{formatMoney(detail?.total_amount)}</Text>
-            </View>
-
-            <View className="op5-lala-actions">
-              {showTerminalOnlyAction ? (
-                <View className="op5-lala-button op5-lala-button-muted" onClick={() => Taro.switchTab({ url: '/pages/home/index' })}>
-                  <Text>重新下单</Text>
-                </View>
-              ) : (
-                <>
-                  {canCancelOrder(detail) ? (
-                    <View className="op5-lala-button op5-lala-button-ghost" onClick={cancelOrder}>
-                      <Text>取消订单</Text>
-                    </View>
-                  ) : null}
-                  {canIncreaseOrderPrice(detail) ? (
-                    <View className="op5-lala-button op5-lala-button-warn" onClick={increasePrice}>
-                      <Text>附近运力紧张？加价</Text>
-                    </View>
-                  ) : null}
-                  {canAddOrderTip(detail) ? (
-                    <View className="op5-lala-button op5-lala-button-ghost" onClick={addTip}>
-                      <Text>给个小费</Text>
-                    </View>
-                  ) : null}
-                  {canViewLive ? (
-                    <View className="op5-lala-button op5-lala-button-primary" onClick={viewLive}>
-                      <Text>查看实时位置</Text>
-                    </View>
-                  ) : null}
                   {canContactOrderProvider(detail) ? (
-                    <View className="op5-lala-button op5-lala-button-ghost" onClick={contactCounterparty}>
-                      <Text>拨打电话</Text>
+                    <View className="op-provider-phone" onClick={contactCounterparty}>
+                      <View className="op-phone-icon" />
                     </View>
                   ) : null}
-                  {canPay ? (
-                    <View className="op5-lala-button op5-lala-button-primary" onClick={submitConfirm}>
-                      <Text>去支付</Text>
-                    </View>
-                  ) : null}
-                  {canReviewOrder(detail) ? (
-                    <View className="op5-lala-button op5-lala-button-primary" onClick={() => Taro.navigateTo({ url: `/pages/review/index?orderId=${orderId}` })}>
-                      <Text>评价服务</Text>
-                    </View>
-                  ) : null}
-                </>
-              )}
-            </View>
-          </View>
-
-          <View className="op5-summary-card">
-            <Text className="op5-card-title">订单摘要</Text>
-            <View className="op5-summary-table">
-              {summaryRows.map((row, index) => (
-                <View
-                  key={row.key}
-                  className={`op5-summary-row ${index === summaryRows.length - 1 ? 'op5-summary-row-last' : ''}`}
-                  onClick={row.clickable ? viewPlan : undefined}
-                >
-                  <Image className={`op5-summary-icon op5-summary-icon-${row.key}`} src={row.icon} mode="aspectFit" />
-                  <Text className="op5-summary-label">{row.label}</Text>
-                  <Text className="op5-summary-value" numberOfLines={1}>{row.value}</Text>
-                  {row.clickable ? <Image className="op5-summary-chevron" src={iconChevron} mode="aspectFit" /> : null}
                 </View>
-              ))}
-            </View>
-          </View>
+              ) : null}
 
-          <View className="op5-progress-card">
-            <Text className="op5-card-title">订单进度</Text>
-            {stepState === 3 ? <View className="op5-timeline-highlight" /> : null}
-            <View className="op5-timeline-line" />
-            {timelineRows.map((item) => (
-              <View
-                key={item.idx}
-                className={`op5-timeline-row op5-timeline-row-${item.idx}`}
-              >
-                <Image className="op5-timeline-icon" src={item.icon} mode="aspectFit" />
-                <Text className="op5-timeline-title">{item.title}</Text>
-                <Text className="op5-timeline-time">{item.time}</Text>
-                <Text className={`op5-timeline-desc ${item.done ? 'op5-timeline-desc-done' : ''}`}>{item.desc}</Text>
+              {showEtaRow ? (
+                <View className="op-eta">
+                  <Text className="op-eta-label">预计到达</Text>
+                  <Text className="op-eta-value">{formatEta(detail?.live?.eta_seconds)}</Text>
+                </View>
+              ) : null}
+
+              <View className="op-meta">
+                <View className="op-meta-left">
+                  <Text className="op-meta-no">{orderNo}</Text>
+                  <Text className="op-meta-time">下单时间：{createdAt}</Text>
+                </View>
+                <Text className="op-meta-amount">{formatMoney(detail?.total_amount)}</Text>
               </View>
-            ))}
-          </View>
 
-          {detail?.status === 'completed' ? (
-            <View className="op5-settlement-card">
-              <Text className="op5-card-title">结算明细</Text>
-              {settlementRows.length > 0 ? (
-                <View className="op5-settlement-table">
-                  {settlementRows.map((row, index) => (
-                    <View key={row.label} className={`op5-settlement-row ${index === settlementRows.length - 1 ? 'op5-settlement-row-last' : ''}`}>
-                      <Text className="op5-settlement-label">{row.label}</Text>
-                      <Text className="op5-settlement-value" numberOfLines={1}>{row.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text className="op5-settlement-empty">{settlementLoading ? '正在生成结算明细' : '暂未生成结算明细'}</Text>
-              )}
+              <View className="op-actions">
+                {showTerminalOnlyAction ? (
+                  <View className="op-button op-button-muted" onClick={() => Taro.switchTab({ url: '/pages/home/index' })}>
+                    <Text>重新下单</Text>
+                  </View>
+                ) : (
+                  <>
+                    {canCancelOrder(detail) ? (
+                      <View className="op-button op-button-ghost" onClick={cancelOrder}>
+                        <Text>{actionLoading ? '取消中…' : isProviderViewer ? '取消接单' : '取消订单'}</Text>
+                      </View>
+                    ) : null}
+                    {canIncreaseOrderPrice(detail) ? (
+                      <View className="op-button op-button-warn" onClick={increasePrice}>
+                        <Text>运力紧张？加价</Text>
+                      </View>
+                    ) : null}
+                    {!isProviderViewer && canAddOrderTip(detail) ? (
+                      <View className="op-button op-button-ghost" onClick={addTip}>
+                        <Text>给个小费</Text>
+                      </View>
+                    ) : null}
+                    {canViewLive ? (
+                      <View className="op-button op-button-ghost" onClick={viewLive}>
+                        <Text>查看路线进度</Text>
+                      </View>
+                    ) : null}
+	                    {canContactOrderProvider(detail) ? (
+	                      <View className="op-button op-button-ghost" onClick={contactCounterparty}>
+	                        <Text>拨打电话</Text>
+	                      </View>
+	                    ) : null}
+		                    {providerAdvanceAction ? (
+		                      <View className="op-button op-button-primary" onClick={advanceProviderOrder}>
+		                        <Text>{providerAdvanceLoading ? '推进中…' : providerAdvanceAction.label}</Text>
+		                      </View>
+		                    ) : null}
+	                    {canPay ? (
+                      <View className="op-button op-button-primary" onClick={submitConfirm}>
+                        <Text>{needsContractSign ? '签署合同' : '去支付'}</Text>
+                      </View>
+                    ) : null}
+                    {canConfirm ? (
+                      <View className="op-button op-button-primary" onClick={submitConfirm}>
+                        <Text>{actionLoading ? '确认中…' : '确认完成'}</Text>
+                      </View>
+                    ) : null}
+                    {canReview ? (
+                      <View className="op-button op-button-primary" onClick={() => Taro.navigateTo({ url: `/pages/review/index?orderId=${orderId}` })}>
+                        <Text>评价服务</Text>
+                      </View>
+                    ) : null}
+                  </>
+                )}
+              </View>
             </View>
-          ) : null}
-            </>
-          )}
-        </View>
-      </ScrollView>
 
-      <View className="op5-tabbar">
-        <View className="op5-tab-item" onClick={() => switchMainTab('/pages/home/index')}>
-          <Image className="op5-tab-icon" src={tabHome} mode="aspectFit" />
-          <Text>首页</Text>
-        </View>
-        <View className="op5-tab-item op5-tab-current" onClick={() => switchMainTab('/pages/orders/index')}>
-          <Image className="op5-tab-icon" src={tabOrder} mode="aspectFit" />
-          <Text>订单</Text>
-        </View>
-        <View className="op5-tab-item op5-tab-message" onClick={() => switchMainTab('/pages/messages/index')}>
-          <Image className="op5-tab-icon" src={tabMessage} mode="aspectFit" />
-          <Image className="op5-tab-badge" src={badgeMessage} mode="aspectFit" />
-          <Text>消息</Text>
-        </View>
-        <View className="op5-tab-item" onClick={() => switchMainTab('/pages/profile/index')}>
-          <Image className="op5-tab-icon" src={tabProfile} mode="aspectFit" />
-          <Text>我的</Text>
-        </View>
-      </View>
+            {/* Summary */}
+            <View className="op-card">
+              <Text className="op-card-title">订单摘要</Text>
+              <View className="op-summary-list">
+                {summaryRows.map((row, index) => (
+                  <View
+                    key={row.key}
+                    className={`op-summary-row ${index === summaryRows.length - 1 ? 'is-last' : ''}`}
+                    onClick={row.clickable ? viewPlan : undefined}
+                  >
+                    <Image className="op-summary-icon" src={row.icon} mode="aspectFit" />
+                    <Text className="op-summary-label">{row.label}</Text>
+                    <Text className="op-summary-value">{row.value}</Text>
+                    {row.clickable ? (
+                      <Image className="op-summary-chevron" src={iconChevron} mode="aspectFit" />
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Progress timeline */}
+            <View className="op-card">
+              <Text className="op-card-title">订单进度</Text>
+              <View className="op-timeline">
+                {timelineRows.map((item: any, index: number) => (
+                  <View
+                    key={item.idx}
+                    className={`op-tl-row ${item.active ? 'is-active' : ''} ${item.done ? 'is-done' : ''} ${index === timelineRows.length - 1 ? 'is-last' : ''}`}
+                  >
+                    <View className="op-tl-rail">
+                      <View className="op-tl-icon-wrap">
+                        <Image className="op-tl-icon" src={item.icon} mode="aspectFit" />
+                      </View>
+                      {index === timelineRows.length - 1 ? null : <View className="op-tl-line" />}
+                    </View>
+                    <View className="op-tl-body">
+                      <View className="op-tl-line-1">
+                        <Text className="op-tl-title">{item.title}</Text>
+                        <Text className={`op-tl-desc ${item.done ? 'is-done' : ''}`}>{item.desc}</Text>
+                      </View>
+                      <Text className="op-tl-time">{item.time}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Settlement */}
+            {detail?.status === 'completed' ? (
+              <View className="op-card">
+                <Text className="op-card-title">结算明细</Text>
+                {settlementRows.length > 0 ? (
+                  <View className="op-settlement-list">
+                    {settlementRows.map((row, index) => (
+                      <View key={row.label} className={`op-settlement-row ${index === settlementRows.length - 1 ? 'is-last' : ''}`}>
+                        <Text className="op-settlement-label">{row.label}</Text>
+                        <Text className="op-settlement-value">{row.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text className="op-settlement-empty">{settlementLoading ? '正在生成结算明细' : '暂未生成结算明细'}</Text>
+                )}
+              </View>
+            ) : null}
+
+            <View className="op-scroll-spacer" />
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }

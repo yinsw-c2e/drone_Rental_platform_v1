@@ -11,7 +11,6 @@ import { formatAmountYuan } from '../../utils';
 import { canUseProviderWorkbench, getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
 import { useProviderPresence } from '../../hooks/useProviderPresence';
 import { RootState, useAppDispatch } from '../../store/store';
-import { setHaulRoleMode } from '../../store/slices/roleSlice';
 import { presenceConfigUpdated } from '../../store/slices/providerPresenceSlice';
 import {
   HomeDashboard,
@@ -71,6 +70,7 @@ const formatMoney = (amount: number) =>
   amount.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
 
 const PROVIDER_RADIUS_OPTIONS = [5, 10, 20, 30];
+const SELF_EXECUTABLE_REQUIRED_TOAST = '需要先完善设备和履约资质';
 
 const normalizeServiceClasses = (items: unknown): V2ServiceClass[] =>
   Array.isArray(items) ? items.filter((item): item is V2ServiceClass => Boolean(item && (item as V2ServiceClass).code)) : [];
@@ -82,9 +82,15 @@ const normalizeProviderItems = <T,>(res: unknown): T[] => {
   return [];
 };
 
-const formatCompletionRate = (rate?: number) => {
-  const normalized = Number.isFinite(Number(rate)) ? Number(rate) : 1;
+const formatCompletionRate = (rate?: number | null) => {
+  if (rate === null || rate === undefined || !Number.isFinite(Number(rate))) return '新入驻';
+  const normalized = Number(rate);
   return `${Math.round(Math.max(0, Math.min(1, normalized)) * 100)}%`;
+};
+
+const formatProviderRating = (rating?: number | null) => {
+  if (rating === null || rating === undefined || !Number.isFinite(Number(rating))) return '暂无评分';
+  return Number(rating).toFixed(1);
 };
 
 const formatBroadcastDistance = (km?: number | null) => {
@@ -133,11 +139,6 @@ const getOrderIdFromPayload = (payload: unknown, fallback: number) => {
   return Number(value?.order?.id || value?.data?.order?.id || fallback || 0);
 };
 
-const firstFulfillmentOrderOf = (workbench?: OwnerWorkbenchView | null): OwnerWorkbenchOrderItem | null =>
-  workbench?.pending_provider_confirmation_orders?.[0] ||
-  workbench?.pending_dispatch_orders?.[0] ||
-  null;
-
 const formatOrderTodoSubtitle = (item: OwnerWorkbenchOrderItem) => {
   const route = [item.service_address, item.dest_address].filter(Boolean).join(' → ') || '待补地址';
   return `${route} · ${formatMoney(Math.round(Number(item.total_amount || 0) / 100))}元`;
@@ -149,7 +150,11 @@ function safeNavigateTo(url: string) {
   });
 }
 
-function NearbyBroadcasts({ onGrabbed }: { onGrabbed?: (orderId: number) => void }) {
+function isProviderNotSelfExecutableError(error: any) {
+  return error?.statusCode === 403 && String(error?.message || '').includes('provider_not_self_executable');
+}
+
+function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boolean; onGrabbed?: (orderId: number) => void }) {
   const [items, setItems] = useState<V2ProviderBroadcastView[]>([]);
   const [tick, setTick] = useState(0);
   const [grabbingId, setGrabbingId] = useState<number | null>(null);
@@ -197,6 +202,10 @@ function NearbyBroadcasts({ onGrabbed }: { onGrabbed?: (orderId: number) => void
 
   const grab = useCallback(async (broadcast: V2ProviderBroadcastView) => {
     if (grabbingId) return;
+    if (!canSelfExecute) {
+      Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
+      return;
+    }
     setGrabbingId(broadcast.id);
     try {
       const res = await providerService.grabBroadcast(broadcast.id);
@@ -209,53 +218,55 @@ function NearbyBroadcasts({ onGrabbed }: { onGrabbed?: (orderId: number) => void
       if (error?.statusCode === 409 || error?.errno === 409) {
         Taro.showToast({ title: '已被其他服务商抢走', icon: 'none' });
         pullBroadcasts();
+      } else if (isProviderNotSelfExecutableError(error)) {
+        Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
       } else {
         Taro.showToast({ title: String(error?.message || '抢单失败'), icon: 'none' });
       }
     } finally {
       setGrabbingId(null);
     }
-  }, [grabbingId, onGrabbed, pullBroadcasts]);
+  }, [canSelfExecute, grabbingId, onGrabbed, pullBroadcasts]);
 
   return (
-    <View className="nearby-broadcast-section">
-      <View className="nearby-broadcast-header">
-        <Text className="nearby-broadcast-title">附近订单</Text>
-        <Text className="nearby-broadcast-subtitle">在线后自动刷新</Text>
+    <View className='pw-card pw-broadcast-card'>
+      <View className='pw-card-head'>
+        <Text className='pw-card-title'>附近订单</Text>
+        <Text className='pw-card-sub'>在线后自动刷新</Text>
       </View>
       {visibleItems.length > 0 ? (
-        <View className="nearby-broadcast-list">
+        <View className='pw-broadcast-list'>
           {visibleItems.map((item) => {
             const order = getOrderFromBroadcast(item);
             const remaining = getRemainingSeconds(item.expires_at, item.remaining_seconds);
             const isGrabbing = grabbingId === item.id;
             return (
-              <View className="nearby-broadcast-item" key={item.id}>
-                <View className="nearby-broadcast-item-head">
-                  <Text className="nearby-broadcast-distance">{formatBroadcastDistance(item.distance_km)}</Text>
-                  <Text className="nearby-broadcast-countdown">剩 {remaining}s</Text>
+              <View className='pw-broadcast-item' key={item.id}>
+                <View className='pw-broadcast-head'>
+                  <Text className='pw-broadcast-distance'>{formatBroadcastDistance(item.distance_km)}</Text>
+                  <Text className='pw-broadcast-countdown'>剩 {remaining}s</Text>
                 </View>
-                <View className="nearby-broadcast-route">
-                  <Text className="nearby-route-start">{order?.service_address || '起点待确认'}</Text>
-                  <Text className="nearby-route-arrow">→</Text>
-                  <Text className="nearby-route-end">{order?.dest_address || '终点待确认'}</Text>
+                <View className='pw-broadcast-route'>
+                  <Text className='pw-broadcast-route-start'>{order?.service_address || '起点待确认'}</Text>
+                  <Text className='pw-broadcast-route-arrow'>→</Text>
+                  <Text className='pw-broadcast-route-end'>{order?.dest_address || '终点待确认'}</Text>
                 </View>
-                <View className="nearby-broadcast-meta">
+                <View className='pw-broadcast-meta'>
                   <Text>{formatWeight(order?.cargo_weight_kg || item.weight_kg)}</Text>
                   <Text>{formatDuration(order?.estimated_duration_min)}</Text>
                   <Text>{formatRouteDistance(order?.estimated_distance_m)}</Text>
                 </View>
-                <View className="nearby-broadcast-footer">
-                  <Text className="nearby-broadcast-price">{formatAmountYuan(getBroadcastAmount(item))}</Text>
+                <View className='pw-broadcast-foot'>
+                  <Text className='pw-broadcast-price'>{formatAmountYuan(getBroadcastAmount(item))}</Text>
                   <View
-                    className={`nearby-broadcast-grab ${isGrabbing ? 'is-loading' : ''}`}
+                    className={`pw-broadcast-grab ${isGrabbing ? 'is-loading' : ''}`}
                     onClick={() => {
                       if (!isGrabbing) {
                         grab(item);
                       }
                     }}
                   >
-                    <Text>{isGrabbing ? '抢单中...' : '一键抢单'}</Text>
+                    <Text>{isGrabbing ? '抢单中…' : '一键抢单'}</Text>
                   </View>
                 </View>
               </View>
@@ -263,7 +274,8 @@ function NearbyBroadcasts({ onGrabbed }: { onGrabbed?: (orderId: number) => void
           })}
         </View>
       ) : (
-        <View className="nearby-broadcast-empty">
+        <View className='pw-broadcast-empty'>
+          <Image className='pw-broadcast-empty-image' src={todoAirspaceIcon} mode='aspectFit' />
           <Text>暂无附近订单，保持在线等待</Text>
         </View>
       )}
@@ -330,6 +342,9 @@ function AssignmentModal({ onAccepted }: { onAccepted?: (orderId: number) => voi
       if (error?.statusCode === 409 || error?.errno === 409) {
         Taro.showToast({ title: '指派已失效或超时', icon: 'none' });
         setAssignment(null);
+      } else if (isProviderNotSelfExecutableError(error)) {
+        Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
+        setAssignment(null);
       } else {
         Taro.showToast({ title: String(error?.message || '接受失败'), icon: 'none' });
       }
@@ -363,30 +378,30 @@ function AssignmentModal({ onAccepted }: { onAccepted?: (orderId: number) => voi
 
   const order = assignment.order;
   return (
-    <View className="assignment-modal-mask">
-      <View className="assignment-modal-card">
-        <View className="assignment-modal-titlebar">
-          <Text>平台为你指派了订单 第 {assignment.attempt_seq} 轮</Text>
+    <View className='pw-assign-mask'>
+      <View className='pw-assign-card'>
+        <View className='pw-assign-title'>
+          <Text>平台为你指派了订单 · 第 {assignment.attempt_seq} 轮</Text>
         </View>
-        <Text className="assignment-modal-countdown">{remaining}s 内响应</Text>
-        <View className="assignment-modal-route">
-          <Text className="assignment-route-start">{order?.service_address || '起点待确认'}</Text>
-          <Text className="assignment-route-arrow">→</Text>
-          <Text className="assignment-route-end">{order?.dest_address || '终点待确认'}</Text>
+        <Text className='pw-assign-countdown'>{remaining}s 内响应</Text>
+        <View className='pw-assign-route'>
+          <Text className='pw-assign-route-start'>{order?.service_address || '起点待确认'}</Text>
+          <Text className='pw-assign-route-arrow'>→</Text>
+          <Text className='pw-assign-route-end'>{order?.dest_address || '终点待确认'}</Text>
         </View>
-        <View className="assignment-modal-meta">
+        <View className='pw-assign-meta'>
           <Text>{formatBroadcastDistance(assignment.distance_km)}</Text>
           <Text>{formatWeight(order?.cargo_weight_kg || assignment.broadcast?.weight_kg)}</Text>
           <Text>{formatDuration(order?.estimated_duration_min)}</Text>
           <Text>{formatRouteDistance(order?.estimated_distance_m)}</Text>
         </View>
-        <Text className="assignment-modal-price">{formatAmountYuan(getBroadcastAmount(assignment))}</Text>
-        <View className="assignment-modal-actions">
-          <View className={`assignment-decline ${responding ? 'is-loading' : ''}`} onClick={decline}>
+        <Text className='pw-assign-price'>{formatAmountYuan(getBroadcastAmount(assignment))}</Text>
+        <View className='pw-assign-actions'>
+          <View className={`pw-assign-decline ${responding ? 'is-loading' : ''}`} onClick={decline}>
             <Text>拒绝</Text>
           </View>
-          <View className={`assignment-accept ${responding ? 'is-loading' : ''}`} onClick={accept}>
-            <Text>{responding ? '处理中...' : '接受'}</Text>
+          <View className={`pw-assign-accept ${responding ? 'is-loading' : ''}`} onClick={accept}>
+            <Text>{responding ? '处理中…' : '接受'}</Text>
           </View>
         </View>
       </View>
@@ -399,8 +414,8 @@ export default function ProviderWorkbench() {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
-  const [navShift, setNavShift] = useState(0);
-  const [headerActionTop, setHeaderActionTop] = useState(82);
+  const [navShift, setNavShift] = useState(132);
+  const [headerActionTop, setHeaderActionTop] = useState(132);
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [workbench, setWorkbench] = useState<OwnerWorkbenchView | null>(null);
   const [openedOnboardingOnce, setOpenedOnboardingOnce] = useState(false);
@@ -471,16 +486,13 @@ export default function ProviderWorkbench() {
     safeNavigateTo(url);
   }, [isAuthenticated, promptLogin]);
 
-  const openDemandTab = useCallback(() => {
+  // 「需求市场」——客户发布的议价单池，服务商主动去报价
+  const openDemandList = useCallback(() => {
     if (!isAuthenticated) {
       promptLogin();
       return;
     }
-    Taro.switchTab({ url: '/pages/orders/index' }).catch(() => {
-      Taro.reLaunch({ url: '/pages/orders/index?mode=provider' }).catch(() => {
-        Taro.showToast({ title: '接单页暂不可用', icon: 'none' });
-      });
-    });
+    safeNavigateTo('/pages/demand/list/index');
   }, [isAuthenticated, promptLogin]);
 
   const refreshDashboard = useCallback(() => {
@@ -559,8 +571,8 @@ export default function ProviderWorkbench() {
   ]);
 
   useDidShow(() => {
-    dispatch(setHaulRoleMode('provider'));
-    syncCustomTabBar(0, 'provider');
+    // 仅同步 TabBar 选中态，不强制改写全局角色身份。
+    syncCustomTabBar(0);
     if (isAuthenticated && !canUseProvider && !openedOnboardingOnce) {
       setOpenedOnboardingOnce(true);
       safeNavigateTo('/pages/provider/onboarding/index?from=workbench');
@@ -581,15 +593,14 @@ export default function ProviderWorkbench() {
 
   useEffect(() => {
     try {
-      const menu = Taro.getMenuButtonBoundingClientRect();
-      const system = Taro.getSystemInfoSync();
-      const rpxRatio = 750 / system.windowWidth;
-      const menuTopRpx = menu.top * rpxRatio;
-      setNavShift(Number(Math.max(0, menuTopRpx - 95.1).toFixed(1)));
-      setHeaderActionTop(82);
+      const sys = Taro.getSystemInfoSync();
+      const ratio = 750 / (sys.windowWidth || 375);
+      const statusBarRpx = Math.round(((sys.statusBarHeight || 20) + 12) * ratio);
+      setNavShift(statusBarRpx);
+      setHeaderActionTop(statusBarRpx);
     } catch {
-      setNavShift(0);
-      setHeaderActionTop(82);
+      setNavShift(132);
+      setHeaderActionTop(132);
     }
   }, []);
 
@@ -617,16 +628,30 @@ export default function ProviderWorkbench() {
     };
   }, [dashboard, workbench]);
 
-  const firstFulfillmentOrder = useMemo(() => firstFulfillmentOrderOf(workbench), [workbench]);
-
+  // 单条订单：点击 todo 行时使用，进入该订单详情
   const openFulfillment = useCallback((orderId?: number) => {
-    const nextOrderId = Number(orderId || firstFulfillmentOrder?.id || 0);
-    navigateWithAuth(nextOrderId ? `/pages/orders/detail/index?orderId=${nextOrderId}` : '/pages/orders/index');
-  }, [firstFulfillmentOrder?.id, navigateWithAuth]);
+    const nextOrderId = Number(orderId || 0);
+    if (nextOrderId > 0) {
+      navigateWithAuth(`/pages/orders/detail/index?orderId=${nextOrderId}`);
+      return;
+    }
+    // 没传 ID：兜底跳到订单列表
+    Taro.switchTab({ url: '/pages/orders/index' }).catch(() => null);
+  }, [navigateWithAuth]);
 
-  const openFulfillmentOrExecution = useCallback(() => {
-    openFulfillment(firstFulfillmentOrder?.id);
-  }, [firstFulfillmentOrder?.id, openFulfillment]);
+  // 聚合数字 / 全部事项：始终跳到订单列表，让用户看到所有待办
+  const openFulfillmentList = useCallback(() => {
+    if (!isAuthenticated) {
+      promptLogin();
+      return;
+    }
+    Taro.setStorageSync('provider_orders_default_segment', 'mine');
+    Taro.switchTab({ url: '/pages/orders/index' }).catch(() => {
+      Taro.reLaunch({ url: '/pages/orders/index' }).catch(() => {
+        Taro.showToast({ title: '订单列表暂不可用', icon: 'none' });
+      });
+    });
+  }, [isAuthenticated, promptLogin]);
 
   const openGrabbedOrder = useCallback((orderId: number) => {
     const nextOrderId = Number(orderId || 0);
@@ -657,20 +682,12 @@ export default function ProviderWorkbench() {
 
   const metrics: MetricItem[] = [
     {
-      key: 'pending',
-      label: '今日待处理',
-      value: String(dashboardStats.todayPending),
-      icon: metricPendingIcon,
-      valueClass: 'provider-metric-value-blue',
-      onClick: openFulfillmentOrExecution,
-    },
-    {
       key: 'quote',
       label: '待报价服务',
       value: String(dashboardStats.pendingQuote),
       icon: metricQuoteIcon,
       valueClass: 'provider-metric-value-orange',
-      onClick: openDemandTab,
+      onClick: openDemandList,
     },
     {
       key: 'contract',
@@ -678,7 +695,7 @@ export default function ProviderWorkbench() {
       value: String(dashboardStats.pendingFulfillment),
       icon: metricContractIcon,
       valueClass: 'provider-metric-value-green',
-      onClick: openFulfillmentOrExecution,
+      onClick: openFulfillmentList,
     },
     {
       key: 'income',
@@ -692,25 +709,11 @@ export default function ProviderWorkbench() {
 
   const quickEntries: QuickEntry[] = [
     {
-      key: 'new-demand',
-      label: '查看新需求',
-      icon: quickNewDemandIcon,
-      iconClass: 'provider-quick-icon-new-demand',
-      onClick: openDemandTab,
-    },
-    {
       key: 'my-quote',
       label: '我的报价',
       icon: quickMyQuoteIcon,
       iconClass: 'provider-quick-icon-my-quote',
       onClick: () => navigateWithAuth('/pages/profile/my-quotes/index'),
-    },
-    {
-      key: 'fulfillment',
-      label: '履约执行',
-      icon: quickFulfillmentIcon,
-      iconClass: 'provider-quick-icon-fulfillment',
-      onClick: openFulfillmentOrExecution,
     },
     {
       key: 'device-staff',
@@ -777,238 +780,249 @@ export default function ProviderWorkbench() {
     return items.slice(0, 4);
   }, [navigateWithAuth, openFulfillment, workbench]);
 
-  const canvasStyle = {
-    marginTop: `${navShift}rpx`,
-  } as React.CSSProperties;
-
-  const headerSettingsStyle = {
-    top: `${headerActionTop}rpx`,
-  } as React.CSSProperties;
+  const navHeaderStyle = { paddingTop: `${navShift}rpx` } as React.CSSProperties;
+  const settingsStyle = { top: `${headerActionTop}rpx` } as React.CSSProperties;
 
   if (!isAuthenticated || !canUseProvider) {
     return (
-      <View className="provider-workbench-page">
-        <ScrollView scrollY className="provider-workbench-scroll">
-          <View className="provider-workbench-canvas" style={canvasStyle}>
-            <View className="provider-header-bg" />
-            <View className="provider-header-curve" />
-            <Text className="provider-page-title">工作台</Text>
-            <View className="provider-gate-card">
-              <Text className="provider-gate-title">
-                {providerGateCopy.title}
-              </Text>
-              <Text className="provider-gate-desc">
-                {providerGateCopy.desc}
-              </Text>
-              <View
-                className="provider-gate-primary"
-                onClick={openProviderOnboarding}
-              >
-                <Text className="provider-gate-primary-text">{providerGateCopy.primary}</Text>
-              </View>
-              <View
-                className="provider-gate-secondary"
-                onClick={() => {
-                  Taro.switchTab({ url: '/pages/profile/index' })
-                    .then(() => syncCustomTabBar(3, 'provider'))
-                    .catch(() => null);
-                }}
-              >
-                <Text className="provider-gate-secondary-text">查看账号资料</Text>
+      <View className='pw-page'>
+        <View className='pw-header' style={navHeaderStyle}>
+          <View className='pw-brand'>
+            <Image className='pw-brand-logo' src={logoProvider} mode='aspectFit' />
+            <View className='pw-brand-text'>
+              <Text className='pw-brand-name'>服务商工作台</Text>
+              <View className='pw-brand-tags'>
+                <View className='pw-settings-inline' onClick={() => safeNavigateTo('/pages/settings/index')}>
+                  <Text>设置</Text>
+                </View>
               </View>
             </View>
           </View>
+          <View className='pw-title-wrap'>
+            <Text className='pw-greeting'>登录以解锁专属接单与履约功能</Text>
+          </View>
+        </View>
+        <ScrollView scrollY className='pw-scroll'>
+          <View className='pw-card pw-gate-card'>
+            <Text className='pw-gate-title'>{providerGateCopy.title}</Text>
+            <Text className='pw-gate-desc'>{providerGateCopy.desc}</Text>
+            <View className='pw-gate-primary' onClick={openProviderOnboarding}>
+              <Text>{providerGateCopy.primary}</Text>
+            </View>
+            <View
+              className='pw-gate-secondary'
+              onClick={() => {
+                Taro.switchTab({ url: '/pages/profile/index' })
+                  .then(() => syncCustomTabBar(3))
+                  .catch(() => null);
+              }}
+            >
+              <Text>查看账号资料</Text>
+            </View>
+          </View>
+          <View className='pw-scroll-spacer' />
         </ScrollView>
       </View>
     );
   }
 
+  const ctaText = actionLoading ? '处理中…' : presence.online ? '下线（停止接单）' : '上线接单';
+  const ctaState = actionLoading ? 'loading' : presence.online ? 'offline' : 'online';
+  const ctaHint = presence.online
+    ? '已暂停派单。下线后仍可去「接单」Tab 主动报价。'
+    : '上线后平台会按你的机型/半径主动派单。';
+
   return (
-    <View className="provider-workbench-page">
-      <ScrollView scrollY className="provider-workbench-scroll">
-        <View className={`provider-workbench-canvas ${presence.online ? 'provider-workbench-canvas-online' : ''}`} style={canvasStyle}>
-          <View className="provider-header-bg" />
-          <View className="provider-header-curve" />
-
-          <View className="presence-panel">
-            <View className="presence-header">
-              <View className={`presence-status-dot ${presence.online ? 'online' : 'offline'}`} />
-              <Text className="presence-status-text">
-                {presence.online ? '已上线，等待接单' : '已下线'}
-              </Text>
-            </View>
-
-            <View className="presence-metrics">
-              <View className="presence-metric">
-                <Text className="presence-metric-value">{providerStats?.today_order_count ?? '--'}</Text>
-                <Text className="presence-metric-label">今日接单</Text>
+    <View className='pw-page'>
+      <View className='pw-header' style={navHeaderStyle}>
+        <View className='pw-brand'>
+          <Image className='pw-brand-logo' src={logoProvider} mode='aspectFit' onClick={() => navigateWithAuth('/pages/profile/owner/index')} />
+          <View className='pw-brand-text'>
+            <Text className='pw-brand-name' onClick={() => navigateWithAuth('/pages/profile/owner/index')}>{providerBrandName}</Text>
+            <View className='pw-brand-tags'>
+              <View className='pw-cert-badge' onClick={() => navigateWithAuth('/pages/profile/owner/index')}>
+                <Text>{providerCertLabel}</Text>
               </View>
-              <View className="presence-metric">
-                <Text className="presence-metric-value">{formatAmountYuan(providerStats?.today_income_cents)}</Text>
-                <Text className="presence-metric-label">今日收入</Text>
-              </View>
-              <View className="presence-metric">
-                <Text className="presence-metric-value">{formatAmountYuan(providerStats?.pending_settlement_cents)}</Text>
-                <Text className="presence-metric-label">待结算</Text>
-              </View>
-              <View className="presence-metric">
-                <Text className="presence-metric-value">{formatCompletionRate(providerStats?.completion_rate)}</Text>
-                <Text className="presence-metric-label">完单率</Text>
-              </View>
-              <View className="presence-metric">
-                <Text className="presence-metric-value">{(providerStats?.rating ?? 4.5).toFixed(1)}</Text>
-                <Text className="presence-metric-label">评分</Text>
+              <View className='pw-settings-inline' onClick={() => navigateWithAuth('/pages/settings/index')}>
+                <Text>设置</Text>
               </View>
             </View>
+          </View>
+        </View>
+        <View className='pw-title-wrap'>
+          <Text className='pw-greeting'>
+            {presence.online ? '正在为您实时监控派单与附近需求' : '当前处于离线状态，随时准备开启接单'}
+          </Text>
+        </View>
+      </View>
 
-            <View className="presence-config">
-              <View className="presence-config-row">
-                <Text className="presence-config-label">服务半径</Text>
-                <View className="presence-radius-chips">
-                  {PROVIDER_RADIUS_OPTIONS.map(km => (
-                    <View
-                      key={km}
-                      className={`presence-radius-chip ${presence.maxRadiusKM === km ? 'is-active' : ''}`}
-                      onClick={() => setMaxRadius(km)}
-                    >
-                      <Text>{km}km</Text>
-                    </View>
-                  ))}
+      <ScrollView scrollY className='pw-scroll' enhanced showScrollbar={false}>
+        {/* Presence panel */}
+        <View className='pw-card pw-presence-card'>
+          <View className='pw-presence-status'>
+            <View className={`pw-presence-dot ${presence.online ? 'is-online' : 'is-offline'}`} />
+            <Text className='pw-presence-status-text'>
+              {presence.online ? '已上线，等待接单' : '已下线'}
+            </Text>
+          </View>
+
+          <View className='pw-stats'>
+            <View className='pw-stats-main'>
+              <View className='pw-stat pw-stat-primary pw-stat-primary-income'>
+                <View className='pw-stat-header'>
+                  <Image className='pw-stat-icon' src={metricIncomeIcon} mode='aspectFit' />
+                  <Text className='pw-stat-label'>今日收入</Text>
                 </View>
+                <Text className='pw-stat-value pw-color-orange'>{formatAmountYuan(providerStats?.today_income_cents)}</Text>
               </View>
-
-              <View className="presence-config-row presence-config-row-classes">
-                <Text className="presence-config-label">可接机型</Text>
-                <View className="presence-class-chips">
-                  {serviceClasses.map(item => {
-                    const checked = (presence.acceptedServiceClasses || []).includes(item.code);
-                    return (
-                      <View
-                        key={item.code}
-                        className={`presence-class-chip ${checked ? 'is-active' : ''}`}
-                        onClick={() => toggleServiceClass(item.code)}
-                      >
-                        <Text>{item.display_name}</Text>
-                      </View>
-                    );
-                  })}
+              <View className='pw-stat pw-stat-primary pw-stat-primary-orders'>
+                <View className='pw-stat-header'>
+                  <Image className='pw-stat-icon' src={metricPendingIcon} mode='aspectFit' />
+                  <Text className='pw-stat-label'>今日接单</Text>
                 </View>
+                <Text className='pw-stat-value pw-color-blue'>{providerStats?.today_order_count ?? '--'}</Text>
               </View>
             </View>
-
-            <View
-              className={`presence-cta ${presence.online ? 'is-offline' : 'is-online'} ${actionLoading ? 'is-loading' : ''}`}
-              onClick={() => {
-                if (!actionLoading) {
-                  togglePresence();
-                }
-              }}
-            >
-              <Text>
-                {actionLoading ? '处理中...' : presence.online ? '下线接单' : '上线接单'}
-              </Text>
-            </View>
-
-            {presence.lastError ? (
-              <Text className="presence-error">{presence.lastError}</Text>
-            ) : null}
-          </View>
-
-          {presence.online ? (
-            <NearbyBroadcasts onGrabbed={openGrabbedOrder} />
-          ) : null}
-
-          <View className="provider-brand" onClick={() => navigateWithAuth('/pages/profile/owner/index')}>
-            <Image className="provider-brand-logo" src={logoProvider} mode="aspectFit" />
-            <Text className="provider-brand-name">{providerBrandName}</Text>
-            <View className="provider-cert-badge">
-              <Text className="provider-cert-text">{providerCertLabel}</Text>
-            </View>
-          </View>
-
-          <View
-            className="provider-header-action provider-header-settings"
-            style={headerSettingsStyle}
-            onClick={() => navigateWithAuth('/pages/settings/index')}
-          >
-            <View className="provider-header-settings-clean-icon">
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-top" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-bottom" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-left" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-right" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-lt" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-rt" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-lb" />
-              <View className="provider-settings-gear-tooth provider-settings-gear-tooth-rb" />
-              <View className="provider-settings-gear-core" />
-            </View>
-            <Text className="provider-header-action-text">设置</Text>
-          </View>
-
-          <Text className="provider-page-title">工作台</Text>
-
-          <View className={`provider-metric-card ${presence.online ? 'provider-metric-card-online' : ''}`}>
-            <View className="provider-metric-line-h" />
-            <View className="provider-metric-line-v" />
-            {metrics.map((item, index) => (
-              <View
-                key={item.key}
-                className={`provider-metric-item provider-metric-item-${index}`}
-                onClick={item.onClick}
-              >
-                <Image className="provider-metric-icon" src={item.icon} mode="aspectFit" />
-                <Text className="provider-metric-label">{item.label}</Text>
-                <Text className={`provider-metric-value ${item.valueClass}`}>{item.value}</Text>
-                <Image className="provider-metric-chevron" src={chevronRightIcon} mode="aspectFit" />
+            <View className='pw-stats-sub'>
+              <View className='pw-stat'>
+                <Text className='pw-stat-value'>{formatAmountYuan(providerStats?.pending_settlement_cents)}</Text>
+                <Text className='pw-stat-label'>待结算</Text>
               </View>
-            ))}
-          </View>
-
-          <View className={`provider-quick-card ${presence.online ? 'provider-quick-card-online' : ''}`}>
-            <Text className="provider-section-title provider-quick-title">快捷入口</Text>
-            {quickEntries.map((item, index) => (
-              <View
-                key={item.key}
-                className={`provider-quick-entry provider-quick-entry-${index}`}
-                onClick={item.onClick}
-              >
-                <View className="provider-quick-icon-box">
-                  <Image className={`provider-quick-icon ${item.iconClass}`} src={item.icon} mode="aspectFit" />
-                </View>
-                <Text className="provider-quick-label">{item.label}</Text>
+              <View className='pw-stat'>
+                <Text className='pw-stat-value'>{formatCompletionRate(providerStats?.completion_rate)}</Text>
+                <Text className='pw-stat-label'>完单率</Text>
               </View>
-            ))}
-          </View>
-
-          <View className={`provider-todo-card ${presence.online ? 'provider-todo-card-online' : ''}`}>
-            <View className="provider-todo-header">
-              <Text className="provider-section-title">待处理事项</Text>
-              <View className="provider-todo-all" onClick={openFulfillmentOrExecution}>
-                <Text className="provider-todo-all-text">全部事项</Text>
-                <Image className="provider-todo-all-chevron" src={chevronRightIcon} mode="aspectFit" />
+              <View className='pw-stat'>
+                <Text className='pw-stat-value'>{formatProviderRating(providerStats?.rating)}</Text>
+                <Text className='pw-stat-label'>评分</Text>
               </View>
             </View>
-            <View className="provider-todo-box">
-              {todoItems.map((item, index) => (
+          </View>
+
+          <View className='pw-config-row'>
+            <Text className='pw-config-label'>服务半径</Text>
+            <View className='pw-chip-row'>
+              {PROVIDER_RADIUS_OPTIONS.map(km => (
                 <View
-                  key={item.key}
-                  className={`provider-todo-row provider-todo-row-${index}`}
-                  onClick={item.onClick}
+                  key={km}
+                  className={`pw-chip ${presence.maxRadiusKM === km ? 'is-active' : ''}`}
+                  onClick={() => setMaxRadius(km)}
                 >
-                  <Image className="provider-todo-icon" src={item.icon} mode="aspectFit" />
-                  <Text className="provider-todo-title">{item.title}</Text>
-                  <Text className="provider-todo-subtitle">{item.subtitle}</Text>
-                  <View className={`provider-todo-status provider-todo-status-${item.tone} provider-todo-status-${index}`}>
-                    <Text className={`provider-todo-status-text provider-todo-status-text-${item.tone}`}>{item.status}</Text>
-                  </View>
-                  <Image className="provider-todo-chevron" src={chevronRightIcon} mode="aspectFit" />
+                  <Text>{km}km</Text>
                 </View>
               ))}
             </View>
           </View>
+
+          <View className='pw-config-row'>
+            <Text className='pw-config-label'>可接机型</Text>
+            <View className='pw-chip-row'>
+              {serviceClasses.length === 0 ? (
+                <Text className='pw-chip-empty'>暂无可选机型</Text>
+              ) : serviceClasses.map(item => {
+                const checked = (presence.acceptedServiceClasses || []).includes(item.code);
+                return (
+                  <View
+                    key={item.code}
+                    className={`pw-chip ${checked ? 'is-active' : ''}`}
+                    onClick={() => toggleServiceClass(item.code)}
+                  >
+                    <Text>{item.display_name}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <View
+            className={`pw-cta pw-cta-${ctaState}`}
+            onClick={() => {
+              if (!actionLoading) {
+                togglePresence();
+              }
+            }}
+          >
+            <Text>{ctaText}</Text>
+          </View>
+
+          <Text className='pw-cta-hint'>{ctaHint}</Text>
+
+          {presence.lastError ? (
+            <Text className='pw-presence-error'>{presence.lastError}</Text>
+          ) : null}
         </View>
-        <View className="provider-tabbar-spacer" />
+
+        {/* Nearby broadcasts */}
+        {presence.online ? (
+          <NearbyBroadcasts canSelfExecute={providerCapabilities.canSelfExecute} onGrabbed={openGrabbedOrder} />
+        ) : null}
+
+        {/* Metric grid */}
+        <View className='pw-card pw-metric-card'>
+          <View className='pw-metric-grid'>
+            {metrics.map(item => (
+              <View key={item.key} className='pw-metric-item' onClick={item.onClick}>
+                <Image className='pw-metric-icon' src={item.icon} mode='aspectFit' />
+                <View className='pw-metric-body'>
+                  <Text className='pw-metric-label'>{item.label}</Text>
+                  <Text className={`pw-metric-value ${item.valueClass}`}>{item.value}</Text>
+                </View>
+                <Image className='pw-metric-chevron' src={chevronRightIcon} mode='aspectFit' />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Quick entries */}
+        <View className='pw-card'>
+          <View className='pw-card-head'>
+            <Text className='pw-card-title'>快捷入口</Text>
+          </View>
+          <View className='pw-quick-grid'>
+            {quickEntries.map(item => (
+              <View key={item.key} className='pw-quick-item' onClick={item.onClick}>
+                <View className='pw-quick-icon-box'>
+                  <Image className='pw-quick-icon' src={item.icon} mode='aspectFit' />
+                </View>
+                <Text className='pw-quick-label'>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Todo list */}
+        <View className='pw-card'>
+          <View className='pw-card-head'>
+            <Text className='pw-card-title'>待处理事项</Text>
+            <View className='pw-card-link' onClick={openFulfillmentList}>
+              <Text>全部事项</Text>
+              <Image className='pw-card-link-chevron' src={chevronRightIcon} mode='aspectFit' />
+            </View>
+          </View>
+          <View className='pw-todo-list'>
+            {todoItems.map((item, index) => (
+              <View
+                key={item.key}
+                className={`pw-todo-row ${index === todoItems.length - 1 ? 'is-last' : ''}`}
+                onClick={item.onClick}
+              >
+                <Image className='pw-todo-icon' src={item.icon} mode='aspectFit' />
+                <View className='pw-todo-body'>
+                  <Text className='pw-todo-title'>{item.title}</Text>
+                  <Text className='pw-todo-sub'>{item.subtitle}</Text>
+                </View>
+                <View className={`pw-todo-status pw-todo-status-${item.tone}`}>
+                  <Text>{item.status}</Text>
+                </View>
+                <Image className='pw-todo-chevron' src={chevronRightIcon} mode='aspectFit' />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View className='pw-scroll-spacer' />
       </ScrollView>
+
       {presence.online ? (
         <AssignmentModal onAccepted={openGrabbedOrder} />
       ) : null}

@@ -17,7 +17,7 @@ import {
 } from '../types';
 
 export type OrderV2ListParams = {
-  role?: 'client' | 'owner' | 'pilot';
+  role?: 'client' | 'owner' | 'pilot' | 'provider';
   status?: string;
   page?: number;
   page_size?: number;
@@ -96,6 +96,15 @@ export const orderV2Service = {
       dispatch_mode: 'self_execute',
       reason: '服务商开始履约',
     }),
+
+  startPreparing: (orderId: number) =>
+    apiV2.post<V2OrderSummary>(`/orders/${orderId}/start-preparing`, {}),
+
+  startFlight: (orderId: number) =>
+    apiV2.post<V2OrderSummary>(`/orders/${orderId}/start-flight`, {}),
+
+  confirmDelivery: (orderId: number) =>
+    apiV2.post<V2OrderSummary>(`/orders/${orderId}/confirm-delivery`, {}),
 };
 
 export const updateExecutionStatus = async (orderId: number, status: string): Promise<void> => {

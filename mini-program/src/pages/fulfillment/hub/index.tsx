@@ -5,8 +5,7 @@ import { useSelector } from 'react-redux';
 import { orderV2Service } from '../../../services/orderV2';
 import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
 import { ownerService } from '../../../services/owner';
-import { RootState, useAppDispatch } from '../../../store/store';
-import { setHaulRoleMode } from '../../../store/slices/roleSlice';
+import { RootState } from '../../../store/store';
 import { syncCustomTabBar } from '../../../utils/tabBar';
 import { canUseProviderWorkbench, getEffectiveRoleSummary } from '../../../utils/roleSummary';
 import { V2SettlementSummary } from '../../../types';
@@ -293,7 +292,6 @@ const addressPointOf = (detail: any, type: 'pickup' | 'dropoff') => {
 };
 
 export default function FulfillmentHubPage() {
-  const dispatch = useAppDispatch();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary);
@@ -374,8 +372,8 @@ export default function FulfillmentHubPage() {
   }, [canUseProvider, isAuthenticated]);
 
   useDidShow(() => {
-    dispatch(setHaulRoleMode('provider'));
-    syncCustomTabBar(1, 'provider');
+    // 仅同步 TabBar 选中态，不强制改写全局角色身份。
+    syncCustomTabBar(1);
     loadDetail();
   });
 
