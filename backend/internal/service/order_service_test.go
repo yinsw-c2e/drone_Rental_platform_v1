@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -1079,6 +1080,114 @@ func TestPlatformPricedCancelGraceBoundary(t *testing.T) {
 			}
 			if refund.Amount != tc.expectedRefund {
 				t.Fatalf("expected refund %d, got %d (%s)", tc.expectedRefund, refund.Amount, refund.Reason)
+			}
+		})
+	}
+}
+
+func TestPlatformPricedPaidCancelRefundMatrix(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.Payment{},
+		&model.Refund{},
+		&model.DisputeRecord{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+	)
+	now := time.Now()
+	service := &OrderService{
+		orderRepo:         repository.NewOrderRepo(db),
+		paymentRepo:       repository.NewPaymentRepo(db),
+		orderArtifactRepo: repository.NewOrderArtifactRepo(db),
+		logger:            zap.NewNop(),
+	}
+
+	cases := []struct {
+		status         string
+		mode           string
+		wantRefund     int64
+		wantDispute    bool
+		wantFinalState string
+	}{
+		{status: "pending_dispatch", mode: OrderModeInstant, wantRefund: 10000, wantFinalState: "cancelled"},
+		{status: "dispatch_failed", mode: OrderModeInstant, wantRefund: 10000, wantFinalState: "cancelled"},
+		{status: "scheduled", mode: OrderModeReservation, wantRefund: 10000, wantFinalState: "cancelled"},
+		{status: "preparing", mode: OrderModeInstant, wantRefund: 9000, wantFinalState: "cancelled"},
+		{status: "in_transit", mode: OrderModeInstant, wantDispute: true, wantFinalState: "in_transit"},
+	}
+
+	for i, tc := range cases {
+		t.Run(tc.status, func(t *testing.T) {
+			paidAt := now.Add(-10 * time.Minute)
+			grabbedAt := now.Add(-10 * time.Minute)
+			order := &model.Order{
+				OrderNo:              "WRJ-H6-CANCEL-MATRIX-" + tc.status,
+				OrderType:            "cargo",
+				OrderMode:            tc.mode,
+				OrderSource:          tc.mode,
+				ClientUserID:         int64(6600 + i),
+				RenterID:             int64(6600 + i),
+				ProviderUserID:       7700,
+				GrabbedByUserID:      7700,
+				GrabbedAt:            &grabbedAt,
+				ProviderConfirmedAt:  &grabbedAt,
+				ServiceType:          defaultDemandServiceType,
+				StartTime:            now,
+				EndTime:              now.Add(time.Hour),
+				ServiceAddress:       "起点",
+				DestAddress:          "终点",
+				TotalAmount:          10000,
+				Status:               tc.status,
+				PaidAt:               &paidAt,
+				EstimatedDistanceM:   10000,
+				EstimatedDurationMin: 30,
+			}
+			if err := db.Create(order).Error; err != nil {
+				t.Fatalf("create order: %v", err)
+			}
+			if err := db.Create(&model.Payment{
+				PaymentNo:     "PAY-H6-CANCEL-MATRIX-" + tc.status,
+				OrderID:       order.ID,
+				UserID:        order.ClientUserID,
+				PaymentType:   "order",
+				PaymentMethod: "mock",
+				Amount:        order.TotalAmount,
+				Status:        "paid",
+				PaidAt:        &paidAt,
+			}).Error; err != nil {
+				t.Fatalf("create payment: %v", err)
+			}
+
+			if err := service.CancelOrder(order.ID, order.ClientUserID, "客户取消", "client"); err != nil {
+				t.Fatalf("cancel order: %v", err)
+			}
+			var reloaded model.Order
+			if err := db.First(&reloaded, order.ID).Error; err != nil {
+				t.Fatalf("reload order: %v", err)
+			}
+			if reloaded.Status != tc.wantFinalState {
+				t.Fatalf("expected status %s, got %s", tc.wantFinalState, reloaded.Status)
+			}
+			var refund model.Refund
+			refundErr := db.Where("order_id = ?", order.ID).First(&refund).Error
+			if tc.wantRefund > 0 {
+				if refundErr != nil {
+					t.Fatalf("load refund: %v", refundErr)
+				}
+				if refund.Amount != tc.wantRefund {
+					t.Fatalf("expected refund %d, got %d (%s)", tc.wantRefund, refund.Amount, refund.Reason)
+				}
+			} else if !errors.Is(refundErr, gorm.ErrRecordNotFound) {
+				t.Fatalf("expected no refund, got refund=%#v err=%v", refund, refundErr)
+			}
+			var disputeCount int64
+			if err := db.Model(&model.DisputeRecord{}).Where("order_id = ?", order.ID).Count(&disputeCount).Error; err != nil {
+				t.Fatalf("count disputes: %v", err)
+			}
+			if (disputeCount > 0) != tc.wantDispute {
+				t.Fatalf("expected dispute=%v, got count=%d", tc.wantDispute, disputeCount)
 			}
 		})
 	}

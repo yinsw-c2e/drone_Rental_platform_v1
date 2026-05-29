@@ -90,6 +90,7 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   pending_payment: '待支付',
   pending_dispatch: '待开始履约',
   auto_assigning: '匹配中',
+  dispatch_failed: '暂无服务商',
   assigned: '服务商已接单',
   preparing: '准备中',
   loading: '装载中',
@@ -160,6 +161,7 @@ const statusTitleOf = (status: string) => {
   if (status === 'completed') return '订单已完成';
   if (status === 'delivered') return '等待客户确认';
   if (status === 'cancelled') return '订单已取消';
+  if (status === 'dispatch_failed') return '暂未匹配到服务商';
   if (status === 'pending_provider_confirmation') return '等待服务商接单';
   if (status === 'pending_payment') return '等待支付';
   if (status === 'pending_dispatch') return '等待服务商开始履约';
@@ -173,6 +175,7 @@ const statusDescOf = (status: string) => {
   if (status === 'completed') return '本次吊运服务已完成';
   if (status === 'delivered') return '货物已送达，请确认完成';
   if (status === 'cancelled') return '订单已结束';
+  if (status === 'dispatch_failed') return '暂未匹配到合适服务商，可取消订单或稍后重试';
   if (status === 'pending_provider_confirmation') return '服务商正在确认方案，请耐心等待';
   if (status === 'pending_payment') return '请完成支付后继续履约流程';
   if (status === 'pending_dispatch') return '服务商待开始履约';
@@ -190,13 +193,13 @@ const getStepState = (detail: any) => {
   if (status === 'delivered') return 5;                                    // step 5 active (等客户确认)
   if (status === 'in_transit') return 4;                                   // step 4 active (吊运中)
   if (['preparing', 'assigned'].includes(status)) return 3;                // step 3 active (开始履约)
-  if (['pending_dispatch', 'paid', 'pending_payment'].includes(status)) return 2; // step 2 active (服务商确认/等履约)
+  if (['pending_dispatch', 'dispatch_failed', 'paid', 'pending_payment'].includes(status)) return 2; // step 2 active (服务商确认/等履约)
   return 1;                                                                // 默认 step 1 active (已下单)
 };
 
 const normalizedStatus = (order?: any) => String(order?.status || '').toLowerCase();
 const normalizedMode = (order?: any) => String(order?.order_mode || '').toLowerCase();
-const cancelStatuses = ['pending_dispatch', 'scheduled', 'assigned', 'preparing'];
+const cancelStatuses = ['pending_dispatch', 'dispatch_failed', 'scheduled', 'assigned', 'preparing'];
 const contactVisibleStatuses = ['assigned', 'preparing', 'in_transit', 'delivered'];
 const terminalOnlyStatuses = ['cancelled', 'provider_rejected'];
 
@@ -227,6 +230,7 @@ const formatEta = (seconds?: number | null) => {
 const orderStatusBadgeOf = (order: any) => {
   const status = normalizedStatus(order);
   if (status === 'pending_dispatch' || status === 'auto_assigning') return '等待服务商';
+  if (status === 'dispatch_failed') return '暂无服务商';
   if (status === 'assigned') return '服务商已接单';
   if (status === 'preparing') return '准备起飞';
   if (status === 'in_transit') return '飞行中';
@@ -243,7 +247,7 @@ const orderStatusToneOf = (order: any) => {
   const status = normalizedStatus(order);
   if (['completed', 'delivered'].includes(status)) return 'success';
   if (['cancelled', 'provider_rejected'].includes(status)) return 'muted';
-  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'scheduled'].includes(status)) return 'warning';
+  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled'].includes(status)) return 'warning';
   return 'primary';
 };
 

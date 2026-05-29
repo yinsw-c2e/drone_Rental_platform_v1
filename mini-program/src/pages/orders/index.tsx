@@ -21,11 +21,11 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: 'done', label: '已结束' },
 ];
 
-const activeStatuses = ['pending_dispatch', 'auto_assigning', 'scheduled', 'assigned', 'preparing', 'in_transit', 'delivered', 'pending_payment'];
+const activeStatuses = ['pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled', 'assigned', 'preparing', 'in_transit', 'delivered', 'pending_payment'];
 const providerVisibleStatuses = ['assigned', 'preparing', 'in_transit', 'delivered', 'completed'];
 const contactVisibleStatuses = ['assigned', 'preparing', 'in_transit', 'delivered'];
 const liveStatuses = ['assigned', 'preparing', 'in_transit', 'delivered'];
-const cancelStatuses = ['pending_dispatch', 'scheduled', 'assigned', 'preparing'];
+const cancelStatuses = ['pending_dispatch', 'dispatch_failed', 'scheduled', 'assigned', 'preparing'];
 const terminalOnlyStatuses = ['cancelled', 'provider_rejected'];
 const SELF_EXECUTABLE_REQUIRED_TOAST = '需要先完善设备和履约资质';
 
@@ -69,6 +69,7 @@ const within24Hours = (value?: string | null) => {
 const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   pending_dispatch: '等待服务商',
   auto_assigning: '匹配中',
+  dispatch_failed: '暂无服务商',
   assigned: '服务商已接单',
   preparing: '准备起飞',
   in_transit: '飞行中',
@@ -99,7 +100,7 @@ const statusToneOf = (order: V2OrderSummary) => {
   const status = normalizedStatus(order);
   if (['completed', 'delivered'].includes(status)) return 'success';
   if (['cancelled', 'provider_rejected'].includes(status)) return 'muted';
-  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'scheduled'].includes(status)) return 'warning';
+  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled'].includes(status)) return 'warning';
   return 'primary';
 };
 

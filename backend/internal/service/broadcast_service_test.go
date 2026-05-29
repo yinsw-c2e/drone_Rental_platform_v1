@@ -410,6 +410,13 @@ func TestAutoAssignDeclineTriggersNextAttempt(t *testing.T) {
 	if err := service.DeclineAssignment(first.ID, 7401, "暂不方便承接"); err != nil {
 		t.Fatalf("decline assignment: %v", err)
 	}
+	excluded, err := handles.broadcastRepo.IsProviderExcluded(order.ID, broadcast.ID, 7401)
+	if err != nil {
+		t.Fatalf("check declined provider exclusion: %v", err)
+	}
+	if !excluded {
+		t.Fatalf("expected declined provider 7401 to be excluded from order %d", order.ID)
+	}
 	second, err := handles.assignmentRepo.GetActiveByBroadcast(broadcast.ID)
 	if err != nil {
 		t.Fatalf("load second assignment: %v", err)
@@ -452,6 +459,13 @@ func TestAutoAssignExpiresAfterMaxAttempts(t *testing.T) {
 	}
 	if updated.Status != broadcastStatusExpired {
 		t.Fatalf("expected expired broadcast after max attempts, got %s", updated.Status)
+	}
+	var updatedOrder model.Order
+	if err := handles.orderRepo.DB().First(&updatedOrder, order.ID).Error; err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	if updatedOrder.Status != "dispatch_failed" {
+		t.Fatalf("expected order dispatch_failed after max attempts, got %s", updatedOrder.Status)
 	}
 	attempts, err := handles.assignmentRepo.ListAttempts(broadcast.ID)
 	if err != nil {
@@ -505,6 +519,13 @@ func TestAutoAssignAcceptDeadlinePassedTransitionsToExpiredAssignment(t *testing
 	}
 	if expired.Status != assignmentStatusExpired {
 		t.Fatalf("expected expired assignment, got %s", expired.Status)
+	}
+	excluded, err := handles.broadcastRepo.IsProviderExcluded(order.ID, broadcast.ID, 7601)
+	if err != nil {
+		t.Fatalf("check timeout provider exclusion: %v", err)
+	}
+	if !excluded {
+		t.Fatalf("expected timed-out provider 7601 to be excluded from order %d", order.ID)
 	}
 	next, err := handles.assignmentRepo.GetActiveByBroadcast(broadcast.ID)
 	if err != nil {

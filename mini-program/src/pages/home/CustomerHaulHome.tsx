@@ -185,6 +185,7 @@ const getRecentOrderStatus = (order?: V2OrderSummary | null) => {
   const statusMap: Record<string, string> = {
     pending_dispatch: '等待服务商接单',
     auto_assigning: '正在匹配服务商',
+    dispatch_failed: '暂无服务商',
     assigned: '服务商已接单',
     preparing: '准备起飞',
     in_transit: '飞行中',

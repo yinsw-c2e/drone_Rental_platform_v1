@@ -771,7 +771,7 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 		return outcome, err
 	}
 	if len(attempts) >= s.autoAssignMaxAttempts() {
-		if err := s.expireBroadcastWithTimeline(orderRepo, broadcastRepo, order, broadcast.ID, now, "服务商运力紧张，订单自动指派失败"); err != nil {
+		if err := s.expireBroadcastWithTimeline(orderRepo, broadcastRepo, order, broadcast.ID, now, "服务商运力紧张，订单自动指派失败", true); err != nil {
 			return outcome, err
 		}
 		outcome.order = order
@@ -788,7 +788,7 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 		return outcome, err
 	}
 	if !ok {
-		if err := s.expireBroadcastWithTimeline(orderRepo, broadcastRepo, order, broadcast.ID, now, "附近暂无可指派的服务商"); err != nil {
+		if err := s.expireBroadcastWithTimeline(orderRepo, broadcastRepo, order, broadcast.ID, now, "附近暂无可指派的服务商", true); err != nil {
 			return outcome, err
 		}
 		outcome.order = order
@@ -911,6 +911,9 @@ func (s *BroadcastService) declineAssignmentWithRepos(
 	}); err != nil {
 		return 0, err
 	}
+	if err := broadcastRepo.ExcludeProvider(assignment.OrderID, assignment.BroadcastID, assignment.ProviderUserID, "assignment_declined"); err != nil {
+		return 0, err
+	}
 	if err := broadcastRepo.UpdateFields(assignment.BroadcastID, map[string]interface{}{
 		"status":     broadcastStatusOpen,
 		"expires_at": now.Add(s.autoAssignAcceptWindow()),
@@ -944,6 +947,9 @@ func (s *BroadcastService) expireAssignmentWithRepos(
 	}); err != nil {
 		return 0, 0, false, err
 	}
+	if err := broadcastRepo.ExcludeProvider(assignment.OrderID, assignment.BroadcastID, assignment.ProviderUserID, "assignment_timeout"); err != nil {
+		return 0, 0, false, err
+	}
 	if err := broadcastRepo.UpdateFields(assignment.BroadcastID, map[string]interface{}{
 		"status":     broadcastStatusOpen,
 		"expires_at": now.Add(s.autoAssignAcceptWindow()),
@@ -961,6 +967,7 @@ func (s *BroadcastService) expireBroadcastWithTimeline(
 	broadcastID int64,
 	now time.Time,
 	note string,
+	markDispatchFailed bool,
 ) error {
 	if err := broadcastRepo.UpdateFields(broadcastID, map[string]interface{}{
 		"status":     broadcastStatusExpired,
@@ -970,6 +977,15 @@ func (s *BroadcastService) expireBroadcastWithTimeline(
 	}
 	if order == nil {
 		return nil
+	}
+	if markDispatchFailed && order.Status == "pending_dispatch" && order.ProviderUserID == 0 && order.GrabbedByUserID == 0 {
+		if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+			"status":     "dispatch_failed",
+			"updated_at": now,
+		}); err != nil {
+			return err
+		}
+		order.Status = "dispatch_failed"
 	}
 	return orderRepo.AddTimeline(&model.OrderTimeline{
 		OrderID:      order.ID,

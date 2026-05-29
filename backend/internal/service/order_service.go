@@ -2033,7 +2033,7 @@ func (s *OrderService) calculatePlatformPricedCancelRefund(order *model.Order, p
 
 	status := normalizeCancelStatus(order.Status)
 	switch status {
-	case "pending_dispatch", "scheduled", "pending_payment", "created":
+	case "pending_dispatch", "dispatch_failed", "scheduled", "pending_payment", "created":
 		return paidAmount, "服务商接单前取消，全额退款", nil
 	case "assigned":
 		assignedAt := firstSettlementTime(order.GrabbedAt, order.ProviderConfirmedAt, &order.UpdatedAt)
