@@ -1598,7 +1598,7 @@ mindmap
 
 ## 14. 即时单链路（H 阶段重构后）
 
-> H10 原计划要求在附录补“§11 即时单链路”。本文档已有 §11-§13，因此本附录顺延为 §14，内容仍对应 H 阶段货拉拉式重构后的主链路。
+> H10 原计划要求在附录补“§11 即时单链路”。本文档已有 §11-§13，因此本附录顺延为 §14，内容仍对应 H 阶段即时调度重构后的主链路。
 
 ### 14.1 主流程
 
@@ -1625,4 +1625,4 @@ mindmap
 - 加价和小费写入 `settlements` 表的 `surcharge_amount`、`tip_amount` 等调整字段。
 - H9 后台改价只影响新订单；在途订单继续使用订单上的计价快照。
 
-关联任务书：[`docs/planning/HUOLALA_STYLE_REFACTOR_TASKBOOK.md`](../planning/HUOLALA_STYLE_REFACTOR_TASKBOOK.md)
+关联任务书：[`docs/planning/INSTANT_DISPATCH_REFACTOR_TASKBOOK.md`](../planning/INSTANT_DISPATCH_REFACTOR_TASKBOOK.md)

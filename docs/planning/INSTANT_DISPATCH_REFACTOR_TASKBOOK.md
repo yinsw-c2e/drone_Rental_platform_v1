@@ -1,4 +1,4 @@
-# 货拉拉模式重构任务书
+# 重载吊运即时调度重构任务书
 
 > 基线日期：2026-05-26
 > 适用范围：backend (Go/Gin) + mini-program (Taro/WeChat) + admin (React) + mobile (RN)
@@ -11,14 +11,14 @@
 ## 0. 重构目标（Why）
 
 把当前"重载末端货物吊运 + 需求市场 + 机主报价 + 派单"的撮合型平台，
-改造为对货主**一键下单**、对服务商**抢单/秒接**、平台**自动算价**的**货拉拉式即时（含预约）吊运平台**。
+改造为对货主**一键下单**、对服务商**抢单/秒接**、平台**自动算价**的**平台化即时（含预约）吊运服务**。
 
 业务边界保持不变（仍为 ≥150kg 起飞重量 / ≥50kg 有效载荷的重载无人机吊运），
-但**用户心智、下单链路、撮合机制、计价模型、履约可视化**全部对齐货拉拉。
+但**用户心智、下单链路、撮合机制、计价模型、履约可视化**全部对齐成熟即时调度产品的体验标准。
 
-### 0.1 货拉拉模式的核心特征（目标态）
+### 0.1 即时调度模型的核心特征（目标态）
 
-| 维度 | 货拉拉做法 | 当前项目做法 | 差距 |
+| 维度 | 即时调度平台做法 | 当前项目做法 | 差距 |
 |------|-----------|--------------|------|
 | 下单心智 | 输入起点/终点 → 选车型 → 看到固定预估价 → 一键下单 | 客户写"需求"→ 等机主报价 → 比价 → 选机主 | 主路径过长，预算/价格由机主报，客户被动等待 |
 | 计价 | 平台按 `车型基础价 + 公里 + 时长 + 附加项` **自动算价**，下单前可见 | 机主自由报价，或供给挂牌价 × 用量 | 没有平台计价引擎，无标准车型/机型价目表 |
@@ -32,7 +32,7 @@
 
 ### 0.2 不变的边界
 
-仍然守住以下硬约束，不要在重构中被货拉拉模式"带歪"：
+仍然守住以下硬约束，不要在重构中被即时调度模型"带偏"：
 
 - 只服务**重载吊运**，禁止扩到航拍/植保/测绘/同城闪送
 - 机型准入 `mtow_kg ≥ 150 且 max_payload_kg ≥ 50`
@@ -51,7 +51,7 @@
 | **预约单** | 货主端"预约吊运" | 未来 1-30 天的标准场景 | 平台算价 | 预约时段前 2 小时广播 |
 | **议价单**（保留旧链路） | 货主端"复杂需求" | 非标场景（应急、特种货物、长时段、需勘察） | 服务商报价 | 现有"需求市场 + 报价"链路 |
 
-> 即时单 + 预约单走货拉拉式自动算价 + 抢单；议价单作为旧链路保留，但**默认不再是首页主入口**。
+> 即时单 + 预约单走平台自动算价 + 抢单；议价单作为旧链路保留，但**默认不再是首页主入口**。
 
 ### 1.2 角色对外可见性收敛
 
@@ -80,7 +80,7 @@
 | H4 | 实时位置 + ETA + 全程可视化（tracking） | 1 周 | M | H3 |
 | H5 | 行程后结算调整：加价/小费/超时（settlement v2） | 1 周 | M | H2、H4 |
 | H6 | 取消、改派、责任链收紧（cancel & reassign） | 1 周 | M | H3、H5 |
-| H7 | 货主端 UI 货拉拉化（mini-program 主路径） | 1.5 周 | M | H1–H6 |
+| H7 | 货主端 UI 即时下单化（mini-program 主路径） | 1.5 周 | M | H1–H6 |
 | H8 | 服务商端 UI 抢单化（mini-program / mobile） | 1 周 | M | H3、H4 |
 | H9 | 管理端：机型档/广播策略/抢单监控配置 | 0.5 周 | S | H1、H3 |
 | H10 | 端到端验收 + 文档回写 + 旧主入口降级 | 0.5 周 | S | H1–H9 |
@@ -143,7 +143,7 @@
   - `ReservedStartAt *time.Time`
   - `GrabbedAt *time.Time`、`GrabbedByUserID int64`
 - 新增迁移脚本。**不动既有字段**。
-- 完成：新增迁移 `119_extend_orders_for_huolala_modes.sql`，`order_mode` 默认 `negotiated`，已对历史空值回填 `negotiated`。
+- 完成：新增迁移 119，`order_mode` 默认 `negotiated`，已对历史空值回填 `negotiated`。
 
 #### [x] H2.02 创建即时单 / 预约单接口
 
@@ -288,7 +288,7 @@
 
 ### H6 取消、改派、责任链
 
-**目标**：取消与责任规则向货拉拉对齐，避免"卡单"。
+**目标**：取消与责任规则向即时调度场景收紧，避免"卡单"。
 
 #### H6.01 取消规则 [x]
 
@@ -317,9 +317,9 @@
 
 ---
 
-### H7 货主端 UI 货拉拉化（mini-program）
+### H7 货主端 UI 即时下单化（mini-program）
 
-**目标**：小程序首页 = 货拉拉首页观感。
+**目标**：小程序首页突出立即吊运心智。
 
 #### H7.01 首页改版 [x]
 
@@ -335,7 +335,7 @@
 
 - 字段：当前状态条 + 服务商头像/电话/评分 + 实时位置缩略图 + 预计送达时间 + 取消/加价/小费按钮
 - 不再展示"派单任务"、"候选飞手"、"机主报价" 等术语
-- 完成：`mini-program/src/pages/orders/index.tsx` 与 `mini-program/src/pages/orders/detail/index.tsx` 改为货拉拉式订单卡片；按钮按状态精确控制取消、加价、小费、实时位置、联系、支付、评价；清理 `home/index.tsx` 不可达旧 dashboard 代码。
+- 完成：`mini-program/src/pages/orders/index.tsx` 与 `mini-program/src/pages/orders/detail/index.tsx` 改为即时履约订单卡片；按钮按状态精确控制取消、加价、小费、实时位置、联系、支付、评价；清理 `home/index.tsx` 不可达旧 dashboard 代码。
 
 #### H7.03 地址簿 [x]
 
@@ -418,13 +418,13 @@
 
 #### H10.01 自动化验收脚本 [x]
 
-- 复制 `phase10_role_acceptance.sh` 思路新建 `huolala_acceptance.sh`，覆盖：
+- 复制 `phase10_role_acceptance.sh` 思路新建 `instant_dispatch_acceptance.sh`，覆盖：
   - 即时单：游客估价 → 注册 → 下单 → 服务商上线 → 抢单 → 履约 → 完成 → 结算
   - 预约单：下单 → 到点入池 → 自动指派 → 履约
   - 议价单（旧链路）保留，跑通即可
-- 输出 JSON 至 `backend/docs/huolala_acceptance_last_run.json`
+- 输出 JSON 至 `backend/docs/instant_dispatch_acceptance_last_run.json`
 
-完成：新增 `backend/docs/huolala_acceptance.sh`，支持 `--base` 指定 v2 API 地址，按即时单、预约单、议价单三条链路记录请求、响应、耗时并输出 `backend/docs/huolala_acceptance_last_run.json`。脚本不写死订单、广播、需求、报价 ID；预约单本地验收仅在可用时使用 DB patch 缩短等待 cron 的时间。
+完成：新增 `backend/docs/instant_dispatch_acceptance.sh`，支持 `--base` 指定 v2 API 地址，按即时单、预约单、议价单三条链路记录请求、响应、耗时并输出 `backend/docs/instant_dispatch_acceptance_last_run.json`。脚本不写死订单、广播、需求、报价 ID；预约单本地验收仅在可用时使用 DB patch 缩短等待 cron 的时间。
 
 最近一次本地验收结果：议价单链路通过；即时单和预约单在 `POST /orders/instant|reservation` 创建阶段失败，原因是平台定价订单写入 `orders.drone_id = 0` 触发 `fk_orders_drone` 外键约束。按 H10 规则该问题已记录到 JSON 报告，未在验收脚本中绕过。
 
@@ -439,7 +439,7 @@ H10 验收暴露的 `fk_orders_drone` 已由 H11.01 修复（迁移 124 + 即时
 
 #### H10.03 文档回写 [x]
 
-- 更新 `README.md`：业务定位补一句"采用货拉拉式即时调度模型，议价单作为复杂场景兼容"
+- 更新 `README.md`：业务定位补一句"采用重载吊运即时调度模型，议价单作为复杂场景兼容"
 - 在 `docs/business/BUSINESS_ROLE_REDESIGN.md` 附录补 §11 即时单链路，并把本任务书链接进去。
 - 把本文件改成全 `[x]` 状态；按用户要求，本任务书原地保留，不移动到 `docs/planning/done/`。
 
@@ -481,7 +481,7 @@ H10 性能监控欠账：`OrderBroadcastRepo.StatsBetween` 当前按区间取出
 - H5.01-H5.03  local  2026-05-26  结算调整字段迁移 122 + 小费即时入账 + 客户加价刷新广播池；新增 `POST /api/v2/orders/:id/tip`、`POST /api/v2/orders/:id/price-increase`；H2 订单金额和价格明细快照保持只读。
 - H6.01-H6.03  local  2026-05-26  取消阶梯 + 服务商取消自动重派 + 改派部分结算；新增迁移 123、`cancel.*` 配置、`partial_handover_*` 结算字段、服务商取消信用扣减；`go test ./internal/... -count=1`、`go build ./...`、`go vet ./...` 通过。
 - H7.01/H5.03 UI  local  2026-05-26  mini-program 货主首页主路径改为地址条 + 机型档 + 服务端估价 CTA；新增 `GET /api/v2/service-classes`；即时/预约下单成功直达实时位置页；live 页补“附近运力紧张，加价试试”入口。
-- H7.02  local  2026-05-26  mini-program 订单列表 + 订单详情卡片货拉拉化；补 `addTip/priceIncrease` service 方法；清理 `home/index.tsx` 死代码和订单/home 主路径旧术语。
+- H7.02  local  2026-05-26  mini-program 订单列表 + 订单详情卡片即时履约化；补 `addTip/priceIncrease` service 方法；清理 `home/index.tsx` 死代码和订单/home 主路径旧术语。
 - H7.03  local  2026-05-26  地址簿 CRUD + 首页/选择器接入云端；实际接口使用 `/api/v2/address`，保留本地 `addressHistory` 作为降级。
 - H7.04  local  2026-05-26  主路径术语切换 + 旧入口可达性审计；切断货主主路径到 dispatch/fulfillment/profile-pilot 旧页面的直接跳转，保留相关页面和 supply/owner 目录给 H8 服务商端重做。
 - H8.0  local  2026-05-26  服务商在线/heartbeat 基础设施 + 临时调试按钮；新增 providerPresence service/slice/hook，冷启动不恢复在线态，离开页面停心跳、返回自动续。
@@ -489,7 +489,7 @@ H10 性能监控欠账：`OrderBroadcastRepo.StatsBetween` 当前按区间取出
 - H8.02  local  2026-05-26  附近订单池 + 自动指派 modal + 5s/3s 轮询；抢单/指派成功跳订单详情，409 冲突文案区分。
 - H8.03  local  2026-05-26  stats 加 `pending_settlement_cents` + 工作台第 5 项 + 钱包页顶部今日预估收入/待结算数字。
 - H9.0  local  2026-05-26  admin 配置接口 backend 部分：service-class CRUD + system_configs CRUD 白名单 + broadcast stats/recent 查询；admin UI 延后。
-- H10.01  local  2026-05-26  新增 `backend/docs/huolala_acceptance.sh` 与 JSON 报告输出，覆盖即时单、预约单、议价单三条 H 阶段验收链路；记录请求、响应、耗时和失败点。
+- H10.01  local  2026-05-26  新增 `backend/docs/instant_dispatch_acceptance.sh` 与 JSON 报告输出，覆盖即时单、预约单、议价单三条 H 阶段验收链路；记录请求、响应、耗时和失败点。
 - H10.02  local  2026-05-26  旧主入口降级审计完成：首页主 CTA 保持“立即下单”，复杂服务/议价单为二级入口，底部 Tab 不出现市场/派单/飞行。
 - H10.03  local  2026-05-26  README 业务模式、`BUSINESS_ROLE_REDESIGN.md` 即时单链路附录、任务书 H10 状态与完成记录已回写；任务书原地保留。
 - H11.01  local  2026-05-26  hotfix：orders 三列改 NULL，即时/预约单创建时 Omit `drone_id`/`pilot_id`/`owner_id`，不再触发 `fk_orders_drone`；H10 三条链路重跑全通过。

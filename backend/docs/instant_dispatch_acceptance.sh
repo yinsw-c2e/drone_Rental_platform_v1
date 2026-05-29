@@ -4,7 +4,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_DIR="$(cd "$BACKEND_DIR/.." && pwd)"
-REPORT_FILE="${REPORT_FILE:-$SCRIPT_DIR/huolala_acceptance_last_run.json}"
+REPORT_FILE="${REPORT_FILE:-$SCRIPT_DIR/instant_dispatch_acceptance_last_run.json}"
 
 RAW_BASE="${BASE_URL:-http://127.0.0.1:8080}"
 while [[ $# -gt 0 ]]; do
@@ -16,8 +16,8 @@ while [[ $# -gt 0 ]]; do
     --help|-h)
       cat <<'USAGE'
 Usage:
-  cd backend && ./docs/huolala_acceptance.sh
-  cd backend && ./docs/huolala_acceptance.sh --base http://127.0.0.1:8080/api/v2
+  cd backend && ./docs/instant_dispatch_acceptance.sh
+  cd backend && ./docs/instant_dispatch_acceptance.sh --base http://127.0.0.1:8080/api/v2
 
 Environment:
   CUSTOMER_PHONE, PROVIDER_PHONE, PILOT_PHONE, ADMIN_PHONE

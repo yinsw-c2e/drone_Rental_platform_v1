@@ -7,7 +7,7 @@
 
 ## 业务模式
 
-平台采用**货拉拉式即时调度模型**承接重载无人机吊运业务：
+平台采用**重载吊运即时调度模型**承接重载无人机吊运业务：
 
 - **即时单**：货主输入起降点 + 重量 + 机型档，系统自动算价，一键下单后广播给附近在线服务商抢单。
 - **预约单**：未来 1-30 天的标准场景，预约时段前进入广播池，后续同样走服务商抢单和履约。
@@ -15,7 +15,7 @@
 
 业务边界：服务于 `>=150kg` 最大起飞重量、`>=50kg` 有效载荷的重载无人机吊运，典型场景包括电网物资、山区农副、高原给养、海岛运送、应急救援；不做城市闪送或通用航拍。
 
-详见 [货拉拉模式重构任务书](./docs/planning/HUOLALA_STYLE_REFACTOR_TASKBOOK.md)。
+详见 [即时调度链路重构任务书](./docs/planning/INSTANT_DISPATCH_REFACTOR_TASKBOOK.md)。
 
 ## 文档导航
 
@@ -42,5 +42,4 @@
 - [角色视角业务验收走查](./docs/testing/ROLE_ACCEPTANCE_WALKTHROUGH.md)
 - [演示账号说明](./docs/testing/DEMO_ACCOUNTS.md)
 - [最近一次角色验收报告 JSON](./backend/docs/phase10_role_acceptance_last_run.json)
-- [货拉拉式链路验收脚本](./backend/docs/huolala_acceptance.sh)
-- [最近一次货拉拉式链路验收报告 JSON](./backend/docs/huolala_acceptance_last_run.json)
+- [即时调度链路验收脚本](./backend/docs/instant_dispatch_acceptance.sh)
