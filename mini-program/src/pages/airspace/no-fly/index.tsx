@@ -164,7 +164,7 @@ export default function NoFlyZonePage() {
             </View>
           ) : zones.length === 0 ? (
             <View className='empty-state'>
-              <Text className='empty-state-icon'>🗺️</Text>
+              <View className='empty-state-icon empty-state-icon-map' />
               <Text className='empty-state-text'>{hasLocation ? '附近暂无禁飞区' : '暂无禁飞区数据'}</Text>
             </View>
           ) : (

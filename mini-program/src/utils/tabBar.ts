@@ -7,7 +7,7 @@ import type { HaulRoleMode } from '../store/slices/roleSlice';
 const MESSAGE_TAB_INDEX = 2;
 const TAB_LABELS = {
   customer: ['首页', '订单', '消息', '我的'],
-  provider: ['工作台', '接单', '消息', '我的'],
+  provider: ['工作台', '接单需求', '消息', '我的'],
 };
 
 const PROVIDER_TAB_ICONS = [
@@ -28,12 +28,12 @@ const PROVIDER_TAB_ICONS = [
     selectedIconHeight: 60,
   },
   {
-    iconPath: '/custom-tab-bar/assets/provider_tab_message_inactive.png',
-    selectedIconPath: '/custom-tab-bar/assets/provider_tab_message_active.png',
+    iconPath: '/custom-tab-bar/assets/icon_tab_message_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/icon_tab_message_active.png',
     iconWidth: 58,
-    iconHeight: 60,
+    iconHeight: 56,
     selectedIconWidth: 58,
-    selectedIconHeight: 60,
+    selectedIconHeight: 56,
   },
   {
     iconPath: '/custom-tab-bar/assets/provider_tab_profile_inactive.png',
@@ -97,8 +97,7 @@ function isRealConversation(item: any) {
 
 function patchMessageBadge(tabBar: any, unreadCount: number) {
   const list = Array.isArray(tabBar?.data?.list) ? tabBar.data.list : [];
-  const isProviderMode = store.getState().role.selectedMode === 'provider';
-  const badge = isProviderMode ? '' : formatBadge(unreadCount);
+  const badge = formatBadge(unreadCount);
 
   if (!list.length) return;
 
@@ -128,7 +127,6 @@ function patchRoleTabLabels(tabBar: any, selected?: number, modeOverride?: HaulR
       text: labels[index] || item.text,
       ...(icons[index] || {}),
       badgeDot: false,
-      ...(selectedMode === 'provider' && index === MESSAGE_TAB_INDEX ? { badge: '' } : {}),
     })),
   });
 }

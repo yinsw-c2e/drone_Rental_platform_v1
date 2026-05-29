@@ -49,27 +49,28 @@
 
 .tabbar-badge {
   position: absolute;
-  top: -6px;
-  right: -10px;
-  min-width: 18px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #ff3045, #ff4d5e);
+  top: -10rpx;
+  right: -16rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #ff3b30, #ff4d5e);
   color: #ffffff;
-  border: 2px solid #ffffff;
+  border: 2rpx solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  z-index: 2;
+  z-index: 10;
 }
 
 .tabbar-badge-text {
   color: #ffffff;
-  font-size: 9px;
-  line-height: 12px;
+  font-size: 18rpx;
+  line-height: 24rpx;
   font-weight: 900;
+  text-align: center;
 }
 
 .tabbar-badge-dot {

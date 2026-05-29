@@ -421,7 +421,7 @@ export default function PilotProfilePage() {
                   Taro.switchTab({ url: "/pages/orders/index" })
                 }
               >
-                <Text className="pilot-quick-icon">📮</Text>
+                <View className="pilot-quick-icon pilot-quick-icon-orders" />
                 <Text className="pilot-quick-title">履约订单</Text>
               </View>
               <View
@@ -430,7 +430,7 @@ export default function PilotProfilePage() {
                   Taro.navigateTo({ url: "/pages/flight/records/index" })
                 }
               >
-                <Text className="pilot-quick-icon">📈</Text>
+                <View className="pilot-quick-icon pilot-quick-icon-flight" />
                 <Text className="pilot-quick-title">飞行记录</Text>
               </View>
               <View
@@ -439,7 +439,7 @@ export default function PilotProfilePage() {
                   Taro.navigateTo({ url: "/pages/profile/owner/index" })
                 }
               >
-                <Text className="pilot-quick-icon">🧭</Text>
+                <View className="pilot-quick-icon pilot-quick-icon-owner" />
                 <Text className="pilot-quick-title">服务商档案</Text>
               </View>
               <View
@@ -448,7 +448,7 @@ export default function PilotProfilePage() {
                   Taro.navigateTo({ url: "/pages/profile/drones/index" })
                 }
               >
-                <Text className="pilot-quick-icon">🚁</Text>
+                <View className="pilot-quick-icon pilot-quick-icon-drone" />
                 <Text className="pilot-quick-title">设备资质</Text>
               </View>
             </View>

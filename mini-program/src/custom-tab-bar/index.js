@@ -62,7 +62,7 @@ const providerTabList = [
   {
     key: 'orders',
     pagePath: '/pages/orders/index',
-    text: '接单',
+    text: '接单需求',
     iconPath: '/custom-tab-bar/assets/provider_tab_accept_order_inactive.png',
     selectedIconPath: '/custom-tab-bar/assets/provider_tab_accept_order_active.png',
     iconWidth: 56,
@@ -74,14 +74,13 @@ const providerTabList = [
     key: 'messages',
     pagePath: '/pages/messages/index',
     text: '消息',
-    iconPath: '/custom-tab-bar/assets/provider_tab_message_inactive.png',
-    selectedIconPath: '/custom-tab-bar/assets/provider_tab_message_active.png',
+    iconPath: '/custom-tab-bar/assets/icon_tab_message_inactive.png',
+    selectedIconPath: '/custom-tab-bar/assets/icon_tab_message_active.png',
     iconWidth: 58,
-    iconHeight: 60,
+    iconHeight: 56,
     selectedIconWidth: 58,
-    selectedIconHeight: 60,
-  },
-  {
+    selectedIconHeight: 56,
+  },  {
     key: 'profile',
     pagePath: '/pages/profile/index',
     text: '我的',

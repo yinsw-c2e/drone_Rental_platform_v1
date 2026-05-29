@@ -217,8 +217,22 @@ export default function ProfilePage() {
     loadData();
   });
 
+  const TAB_BAR_PATHS = [
+    '/pages/home/index',
+    '/pages/orders/index',
+    '/pages/messages/index',
+    '/pages/profile/index',
+  ];
+
   const handleNavigate = (url: string) => {
-    Taro.navigateTo({ url });
+    if (!url) return;
+    const pathOnly = url.split('?')[0];
+    // TabBar 页面必须用 switchTab，否则报 "can not navigateTo a tabbar page"
+    if (TAB_BAR_PATHS.includes(pathOnly)) {
+      Taro.switchTab({ url: pathOnly }).catch(() => null);
+      return;
+    }
+    Taro.navigateTo({ url }).catch(() => null);
   };
 
   const handleAvatarPress = async () => {
@@ -288,7 +302,6 @@ export default function ProfilePage() {
         key: 'my-orders',
         title: '我的订单',
         desc: '查看下单、履约和结算进度',
-        icon: '📋',
         screen: '/pages/orders/index',
         rightText: `${stats.orders} 单`,
       },
@@ -299,7 +312,6 @@ export default function ProfilePage() {
         key: 'my-demands',
         title: '我的任务',
         desc: '需求发布、询价与转单记录',
-        icon: '📝',
         screen: '/pages/profile/my-demands/index',
         rightText: `${stats.demands} 个`,
       });
@@ -310,7 +322,6 @@ export default function ProfilePage() {
         key: 'my-quotes',
         title: '我的报价',
         desc: '已发送方案与成交跟进',
-        icon: '💬',
         screen: '/pages/profile/my-quotes/index',
         rightText: `${stats.quotes} 条`,
       });
@@ -321,7 +332,6 @@ export default function ProfilePage() {
         key: 'wallet',
         title: '我的钱包',
         desc: '查看结算入账、钱包流水和提现记录',
-        icon: 'wallet',
         screen: '/pages/settlement/wallet/index',
         rightText: '查看',
       });
@@ -332,7 +342,6 @@ export default function ProfilePage() {
         key: 'client-profile',
         title: '客户档案',
         desc: '联系人、地址和任务偏好',
-        icon: '👔',
         screen: '/pages/client/profile/index',
         rightText: effectiveRoleSummary.has_client_role ? '已就绪' : '待补齐',
       },
@@ -340,7 +349,6 @@ export default function ProfilePage() {
         key: 'verify',
         title: '实名认证',
         desc: '账号实名与资料校验',
-        icon: '🔒',
         screen: '/pages/verification/index',
         rightText: verifyInfo.label,
       },
@@ -359,7 +367,6 @@ export default function ProfilePage() {
         key: 'owner-profile',
         title: providerCapabilities.canUseWorkbench ? '服务商档案' : '服务商入驻',
         desc: providerCapabilities.canUseWorkbench ? '资产、服务与履约资料' : '入驻资料、设备资质与审核状态',
-        icon: '🧭',
         screen: providerCapabilities.canUseWorkbench
           ? '/pages/profile/owner/index'
           : '/pages/provider/onboarding/index',
@@ -371,7 +378,6 @@ export default function ProfilePage() {
       key: effectiveRoleSummary.has_pilot_role ? 'pilot-profile' : 'pilot-register',
       title: effectiveRoleSummary.has_pilot_role ? '履约资质' : '履约资质认证',
       desc: effectiveRoleSummary.has_pilot_role ? '履约状态、统计与服务范围' : '完善后用于服务商履约推进',
-      icon: effectiveRoleSummary.has_pilot_role ? '🎮' : '🪪',
       screen: effectiveRoleSummary.has_pilot_role
         ? '/pages/profile/pilot/index'
         : '/pages/pilot/register/index',
@@ -385,7 +391,6 @@ export default function ProfilePage() {
           key: 'my-offers',
           title: '我的服务',
           desc: '上架、暂停和草稿中的服务',
-          icon: '📦',
           screen: '/pages/profile/my-offers/index',
           rightText: `${stats.supplies} 个`,
         },
@@ -398,7 +403,6 @@ export default function ProfilePage() {
           key: 'my-drones',
           title: '我的无人机',
           desc: '设备、资质和可用状态',
-          icon: '🛩️',
           screen: '/pages/profile/drones/index',
           rightText: `${stats.drones} 架`,
         },
@@ -410,14 +414,12 @@ export default function ProfilePage() {
         key: 'edit-profile',
         title: '编辑资料',
         desc: '昵称、头像和基础信息',
-        icon: '✏️',
         screen: '/pages/edit-profile/index',
       },
       {
         key: 'settings',
         title: '设置',
         desc: '账号与通知偏好',
-        icon: '⚙️',
         screen: '/pages/settings/index',
       },
     ];

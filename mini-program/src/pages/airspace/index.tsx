@@ -316,12 +316,12 @@ export default function AirspacePage() {
             <View className='empty-state'><Text className='empty-state-text'>加载中...</Text></View>
           ) : !pilotId ? (
             <View className='empty-state'>
-              <Text className='empty-state-icon'>🪪</Text>
+              <View className='empty-state-icon empty-state-icon-cert' />
               <Text className='empty-state-text'>请先完成履约资质认证后再办理空域报备</Text>
             </View>
           ) : applications.length === 0 ? (
             <View className='empty-state'>
-              <Text className='empty-state-icon'>🗺️</Text>
+              <View className='empty-state-icon empty-state-icon-map' />
               <Text className='empty-state-text'>暂无空域报备记录</Text>
             </View>
           ) : applications.map((item) => {

@@ -95,12 +95,12 @@ export default function WalletPage() {
       <View className="wallet-highlight-card">
         <Text className="wallet-highlight-label">今日预估收入</Text>
         <Text className="wallet-highlight-value">¥{formatAmount(providerStats?.today_income_cents || 0)}</Text>
-        <Text className="wallet-highlight-hint">基于今日已完成订单，T+3 到账</Text>
+        <Text className="wallet-highlight-hint">基于今日已完成订单，订单完成后入账</Text>
       </View>
       <View className="wallet-highlight-card">
         <Text className="wallet-highlight-label">待结算</Text>
         <Text className="wallet-highlight-value">¥{formatAmount(providerStats?.pending_settlement_cents || 0)}</Text>
-        <Text className="wallet-highlight-hint">含进行中和等待 T+3 的结算单</Text>
+        <Text className="wallet-highlight-hint">含已计算和待处理的结算单</Text>
       </View>
     </View>
   );

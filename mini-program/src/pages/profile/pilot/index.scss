@@ -221,7 +221,97 @@
 }
 
 .pilot-quick-icon {
-  font-size: 20px;
+  position: relative;
+  width: 44rpx;
+  height: 44rpx;
+  margin: 4rpx 0 8rpx;
+}
+
+/* 履约订单：信封轮廓 */
+.pilot-quick-icon-orders {
+  border: 3rpx solid #1677ff;
+  border-radius: 6rpx;
+  background: #eaf2ff;
+}
+.pilot-quick-icon-orders::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4rpx;
+  width: 0;
+  height: 0;
+  margin-left: -16rpx;
+  border-left: 16rpx solid transparent;
+  border-right: 16rpx solid transparent;
+  border-top: 14rpx solid #1677ff;
+}
+
+/* 飞行记录：上升折线 */
+.pilot-quick-icon-flight {
+  border-bottom: 3rpx solid #16a34a;
+  border-left: 3rpx solid #16a34a;
+}
+.pilot-quick-icon-flight::after {
+  content: '';
+  position: absolute;
+  left: 8rpx;
+  bottom: 6rpx;
+  width: 24rpx;
+  height: 18rpx;
+  border-top: 3rpx solid #16a34a;
+  border-right: 3rpx solid #16a34a;
+  transform: skewY(-18deg);
+  border-top-right-radius: 2rpx;
+}
+
+/* 服务商档案：指南针 (圆环 + 指针 + 中心) */
+.pilot-quick-icon-owner {
+  border: 3rpx solid #6d35ff;
+  border-radius: 50%;
+}
+.pilot-quick-icon-owner::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6rpx;
+  width: 4rpx;
+  height: 14rpx;
+  margin-left: -2rpx;
+  background: #6d35ff;
+  border-radius: 2rpx;
+}
+.pilot-quick-icon-owner::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10rpx;
+  height: 10rpx;
+  margin-left: -5rpx;
+  margin-top: -5rpx;
+  background: #6d35ff;
+  border-radius: 50%;
+}
+
+/* 设备资质：无人机 (中心机身 + 4 角螺旋桨) */
+.pilot-quick-icon-drone {
+  background:
+    radial-gradient(circle 6rpx at 6rpx 6rpx, #ff7a1a 90%, transparent 100%),
+    radial-gradient(circle 6rpx at 38rpx 6rpx, #ff7a1a 90%, transparent 100%),
+    radial-gradient(circle 6rpx at 6rpx 38rpx, #ff7a1a 90%, transparent 100%),
+    radial-gradient(circle 6rpx at 38rpx 38rpx, #ff7a1a 90%, transparent 100%);
+}
+.pilot-quick-icon-drone::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16rpx;
+  height: 16rpx;
+  margin-left: -8rpx;
+  margin-top: -8rpx;
+  background: #ff7a1a;
+  border-radius: 4rpx;
 }
 
 .pilot-quick-title {

@@ -12,92 +12,110 @@
 }
 
 .pilot-register-content {
-  padding: 20px;
-  padding-bottom: 40px;
+  padding: 40rpx;
+  padding-bottom: 80rpx;
 }
 
 .pilot-register-hero {
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 24px;
-  margin-bottom: 24px;
-  border: 1px solid #bfdbfe;
-}
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  border-bottom-left-radius: 40rpx;
+  border-bottom-right-radius: 40rpx;
+  padding: 48rpx 48rpx 84rpx;
+  margin-bottom: -40rpx;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10rpx 30rpx rgba(30, 58, 138, 0.15);
+  z-index: 10;
 
-.pilot-register-hero-top {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: flex-start;
+  &::before {
+    content: '';
+    position: absolute;
+    top: -40rpx;
+    right: -60rpx;
+    width: 320rpx;
+    height: 320rpx;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+  }
 }
 
 .pilot-register-hero-main {
   flex: 1;
-  padding-right: 12px;
+  padding-right: 24rpx;
+  position: relative;
+  z-index: 2;
 }
 
 .pilot-register-hero-title {
   display: block;
-  font-size: 22px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 44rpx;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 1rpx;
 }
 
 .pilot-register-hero-subtitle {
   display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  line-height: 20px;
-  color: #64748b;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  line-height: 40rpx;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
 }
 
 .pilot-register-section {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 18px;
-  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1rpx solid rgba(255, 255, 255, 0.6);
+  border-radius: 32rpx;
+  padding: 36rpx;
+  margin: 0 32rpx 32rpx;
+  box-shadow: 0 16rpx 48rpx -12rpx rgba(15, 35, 65, 0.08);
+  position: relative;
+  z-index: 12;
 }
 
 .pilot-register-section-header {
-  margin-bottom: 4px;
+  margin-bottom: 24rpx;
 }
 
 .pilot-register-section-title {
   display: block;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 34rpx;
+  font-weight: 800;
   color: #0f172a;
 }
 
 .pilot-register-section-desc {
   display: block;
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 18px;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 36rpx;
   color: #64748b;
+  font-weight: 500;
 }
 
 .pilot-register-field {
-  margin-top: 16px;
+  margin-top: 32rpx;
 }
 
 .pilot-register-label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 600;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+  font-weight: 700;
   color: #0f172a;
 }
 
 .pilot-register-input {
   width: 100%;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  height: 48px;
-  line-height: 48px;
-  padding: 0 16px;
+  border-radius: 20rpx;
+  height: 96rpx;
+  padding: 0 32rpx;
   background: #f8fafc;
-  font-size: 15px;
+  border: 1rpx solid #e2e8f0;
+  font-size: 30rpx;
   color: #0f172a;
 }
 
@@ -106,11 +124,11 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid #dbeafe;
-  background: #f8fbff;
+  gap: 24rpx;
+  padding: 32rpx;
+  border-radius: 20rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
 }
 
 .pilot-register-location-main {
@@ -120,24 +138,25 @@
 
 .pilot-register-location-title {
   display: block;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 21px;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 42rpx;
   color: #0f172a;
 }
 
 .pilot-register-location-sub {
   display: block;
-  margin-top: 5px;
-  font-size: 12px;
-  line-height: 17px;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
   color: #64748b;
+  font-weight: 500;
 }
 
 .pilot-register-location-action {
   flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 26rpx;
+  font-weight: 800;
   color: #2563eb;
 }
 
@@ -146,40 +165,41 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 16rpx;
 }
 
 .pilot-register-type-chip,
 .pilot-register-skill-chip {
-  padding: 10px 14px;
-  border-radius: 999px;
+  padding: 16rpx 28rpx;
+  border-radius: 16rpx;
   background: #f1f5f9;
-  border: 1px solid transparent;
+  border: 1rpx solid transparent;
 }
 
 .pilot-register-type-chip-active,
 .pilot-register-skill-chip-active {
   background: #eff6ff;
-  border-color: #bfdbfe;
+  border-color: rgba(37, 99, 235, 0.2);
 }
 
 .pilot-register-type-text,
 .pilot-register-skill-text {
-  font-size: 13px;
+  font-size: 26rpx;
   font-weight: 600;
-  color: #475569;
+  color: #64748b;
 }
 
 .pilot-register-type-text-active,
 .pilot-register-skill-text-active {
-  color: #1d4ed8;
+  color: #2563eb;
+  font-weight: 800;
 }
 
 .pilot-register-upload {
   width: 100%;
-  height: 168px;
-  border-radius: 16px;
-  border: 1px dashed #bfdbfe;
+  height: 336rpx;
+  border-radius: 24rpx;
+  border: 2rpx dashed #cbd5e1;
   background: #f8fafc;
   overflow: hidden;
   position: relative;
@@ -187,8 +207,8 @@
 
 .pilot-register-upload-filled {
   border-style: solid;
-  border-color: #dbeafe;
-  background: #eef6ff;
+  border-color: #3b82f6;
+  background: #eff6ff;
 }
 
 .pilot-register-upload-placeholder {
@@ -201,14 +221,16 @@
 }
 
 .pilot-register-upload-plus {
-  font-size: 28px;
-  color: #2563eb;
+  font-size: 64rpx;
+  color: #3b82f6;
+  font-weight: 300;
 }
 
 .pilot-register-upload-text {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #64748b;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .pilot-register-uploaded-image {
@@ -216,79 +238,28 @@
   height: 100%;
 }
 
-.pilot-register-upload-mask {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 10px 12px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.72));
-}
-
-.pilot-register-upload-status {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.pilot-register-upload-hint {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.pilot-register-upload-actions {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.pilot-register-upload-action {
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 17px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pilot-register-upload-action-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2563eb;
-}
-
-.pilot-register-upload-action-danger {
-  background: #fff1f2;
-  border-color: #fecdd3;
-}
-
-.pilot-register-upload-action-danger-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e11d48;
-}
-
 .pilot-register-submit-btn {
-  height: 48px;
-  border-radius: 24px;
-  background: #2563eb;
+  height: 96rpx;
+  margin: 40rpx 32rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 8rpx 24rpx rgba(37, 99, 235, 0.25);
 }
 
 .pilot-register-submit-btn-disabled {
   opacity: 0.6;
+  box-shadow: none;
 }
 
 .pilot-register-submit-text {
   color: #ffffff;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+::-webkit-scrollbar {
+  display: none;
 }
