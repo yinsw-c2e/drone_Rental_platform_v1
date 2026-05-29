@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
+
+	"go.uber.org/zap"
 
 	"wurenji-backend/internal/model"
+	paymentpkg "wurenji-backend/internal/pkg/payment"
 	"wurenji-backend/internal/repository"
 )
 
@@ -170,5 +174,89 @@ func TestMockPaymentCompleteRejectsWhenDisabled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "不允许模拟支付") {
 		t.Fatalf("expected mock disabled error, got %v", err)
+	}
+}
+
+func TestRefundPaymentIsIdempotentAndDoesNotDuplicateTimeline(t *testing.T) {
+	db := newServiceTestDB(
+		t,
+		&model.Order{},
+		&model.Payment{},
+		&model.Refund{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+	)
+	orderRepo := repository.NewOrderRepo(db)
+	paymentRepo := repository.NewPaymentRepo(db)
+	artifactRepo := repository.NewOrderArtifactRepo(db)
+
+	paidAt := time.Now().Add(-30 * time.Minute)
+	order := &model.Order{
+		OrderNo:      "WRJ-REFUND-IDEMPOTENT",
+		OrderType:    "cargo",
+		OrderMode:    OrderModeInstant,
+		OrderSource:  OrderModeInstant,
+		ClientUserID: 46,
+		RenterID:     46,
+		Status:       "cancelled",
+		TotalAmount:  108400,
+		PaidAt:       &paidAt,
+	}
+	if err := orderRepo.Create(order); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	p := &model.Payment{
+		PaymentNo:     "PAY-REFUND-IDEMPOTENT",
+		OrderID:       order.ID,
+		UserID:        order.ClientUserID,
+		PaymentType:   "order",
+		PaymentMethod: "mock",
+		Amount:        108400,
+		Status:        "paid",
+		PaidAt:        &paidAt,
+	}
+	if err := paymentRepo.Create(p); err != nil {
+		t.Fatalf("create payment: %v", err)
+	}
+	if err := artifactRepo.CreateRefund(&model.Refund{
+		RefundNo:  repository.GenerateRefundNo(),
+		OrderID:   order.ID,
+		PaymentID: p.ID,
+		Amount:    108400,
+		Reason:    "取消退款",
+		Status:    "pending",
+	}); err != nil {
+		t.Fatalf("create refund: %v", err)
+	}
+
+	service := NewPaymentService(paymentRepo, orderRepo, nil, nil, artifactRepo, paymentpkg.NewMockPayment(zap.NewNop()), nil)
+	for i := 0; i < 2; i++ {
+		if err := service.RefundPayment(order.ID, order.ClientUserID); err != nil {
+			t.Fatalf("refund payment attempt %d: %v", i+1, err)
+		}
+	}
+
+	var refund model.Refund
+	if err := db.Where("payment_id = ?", p.ID).First(&refund).Error; err != nil {
+		t.Fatalf("load refund: %v", err)
+	}
+	if refund.Status != "success" {
+		t.Fatalf("expected success refund, got %#v", refund)
+	}
+	var payment model.Payment
+	if err := db.First(&payment, p.ID).Error; err != nil {
+		t.Fatalf("load payment: %v", err)
+	}
+	if payment.Status != "refunded" {
+		t.Fatalf("expected refunded payment, got %#v", payment)
+	}
+	var refundedTimelineCount int64
+	if err := db.Model(&model.OrderTimeline{}).
+		Where("order_id = ? AND status = ?", order.ID, "refunded").
+		Count(&refundedTimelineCount).Error; err != nil {
+		t.Fatalf("count refund timeline: %v", err)
+	}
+	if refundedTimelineCount != 1 {
+		t.Fatalf("expected one refunded timeline, got %d", refundedTimelineCount)
 	}
 }

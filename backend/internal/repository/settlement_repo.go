@@ -313,6 +313,94 @@ func (r *SettlementRepo) addWalletIncomeTx(tx *gorm.DB, userID int64, amount int
 	return tx.Create(txRecord).Error
 }
 
+// ReverseWalletIncomeInCurrentTx 冲正一笔已入账收入，调用方负责外层事务。
+// related_transaction_id 指向原 income 流水，重复调用同一原流水会被幂等吸收。
+func (r *SettlementRepo) ReverseWalletIncomeInCurrentTx(userID, originalTransactionID int64, amount int64, orderID, settlementID int64, description string) error {
+	return r.reverseWalletIncomeTx(r.db, userID, originalTransactionID, amount, orderID, settlementID, description)
+}
+
+func (r *SettlementRepo) ReverseWalletIncome(userID, originalTransactionID int64, amount int64, orderID, settlementID int64, description string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return r.reverseWalletIncomeTx(tx, userID, originalTransactionID, amount, orderID, settlementID, description)
+	})
+}
+
+func (r *SettlementRepo) reverseWalletIncomeTx(tx *gorm.DB, userID, originalTransactionID int64, amount int64, orderID, settlementID int64, description string) error {
+	if originalTransactionID <= 0 {
+		return fmt.Errorf("原收入流水不能为空")
+	}
+	if amount <= 0 {
+		return fmt.Errorf("冲正金额必须大于0")
+	}
+
+	var original model.WalletTransaction
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND user_id = ? AND type = ?", originalTransactionID, userID, "income").
+		First(&original).Error; err != nil {
+		return err
+	}
+	if original.Amount <= 0 {
+		return fmt.Errorf("原收入流水金额异常: %d", original.Amount)
+	}
+	if amount > original.Amount {
+		return fmt.Errorf("冲正金额不能超过原收入流水: reversal=%d original=%d", amount, original.Amount)
+	}
+
+	var existing model.WalletTransaction
+	err := tx.Where(
+		"user_id = ? AND related_transaction_id = ? AND type = ?",
+		userID,
+		originalTransactionID,
+		"income_reversal",
+	).First(&existing).Error
+	if err == nil {
+		if existing.Amount != -amount || existing.RelatedOrderID != orderID || existing.RelatedSettlementID != settlementID {
+			return fmt.Errorf("已存在收入冲正流水但金额或关联对象不一致: transaction_id=%d user_id=%d", originalTransactionID, userID)
+		}
+		return nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	wallet, err := r.getOrCreateWalletTx(tx, userID, "general")
+	if err != nil {
+		return err
+	}
+	if wallet.Status != "active" {
+		return fmt.Errorf("钱包状态异常: %s", wallet.Status)
+	}
+	if wallet.AvailableBalance < amount {
+		return fmt.Errorf("钱包余额不足，无法冲正: available=%d amount=%d", wallet.AvailableBalance, amount)
+	}
+
+	balanceBefore := wallet.AvailableBalance
+	wallet.AvailableBalance -= amount
+	if wallet.TotalIncome >= amount {
+		wallet.TotalIncome -= amount
+	} else {
+		wallet.TotalIncome = 0
+	}
+	if err := tx.Save(wallet).Error; err != nil {
+		return err
+	}
+
+	txRecord := &model.WalletTransaction{
+		TransactionNo:        generateTransactionNo(),
+		WalletID:             wallet.ID,
+		UserID:               userID,
+		Type:                 "income_reversal",
+		Amount:               -amount,
+		BalanceBefore:        balanceBefore,
+		BalanceAfter:         wallet.AvailableBalance,
+		RelatedOrderID:       orderID,
+		RelatedSettlementID:  settlementID,
+		RelatedTransactionID: originalTransactionID,
+		Description:          description,
+	}
+	return tx.Create(txRecord).Error
+}
+
 // FreezeWalletBalance 冻结余额(用于提现)
 func (r *SettlementRepo) FreezeWalletBalance(userID int64, amount int64, description string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {

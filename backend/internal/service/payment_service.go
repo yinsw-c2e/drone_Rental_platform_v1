@@ -241,7 +241,19 @@ func (s *PaymentService) GetPaymentStatus(paymentNo string) (*model.Payment, err
 }
 
 func (s *PaymentService) RefundPayment(orderID, userID int64) error {
-	return s.refundPaymentWithRepos(orderID, userID, s.paymentRepo, s.orderRepo, s.orderArtifactRepo)
+	db := s.paymentRepo.DB()
+	if db == nil {
+		return s.refundPaymentWithRepos(orderID, userID, s.paymentRepo, s.orderRepo, s.orderArtifactRepo)
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		return s.refundPaymentWithRepos(
+			orderID,
+			userID,
+			repository.NewPaymentRepo(tx),
+			repository.NewOrderRepo(tx),
+			repository.NewOrderArtifactRepo(tx),
+		)
+	})
 }
 
 func (s *PaymentService) ListByUser(userID int64, page, pageSize int) ([]model.Payment, int64, error) {
@@ -345,6 +357,12 @@ func (s *PaymentService) refundPaymentWithRepos(
 	if len(refundByPaymentID) == 0 {
 		return errors.New("未找到待处理退款记录，请先取消订单")
 	}
+	if order.Status == "refunded" && allRefundRecordsSuccessful(refundByPaymentID) {
+		return nil
+	}
+	if s.provider == nil {
+		return errors.New("退款通道未初始化")
+	}
 
 	var refundedAmount int64
 	refundSuccessCount := 0
@@ -435,6 +453,18 @@ func (s *PaymentService) refundPaymentWithRepos(
 	}
 
 	return nil
+}
+
+func allRefundRecordsSuccessful(refundByPaymentID map[int64]*model.Refund) bool {
+	if len(refundByPaymentID) == 0 {
+		return false
+	}
+	for _, refundRecord := range refundByPaymentID {
+		if refundRecord == nil || refundRecord.Status != "success" {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *PaymentService) advanceOrderAfterPaymentWithRepos(

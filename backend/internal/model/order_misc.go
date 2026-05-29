@@ -163,15 +163,16 @@ func (Payment) TableName() string {
 }
 
 type Refund struct {
-	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	RefundNo  string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"refund_no"`
-	OrderID   int64     `gorm:"index;not null" json:"order_id"`
-	PaymentID int64     `gorm:"uniqueIndex;not null" json:"payment_id"`
-	Amount    int64     `json:"amount"`
-	Reason    string    `gorm:"type:text" json:"reason"`
-	Status    string    `gorm:"type:varchar(20);default:pending;index" json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                   int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	RefundNo             string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"refund_no"`
+	OrderID              int64     `gorm:"index;not null" json:"order_id"`
+	PaymentID            int64     `gorm:"uniqueIndex;not null" json:"payment_id"`
+	RelatedTransactionID int64     `gorm:"index" json:"related_transaction_id"`
+	Amount               int64     `json:"amount"`
+	Reason               string    `gorm:"type:text" json:"reason"`
+	Status               string    `gorm:"type:varchar(20);default:pending;index" json:"status"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 
 	Order   *Order   `gorm:"foreignKey:OrderID" json:"order,omitempty"`
 	Payment *Payment `gorm:"foreignKey:PaymentID" json:"payment,omitempty"`
