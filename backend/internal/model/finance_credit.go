@@ -103,18 +103,19 @@ func (UserWallet) TableName() string {
 
 // WalletTransaction 钱包流水记录
 type WalletTransaction struct {
-	ID                  int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	TransactionNo       string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"transaction_no"`
-	WalletID            int64     `gorm:"index;not null" json:"wallet_id"`
-	UserID              int64     `gorm:"index;not null" json:"user_id"`
-	Type                string    `gorm:"type:varchar(30);not null" json:"type"` // income, withdraw, freeze, unfreeze, deduct, refund
-	Amount              int64     `json:"amount"`                                // 交易金额(分, 正为收入负为支出)
-	BalanceBefore       int64     `json:"balance_before"`                        // 交易前余额(分)
-	BalanceAfter        int64     `json:"balance_after"`                         // 交易后余额(分)
-	RelatedOrderID      int64     `gorm:"index" json:"related_order_id"`
-	RelatedSettlementID int64     `gorm:"index" json:"related_settlement_id"`
-	Description         string    `gorm:"type:varchar(255)" json:"description"`
-	CreatedAt           time.Time `json:"created_at"`
+	ID                   int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	TransactionNo        string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"transaction_no"`
+	WalletID             int64     `gorm:"index;not null" json:"wallet_id"`
+	UserID               int64     `gorm:"index;not null" json:"user_id"`
+	Type                 string    `gorm:"type:varchar(30);not null" json:"type"` // income, withdraw, freeze, unfreeze, deduct, refund, income_reversal
+	Amount               int64     `json:"amount"`                                // 交易金额(分, 正为收入负为支出)
+	BalanceBefore        int64     `json:"balance_before"`                        // 交易前余额(分)
+	BalanceAfter         int64     `json:"balance_after"`                         // 交易后余额(分)
+	RelatedOrderID       int64     `gorm:"index" json:"related_order_id"`
+	RelatedSettlementID  int64     `gorm:"index" json:"related_settlement_id"`
+	RelatedTransactionID int64     `gorm:"index" json:"related_transaction_id"` // 退款/冲正关联的原流水ID
+	Description          string    `gorm:"type:varchar(255)" json:"description"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
 func (WalletTransaction) TableName() string {
