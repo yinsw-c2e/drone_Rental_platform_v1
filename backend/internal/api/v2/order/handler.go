@@ -80,6 +80,7 @@ type estimateOrderRequest struct {
 	CargoScene           string               `json:"cargo_scene"`
 	Note                 string               `json:"note"`
 	Description          string               `json:"description"`
+	ClientRequestID      string               `json:"client_request_id"`
 }
 
 func (h *Handler) Estimate(c *gin.Context) {
@@ -209,6 +210,7 @@ func (req estimateOrderRequest) toPlatformPricedOrderInput(scheduledAt time.Time
 		CargoScene:       pricingInput.CargoScene,
 		Note:             strings.TrimSpace(req.Note),
 		Description:      strings.TrimSpace(req.Description),
+		ClientRequestID:  strings.TrimSpace(req.ClientRequestID),
 	}, nil
 }
 
@@ -407,8 +409,15 @@ func (h *Handler) Cancel(c *gin.Context) {
 
 	updated, err := h.orderService.GetAuthorizedOrder(orderID, userID, "")
 	if err != nil {
-		v2common.HandleServiceError(c, err)
-		return
+		if !providerActorCanLoseAccessAfterCancel(role) {
+			v2common.HandleServiceError(c, err)
+			return
+		}
+		updated, err = h.orderService.GetOrder(orderID)
+		if err != nil {
+			v2common.HandleServiceError(c, err)
+			return
+		}
 	}
 	response.V2Success(c, buildOrderSummary(updated))
 }
@@ -1660,6 +1669,15 @@ func normalizeOrderActorRole(userType string) string {
 		return "client"
 	default:
 		return ""
+	}
+}
+
+func providerActorCanLoseAccessAfterCancel(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "owner", "pilot", "provider":
+		return true
+	default:
+		return false
 	}
 }
 

@@ -49,6 +49,7 @@ type FlightServiceConfig struct {
 }
 
 type OrderLiveSnapshot struct {
+	Status       string                `json:"status,omitempty"`
 	ETASeconds   *int                  `json:"eta_seconds"`
 	ProgressPct  float64               `json:"progress_pct"`
 	LastPosition *LivePositionSnapshot `json:"last_position"`
@@ -1249,7 +1250,7 @@ func (s *FlightService) GetOrderLive(order *model.Order) (*OrderLiveSnapshot, er
 	}
 
 	now := time.Now()
-	live := &OrderLiveSnapshot{}
+	live := &OrderLiveSnapshot{Status: order.Status}
 	if order.Status == "delivered" || order.Status == "completed" {
 		live.ProgressPct = 100
 		zero := 0

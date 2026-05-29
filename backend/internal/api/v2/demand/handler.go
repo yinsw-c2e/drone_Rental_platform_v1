@@ -232,6 +232,24 @@ func (h *Handler) ListQuotes(c *gin.Context) {
 	response.V2Success(c, gin.H{"items": items})
 }
 
+func (h *Handler) SuggestedPrice(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	demandID, ok := parseDemandID(c)
+	if !ok {
+		return
+	}
+	result, err := h.clientService.SuggestDemandPrice(userID, demandID)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, result)
+}
+
 func (h *Handler) SelectProvider(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

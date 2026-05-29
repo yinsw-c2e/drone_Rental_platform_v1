@@ -228,6 +228,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			demandGroup.POST("/:demand_id/publish", h.Demand.Publish)
 			demandGroup.POST("/:demand_id/cancel", h.Demand.Cancel)
 			demandGroup.GET("/:demand_id/quotes", h.Demand.ListQuotes)
+			demandGroup.POST("/:demand_id/suggested-price", h.Demand.SuggestedPrice)
 			demandGroup.POST("/:demand_id/select-provider", h.Demand.SelectProvider)
 			demandGroup.POST("/:demand_id/quotes", h.Owner.CreateQuote)
 			demandGroup.POST("/:demand_id/candidate", h.Pilot.ApplyDemandCandidate)

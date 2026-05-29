@@ -1,6 +1,8 @@
 package location
 
 import (
+	"errors"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +19,17 @@ func NewHandler(amapService *amap.AmapService) *Handler {
 	return &Handler{amapService: amapService}
 }
 
+func handleLocationError(c *gin.Context, err error, fallback string) {
+	if errors.Is(err, amap.ErrNotConfigured) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"code":    "AMAP_NOT_CONFIGURED",
+			"message": "地图服务暂未配置，请联系平台",
+		})
+		return
+	}
+	response.Error(c, response.CodeServerError, fallback+": "+err.Error())
+}
+
 // SearchPOI GET /location/search?keyword=xxx&city=xxx&page=1&page_size=20
 func (h *Handler) SearchPOI(c *gin.Context) {
 	keyword := c.Query("keyword")
@@ -30,7 +43,7 @@ func (h *Handler) SearchPOI(c *gin.Context) {
 
 	pois, total, err := h.amapService.SearchPOI(keyword, city, page, pageSize)
 	if err != nil {
-		response.Error(c, response.CodeServerError, "搜索失败: "+err.Error())
+		handleLocationError(c, err, "搜索失败")
 		return
 	}
 	response.Success(c, gin.H{"list": pois, "total": total})
@@ -57,7 +70,7 @@ func (h *Handler) ReverseGeoCode(c *gin.Context) {
 
 	result, err := h.amapService.ReverseGeoCode(lng, lat)
 	if err != nil {
-		response.Error(c, response.CodeServerError, "逆地理编码失败: "+err.Error())
+		handleLocationError(c, err, "逆地理编码失败")
 		return
 	}
 	response.Success(c, result)
@@ -89,7 +102,7 @@ func (h *Handler) Nearby(c *gin.Context) {
 
 	pois, total, err := h.amapService.SearchNearby(lng, lat, radius, keyword, page, pageSize)
 	if err != nil {
-		response.Error(c, response.CodeServerError, "周边搜索失败: "+err.Error())
+		handleLocationError(c, err, "周边搜索失败")
 		return
 	}
 	response.Success(c, gin.H{"list": pois, "total": total})

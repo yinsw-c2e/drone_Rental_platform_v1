@@ -3,6 +3,7 @@ package amap
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 
 	"go.uber.org/zap"
 )
+
+var ErrNotConfigured = errors.New("amap service not configured")
 
 // FlexString 处理高德API中可能为字符串或空数组的字段
 // 例如直辖市的city字段返回[]而非""
@@ -84,7 +87,7 @@ type GeoCodeResult struct {
 // GeoCode 地理编码：地址 -> 坐标
 func (s *AmapService) GeoCode(address, city string) ([]GeoCodeResult, error) {
 	if !s.IsEnabled() {
-		return nil, fmt.Errorf("amap service not configured")
+		return nil, ErrNotConfigured
 	}
 
 	params := url.Values{}
@@ -162,7 +165,7 @@ type ReverseGeoResult struct {
 // ReverseGeoCode 逆地理编码：坐标 -> 地址
 func (s *AmapService) ReverseGeoCode(longitude, latitude float64) (*ReverseGeoResult, error) {
 	if !s.IsEnabled() {
-		return nil, fmt.Errorf("amap service not configured")
+		return nil, ErrNotConfigured
 	}
 
 	location := fmt.Sprintf("%.6f,%.6f", longitude, latitude)
@@ -248,7 +251,7 @@ type POIResult struct {
 // SearchPOI 关键词搜索POI
 func (s *AmapService) SearchPOI(keyword, city string, page, pageSize int) ([]POIResult, int, error) {
 	if !s.IsEnabled() {
-		return nil, 0, fmt.Errorf("amap service not configured")
+		return nil, 0, ErrNotConfigured
 	}
 
 	params := url.Values{}
@@ -323,7 +326,7 @@ func (s *AmapService) SearchPOI(keyword, city string, page, pageSize int) ([]POI
 // SearchNearby 周边搜索POI
 func (s *AmapService) SearchNearby(longitude, latitude float64, radius int, keyword string, page, pageSize int) ([]POIResult, int, error) {
 	if !s.IsEnabled() {
-		return nil, 0, fmt.Errorf("amap service not configured")
+		return nil, 0, ErrNotConfigured
 	}
 
 	location := fmt.Sprintf("%.6f,%.6f", longitude, latitude)
