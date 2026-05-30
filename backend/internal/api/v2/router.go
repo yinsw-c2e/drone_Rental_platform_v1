@@ -97,7 +97,7 @@ type LongtailHandlers struct {
 	Owner      *longowner.Handler
 }
 
-func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, broadcastService *service.BroadcastService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, uploadService *uploadpkg.UploadService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth, serverMode string, longtail *LongtailHandlers) *Handlers {
+func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, broadcastService *service.BroadcastService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, wechatSubscribe v2push.WeChatSubscribeGrantRecorder, uploadService *uploadpkg.UploadService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth, serverMode string, longtail *LongtailHandlers) *Handlers {
 	return &Handlers{
 		Base:         base.NewHandler(),
 		Auth:         v2auth.NewHandler(authService, userService, wechatOAuth, wechatMiniOAuth, qqOAuth),
@@ -117,7 +117,7 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Payment:      v2payment.NewHandler(orderService, paymentService),
 		Settlement:   v2settlement.NewHandler(orderService, settlementService),
 		Notification: v2notification.NewHandler(messageService),
-		Push:         v2push.NewHandler(pushService, serverMode),
+		Push:         v2push.NewHandler(pushService, serverMode, wechatSubscribe),
 		Review:       v2review.NewHandler(orderService, reviewService),
 		Longtail:     longtail,
 	}
@@ -450,6 +450,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 		{
 			pushGroup.POST("/device", h.Push.RegisterDevice)
 			pushGroup.POST("/test", h.Push.SendTest)
+			pushGroup.POST("/wechat-subscribe", h.Push.GrantWeChatSubscribe)
 		}
 
 		conversationGroup := authenticated.Group("/conversations")

@@ -67,6 +67,7 @@ import (
 	"wurenji-backend/internal/pkg/push"
 	"wurenji-backend/internal/pkg/sms"
 	"wurenji-backend/internal/pkg/upload"
+	wechatpkg "wurenji-backend/internal/pkg/wechat"
 	"wurenji-backend/internal/repository"
 	"wurenji-backend/internal/service"
 	ws "wurenji-backend/internal/websocket"
@@ -162,6 +163,7 @@ func main() {
 	providerPresenceRepo := repository.NewProviderPresenceRepo(db)
 	orderBroadcastRepo := repository.NewOrderBroadcastRepo(db)
 	broadcastAssignmentRepo := repository.NewBroadcastAssignmentRepo(db)
+	wechatSubscribeRepo := repository.NewWeChatSubscribeRepo(db)
 
 	contractRepo := repository.NewContractRepo(db)
 
@@ -191,6 +193,31 @@ func main() {
 	} else {
 		pushService = push.NewMockPushService(zapLogger)
 		zapLogger.Info("Using mock push service")
+	}
+
+	var wechatSubscribeService interface {
+		service.WeChatSubscribeEventSender
+		GrantAcceptedTemplates(ctx context.Context, userID int64, templateIDs []string) (int, error)
+	}
+	if cfg.WeChat.Subscribe.Enabled {
+		if cfg.Push.Provider == "mock" {
+			wechatSubscribeService = service.NewMockWeChatSubscribeService(zapLogger)
+			zapLogger.Info("Using mock WeChat subscribe service")
+		} else if cfg.OAuth.IsWeChatMiniEnabled() {
+			accessTokenManager := wechatpkg.NewAccessTokenManager(wechatpkg.AccessTokenConfig{
+				AppID:     cfg.OAuth.WeChatMini.AppID,
+				AppSecret: cfg.OAuth.WeChatMini.AppSecret,
+				Logger:    zapLogger,
+			})
+			subscribeClient := wechatpkg.NewSubscribeClient(wechatpkg.SubscribeClientConfig{
+				TokenProvider: accessTokenManager,
+				Logger:        zapLogger,
+			})
+			wechatSubscribeService = service.NewWeChatSubscribeService(userRepo, wechatSubscribeRepo, subscribeClient, cfg.WeChat.Subscribe, zapLogger)
+			zapLogger.Info("WeChat subscribe service initialized")
+		} else {
+			zapLogger.Warn("WeChat subscribe enabled but mini program OAuth is not configured")
+		}
 	}
 
 	// Init OAuth providers
@@ -237,6 +264,9 @@ func main() {
 	messageService := service.NewMessageService(messageRepo)
 	messageService.SetCreditRepository(creditRepo)
 	eventService := service.NewEventService(messageService, pushService, zapLogger)
+	if wechatSubscribeService != nil {
+		eventService.SetWeChatSubscribeService(wechatSubscribeService)
+	}
 	reviewService := service.NewReviewService(reviewRepo, droneRepo, orderRepo)
 	addressService := service.NewAddressService(addressRepo)
 	pilotService := service.NewPilotService(pilotRepo, userRepo, roleProfileRepo, orderRepo, ownerDomainRepo, demandDomainRepo, dispatchRepo, flightRepo, zapLogger)
@@ -337,7 +367,7 @@ func main() {
 		Analytics:  longanalytics.NewHandler(analyticsService),
 	}
 	longtailHandlers.Admin.SetH9Dependencies(serviceClassRepo, orderBroadcastRepo, systemConfigService)
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, pricingService, broadcastService, paymentService, settlementService, messageService, reviewService, pushService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, pricingService, broadcastService, paymentService, settlementService, messageService, reviewService, pushService, wechatSubscribeService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)

@@ -6,6 +6,8 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { logout } from '../../store/slices/authSlice';
 import { RootState } from '../../store/store';
+import { COMMON_PLATFORM_SUBSCRIBE_TEMPLATES } from '../../constants/subscribeTemplates';
+import { requestSubscribe } from '../../services/push';
 import './index.scss';
 
 const PUSH_STORAGE_KEY = 'profile_push_enabled';
@@ -62,6 +64,12 @@ export default function SettingsPage() {
     setPushEnabled(nextValue);
     Taro.setStorageSync(PUSH_STORAGE_KEY, nextValue);
 
+    let acceptedCount = 0;
+    if (nextValue) {
+      const accepted = await requestSubscribe(COMMON_PLATFORM_SUBSCRIBE_TEMPLATES);
+      acceptedCount = accepted.length;
+    }
+
     if (nextValue && subscriptionsMainSwitch === false) {
       Taro.showModal({
         title: '通知入口待开启',
@@ -78,6 +86,11 @@ export default function SettingsPage() {
 
     if (!nextValue) {
       Taro.showToast({ title: '已关闭当前设备提醒', icon: 'none' });
+      return;
+    }
+
+    if (acceptedCount > 0) {
+      Taro.showToast({ title: '通知已开启', icon: 'success' });
     }
   };
 

@@ -6,8 +6,10 @@ import {
   AirspaceCheckResult,
   airspaceService,
 } from '../../../services/airspace';
+import { CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES } from '../../../constants/subscribeTemplates';
 import { getClientEligibility } from '../../../services/client';
 import { demandV2Service, DemandUpsertPayload } from '../../../services/demandV2';
+import { requestSubscribe } from '../../../services/push';
 import { supplyService } from '../../../services/supply';
 import { AddressData, AddressSnapshot, DirectOrderInput, QuickOrderDraft } from '../../../types';
 import { isAirspaceHardBlocked } from '../../../utils/airspaceRisk';
@@ -655,6 +657,7 @@ export default function QuickOrderPage() {
     if (!startDate || !endDate || endDate <= startDate) {
       return Taro.showToast({ title: '请填写正确作业时间', icon: 'none' });
     }
+    await requestSubscribe(CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES);
     setSubmitting(true);
     try {
       const weightKG = Number(cargoWeight);

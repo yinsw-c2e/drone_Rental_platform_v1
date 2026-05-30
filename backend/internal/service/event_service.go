@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -11,9 +12,10 @@ import (
 )
 
 type EventService struct {
-	messageService *MessageService
-	pushService    push.PushService
-	logger         *zap.Logger
+	messageService         *MessageService
+	pushService            push.PushService
+	wechatSubscribeService WeChatSubscribeEventSender
+	logger                 *zap.Logger
 }
 
 var pushEventAllowlist = map[string]struct{}{
@@ -48,6 +50,13 @@ func NewEventService(messageService *MessageService, pushService push.PushServic
 		pushService:    pushService,
 		logger:         logger,
 	}
+}
+
+func (s *EventService) SetWeChatSubscribeService(wechatSubscribeService WeChatSubscribeEventSender) {
+	if s == nil {
+		return
+	}
+	s.wechatSubscribeService = wechatSubscribeService
 }
 
 func (s *EventService) NotifyDemandQuoteSubmitted(demand *model.Demand, quote *model.DemandQuote) {
@@ -714,6 +723,13 @@ func (s *EventService) notifyUsers(userIDs []int64, eventType, title, content st
 		if s.pushService != nil && shouldSendPushEvent(eventType) {
 			if err := s.pushService.PushToUser(userID, title, content, stringifyExtras(payload)); err != nil && s.logger != nil {
 				s.logger.Warn("push notification failed", zap.Int64("user_id", userID), zap.String("event_type", eventType), zap.Error(err))
+			}
+		}
+		if s.wechatSubscribeService != nil && ShouldSendWeChatSubscribeEvent(eventType) {
+			wechatPayload := cloneExtras(payload)
+			wechatPayload["content"] = content
+			if err := s.wechatSubscribeService.SendEvent(context.Background(), userID, eventType, wechatPayload); err != nil && s.logger != nil {
+				s.logger.Warn("wechat subscribe notification failed", zap.Int64("user_id", userID), zap.String("event_type", eventType), zap.Error(err))
 			}
 		}
 	}

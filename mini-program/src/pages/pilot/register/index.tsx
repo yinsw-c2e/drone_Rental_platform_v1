@@ -6,12 +6,14 @@ import { Image, Input, ScrollView, Text, View } from "@tarojs/components";
 import StatusBadge from "../../../components/business/StatusBadge";
 import DateTimeField from "../../../components/DateTimeField";
 import { API_ROOT_URL } from "../../../constants";
+import { PILOT_VERIFICATION_SUBSCRIBE_TEMPLATES } from "../../../constants/subscribeTemplates";
 import {
   submitCriminalCheck,
   submitHealthCheck,
 } from "../../../services/pilot";
 import { locationService } from "../../../services/location";
 import { pilotV2Service } from "../../../services/pilotV2";
+import { requestSubscribe } from "../../../services/push";
 import { uploadFileToEndpoint } from "../../../services/user";
 import "./index.scss";
 
@@ -218,6 +220,7 @@ export default function PilotRegisterPage() {
       return;
     }
 
+    await requestSubscribe(PILOT_VERIFICATION_SUBSCRIBE_TEMPLATES);
     setLoading(true);
     try {
       await pilotV2Service.upsertProfile({

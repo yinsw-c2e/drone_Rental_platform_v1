@@ -28,6 +28,16 @@
 - [API v1 / v2 差异对照](./backend/docs/API_V1_V2_DIFF.md)
 - [业务 API 契约](./docs/business/BUSINESS_API_CONTRACT.md)
 
+## 微信订阅消息
+
+小程序端外通知使用微信一次性订阅消息，站内消息中心仍是主通知链路。上线前需在小程序后台开通「订阅消息」，为 `direct_order_created`、`direct_order_confirmed`、`order_paid`、`settlement_settled`、`broadcast_auto_assigned`、`dispatch_created`、`pilot_verification_result` 申请模板，拿到各 `template_id` 和字段定义后同步填写：
+
+- 后端：`backend/config.yaml` 的 `wechat.subscribe.templates.*.template_id`，或环境变量 `WECHAT_SUBSCRIBE_TEMPLATE_<EVENT_TYPE>_ID`。
+- 前端：`mini-program/src/constants/subscribeTemplates.ts` 中对应模板常量。
+- 小程序服务器出口 IP：加入微信公众平台 IP 白名单，否则 `cgi-bin/token` 会失败。
+
+本地 mock 验证可设置 `wechat.subscribe.enabled=true` 且 `push.provider=mock`，事件触发时日志会输出 `[MOCK] 订阅消息下发记录`，不会调用微信接口。
+
 ## 业务与重构文档
 
 - [业务角色重构总纲](./docs/business/BUSINESS_ROLE_REDESIGN.md)

@@ -12,6 +12,8 @@ import { canUseProviderWorkbench, getEffectiveRoleSummary, resolveProviderCapabi
 import { useProviderPresence } from '../../hooks/useProviderPresence';
 import { RootState, useAppDispatch } from '../../store/store';
 import { presenceConfigUpdated } from '../../store/slices/providerPresenceSlice';
+import { PROVIDER_WORKBENCH_SUBSCRIBE_TEMPLATES } from '../../constants/subscribeTemplates';
+import { requestSubscribe } from '../../services/push';
 import {
   HomeDashboard,
   OwnerWorkbenchOrderItem,
@@ -439,6 +441,7 @@ export default function ProviderWorkbench() {
         Taro.showToast({ title: '请先选择至少一个可接机型', icon: 'none' });
         return;
       }
+      await requestSubscribe(PROVIDER_WORKBENCH_SUBSCRIBE_TEMPLATES);
       const ok = await goOnline({
         acceptedClasses: presence.acceptedServiceClasses,
         maxRadiusKM: presence.maxRadiusKM,

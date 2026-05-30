@@ -15,19 +15,20 @@ import (
 
 // Config 应用配置主结构
 type Config struct {
-	Server    ServerConfig    `mapstructure:"server"`
-	Database  DatabaseConfig  `mapstructure:"database"`
-	Redis     RedisConfig     `mapstructure:"redis"`
-	JWT       JWTConfig       `mapstructure:"jwt"`
-	Upload    UploadConfig    `mapstructure:"upload"`
-	SMS       SMSConfig       `mapstructure:"sms"`
-	Payment   PaymentConfig   `mapstructure:"payment"`
-	Amap      AmapConfig      `mapstructure:"amap"`
-	WebSocket WebSocketConfig `mapstructure:"websocket"`
-	Log       LogConfig       `mapstructure:"log"`
-	CORS      CORSConfig      `mapstructure:"cors"`
-	Push      PushConfig      `mapstructure:"push"`
-	OAuth     OAuthConfig     `mapstructure:"oauth"`
+	Server    ServerConfig         `mapstructure:"server"`
+	Database  DatabaseConfig       `mapstructure:"database"`
+	Redis     RedisConfig          `mapstructure:"redis"`
+	JWT       JWTConfig            `mapstructure:"jwt"`
+	Upload    UploadConfig         `mapstructure:"upload"`
+	SMS       SMSConfig            `mapstructure:"sms"`
+	Payment   PaymentConfig        `mapstructure:"payment"`
+	Amap      AmapConfig           `mapstructure:"amap"`
+	WebSocket WebSocketConfig      `mapstructure:"websocket"`
+	Log       LogConfig            `mapstructure:"log"`
+	CORS      CORSConfig           `mapstructure:"cors"`
+	Push      PushConfig           `mapstructure:"push"`
+	OAuth     OAuthConfig          `mapstructure:"oauth"`
+	WeChat    WeChatPlatformConfig `mapstructure:"wechat"`
 }
 
 // ============================================================
@@ -375,6 +376,25 @@ func (p *PushConfig) IsJPushEnabled() bool {
 }
 
 // ============================================================
+// 微信小程序订阅消息配置
+// ============================================================
+
+type WeChatPlatformConfig struct {
+	Subscribe WeChatSubscribeConfig `mapstructure:"subscribe"`
+}
+
+type WeChatSubscribeConfig struct {
+	Enabled   bool                                     `mapstructure:"enabled"`
+	Templates map[string]WeChatSubscribeTemplateConfig `mapstructure:"templates"`
+}
+
+type WeChatSubscribeTemplateConfig struct {
+	TemplateID string            `mapstructure:"template_id"`
+	Page       string            `mapstructure:"page"`
+	Data       map[string]string `mapstructure:"data"`
+}
+
+// ============================================================
 // 第三方登录配置
 // ============================================================
 
@@ -436,9 +456,63 @@ func LoadConfig(path string) (*Config, error) {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+	applyWeChatSubscribeEnv(&cfg)
 
 	AppConfig = &cfg
 	return &cfg, nil
+}
+
+func applyWeChatSubscribeEnv(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if value, ok := lookupBoolEnv("WECHAT_SUBSCRIBE_ENABLED"); ok {
+		cfg.WeChat.Subscribe.Enabled = value
+	}
+	if cfg.WeChat.Subscribe.Templates == nil {
+		cfg.WeChat.Subscribe.Templates = make(map[string]WeChatSubscribeTemplateConfig)
+	}
+	events := map[string]struct{}{
+		"direct_order_created":      {},
+		"direct_order_confirmed":    {},
+		"order_paid":                {},
+		"settlement_settled":        {},
+		"broadcast_auto_assigned":   {},
+		"dispatch_created":          {},
+		"pilot_verification_result": {},
+	}
+	for event := range cfg.WeChat.Subscribe.Templates {
+		events[event] = struct{}{}
+	}
+	for event := range events {
+		envKey := strings.ToUpper(strings.ReplaceAll(event, "-", "_"))
+		template := cfg.WeChat.Subscribe.Templates[event]
+		if value := strings.TrimSpace(os.Getenv("WECHAT_SUBSCRIBE_TEMPLATE_" + envKey + "_ID")); value != "" {
+			template.TemplateID = value
+		}
+		if value := strings.TrimSpace(os.Getenv("WECHAT_SUBSCRIBE_TEMPLATE_" + envKey + "_TEMPLATE_ID")); value != "" {
+			template.TemplateID = value
+		}
+		if value := strings.TrimSpace(os.Getenv("WECHAT_SUBSCRIBE_TEMPLATE_" + envKey + "_PAGE")); value != "" {
+			template.Page = value
+		}
+		cfg.WeChat.Subscribe.Templates[event] = template
+	}
+}
+
+func lookupBoolEnv(key string) (bool, bool) {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return false, false
+	}
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true, true
+	case "0", "false", "no", "n", "off":
+		return false, true
+	default:
+		return false, false
+	}
 }
 
 // Validate 验证所有配置项
@@ -515,6 +589,7 @@ func (c *Config) PrintConfigStatus() {
 	fmt.Printf("推送服务: %s (%s)\n", boolToStatus(c.Push.IsJPushEnabled()), c.Push.Provider)
 	fmt.Printf("微信登录: %s\n", boolToStatus(c.OAuth.IsWeChatEnabled()))
 	fmt.Printf("微信小程序登录: %s\n", boolToStatus(c.OAuth.IsWeChatMiniEnabled()))
+	fmt.Printf("微信订阅消息: %s\n", boolToStatus(c.WeChat.Subscribe.Enabled))
 	fmt.Printf("QQ登录: %s\n", boolToStatus(c.OAuth.IsQQEnabled()))
 	fmt.Println("========================================")
 }

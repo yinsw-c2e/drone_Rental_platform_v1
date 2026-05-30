@@ -1,6 +1,7 @@
 package push
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,14 +13,20 @@ import (
 )
 
 type Handler struct {
-	pushService push.PushService
-	serverMode  string
+	pushService     push.PushService
+	serverMode      string
+	wechatSubscribe WeChatSubscribeGrantRecorder
 }
 
-func NewHandler(pushService push.PushService, serverMode string) *Handler {
+type WeChatSubscribeGrantRecorder interface {
+	GrantAcceptedTemplates(ctx context.Context, userID int64, templateIDs []string) (int, error)
+}
+
+func NewHandler(pushService push.PushService, serverMode string, wechatSubscribe WeChatSubscribeGrantRecorder) *Handler {
 	return &Handler{
-		pushService: pushService,
-		serverMode:  serverMode,
+		pushService:     pushService,
+		serverMode:      serverMode,
+		wechatSubscribe: wechatSubscribe,
 	}
 }
 
@@ -31,6 +38,10 @@ type testPushRequest struct {
 type registerDeviceRequest struct {
 	RegistrationID string `json:"registration_id"`
 	Platform       string `json:"platform"`
+}
+
+type wechatSubscribeRequest struct {
+	AcceptedTemplateIDs []string `json:"accepted_template_ids"`
 }
 
 func (h *Handler) SendTest(c *gin.Context) {
@@ -135,6 +146,41 @@ func (h *Handler) RegisterDevice(c *gin.Context) {
 		"registration_id": registrationID,
 		"platform":        platform,
 		"alias":           alias,
+	})
+}
+
+func (h *Handler) GrantWeChatSubscribe(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+
+	var req wechatSubscribeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid request body")
+		return
+	}
+	if len(req.AcceptedTemplateIDs) > 20 {
+		response.V2ValidationError(c, "accepted_template_ids is too large")
+		return
+	}
+	if h.wechatSubscribe == nil {
+		response.V2Success(c, gin.H{
+			"granted": 0,
+			"enabled": false,
+		})
+		return
+	}
+
+	granted, err := h.wechatSubscribe.GrantAcceptedTemplates(c.Request.Context(), userID, req.AcceptedTemplateIDs)
+	if err != nil {
+		response.V2InternalError(c, err.Error())
+		return
+	}
+	response.V2Success(c, gin.H{
+		"granted": granted,
+		"enabled": true,
 	})
 }
 

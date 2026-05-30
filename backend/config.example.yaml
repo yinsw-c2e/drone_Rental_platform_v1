@@ -318,6 +318,75 @@ push:
     master_secret: ""
 
 # ------------------------------------------------------------
+# 微信小程序订阅消息配置
+# 重要性等级：中 [小程序端外推送启用时必须配置]
+# 说明：access_token 复用 oauth.wechat_mini.app_id/app_secret。
+# 环境变量覆盖：
+#   WECHAT_SUBSCRIBE_ENABLED=true
+#   WECHAT_SUBSCRIBE_TEMPLATE_ORDER_PAID_ID=xxxxx
+#   WECHAT_SUBSCRIBE_TEMPLATE_ORDER_PAID_PAGE=pages/orders/detail/index?orderId={order_id}
+# ------------------------------------------------------------
+wechat:
+  subscribe:
+    enabled: false
+    templates:
+      direct_order_created:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      direct_order_confirmed:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      order_paid:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      settlement_settled:
+        template_id: ""
+        page: "pages/settlement/wallet/index"
+        data:
+          thing1: title
+          character_string2: settlement_no
+          amount3: amount:income_amount
+          thing4: content
+      broadcast_auto_assigned:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      dispatch_created:
+        template_id: ""
+        page: "pages/fulfillment/hub/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: dispatch_no
+          character_string3: order_no
+          thing4: content
+      pilot_verification_result:
+        template_id: ""
+        page: "pages/profile/pilot/index"
+        data:
+          thing1: title
+          phrase2: approved
+          thing3: note
+
+# ------------------------------------------------------------
 # 第三方登录配置
 # 重要性等级：中 [启用社交登录时必须修改]
 # ------------------------------------------------------------

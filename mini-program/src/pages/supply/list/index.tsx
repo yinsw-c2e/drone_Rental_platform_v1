@@ -2,6 +2,8 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Image, ScrollView, Text, View } from '@tarojs/components';
 
+import { CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES } from '../../../constants/subscribeTemplates';
+import { requestSubscribe } from '../../../services/push';
 import { supplyService } from '../../../services/supply';
 import { store } from '../../../store/store';
 import { AddressData, AddressSnapshot, DirectOrderInput, QuickOrderDraft, SupplySummary } from '../../../types';
@@ -354,6 +356,7 @@ export default function OfferListPage() {
       Taro.showToast({ title: error?.message || '下单信息不完整', icon: 'none' });
       return;
     }
+    await requestSubscribe(CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES);
 
     const confirm = await Taro.showModal({
       title: '确认下单',
