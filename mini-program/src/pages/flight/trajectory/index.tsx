@@ -5,6 +5,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import flightService from '../../../services/flight';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 export default function TrajectoryPage() {
@@ -46,7 +47,7 @@ export default function TrajectoryPage() {
       setTrajectory(traj);
       Taro.showToast({ title: '记录已开始', icon: 'success' });
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '操作失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' });
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,7 @@ export default function TrajectoryPage() {
             setWaypoints(detail.waypoints || []);
             Taro.showToast({ title: '记录已停止', icon: 'success' });
           } catch (e: any) {
-            Taro.showToast({ title: e.message || '操作失败', icon: 'none' });
+            Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' });
           } finally {
             setLoading(false);
           }
@@ -95,7 +96,7 @@ export default function TrajectoryPage() {
             loadRoutes();
           } catch (e: any) {
             Taro.hideLoading();
-            Taro.showToast({ title: e.message || '保存失败', icon: 'none' });
+            Taro.showToast({ title: friendlyErrorMessage(e, '保存失败'), icon: 'none' });
           }
         }
       }

@@ -13,6 +13,7 @@ import {
   updateClientProfile,
 } from '../../../services/client';
 import { RootState } from '../../../store/store';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const sceneOptions = ['电网建设', '山区运输', '海岛给养', '应急救援', '高原补给'];
@@ -159,7 +160,7 @@ export default function ClientProfilePage() {
       syncDraft(nextProfile);
       Taro.showToast({ title: '客户档案已更新', icon: 'success' });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '保存失败，请稍后重试', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '保存失败，请稍后重试'), icon: 'none' });
     } finally {
       setSaving(false);
     }
@@ -178,7 +179,7 @@ export default function ClientProfilePage() {
           Taro.showToast({ title: '已提交征信查询', icon: 'success' });
           loadData();
         } catch (error: any) {
-          Taro.showToast({ title: error?.message || '提交失败', icon: 'none' });
+          Taro.showToast({ title: friendlyErrorMessage(error, '提交失败'), icon: 'none' });
         }
       },
     });

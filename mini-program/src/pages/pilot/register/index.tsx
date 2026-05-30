@@ -15,6 +15,7 @@ import { locationService } from "../../../services/location";
 import { pilotV2Service } from "../../../services/pilotV2";
 import { requestSubscribe } from "../../../services/push";
 import { uploadFileToEndpoint } from "../../../services/user";
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import "./index.scss";
 
 const CAAC_TYPES = [
@@ -140,7 +141,7 @@ export default function PilotRegisterPage() {
       );
       const uploadedUrl = result?.url || result?.data?.url || "";
       if (!uploadedUrl) {
-        throw new Error("上传成功但未返回文件地址，请重试");
+        throw new Error("上传完成后暂时无法读取文件地址，请重试");
       }
       setter(uploadedUrl);
       Taro.showToast({ title: `${label}已上传`, icon: "success" });
@@ -148,7 +149,7 @@ export default function PilotRegisterPage() {
       if (error?.errMsg?.includes("cancel")) {
         return;
       }
-      Taro.showToast({ title: error?.message || "上传失败", icon: "none" });
+      Taro.showToast({ title: friendlyErrorMessage(error, "上传失败"), icon: "none" });
     } finally {
       setUploading(false);
     }
@@ -261,7 +262,7 @@ export default function PilotRegisterPage() {
       });
     } catch (error: any) {
       Taro.showToast({
-        title: error?.message || "提交失败，请稍后重试",
+        title: friendlyErrorMessage(error, "提交失败，请稍后重试"),
         icon: "none",
       });
     } finally {

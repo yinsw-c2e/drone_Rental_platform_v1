@@ -5,6 +5,7 @@ import { orderFinanceV2Service } from '../../services/orderFinanceV2';
 import { orderV2Service } from '../../services/orderV2';
 import { store } from '../../store/store';
 import type { OrderPartySummary, V2OrderDetail, V2ReviewSummary } from '../../types';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 type ReviewTargetRole = 'client' | 'owner' | 'pilot';
@@ -113,7 +114,7 @@ export default function ReviewPage() {
     if (!orderId) {
       setDetail(null);
       setReviews([]);
-      setErrorText('缺少订单ID，无法评价');
+      setErrorText('缺少订单信息，无法评价');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -137,7 +138,7 @@ export default function ReviewPage() {
     } catch (e: any) {
       setDetail(null);
       setReviews([]);
-      setErrorText(e?.message || '评价信息加载失败');
+      setErrorText(friendlyErrorMessage(e, '评价信息加载失败'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -205,7 +206,7 @@ export default function ReviewPage() {
       setContent('');
       await load();
     } catch (e: any) {
-      Taro.showToast({ title: e?.message || '评价失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '评价失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -215,7 +216,7 @@ export default function ReviewPage() {
     return (
       <View className="review-wrap review-center">
         <Text className="review-state-title">正在加载评价信息</Text>
-        <Text className="review-state-desc">请稍候，正在读取真实订单数据。</Text>
+        <Text className="review-state-desc">加载中…</Text>
       </View>
     );
   }

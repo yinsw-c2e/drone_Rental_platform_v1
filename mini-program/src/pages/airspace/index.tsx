@@ -11,6 +11,7 @@ import { pilotV2Service } from '../../services/pilotV2';
 import { AddressData } from '../../types';
 import { formatUnknownEnumLabel } from '../../utils';
 import DateTimeField from '../../components/DateTimeField';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const PURPOSE_OPTIONS = [
@@ -81,7 +82,7 @@ export default function AirspacePage() {
       const result = await airspaceService.listMyApplications(nextPilotId);
       setApplications(result.data || []);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '加载报备失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '加载报备失败'), icon: 'none' });
       setApplications([]);
     } finally {
       setLoading(false);
@@ -190,7 +191,7 @@ export default function AirspacePage() {
       resetForm();
       await loadApplications(pilotId);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '提交失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '提交失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -209,7 +210,7 @@ export default function AirspacePage() {
           Taro.showToast({ title: '已提交存证', icon: 'success' });
           loadApplications(pilotId);
         } catch (error: any) {
-          Taro.showToast({ title: error?.message || '提交失败', icon: 'none' });
+          Taro.showToast({ title: friendlyErrorMessage(error, '提交失败'), icon: 'none' });
         }
       },
     });
@@ -230,7 +231,7 @@ export default function AirspacePage() {
           Taro.showToast({ title: '已撤销', icon: 'success' });
           loadApplications(pilotId);
         } catch (error: any) {
-          Taro.showToast({ title: error?.message || '操作失败', icon: 'none' });
+          Taro.showToast({ title: friendlyErrorMessage(error, '操作失败'), icon: 'none' });
         }
       },
     });

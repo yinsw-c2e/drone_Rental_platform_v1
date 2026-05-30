@@ -17,6 +17,7 @@ import pinBlueIcon from '../../../assets/publish-task/icons/pin_blue.png';
 import shieldIcon from '../../../assets/publish-task/icons/shield.png';
 import truckImage from '../../../assets/publish-task/images/truck_illustration.png';
 import weightBagIcon from '../../../assets/publish-task/icons/weight_bag.png';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -218,7 +219,7 @@ export default function PublishDemandPage() {
       Taro.showToast({ title: '草稿已保存', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1200);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '保存失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '保存失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -242,7 +243,7 @@ export default function PublishDemandPage() {
       }
       return false;
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '资格检查失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '资格检查失败'), icon: 'none' });
       return false;
     }
   };
@@ -261,7 +262,7 @@ export default function PublishDemandPage() {
       Taro.showToast({ title: '发布成功', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1200);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '发布失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '发布失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

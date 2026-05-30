@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, Input, ScrollView, Image } from '@tarojs/components';
 import { droneService } from '../../../services/drone';
 import { API_ROOT_URL, API_V2_BASE_URL } from '../../../constants';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const IMAGE_BASE_URL = API_V2_BASE_URL;
@@ -90,7 +91,7 @@ export default function AddDronePage() {
       Taro.showToast({ title: '添加成功', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1500);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '添加失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '添加失败'), icon: 'none' });
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,7 @@ import { V2OrderSummary } from '../../types';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
 import DemandListPage from '../demand/list';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 type StatusFilter = 'all' | 'active' | 'done';
@@ -279,7 +280,7 @@ function ProviderOrdersPage({ segmentBar }: { segmentBar: React.ReactNode }) {
       );
       setItems(list);
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '订单加载失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '订单加载失败'), icon: 'none' });
       setItems([]);
     } finally {
       setLoading(false);
@@ -319,7 +320,7 @@ function ProviderOrdersPage({ segmentBar }: { segmentBar: React.ReactNode }) {
       Taro.showToast({ title: '已推进', icon: 'success' });
       fetchOrders();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '推进失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '推进失败'), icon: 'none' });
     } finally {
       setAdvancingId(null);
     }
@@ -425,7 +426,7 @@ function CustomerOrdersPage() {
       );
       setItems(list);
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '订单加载失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '订单加载失败'), icon: 'none' });
       setItems([]);
     } finally {
       setLoading(false);
@@ -465,7 +466,7 @@ function CustomerOrdersPage() {
       Taro.showToast({ title: '已取消', icon: 'success' });
       fetchOrders();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '取消失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '取消失败'), icon: 'none' });
     }
   };
 
@@ -482,7 +483,7 @@ function CustomerOrdersPage() {
       Taro.showToast({ title: '加价成功，已通知服务商', icon: 'success' });
       fetchOrders();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '加价失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '加价失败'), icon: 'none' });
     }
   };
 
@@ -502,7 +503,7 @@ function CustomerOrdersPage() {
       Taro.showToast({ title: '小费已支付', icon: 'success' });
       fetchOrders();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '小费支付失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '小费支付失败'), icon: 'none' });
     }
   };
 

@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, Input, ScrollView } from '@tarojs/components';
 import { registerEnterprise } from '../../../services/client';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 export default function ClientRegisterPage() {
@@ -30,7 +31,7 @@ export default function ClientRegisterPage() {
       });
       Taro.showToast({ title: '企业升级申请已提交', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1500);
-    } catch (e: any) { Taro.showToast({ title: e.message || '提交失败', icon: 'none' }); }
+    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '提交失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 

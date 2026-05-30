@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import flightService from '../../../services/flight';
 import { formatUnknownEnumLabel } from '../../../utils';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const TASK_STATUS_LABELS: Record<string, string> = {
@@ -46,7 +47,7 @@ export default function MultiPointTaskPage() {
       loadTask();
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '启动失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '启动失败'), icon: 'none' });
     }
   };
 
@@ -59,7 +60,7 @@ export default function MultiPointTaskPage() {
       loadTask();
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '操作失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' });
     }
   };
 
@@ -72,7 +73,7 @@ export default function MultiPointTaskPage() {
       loadTask();
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '操作失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' });
     }
   };
 

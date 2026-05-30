@@ -8,6 +8,7 @@ import { DemandDetail, DemandQuoteSummary } from '../../../types';
 import { CARGO_TYPES } from '../../../constants';
 import { getDemandSceneLabel, getObjectStatusMeta } from '../../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 export default function DemandDetailPage() {
@@ -56,7 +57,7 @@ export default function DemandDetailPage() {
     if (!res.confirm) return;
     setSubmitting(true);
     try { await demandV2Service.cancel(demandId); Taro.showToast({ title: '已撤销' }); loadData(); }
-    catch (e: any) { Taro.showToast({ title: e.message, icon: 'none' }); }
+    catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '撤销失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 
@@ -69,7 +70,7 @@ export default function DemandDetailPage() {
         await demandV2Service.applyCandidate(demandId);
       }
       loadData();
-    } catch (e: any) { Taro.showToast({ title: e.message, icon: 'none' }); }
+    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 
@@ -90,7 +91,7 @@ export default function DemandDetailPage() {
         else loadData();
       }, 800);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '选择失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '选择失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { userService } from '../../services/user';
 import { updateUser } from '../../store/slices/authSlice';
 import { RootState } from '../../store/store';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 type VerifyStatus = 'unverified' | 'pending' | 'approved' | 'rejected';
@@ -76,7 +77,7 @@ export default function VerificationPage() {
       dispatch(updateUser({ id_verified: 'pending' }));
       Taro.showToast({ title: '认证信息已提交', icon: 'success' });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '提交失败，请稍后重试', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '提交失败，请稍后重试'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -172,7 +173,7 @@ export default function VerificationPage() {
           <View className='verification-section'>
             <Text className='verification-section-title'>身份信息</Text>
             <Text className='verification-section-desc'>
-              请填写您的真实身份信息，用于平台信任验证。
+              请填写您的身份信息，用于平台信任验证。
             </Text>
 
             <Text className='verification-label'>

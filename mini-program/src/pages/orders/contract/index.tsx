@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { RichText, ScrollView, Text, View } from '@tarojs/components';
 import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
 import { store } from '../../../store/store';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const statusLabelOf = (status?: string) => {
@@ -40,7 +41,7 @@ export default function ContractPage() {
   const load = useCallback(async () => {
     if (!orderId) {
       setContract(null);
-      setErrorText('缺少订单ID，无法读取合同');
+      setErrorText('缺少订单信息，无法读取合同');
       setLoading(false);
       return;
     }
@@ -57,7 +58,7 @@ export default function ContractPage() {
       setContract(data);
     } catch (error: any) {
       setContract(null);
-      setErrorText(error?.message || '合同加载失败');
+      setErrorText(friendlyErrorMessage(error, '合同加载失败'));
     } finally {
       setLoading(false);
     }
@@ -101,7 +102,7 @@ export default function ContractPage() {
       setContract(data);
       Taro.showToast({ title: '已签署', icon: 'success' });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '签署失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '签署失败'), icon: 'none' });
     } finally {
       setSigning(false);
     }
@@ -117,7 +118,7 @@ export default function ContractPage() {
     <View className="contract-page">
       <View className="contract-hero">
         <Text className="contract-hero-title">电子合同</Text>
-        <Text className="contract-hero-desc">查看并签署真实运输协议</Text>
+        <Text className="contract-hero-desc">查看并签署运输协议</Text>
       </View>
 
       <ScrollView scrollY className="contract-scroll">

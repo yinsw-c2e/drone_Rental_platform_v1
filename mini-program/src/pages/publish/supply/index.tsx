@@ -6,6 +6,7 @@ import ProviderAccessNotice from '../../../components/business/ProviderAccessNot
 import { ownerService } from '../../../services/owner';
 import { RootState } from '../../../store/store';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -82,7 +83,7 @@ export default function PublishSupplyPage() {
       });
       Taro.showToast({ title: '上架成功', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1200);
-    } catch (e: any) { Taro.showToast({ title: e.message || '上架失败', icon: 'none' }); }
+    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '上架失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 
@@ -175,7 +176,7 @@ export default function PublishSupplyPage() {
             <Text className="publish-label">价格详情说明</Text>
             <Textarea className="publish-textarea" placeholder="例如：基础价含 1 架次，超出的按 300/架计算" value={pricingRule} onInput={e => setPricingRule(e.detail.value)} />
 
-            <Text className="publish-label">可响应时段</Text>
+            <Text className="publish-label">可接单时段</Text>
             <Input className="publish-input" placeholder="例如：工作日 09:00-18:00" value={slots} onInput={e => setSlots(e.detail.value)} />
 
             <View className="publish-actions publish-actions-multi">

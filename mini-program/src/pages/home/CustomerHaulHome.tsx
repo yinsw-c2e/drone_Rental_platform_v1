@@ -15,6 +15,7 @@ import {
   V2PricingEstimate,
   V2ServiceClass,
 } from '../../types';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './CustomerHaulHome.scss';
 
 type AddressTarget = 'pickup' | 'dropoff';
@@ -444,7 +445,7 @@ export default function CustomerHaulHome() {
         .catch((error: any) => {
           if (estimateSeqRef.current !== seq) return;
           setEstimate(null);
-          setEstimateError(String(error?.message || '预估价获取失败'));
+          setEstimateError(friendlyErrorMessage(error, '预估价获取失败'));
         })
         .finally(() => {
           if (estimateSeqRef.current === seq) setEstimating(false);
@@ -526,7 +527,7 @@ export default function CustomerHaulHome() {
       setClientRequestId(generateClientRequestId());
       Taro.redirectTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '下单失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '下单失败'), icon: 'none' });
     } finally {
       setCreating(false);
     }

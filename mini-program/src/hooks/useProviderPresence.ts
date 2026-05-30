@@ -10,6 +10,7 @@ import {
   wentOnline,
 } from '../store/slices/providerPresenceSlice';
 import { RootState, useAppDispatch } from '../store/store';
+import { friendlyErrorMessage } from '../utils/errorMessage';
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const MAX_HEARTBEAT_FAILURES_BEFORE_TOAST = 3;
@@ -60,7 +61,7 @@ export function useProviderPresence(options: UseProviderPresenceOptions = {}) {
       lastLocationErrorRef.current = null;
       return { latitude: res.latitude, longitude: res.longitude };
     } catch (error: any) {
-      const message = String(error?.errMsg || '位置授权失败');
+      const message = friendlyErrorMessage(error, '位置授权失败');
       lastLocationErrorRef.current = message;
       dispatch(setError(message));
       return null;
@@ -84,7 +85,7 @@ export function useProviderPresence(options: UseProviderPresenceOptions = {}) {
       failureToastShownRef.current = false;
       dispatch(heartbeatSucceeded({ presence, location: loc }));
     } catch (error: any) {
-      dispatch(heartbeatFailed(String(error?.message || '心跳失败')));
+      dispatch(heartbeatFailed(friendlyErrorMessage(error, '心跳失败')));
     }
   }, [acquireLocation, dispatch]);
 
@@ -113,7 +114,7 @@ export function useProviderPresence(options: UseProviderPresenceOptions = {}) {
       }
       return true;
     } catch (error: any) {
-      dispatch(setError(String(error?.message || '上线失败')));
+      dispatch(setError(friendlyErrorMessage(error, '上线失败')));
       return false;
     }
   }, [acquireLocation, dispatch, managesHeartbeatLifecycle, startHeartbeat]);

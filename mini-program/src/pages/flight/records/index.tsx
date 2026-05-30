@@ -74,7 +74,7 @@ export default function FlightRecordsPage() {
 
       {/* ── 提示卡片 ── */}
       <View className="card records-tip-card">
-        <Text className="records-tip-title">真实履约飞行记录</Text>
+        <Text className="records-tip-title">履约飞行记录</Text>
         <Text className="records-tip-text">
           这里只展示订单执行中自动沉淀的飞行留痕，不再支持手动补录，避免统计口径和履约数据不一致。
         </Text>
@@ -88,7 +88,7 @@ export default function FlightRecordsPage() {
       ) : records.length === 0 ? (
         <View className="empty-state">
           <Text className="empty-state-icon">🛫</Text>
-          <Text className="empty-state-text">暂无真实飞行记录</Text>
+          <Text className="empty-state-text">暂无飞行记录</Text>
         </View>
       ) : records.map(r => (
         <View key={r.id} className="list-item">

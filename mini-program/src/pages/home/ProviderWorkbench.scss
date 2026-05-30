@@ -31,7 +31,7 @@ page {
 /* ── header ── */
 .pw-header {
   position: relative;
-  padding: 132rpx 40rpx 84rpx;
+  padding: 132rpx 40rpx 52rpx;
   box-sizing: border-box;
   color: #ffffff;
   background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
@@ -216,7 +216,7 @@ page {
 
 /* ── presence card ── */
 .pw-presence-card {
-  margin-top: -30rpx; // Lift card into header without overlapping
+  margin-top: 20rpx;
   position: relative;
   z-index: 10;
   background: rgba(255, 255, 255, 0.9);

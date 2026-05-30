@@ -17,6 +17,7 @@ import eyeOffIcon from '../../../assets/login/icons/eye_off.png';
 import wechatIcon from '../../../assets/icons/wechat.svg';
 import toolsIcon from '../../../assets/login/icons/tools.png';
 import userIcon from '../../../assets/login/icons/user.png';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const QUICK_ACCOUNTS = [
@@ -142,7 +143,7 @@ export default function LoginPage() {
       finishLogin(res as any, activeMode);
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '登录失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '登录失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -162,7 +163,7 @@ export default function LoginPage() {
       finishLogin(res as any, activeMode);
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '微信登录失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '微信登录失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -178,7 +179,7 @@ export default function LoginPage() {
       finishLogin(res as any, roleMode);
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '登录失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '登录失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +267,7 @@ export default function LoginPage() {
           <View className="login-dev-section">
             <View className="login-dev-title-row">
               <Image className="login-dev-tools-icon" src={toolsIcon} mode="aspectFit" />
-              <Text className="login-dev-title">开发模式快速登录 · {modeLabel(activeMode)}</Text>
+              <Text className="login-dev-title">快速登录 · {modeLabel(activeMode)}</Text>
             </View>
 
             {visibleDevCategories.map(cat => {

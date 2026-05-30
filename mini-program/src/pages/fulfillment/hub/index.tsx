@@ -9,6 +9,7 @@ import { RootState } from '../../../store/store';
 import { syncCustomTabBar } from '../../../utils/tabBar';
 import { canUseProviderWorkbench, getEffectiveRoleSummary } from '../../../utils/roleSummary';
 import { V2SettlementSummary } from '../../../types';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 type CleanIconName =
@@ -194,7 +195,7 @@ const airspaceMetaOf = (detail: any) => {
   if (inProgress) {
     return { tag: '待复核', tone: 'orange' as const, desc: '等待服务商到场进行安全复核' };
   }
-  return { tag: '待确认', tone: 'orange' as const, desc: '订单未返回空域或现场复核状态' };
+  return { tag: '待确认', tone: 'orange' as const, desc: '暂无空域或现场复核状态' };
 };
 
 const insuranceMetaOf = (detail: any) => {
@@ -221,9 +222,9 @@ const insuranceMetaOf = (detail: any) => {
     return { tag: '未通过', tone: 'orange' as const, desc: reason ? `未通过：${reason}` : '无人机保险资料未通过审核' };
   }
   if (detail?.contract?.payment_ready) {
-    return { tag: '待核验', tone: 'orange' as const, desc: '合同已就绪，订单未返回无人机保单状态' };
+    return { tag: '待核验', tone: 'orange' as const, desc: '合同已就绪，暂无无人机保单状态' };
   }
-  return { tag: '待确认', tone: 'orange' as const, desc: '订单未返回无人机保单信息' };
+  return { tag: '待确认', tone: 'orange' as const, desc: '暂无无人机保单信息' };
 };
 
 const insuranceCertificationUrlOf = (detail: any, nextOrderId: number) => {
@@ -240,7 +241,7 @@ const droneDescOf = (detail: any) => {
   }
   const supply = detail?.source_info?.snapshots?.supply;
   if (supply?.drone_id) return `供给无人机 #${supply.drone_id}`;
-  return '订单未返回无人机信息';
+  return '暂无无人机信息';
 };
 
 const settlementStatusLabelOf = (status?: string) => {
@@ -337,7 +338,7 @@ export default function FulfillmentHubPage() {
         setDetail(null);
         setOrderId(0);
         setSettlement(null);
-        setErrorText('当前没有后端返回的待确认或待履约订单');
+        setErrorText('暂无待履约订单');
         return;
       }
       const res = await orderV2Service.get(nextOrderId);
@@ -365,7 +366,7 @@ export default function FulfillmentHubPage() {
     } catch (error: any) {
       setDetail(null);
       setSettlement(null);
-      setErrorText(error?.message || '订单履约信息加载失败');
+      setErrorText(friendlyErrorMessage(error, '订单履约信息加载失败'));
     } finally {
       setLoading(false);
     }
@@ -433,7 +434,7 @@ export default function FulfillmentHubPage() {
     const point = addressPointOf(detail, type);
     const address = type === 'pickup' ? detail?.service_address : detail?.dest_address;
     if (!point) {
-      Taro.showToast({ title: '订单未返回坐标', icon: 'none' });
+      Taro.showToast({ title: '暂无地点坐标', icon: 'none' });
       return;
     }
     Taro.openLocation({
@@ -491,7 +492,7 @@ export default function FulfillmentHubPage() {
     }
     const url = insuranceCertificationUrlOf(detail, orderId);
     if (!url) {
-      Taro.showToast({ title: '订单未返回无人机ID', icon: 'none' });
+      Taro.showToast({ title: '暂无无人机信息', icon: 'none' });
       return;
     }
     const drone = detail?.drone || {};
@@ -536,7 +537,7 @@ export default function FulfillmentHubPage() {
             Taro.showToast({ title: '已开始履约', icon: 'success' });
             loadDetail();
           } catch (error: any) {
-            Taro.showToast({ title: error?.message || '开始履约失败', icon: 'none' });
+            Taro.showToast({ title: friendlyErrorMessage(error, '开始履约失败'), icon: 'none' });
           } finally {
             setSubmitting(false);
           }
@@ -564,7 +565,7 @@ export default function FulfillmentHubPage() {
           Taro.showToast({ title: '已确认接单', icon: 'success' });
           loadDetail();
         } catch (error: any) {
-          Taro.showToast({ title: error?.message || '确认失败', icon: 'none' });
+          Taro.showToast({ title: friendlyErrorMessage(error, '确认失败'), icon: 'none' });
         } finally {
           setSubmitting(false);
         }
@@ -592,8 +593,8 @@ export default function FulfillmentHubPage() {
       ? `结算${finance.statusLabel} · 履约服务 ${formatMoney(finance.pilotFee)} · 设备服务 ${formatMoney(finance.ownerFee)}`
       : '完成后生成结算明细，当前为订单预估金额';
   const fulfillmentMeta = detail ? fulfillmentStatusMetaOf(detail) : { label: '待开始', tone: 'orange' as const };
-  const airspaceMeta = detail ? airspaceMetaOf(detail) : { tag: '待确认', tone: 'orange' as const, desc: '订单未返回空域或现场复核状态' };
-  const insuranceMeta = detail ? insuranceMetaOf(detail) : { tag: '待确认', tone: 'orange' as const, desc: '订单未返回无人机保单信息' };
+  const airspaceMeta = detail ? airspaceMetaOf(detail) : { tag: '待确认', tone: 'orange' as const, desc: '暂无空域或现场复核状态' };
+  const insuranceMeta = detail ? insuranceMetaOf(detail) : { tag: '待确认', tone: 'orange' as const, desc: '暂无无人机保单信息' };
   const orderRows: InfoRow[] = detail ? [
     {
       key: 'pickup',
@@ -686,7 +687,7 @@ export default function FulfillmentHubPage() {
           {!detail ? (
             <View className="fs-empty-card">
               <Text className="fs-empty-title">{loading ? '正在同步履约订单' : '暂无可安排订单'}</Text>
-              <Text className="fs-empty-desc">{loading ? '请稍候，正在读取真实订单数据。' : errorText || '当前账号没有后端返回的待履约订单。'}</Text>
+              <Text className="fs-empty-desc">{loading ? '加载中…' : errorText || '暂无待履约订单'}</Text>
             </View>
           ) : (
             <>

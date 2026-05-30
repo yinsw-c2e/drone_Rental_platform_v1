@@ -10,7 +10,7 @@ export default function CargoDetailPage() {
   return (
     <ScrollView scrollY className="page-wrap">
       <View className="empty-state">
-        <Text className="empty-state-text">货单详情模块开发中...</Text>
+        <Text className="empty-state-text">货单详情暂未开放</Text>
       </View>
     </ScrollView>
   );

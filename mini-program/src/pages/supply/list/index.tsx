@@ -18,6 +18,7 @@ import tabMessageInactiveIcon from '../../../assets/haul/offer-list/tab_message_
 import tabOrderActiveIcon from '../../../assets/haul/offer-list/tab_order_active.png';
 import tabProfileInactiveIcon from '../../../assets/haul/offer-list/tab_profile_inactive.png';
 import weightIcon from '../../../assets/haul/offer-list/icon_weight_m.png';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY = 'quick_order_offer_draft_v1';
@@ -138,10 +139,10 @@ const formatAverageResponse = (seconds?: number | null, samples?: number | null)
   const sampleCount = Number(samples || 0);
   if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(sampleCount) || sampleCount <= 0) return '';
   const minutes = Math.max(1, Math.round(value / 60));
-  if (minutes < 60) return `平均响应 ${minutes}分`;
+  if (minutes < 60) return `平均接单 ${minutes}分`;
   const hours = Math.max(1, Math.round(minutes / 60));
-  if (hours < 24) return `平均响应 ${hours}小时`;
-  return `平均响应 ${Math.round(hours / 24)}天`;
+  if (hours < 24) return `平均接单 ${hours}小时`;
+  return `平均接单 ${Math.round(hours / 24)}天`;
 };
 
 const ratingLabel = (item: SupplySummary) => {
@@ -298,7 +299,7 @@ export default function OfferListPage() {
       setFetchError('');
       if (!store.getState().auth.accessToken) {
         setSupplies([]);
-        setFetchError('请先登录后查看真实服务商方案');
+        setFetchError('请先登录后查看可下单服务');
         return;
       }
       const res = await supplyService.list({
@@ -353,14 +354,14 @@ export default function OfferListPage() {
     try {
       payload = buildDirectOrderPayload(draft, plan.supply);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '下单信息不完整', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '下单信息不完整'), icon: 'none' });
       return;
     }
     await requestSubscribe(CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES);
 
     const confirm = await Taro.showModal({
       title: '确认下单',
-      content: `确认选择「${plan.title}」并创建真实吊运订单？`,
+      content: `确认选择「${plan.title}」并创建吊运订单？`,
       confirmText: '确认下单',
       cancelText: '再看看',
     }).catch(() => null);
@@ -372,7 +373,7 @@ export default function OfferListPage() {
       const res = await supplyService.createDirectOrder(plan.supply.id, payload);
       const result = (res as any)?.data || res;
       const orderId = Number(result?.order_id || result?.order?.id || result?.id || 0);
-      if (!orderId) throw new Error('订单创建成功但未返回订单ID');
+      if (!orderId) throw new Error('订单已创建，请稍后在订单列表查看');
       Taro.removeStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY);
       Taro.hideLoading();
       Taro.showToast({ title: '订单已创建', icon: 'success' });
@@ -381,7 +382,7 @@ export default function OfferListPage() {
       }, 500);
     } catch (error: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: error?.message || '创建订单失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '创建订单失败'), icon: 'none' });
     } finally {
       setSubmittingKey('');
     }
@@ -479,14 +480,14 @@ export default function OfferListPage() {
             ) : null}
             {!loading && fetchError ? (
               <View className='qo4-empty-card'>
-                <Text className='qo4-empty-title'>无法加载真实方案</Text>
+                <Text className='qo4-empty-title'>无法加载方案</Text>
                 <Text className='qo4-empty-desc'>{fetchError}</Text>
               </View>
             ) : null}
             {!loading && !fetchError && plans.length === 0 ? (
               <View className='qo4-empty-card'>
                 <Text className='qo4-empty-title'>暂无匹配服务商</Text>
-                <Text className='qo4-empty-desc'>当前条件下没有后端返回的真实可下单服务，请调整地址、重量或时间后重试。</Text>
+                <Text className='qo4-empty-desc'>当前条件下暂无可下单服务，请调整地址、重量或时间后重试</Text>
               </View>
             ) : null}
           </View>

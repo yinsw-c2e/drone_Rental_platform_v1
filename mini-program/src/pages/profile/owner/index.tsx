@@ -9,6 +9,7 @@ import { droneService } from '../../../services/drone';
 import { ownerService } from '../../../services/owner';
 import { RootState } from '../../../store/store';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const formatAmount = (value?: number | null) => `¥${(((value || 0) as number) / 100).toFixed(2)}`;
@@ -204,7 +205,7 @@ export default function OwnerProfilePage() {
       setProfile(nextProfile);
       Taro.showToast({ title: '服务商档案已更新', icon: 'success' });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '保存失败，请稍后重试', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '保存失败，请稍后重试'), icon: 'none' });
     } finally {
       setSaving(false);
     }

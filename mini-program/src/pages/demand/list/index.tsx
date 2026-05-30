@@ -17,6 +17,7 @@ import priceIcon from '../../../assets/haul/provider-demand-list/icon_metric_pri
 import airspaceIcon from '../../../assets/haul/provider-demand-list/icon_airspace_status_green.png';
 import headerMessageIcon from '../../../assets/haul/provider-demand-list/icon_header_message_outline.png';
 import messageDotIcon from '../../../assets/haul/provider-demand-list/badge_message_red_dot.png';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 type FilterKey = 'region' | 'weight' | 'time' | 'scene';
@@ -385,7 +386,7 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
       setHasMore(nextPage * PAGE_SIZE < total);
     } catch (error: any) {
       if (refresh || nextPage === 1) setDemands([]);
-      setFetchError(error?.message || '真实需求加载失败，请稍后重试');
+      setFetchError(friendlyErrorMessage(error, '需求加载失败，请稍后重试'));
       setHasMore(false);
     } finally {
       setLoading(false);
@@ -673,14 +674,14 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
 
         {loading && demands.length === 0 ? (
           <View className='pd-empty-card'>
-            <Text className='pd-empty-title'>正在同步真实需求</Text>
+            <Text className='pd-empty-title'>正在加载需求</Text>
             <Text className='pd-empty-desc'>请稍候，正在读取服务商可接需求。</Text>
           </View>
         ) : null}
 
         {!loading && fetchError ? (
           <View className='pd-empty-card'>
-            <Text className='pd-empty-title'>无法加载真实需求</Text>
+            <Text className='pd-empty-title'>无法加载需求</Text>
             <Text className='pd-empty-desc'>{fetchError}</Text>
             {isAuthenticated ? (
               <View className='pd-empty-action' onClick={goProviderOnboarding}>
@@ -693,7 +694,7 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
         {!loading && !fetchError && visualDemands.length === 0 ? (
           <View className='pd-empty-card'>
             <Text className='pd-empty-title'>{demands.length ? '暂无符合筛选的需求' : '暂无可接需求'}</Text>
-            <Text className='pd-empty-desc'>{demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '后端当前没有返回真实可报价需求。'}</Text>
+            <Text className='pd-empty-desc'>{demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '暂无可报价需求'}</Text>
           </View>
         ) : null}
 

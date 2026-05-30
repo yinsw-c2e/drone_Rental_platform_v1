@@ -4,6 +4,7 @@ import { View, Text, Input, Button } from '@tarojs/components';
 import { useDispatch } from 'react-redux';
 import { authService } from '../../../services/auth';
 import { setCredentials } from '../../../store/slices/authSlice';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import {
   HaulRoleMode,
   setHaulRoleMode,
@@ -53,7 +54,7 @@ export default function RegisterPage() {
       }
       Taro.switchTab({ url: '/pages/home/index' });
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '注册失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '注册失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

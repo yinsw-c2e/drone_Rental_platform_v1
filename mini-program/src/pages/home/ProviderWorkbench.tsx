@@ -39,6 +39,7 @@ import todoOrderScheduleIcon from '../../assets/haul/provider-workbench/icon_tod
 import todoAirspaceIcon from '../../assets/haul/provider-workbench/icon_todo_airspace_confirm.png';
 import todoInsuranceIcon from '../../assets/haul/provider-workbench/icon_todo_insurance_expiring.png';
 import chevronRightIcon from '../../assets/haul/provider-workbench/icon_chevron_right.png';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './ProviderWorkbench.scss';
 
 type MetricItem = {
@@ -238,7 +239,7 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
       } else if (isProviderNotSelfExecutableError(error)) {
         Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
       } else {
-        Taro.showToast({ title: String(error?.message || '抢单失败'), icon: 'none' });
+        Taro.showToast({ title: friendlyErrorMessage(error, '抢单失败'), icon: 'none' });
       }
     } finally {
       setGrabbingId(null);
@@ -331,7 +332,7 @@ export default function ProviderWorkbench() {
     if (!isAuthenticated) {
       return {
         title: '登录后进入接单工作台',
-        desc: '接单工作台只展示真实服务机会、服务订单和结算数据，请先登录服务商账号。',
+        desc: '接单工作台展示服务机会、服务订单和结算信息，请先登录服务商账号。',
         primary: '去登录',
       };
     }
@@ -662,7 +663,7 @@ export default function ProviderWorkbench() {
       return [{
         key: 'empty',
         title: '暂无待处理事项',
-        subtitle: '当前没有后端返回的待办订单或需求',
+        subtitle: '暂无待处理事项',
         status: '已同步',
         tone: 'blue',
         icon: todoInsuranceIcon,
@@ -721,7 +722,7 @@ export default function ProviderWorkbench() {
   const ctaText = actionLoading ? '处理中…' : presence.online ? '下线（停止接单）' : '上线接单';
   const ctaState = actionLoading ? 'loading' : presence.online ? 'offline' : 'online';
   const ctaHint = presence.online
-    ? '已暂停派单。下线后仍可去「接单」Tab 主动报价。'
+    ? '派单进行中。下线后将停止派单，仍可去「接单」Tab 主动报价。'
     : '上线后平台会按你的机型/半径主动派单。';
 
   return (

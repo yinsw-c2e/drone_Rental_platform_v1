@@ -2,6 +2,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { orderV2Service, updateExecutionStatus } from '../../../services/orderV2';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const EXECUTION_STEPS = [
@@ -45,7 +46,7 @@ export default function PilotWorkbenchPage() {
       await updateExecutionStatus(orderId, status);
       setCurrentStatus(status);
       Taro.showToast({ title: `状态已更新`, icon: 'success' });
-    } catch (e: any) { Taro.showToast({ title: e.message || '操作失败', icon: 'none' }); }
+    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 

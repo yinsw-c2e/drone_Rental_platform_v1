@@ -57,7 +57,7 @@ export default function DepositPage() {
 
       {deposit.status === 'pending' && (
         <View className="btn-wrap">
-          <View className="btn-primary" onClick={() => Taro.showToast({ title: '缴纳功能开发中', icon: 'none' })}>
+          <View className="btn-primary" onClick={() => Taro.showToast({ title: '保证金缴纳暂未开放', icon: 'none' })}>
             <Text className="btn-text">缴纳保证金</Text>
           </View>
         </View>

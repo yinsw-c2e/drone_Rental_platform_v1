@@ -6,6 +6,7 @@ import { API_ROOT_URL } from '../../../constants';
 import { orderV2Service } from '../../../services/orderV2';
 import { uploadFileToEndpoint } from '../../../services/user';
 import { V2OrderDetail, V2SiteSafetyCheckSummary, V2SiteSafetyChecklistItem } from '../../../types';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const DEFAULT_CHECKLIST: V2SiteSafetyChecklistItem[] = [
@@ -55,7 +56,7 @@ export default function FulfillmentSafetyCheckPage() {
 
   const loadData = useCallback(async () => {
     if (!orderId) {
-      setErrorText('缺少订单ID');
+      setErrorText('缺少订单信息');
       setLoading(false);
       return;
     }
@@ -82,7 +83,7 @@ export default function FulfillmentSafetyCheckPage() {
         setNote('');
       }
     } catch (error: any) {
-      setErrorText(error?.message || '现场复核信息加载失败');
+      setErrorText(friendlyErrorMessage(error, '现场复核信息加载失败'));
     } finally {
       setLoading(false);
     }
@@ -132,7 +133,7 @@ export default function FulfillmentSafetyCheckPage() {
       }
       setPhotos((items) => [...items, ...uploaded].slice(0, 6));
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '上传失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '上传失败'), icon: 'none' });
     } finally {
       Taro.hideLoading();
     }
@@ -175,7 +176,7 @@ export default function FulfillmentSafetyCheckPage() {
       Taro.showToast({ title: '复核已记录', icon: 'success' });
       setTimeout(() => goBack(), 700);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '提交失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '提交失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

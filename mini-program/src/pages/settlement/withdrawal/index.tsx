@@ -6,6 +6,7 @@ import ProviderAccessNotice from '../../../components/business/ProviderAccessNot
 import { requestWithdrawal } from '../../../services/settlement';
 import { RootState } from '../../../store/store';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const METHODS = [
@@ -63,7 +64,7 @@ export default function WithdrawalPage() {
       setTimeout(() => Taro.navigateBack(), 1500);
     } catch (e: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: e.message || '提现失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '提现失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

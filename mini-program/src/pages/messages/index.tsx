@@ -7,6 +7,7 @@ import { ConversationSummary, V2NotificationSummary } from '../../types';
 import { refreshCustomTabBarBadges, syncCustomTabBar } from '../../utils/tabBar';
 import avatarUserIcon from '../../assets/message/icons/avatar_user.png';
 import packageBoxIcon from '../../assets/message/icons/package_box.png';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const DELETE_WIDTH = 76;
@@ -172,7 +173,7 @@ export default function MessagesPage() {
       Taro.showToast({ title: '已删除会话', icon: 'success' });
     } catch (error: any) {
       setConversations(previous);
-      Taro.showToast({ title: error?.message || '删除失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '删除失败'), icon: 'none' });
     }
   };
 

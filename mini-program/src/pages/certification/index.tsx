@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, Input, ScrollView } from '@tarojs/components';
 import DateTimeField from '../../components/DateTimeField';
 import { formatUnknownEnumLabel } from '../../utils';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const CERT_TYPES = [
@@ -56,7 +57,7 @@ export default function CertificationPage() {
       Taro.showToast({ title: '证书已提交', icon: 'success' });
       setShowForm(false);
       resetForm();
-    } catch (e: any) { Taro.showToast({ title: e.message || '提交失败', icon: 'none' }); }
+    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '提交失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 

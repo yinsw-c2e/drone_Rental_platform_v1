@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, Input, Textarea, ScrollView } from '@tarojs/components';
 import { createCargoDeclaration } from '../../../services/client';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import '../demand/index.scss';
 
 const SCENE_OPTIONS = [
@@ -49,7 +50,7 @@ export default function PublishCargoPage() {
       });
       Taro.showToast({ title: '申报成功', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1200);
-    } catch (e: any) { Taro.showToast({ title: e.message || '申报失败', icon: 'none' }); }
+    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '申报失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 

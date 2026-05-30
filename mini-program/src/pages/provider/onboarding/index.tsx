@@ -28,7 +28,7 @@ const STATUS_META: Record<ProviderReviewStatus, StatusMeta> = {
   none: {
     label: '未开始',
     tone: 'gray',
-    desc: '提交资料后进入后台审核。',
+    desc: '提交资料后进入平台审核。',
   },
   pending_review: {
     label: '审核中',
@@ -107,7 +107,7 @@ export default function ProviderOnboardingPage() {
         label: '已通过',
         tone: 'green' as StatusTone,
         title: '服务商能力已开通',
-        desc: '你的账号已具备正式接单能力，工作台只展示真实需求、履约和结算数据。',
+        desc: '你的账号已具备正式接单能力，可进入工作台查看需求、履约和结算信息。',
         action: '进入工作台',
       };
     }
@@ -116,7 +116,7 @@ export default function ProviderOnboardingPage() {
         label: providerMeta.label,
         tone: providerMeta.tone,
         title: '服务商资质审核中',
-        desc: '审核通过前不能进入正式工作台，也不会展示假订单、假收入或静态示例数据。',
+        desc: '审核通过后即可进入正式工作台，查看需求、履约和结算信息。',
         action: '查看可补充资料',
       };
     }
@@ -125,7 +125,7 @@ export default function ProviderOnboardingPage() {
         label: providerMeta.label,
         tone: providerMeta.tone,
         title: '服务商资质需补充',
-        desc: '请补充被驳回或暂停的资料，重新通过后台审核后才能正式接单。',
+        desc: '请补充被驳回或暂停的资料，重新通过平台审核后才能正式接单。',
         action: '补充服务商资料',
       };
     }
@@ -141,12 +141,12 @@ export default function ProviderOnboardingPage() {
   const assetSteps: FlowStep[] = useMemo(() => [
     buildStep('服务商资料', '维护联系人、服务范围和基础履约信息。', capabilities.assetStatus),
     buildStep('无人机设备与资质', '提交设备、证照、适航、保险和 UOM 相关材料。', capabilities.assetStatus),
-    buildStep('后台审核', '审核通过后可报价、发布服务并承接订单。', capabilities.assetStatus, '待提交'),
+    buildStep('平台审核', '审核通过后可报价、发布服务并承接订单。', capabilities.assetStatus, '待提交'),
   ], [capabilities.assetStatus]);
 
   const executorSteps: FlowStep[] = useMemo(() => [
     buildStep('履约资料', '填写履约负责人、服务区域和联系方式。', capabilities.executorStatus),
-    buildStep('履约资质审核', '提交履约资质，后台确认后开通订单推进能力。', capabilities.executorStatus),
+    buildStep('履约资质审核', '提交履约资质，平台确认后开通订单推进能力。', capabilities.executorStatus),
     {
       title: '服务商履约',
       desc: '审核通过后由服务商主体开始履约并推进订单状态。',

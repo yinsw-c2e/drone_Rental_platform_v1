@@ -7,6 +7,7 @@ import type {
   V2ProviderAssignmentView,
   V2ProviderBroadcastView,
 } from '../../types';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const SELF_EXECUTABLE_REQUIRED_TOAST = '需要先完善设备和履约资质';
@@ -128,7 +129,7 @@ export default function AssignmentModal({ onAccepted }: { onAccepted?: (orderId:
         Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
         setAssignment(null);
       } else {
-        Taro.showToast({ title: String(error?.message || '接受失败'), icon: 'none' });
+        Taro.showToast({ title: friendlyErrorMessage(error, '接受失败'), icon: 'none' });
       }
     } finally {
       setResponding(false);
@@ -150,7 +151,7 @@ export default function AssignmentModal({ onAccepted }: { onAccepted?: (orderId:
       Taro.showToast({ title: '已拒绝', icon: 'none' });
       setAssignment(null);
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '拒绝失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '拒绝失败'), icon: 'none' });
     } finally {
       setResponding(false);
     }
@@ -165,7 +166,7 @@ export default function AssignmentModal({ onAccepted }: { onAccepted?: (orderId:
         <View className='pw-assign-title'>
           <Text>平台为你指派了订单 · 第 {assignment.attempt_seq} 轮</Text>
         </View>
-        <Text className='pw-assign-countdown'>{remaining}s 内响应</Text>
+        <Text className='pw-assign-countdown'>{remaining}s 内确认</Text>
         <View className='pw-assign-route'>
           <Text className='pw-assign-route-start'>{order?.service_address || '起点待确认'}</Text>
           <Text className='pw-assign-route-arrow'>→</Text>

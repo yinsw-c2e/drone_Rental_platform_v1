@@ -3,6 +3,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Input, ScrollView, Switch, Text, View } from '@tarojs/components';
 import { addressService } from '../../../services/address';
 import type { V2UserAddress } from '../../../types';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 type AddressForm = {
@@ -94,7 +95,7 @@ export default function AddressBookPage() {
       setAddresses(list);
     } catch (error: any) {
       setAddresses([]);
-      Taro.showToast({ title: String(error?.message || '地址簿加载失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '地址簿加载失败'), icon: 'none' });
     } finally {
       setLoading(false);
     }
@@ -157,7 +158,7 @@ export default function AddressBookPage() {
       setShowEditor(false);
       await refreshAddresses();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '保存失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '保存失败'), icon: 'none' });
     } finally {
       setSaving(false);
     }
@@ -176,7 +177,7 @@ export default function AddressBookPage() {
       Taro.showToast({ title: '已删除', icon: 'success' });
       setAddresses(prev => prev.filter(entry => entry.id !== item.id));
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '删除失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '删除失败'), icon: 'none' });
     }
   };
 
@@ -190,7 +191,7 @@ export default function AddressBookPage() {
       })).sort((a, b) => Number(b.is_default) - Number(a.is_default)));
       Taro.showToast({ title: '已设为默认', icon: 'success' });
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '设置失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '设置失败'), icon: 'none' });
     }
   };
 

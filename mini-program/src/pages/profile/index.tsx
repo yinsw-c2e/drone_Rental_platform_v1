@@ -33,6 +33,7 @@ import chevronRightIcon from '../../assets/mine/icons/chevron_right.png';
 import chevronDownIcon from '../../assets/mine/icons/chevron_down.png';
 import chipCheckIcon from '../../assets/mine/icons/chip_check.png';
 import chipStarIcon from '../../assets/mine/icons/chip_star.png';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const VERIFY_META = {
@@ -265,7 +266,7 @@ export default function ProfilePage() {
       if (error?.errMsg?.includes('cancel')) {
         return;
       }
-      Taro.showToast({ title: error?.message || '更新失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '更新失败'), icon: 'none' });
     } finally {
       setUploading(false);
     }

@@ -137,7 +137,7 @@ function taroRequest(options: Taro.request.Option<any, any>) {
 
     timer = setTimeout(() => {
       task?.abort?.();
-      finish(() => reject(new Error('请求超时，请检查网络连接或开发者工具代理设置')));
+      finish(() => reject(new Error('请求超时，请检查网络连接后重试')));
     }, API_TIMEOUT + 1000);
   });
 }

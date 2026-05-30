@@ -79,7 +79,7 @@ export default function WalletPage() {
     return (
       <ProviderAccessNotice
         title={isAuthenticated ? '服务商财务未开通' : '请先登录服务商账号'}
-        description={isAuthenticated ? '服务商资质审核通过并产生真实履约后，才能查看结算、流水和提现。' : '登录后才能查看服务商财务。'}
+        description={isAuthenticated ? '服务商资质审核通过后，才能查看结算、流水和提现。' : '登录后才能查看服务商财务。'}
         actionText={isAuthenticated ? '查看服务商入驻' : undefined}
         onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
       />

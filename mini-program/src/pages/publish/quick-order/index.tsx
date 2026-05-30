@@ -29,6 +29,7 @@ import routeStartPinIcon from '../../../assets/haul/quick-order-confirm/icon_rou
 import sectionDetectionShieldIcon from '../../../assets/haul/quick-order-confirm/icon_section_detection_shield.png';
 import sectionLocationPinIcon from '../../../assets/haul/quick-order-confirm/icon_section_location_pin.png';
 import sectionPlanClipboardIcon from '../../../assets/haul/quick-order-confirm/icon_section_plan_clipboard.png';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -568,7 +569,7 @@ export default function QuickOrderPage() {
 
     const confirm = await Taro.showModal({
       title: '确认下单',
-      content: '将按当前吊运信息向该服务商创建真实订单。',
+      content: '将按当前吊运信息向该服务商创建订单。',
       confirmText: '确认下单',
       cancelText: '再修改',
     }).catch(() => null);
@@ -578,7 +579,7 @@ export default function QuickOrderPage() {
     try {
       const result = await supplyService.createDirectOrder(supplyId, buildDirectOrderPayload(draft));
       const orderId = Number((result as any)?.order_id || (result as any)?.order?.id || (result as any)?.id || 0);
-      if (!orderId) throw new Error('订单创建成功但未返回订单ID');
+      if (!orderId) throw new Error('订单已创建，请稍后在订单列表查看');
       Taro.removeStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY);
       Taro.hideLoading();
       Taro.showToast({ title: '订单已创建', icon: 'success' });
@@ -587,7 +588,7 @@ export default function QuickOrderPage() {
       }, 500);
     } catch (error: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: error?.message || '创建订单失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '创建订单失败'), icon: 'none' });
     }
   };
 
@@ -599,7 +600,7 @@ export default function QuickOrderPage() {
     try {
       const created = await demandV2Service.create(buildDemandPayload(draft, selectedPlan, routeDistance));
       const demandId = Number((created as any)?.id || (created as any)?.data?.id || 0);
-      if (!demandId) throw new Error('需求创建成功但未返回需求ID');
+      if (!demandId) throw new Error('需求已创建，请稍后在需求列表查看');
       await demandV2Service.publish(demandId);
       Taro.hideLoading();
       Taro.showToast({ title: '需求已发布', icon: 'success' });
@@ -608,7 +609,7 @@ export default function QuickOrderPage() {
       }, 500);
     } catch (error: any) {
       Taro.hideLoading();
-      Taro.showToast({ title: error?.message || '发布失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '发布失败'), icon: 'none' });
     }
   };
 
@@ -690,7 +691,7 @@ export default function QuickOrderPage() {
       }
       continueToSupplyList(draft);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '进入方案列表失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '进入方案列表失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

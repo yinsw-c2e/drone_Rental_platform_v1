@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text } from '@tarojs/components';
 import { orderFinanceV2Service } from '../../services/orderFinanceV2';
 import { orderV2Service } from '../../services/orderV2';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 type PaymentMethodKey = 'wechat' | 'alipay' | 'mock';
@@ -37,9 +38,9 @@ const basePaymentMethods: Array<{
   },
   {
     key: 'mock',
-    mark: 'DEV',
-    label: '模拟支付',
-    desc: '开发联调自动回写',
+    mark: '备',
+    label: '线下确认',
+    desc: '确认后更新支付状态',
   },
 ];
 
@@ -63,7 +64,7 @@ export default function PaymentPage() {
         setErrorText('');
       })
       .catch((e: any) => {
-        setErrorText(e?.message || '订单读取失败');
+        setErrorText(friendlyErrorMessage(e, '订单读取失败'));
       });
   });
 
@@ -73,7 +74,7 @@ export default function PaymentPage() {
       return;
     }
     if (method === 'mock' && !mockPaymentEnabled) {
-      Taro.showToast({ title: '当前构建不允许模拟支付', icon: 'none' });
+      Taro.showToast({ title: '当前支付方式暂不可用', icon: 'none' });
       return;
     }
     setLoading(true);
@@ -94,14 +95,14 @@ export default function PaymentPage() {
 
       Taro.showModal({
         title: '支付单已创建',
-        content: flow?.notice || '当前渠道等待支付回调确认，订单暂不会进入已支付状态。',
+        content: friendlyErrorMessage(flow?.notice, '当前支付渠道仍在确认中，订单状态稍后更新。'),
         confirmText: '查看订单',
         showCancel: false,
       }).then(() => {
         Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` }).catch(() => Taro.navigateBack());
       });
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '支付失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '支付失败'), icon: 'none' });
     } finally {
       setLoading(false);
       setActiveMethod(null);
@@ -153,8 +154,8 @@ export default function PaymentPage() {
       <View className="payment-notice">
         <Text className="payment-notice-text">
           {mockPaymentEnabled
-            ? '当前为开发构建，可使用模拟支付完成联调；正式支付渠道需等待商户回调。'
-            : '当前构建不开放模拟支付；支付结果以正式渠道回调为准。'}
+            ? '可使用线下确认方式完成支付状态确认；正式渠道以支付结果确认为准。'
+            : '支付结果以正式渠道确认为准。'}
         </Text>
       </View>
     </View>

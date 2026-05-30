@@ -7,6 +7,7 @@ import { userService } from '../../services/user';
 import { updateUser } from '../../store/slices/authSlice';
 import { RootState } from '../../store/store';
 import { getRoleLabels } from '../../utils/roleSummary';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const getVerifyText = (status?: string) => {
@@ -52,7 +53,7 @@ export default function EditProfilePage() {
       Taro.showToast({ title: '资料已更新', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 800);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '保存失败，请重试', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '保存失败，请重试'), icon: 'none' });
     } finally {
       setSaving(false);
     }

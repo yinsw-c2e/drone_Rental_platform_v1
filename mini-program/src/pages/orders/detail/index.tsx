@@ -5,6 +5,7 @@ import { Image, ScrollView, Text, View } from '@tarojs/components';
 import { orderV2Service, confirmReceipt } from '../../../services/orderV2';
 import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
 import { store } from '../../../store/store';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 import iconBack from '../../../assets/haul/order-progress/icon_nav_back.png';
@@ -320,7 +321,7 @@ export default function OrderProgressPage() {
     if (!orderId) {
       setRemoteDetail(null);
       setSettlement(null);
-      setErrorText('缺少订单ID，无法展示订单进度');
+      setErrorText('缺少订单信息，无法展示订单进度');
       setLoading(false);
       return;
     }
@@ -367,7 +368,7 @@ export default function OrderProgressPage() {
       setRemoteDetail(null);
       setRemoteTimeline([]);
       setSettlement(null);
-      setErrorText(error?.message || '订单加载失败，请稍后重试');
+      setErrorText(friendlyErrorMessage(error, '订单加载失败，请稍后重试'));
     } finally {
       setLoading(false);
     }
@@ -437,7 +438,7 @@ export default function OrderProgressPage() {
 
   const viewLive = () => {
     if (!orderId) {
-      Taro.showToast({ title: '缺少订单ID，无法查看进度', icon: 'none' });
+      Taro.showToast({ title: '缺少订单信息，无法查看进度', icon: 'none' });
       return;
     }
     Taro.navigateTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
@@ -485,7 +486,7 @@ export default function OrderProgressPage() {
         await load();
       }
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '取消失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '取消失败'), icon: 'none' });
     } finally {
       setActionLoading(false);
     }
@@ -505,7 +506,7 @@ export default function OrderProgressPage() {
       Taro.showToast({ title: '加价成功，已通知服务商', icon: 'success' });
       load();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '加价失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '加价失败'), icon: 'none' });
     } finally {
       setActionLoading(false);
     }
@@ -535,7 +536,7 @@ export default function OrderProgressPage() {
     } catch (error: any) {
       const code = error?.body?.code || error?.code;
       if (code === 'REDISPATCH_RATE_LIMITED') {
-        Taro.showToast({ title: String(error?.body?.message || '操作过于频繁'), icon: 'none' });
+        Taro.showToast({ title: friendlyErrorMessage(error?.body, '操作过于频繁'), icon: 'none' });
         return;
       }
       if (code === 'REDISPATCH_CAPPED') {
@@ -546,7 +547,7 @@ export default function OrderProgressPage() {
         });
         return;
       }
-      Taro.showToast({ title: String(error?.message || '重发失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '重发失败'), icon: 'none' });
     } finally {
       setActionLoading(false);
     }
@@ -569,7 +570,7 @@ export default function OrderProgressPage() {
       Taro.showToast({ title: '小费已支付', icon: 'success' });
       load();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '小费支付失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '小费支付失败'), icon: 'none' });
     } finally {
       setActionLoading(false);
     }
@@ -583,7 +584,7 @@ export default function OrderProgressPage() {
       Taro.showToast({ title: '已推进', icon: 'success' });
       await load();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '推进失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '推进失败'), icon: 'none' });
     } finally {
       setProviderAdvanceLoading(false);
     }
@@ -614,7 +615,7 @@ export default function OrderProgressPage() {
           Taro.showToast({ title: '已确认', icon: 'success' });
           load();
         } catch (e: any) {
-          Taro.showToast({ title: e?.message || '操作失败', icon: 'none' });
+          Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' });
         } finally {
           setActionLoading(false);
         }
@@ -700,7 +701,7 @@ export default function OrderProgressPage() {
         {!detail ? (
           <View className="op-empty">
             <Text className="op-empty-title">{loading ? '正在同步订单信息' : '无法展示订单进度'}</Text>
-            <Text className="op-empty-desc">{loading ? '请稍候，正在读取真实订单数据。' : errorText || '订单不存在或当前账号无权查看。'}</Text>
+            <Text className="op-empty-desc">{loading ? '加载中…' : errorText || '订单不存在或当前账号无权查看。'}</Text>
           </View>
         ) : (
           <View className="op-content">

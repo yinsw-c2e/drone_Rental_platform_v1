@@ -8,6 +8,7 @@ import {
   airspaceService,
 } from '../../../services/airspace';
 import { formatUnknownEnumLabel } from '../../../utils';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const ZONE_TYPE_LABELS: Record<string, string> = {
@@ -30,14 +31,6 @@ const CHECK_META: Record<string, { title: string; tone: string }> = {
   blocked: { title: '当前位置不可飞行', tone: 'red' },
   warning: { title: '当前位置需留意限制', tone: 'orange' },
   clear: { title: '当前位置空域可用', tone: 'green' },
-};
-
-const getFriendlyErrorMessage = (error: any, fallback: string) => {
-  const message = String(error?.message || error?.errMsg || '').toLowerCase();
-  if (message.includes('authorization') || message.includes('登录') || message.includes('401')) {
-    return '登录状态已失效，请重新登录';
-  }
-  return fallback;
 };
 
 const formatRadius = (radius?: number) => {
@@ -73,7 +66,7 @@ export default function NoFlyZonePage() {
         : (await airspaceService.listNoFlyZones({ status: 'active', page: 1, page_size: 50 })).data;
       setZones(nextZones || []);
     } catch (error: any) {
-      const message = getFriendlyErrorMessage(error, '禁飞区加载失败');
+      const message = friendlyErrorMessage(error, '禁飞区加载失败');
       setLoadError(message);
       Taro.showToast({ title: message, icon: 'none' });
       setZones([]);
@@ -97,7 +90,7 @@ export default function NoFlyZonePage() {
         Taro.showToast({ title: '空域检测完成', icon: 'success' });
       }
     } catch (error: any) {
-      const message = getFriendlyErrorMessage(error, '空域检测失败');
+      const message = friendlyErrorMessage(error, '空域检测失败');
       setCheckError(message);
       Taro.showToast({ title: message, icon: 'none' });
     } finally {

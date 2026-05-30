@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, Input } from '@tarojs/components';
 import { orderFinanceV2Service } from '../../services/orderFinanceV2';
 import { formatUnknownEnumLabel } from '../../utils';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const REFUND_STATUS_LABELS: Record<string, string> = {
@@ -46,7 +47,7 @@ export default function AfterSalePage() {
   const handleRefund = async () => {
     setSubmitting(true);
     try { await orderFinanceV2Service.refund(orderId); Taro.showToast({ title: '退款申请已提交', icon: 'success' }); }
-    catch (e: any) { Taro.showToast({ title: e.message || '退款失败', icon: 'none' }); }
+    catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '退款失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 
@@ -59,7 +60,7 @@ export default function AfterSalePage() {
       setDisputeSummary('');
       Taro.showToast({ title: '争议已提交', icon: 'success' });
     }
-    catch (e: any) { Taro.showToast({ title: e.message || '提交失败', icon: 'none' }); }
+    catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '提交失败'), icon: 'none' }); }
     finally { setSubmitting(false); }
   };
 

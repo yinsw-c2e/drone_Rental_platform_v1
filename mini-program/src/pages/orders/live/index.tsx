@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Map, Text, View } from '@tarojs/components';
 import { orderV2Service } from '../../../services/orderV2';
 import { V2OrderDetail, V2OrderLive } from '../../../types';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 import pinStart from '../../../assets/quick-order/icons/pin_start.png';
@@ -230,7 +231,7 @@ export default function OrderLivePage() {
   const loadInitial = useCallback(async () => {
     if (!orderId) {
       setLoading(false);
-      setErrorText('缺少订单ID，无法查看订单进度');
+      setErrorText('缺少订单信息，无法查看订单进度');
       return;
     }
     setLoading(true);
@@ -246,7 +247,7 @@ export default function OrderLivePage() {
       if (shouldStopPolling(nextStatus, detail?.live || null)) stopPolling();
       else startPolling();
     } catch (error: any) {
-      setErrorText(error?.message || '订单进度加载失败');
+      setErrorText(friendlyErrorMessage(error, '订单进度加载失败'));
     } finally {
       setLoading(false);
     }
@@ -361,7 +362,7 @@ export default function OrderLivePage() {
       Taro.showToast({ title: '已加价，继续匹配服务商', icon: 'none' });
       loadInitial();
     } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '加价失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '加价失败'), icon: 'none' });
     } finally {
       setIncreasingPrice(false);
     }
@@ -428,7 +429,7 @@ export default function OrderLivePage() {
           <View className="order-live-price-increase">
             <View>
               <Text className="order-live-price-title">附近运力紧张</Text>
-              <Text className="order-live-price-desc">适当加价可提升服务商响应速度</Text>
+              <Text className="order-live-price-desc">适当加价可提升服务商接单速度</Text>
             </View>
             <View className={`order-live-price-button ${increasingPrice ? 'is-disabled' : ''}`} onClick={increasePrice}>
               <Text>{increasingPrice ? '处理中' : '加价试试'}</Text>

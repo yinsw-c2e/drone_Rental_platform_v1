@@ -8,6 +8,7 @@ import { droneService } from '../../../services/drone';
 import { RootState } from '../../../store/store';
 import { Drone } from '../../../types';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 export default function DemandQuotePage() {
@@ -69,7 +70,7 @@ export default function DemandQuotePage() {
       Taro.showToast({ title: '报价提交成功', icon: 'success' });
       setTimeout(() => Taro.navigateBack(), 1500);
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '提交失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '提交失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

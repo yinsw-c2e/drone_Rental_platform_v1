@@ -34,7 +34,7 @@ const anomalyTypeLabels: Record<string, string> = {
   payment_overdue: '支付逾期',
   provider_confirmation_overdue: '服务商确认超时',
   dispatch_overdue: '履约开始超时',
-  dispatch_response_overdue: '履约响应超时',
+  dispatch_response_overdue: '履约确认超时',
   execution_stalled: '履约停滞',
   airspace_blocked: '空域受阻',
   compliance_risk: '合规风险',

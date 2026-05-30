@@ -58,7 +58,7 @@ const ORDER_STATUS: Record<string, BadgeMeta> = {
 
 const DISPATCH_STATUS: Record<string, BadgeMeta> = {
   pending: { label: '待派发', tone: 'muted' },
-  pending_response: { label: '待响应', tone: 'orange' },
+  pending_response: { label: '待确认', tone: 'orange' },
   accepted: { label: '已接受', tone: 'green' },
   rejected: { label: '已拒绝', tone: 'red' },
   in_progress: { label: '执行中', tone: 'blue' },

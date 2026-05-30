@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Input } from '@tarojs/components';
 import DateTimeField from '../../../components/DateTimeField';
 import { apiV2 } from '../../../services/api';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 export default function DroneMaintenancePage() {
@@ -53,7 +54,7 @@ export default function DroneMaintenancePage() {
       setCost('');
       loadLogs();
     } catch (e: any) {
-      Taro.showToast({ title: e.message || '提交失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '提交失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }

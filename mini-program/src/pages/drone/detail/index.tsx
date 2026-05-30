@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Image } from '@tarojs/components';
 import { droneService } from '../../../services/drone';
 import { Drone } from '../../../types';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
 const statusMap: Record<string, { label: string; tone: string }> = {
@@ -43,7 +44,7 @@ export default function DroneDetailPage() {
             setTimeout(() => Taro.navigateBack(), 1500);
           } catch (e: any) {
             Taro.hideLoading();
-            Taro.showToast({ title: e.message || '删除失败', icon: 'none' });
+            Taro.showToast({ title: friendlyErrorMessage(e, '删除失败'), icon: 'none' });
           }
         }
       }

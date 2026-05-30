@@ -6,6 +6,7 @@ import {
   ComplianceCheck,
   airspaceService,
 } from '../../services/airspace';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const RESULT_CONFIG: Record<string, { label: string; color: string }> = {
@@ -76,7 +77,7 @@ export default function CompliancePage() {
       const cfg = getResultConfig(next.overall_result);
       Taro.showToast({ title: `合规检查${cfg.label}`, icon: next.overall_result === 'failed' ? 'none' : 'success' });
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || '检查失败', icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '检查失败'), icon: 'none' });
     } finally {
       setRunning(false);
     }

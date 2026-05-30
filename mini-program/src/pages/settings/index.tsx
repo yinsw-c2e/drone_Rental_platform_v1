@@ -206,12 +206,12 @@ export default function SettingsPage() {
           {isDevMode ? (
             <>
               <View className='settings-section-header'>
-                <Text className='settings-section-title'>开发诊断</Text>
+                <Text className='settings-section-title'>诊断信息</Text>
               </View>
               <View className='settings-section settings-dev-section'>
                 <View className='settings-row'>
                   <Text className='settings-row-label'>当前环境</Text>
-                  <Text className='settings-row-value'>开发模式</Text>
+                  <Text className='settings-row-value'>测试模式</Text>
                 </View>
                 <View className='settings-row'>
                   <Text className='settings-row-label'>登录状态</Text>

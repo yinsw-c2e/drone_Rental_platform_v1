@@ -11,6 +11,7 @@ import {
   aggregateFlightRecords,
   formatHoursFromSeconds,
 } from "../../../utils/flightRecords";
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import "./index.scss";
 
 const STATUS_MAP = {
@@ -171,7 +172,7 @@ export default function PilotProfilePage() {
       );
       setPilot(nextProfile);
     } catch (error: any) {
-      Taro.showToast({ title: error?.message || "更新失败", icon: "none" });
+      Taro.showToast({ title: friendlyErrorMessage(error, "更新失败"), icon: "none" });
     }
   };
 
@@ -247,7 +248,7 @@ export default function PilotProfilePage() {
       Taro.showToast({ title: "履约资质设置已更新", icon: "success" });
     } catch (error: any) {
       Taro.showToast({
-        title: error?.message || "保存失败，请稍后重试",
+        title: friendlyErrorMessage(error, "保存失败，请稍后重试"),
         icon: "none",
       });
     } finally {
