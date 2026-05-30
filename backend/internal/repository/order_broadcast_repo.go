@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ func (r *OrderBroadcastRepo) GetByID(id int64) (*model.OrderBroadcast, error) {
 
 func (r *OrderBroadcastRepo) GetByOrderID(orderID int64) (*model.OrderBroadcast, error) {
 	var broadcast model.OrderBroadcast
-	err := r.db.Preload("Order").Where("order_id = ?", orderID).First(&broadcast).Error
+	err := r.db.Preload("Order").Where("order_id = ?", orderID).Order("id DESC").First(&broadcast).Error
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +59,7 @@ func (r *OrderBroadcastRepo) LockByOrderID(orderID int64) (*model.OrderBroadcast
 	var broadcast model.OrderBroadcast
 	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("order_id = ?", orderID).
+		Order("id DESC").
 		First(&broadcast).Error
 	if err != nil {
 		return nil, err
@@ -102,29 +104,66 @@ func (r *OrderBroadcastRepo) UpdateFields(id int64, fields map[string]interface{
 	return r.db.Model(&model.OrderBroadcast{}).Where("id = ?", id).Updates(fields).Error
 }
 
-func (r *OrderBroadcastRepo) ExcludeProvider(orderID, broadcastID, providerUserID int64, reason string) error {
+func (r *OrderBroadcastRepo) ExcludeProvider(orderID, broadcastID, providerUserID int64, reason string, expiresAt ...*time.Time) error {
 	if r == nil || r.db == nil || orderID <= 0 || broadcastID <= 0 || providerUserID <= 0 {
 		return nil
 	}
-	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.OrderBroadcastExclusion{
+	var expiry *time.Time
+	if len(expiresAt) > 0 && expiresAt[0] != nil {
+		value := *expiresAt[0]
+		expiry = &value
+	}
+	exclusion := &model.OrderBroadcastExclusion{
 		OrderID:        orderID,
 		BroadcastID:    broadcastID,
 		ProviderUserID: providerUserID,
 		Reason:         strings.TrimSpace(reason),
 		CreatedAt:      time.Now(),
-	}).Error
+		ExpiresAt:      expiry,
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var existing model.OrderBroadcastExclusion
+		err := tx.Where("order_id = ? AND provider_user_id = ?", orderID, providerUserID).First(&existing).Error
+		if err == nil {
+			if existing.ExpiresAt == nil && expiry != nil {
+				return nil
+			}
+			return tx.Model(&model.OrderBroadcastExclusion{}).
+				Where("id = ?", existing.ID).
+				Updates(map[string]interface{}{
+					"broadcast_id": broadcastID,
+					"reason":       exclusion.Reason,
+					"expires_at":   expiry,
+				}).Error
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		return tx.Create(exclusion).Error
+	})
+}
+
+func (r *OrderBroadcastRepo) DeleteTimeoutExclusionsByOrder(orderID int64) error {
+	if r == nil || r.db == nil || orderID <= 0 {
+		return nil
+	}
+	return r.db.Where("order_id = ? AND reason = ?", orderID, "assignment_timeout").
+		Delete(&model.OrderBroadcastExclusion{}).Error
 }
 
 func (r *OrderBroadcastRepo) IsProviderExcluded(orderID, broadcastID, providerUserID int64) (bool, error) {
 	if r == nil || r.db == nil || providerUserID <= 0 {
 		return false, nil
 	}
-	query := r.db.Model(&model.OrderBroadcastExclusion{}).Where("provider_user_id = ?", providerUserID)
+	now := time.Now()
+	query := r.db.Model(&model.OrderBroadcastExclusion{}).
+		Where("provider_user_id = ?", providerUserID).
+		Where("(expires_at IS NULL OR expires_at > ?)", now)
 	switch {
 	case orderID > 0 && broadcastID > 0:
-		query = query.Where("(order_id = ? OR broadcast_id = ?)", orderID, broadcastID)
+		query = query.Where("(broadcast_id = ? OR (order_id = ? AND expires_at IS NULL))", broadcastID, orderID)
 	case orderID > 0:
-		query = query.Where("order_id = ?", orderID)
+		query = query.Where("order_id = ? AND expires_at IS NULL", orderID)
 	case broadcastID > 0:
 		query = query.Where("broadcast_id = ?", broadcastID)
 	default:

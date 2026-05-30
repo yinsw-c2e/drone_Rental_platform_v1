@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -140,7 +141,7 @@ func TestBroadcastExclusionFiltersListAndGrab(t *testing.T) {
 	if len(views) != 0 {
 		t.Fatalf("expected excluded provider to see no broadcasts, got %#v", views)
 	}
-	if _, err := service.Grab(broadcast.ID, 7007); !errors.Is(err, ErrBroadcastConflict) {
+	if _, err := service.Grab(broadcast.ID, 7007); !errors.Is(err, ErrBroadcastConflict) || !errors.Is(err, ErrBroadcastPreviouslyCancelled) {
 		t.Fatalf("expected excluded provider grab conflict, got %v", err)
 	}
 
@@ -153,6 +154,85 @@ func TestBroadcastExclusionFiltersListAndGrab(t *testing.T) {
 	}
 	if _, err := service.Grab(broadcast.ID, 7008); err != nil {
 		t.Fatalf("allowed provider grab: %v", err)
+	}
+}
+
+func TestBroadcastGrabConflictReasonSentinels(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, handles *gormDBHandles, order *model.Order, broadcast *model.OrderBroadcast)
+		want  error
+	}{
+		{
+			name: "locked by auto assignment",
+			setup: func(t *testing.T, handles *gormDBHandles, _ *model.Order, broadcast *model.OrderBroadcast) {
+				t.Helper()
+				if err := handles.broadcastRepo.UpdateFields(broadcast.ID, map[string]interface{}{
+					"status": broadcastStatusAutoAssigning,
+				}); err != nil {
+					t.Fatalf("set auto assigning: %v", err)
+				}
+			},
+			want: ErrBroadcastLockedByAssign,
+		},
+		{
+			name: "taken by other provider",
+			setup: func(t *testing.T, handles *gormDBHandles, _ *model.Order, broadcast *model.OrderBroadcast) {
+				t.Helper()
+				now := time.Now()
+				if err := handles.broadcastRepo.UpdateFields(broadcast.ID, map[string]interface{}{
+					"status":             broadcastStatusGrabbed,
+					"grabbed_by_user_id": int64(7999),
+					"grabbed_at":         &now,
+				}); err != nil {
+					t.Fatalf("set grabbed: %v", err)
+				}
+			},
+			want: ErrBroadcastTakenByOther,
+		},
+		{
+			name: "order status invalid",
+			setup: func(t *testing.T, handles *gormDBHandles, order *model.Order, _ *model.OrderBroadcast) {
+				t.Helper()
+				if err := handles.orderRepo.UpdateFields(order.ID, map[string]interface{}{
+					"status": "assigned",
+				}); err != nil {
+					t.Fatalf("set order assigned: %v", err)
+				}
+			},
+			want: ErrBroadcastStatusInvalid,
+		},
+		{
+			name: "previously cancelled",
+			setup: func(t *testing.T, handles *gormDBHandles, order *model.Order, broadcast *model.OrderBroadcast) {
+				t.Helper()
+				if err := handles.broadcastRepo.ExcludeProvider(order.ID, broadcast.ID, 7801, "provider_cancel"); err != nil {
+					t.Fatalf("exclude provider: %v", err)
+				}
+			},
+			want: ErrBroadcastPreviouslyCancelled,
+		},
+	}
+
+	for idx, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service, handles := newBroadcastTestService(t)
+			order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-CONFLICT-REASON-"+string(rune('A'+idx)), "light_heavy", 22.5431, 114.0579, 168000)
+			broadcast, err := service.CreateForOrder(order)
+			if err != nil {
+				t.Fatalf("create broadcast: %v", err)
+			}
+			seedProviderPresence(t, service, 7801, 22.5432, 114.0580, []string{"light_heavy"}, 20)
+			tt.setup(t, handles, order, broadcast)
+
+			_, err = service.Grab(broadcast.ID, 7801)
+			if !errors.Is(err, ErrBroadcastConflict) {
+				t.Fatalf("expected ErrBroadcastConflict, got %v", err)
+			}
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("expected reason %v, got %v", tt.want, err)
+			}
+		})
 	}
 }
 
@@ -417,6 +497,15 @@ func TestAutoAssignDeclineTriggersNextAttempt(t *testing.T) {
 	if !excluded {
 		t.Fatalf("expected declined provider 7401 to be excluded from order %d", order.ID)
 	}
+	var declineExclusion model.OrderBroadcastExclusion
+	if err := handles.broadcastRepo.DB().
+		Where("order_id = ? AND provider_user_id = ?", order.ID, 7401).
+		First(&declineExclusion).Error; err != nil {
+		t.Fatalf("load decline exclusion: %v", err)
+	}
+	if declineExclusion.ExpiresAt != nil {
+		t.Fatalf("expected decline exclusion to be permanent, got expires_at=%v", declineExclusion.ExpiresAt)
+	}
 	second, err := handles.assignmentRepo.GetActiveByBroadcast(broadcast.ID)
 	if err != nil {
 		t.Fatalf("load second assignment: %v", err)
@@ -525,7 +614,16 @@ func TestAutoAssignAcceptDeadlinePassedTransitionsToExpiredAssignment(t *testing
 		t.Fatalf("check timeout provider exclusion: %v", err)
 	}
 	if !excluded {
-		t.Fatalf("expected timed-out provider 7601 to be excluded from order %d", order.ID)
+		t.Fatalf("expected timed-out provider 7601 to be excluded from broadcast %d", broadcast.ID)
+	}
+	var timeoutExclusion model.OrderBroadcastExclusion
+	if err := handles.broadcastRepo.DB().
+		Where("order_id = ? AND provider_user_id = ?", order.ID, 7601).
+		First(&timeoutExclusion).Error; err != nil {
+		t.Fatalf("load timeout exclusion: %v", err)
+	}
+	if timeoutExclusion.ExpiresAt == nil || !timeoutExclusion.ExpiresAt.After(now.Add(2*service.autoAssignAcceptWindow())) {
+		t.Fatalf("expected timeout exclusion to have short expiry, got %#v", timeoutExclusion.ExpiresAt)
 	}
 	next, err := handles.assignmentRepo.GetActiveByBroadcast(broadcast.ID)
 	if err != nil {
@@ -533,6 +631,268 @@ func TestAutoAssignAcceptDeadlinePassedTransitionsToExpiredAssignment(t *testing
 	}
 	if next.ProviderUserID != 7602 || next.AttemptSeq != 2 {
 		t.Fatalf("expected provider 7602 attempt 2, got %#v", next)
+	}
+}
+
+func TestBroadcastExclusionTimeoutExpiresAndDeclinePersists(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-EXCLUSION-TTL", "light_heavy", 22.5431, 114.0579, 168000)
+	broadcast, err := service.CreateForOrder(order)
+	if err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+
+	timeoutExpiresAt := time.Now().Add(time.Minute)
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, broadcast.ID, 7701, "assignment_timeout", &timeoutExpiresAt); err != nil {
+		t.Fatalf("exclude timed-out provider: %v", err)
+	}
+	excluded, err := handles.broadcastRepo.IsProviderExcluded(order.ID, broadcast.ID, 7701)
+	if err != nil {
+		t.Fatalf("check active timeout exclusion: %v", err)
+	}
+	if !excluded {
+		t.Fatalf("expected timeout exclusion to match before expiry")
+	}
+
+	expiredAt := time.Now().Add(-time.Minute)
+	if err := handles.broadcastRepo.DB().
+		Model(&model.OrderBroadcastExclusion{}).
+		Where("order_id = ? AND provider_user_id = ?", order.ID, 7701).
+		Update("expires_at", &expiredAt).Error; err != nil {
+		t.Fatalf("expire timeout exclusion: %v", err)
+	}
+	excluded, err = handles.broadcastRepo.IsProviderExcluded(order.ID, broadcast.ID, 7701)
+	if err != nil {
+		t.Fatalf("check expired timeout exclusion: %v", err)
+	}
+	if excluded {
+		t.Fatalf("expected timeout exclusion to stop matching after expiry")
+	}
+
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, broadcast.ID, 7702, "assignment_declined"); err != nil {
+		t.Fatalf("exclude declined provider: %v", err)
+	}
+	excluded, err = handles.broadcastRepo.IsProviderExcluded(order.ID, broadcast.ID, 7702)
+	if err != nil {
+		t.Fatalf("check permanent decline exclusion: %v", err)
+	}
+	if !excluded {
+		t.Fatalf("expected decline exclusion to keep matching")
+	}
+}
+
+func TestAutoAssignTimeoutExclusionIsBroadcastScoped(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-EXCLUSION-SCOPE", "light_heavy", 22.5431, 114.0579, 168000)
+	broadcast, err := service.CreateForOrder(order)
+	if err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+	seedProviderPresence(t, service, 7703, 22.5432, 114.0580, []string{"light_heavy"}, 30)
+
+	timeoutExpiresAt := time.Now().Add(time.Minute)
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, broadcast.ID, 7703, "assignment_timeout", &timeoutExpiresAt); err != nil {
+		t.Fatalf("exclude timed-out provider: %v", err)
+	}
+	if _, ok, err := service.selectAutoAssignCandidate(broadcast, order, map[int64]struct{}{}, time.Now(), handles.broadcastRepo); err != nil {
+		t.Fatalf("select candidate for timed-out broadcast: %v", err)
+	} else if ok {
+		t.Fatalf("expected timeout exclusion to block the original broadcast")
+	}
+
+	nextBroadcast := *broadcast
+	nextBroadcast.ID = broadcast.ID + 1000
+	candidate, ok, err := service.selectAutoAssignCandidate(&nextBroadcast, order, map[int64]struct{}{}, time.Now(), handles.broadcastRepo)
+	if err != nil {
+		t.Fatalf("select candidate for next broadcast: %v", err)
+	}
+	if !ok || candidate.presence.UserID != 7703 {
+		t.Fatalf("expected provider 7703 to be eligible for next broadcast, got ok=%v candidate=%#v", ok, candidate)
+	}
+
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, nextBroadcast.ID, 7703, "assignment_declined"); err != nil {
+		t.Fatalf("exclude declined provider: %v", err)
+	}
+	if _, ok, err := service.selectAutoAssignCandidate(&nextBroadcast, order, map[int64]struct{}{}, time.Now(), handles.broadcastRepo); err != nil {
+		t.Fatalf("select candidate after decline: %v", err)
+	} else if ok {
+		t.Fatalf("expected permanent decline exclusion to block follow-up broadcasts")
+	}
+}
+
+func TestRedispatchOrderClearsTimeoutKeepsDeclineAndCreatesNewBroadcast(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-REDISPATCH", "light_heavy", 22.5431, 114.0579, 168000)
+	order.PriceBreakdownJSON = model.JSON(`{"source":"test","matching_radius_km":30,"total_estimated_cents":168000}`)
+	if err := handles.orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"price_breakdown_json": order.PriceBreakdownJSON,
+	}); err != nil {
+		t.Fatalf("update price breakdown: %v", err)
+	}
+	oldBroadcast, err := service.CreateForOrder(order)
+	if err != nil {
+		t.Fatalf("create original broadcast: %v", err)
+	}
+	timeoutProviderID := int64(7801)
+	declinedProviderID := int64(7802)
+	seedProviderPresence(t, service, timeoutProviderID, 22.8581, 114.0579, []string{"light_heavy"}, 60)
+	seedProviderPresence(t, service, declinedProviderID, 22.5432, 114.0580, []string{"light_heavy"}, 60)
+
+	timeoutExpiresAt := time.Now().Add(time.Minute)
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, oldBroadcast.ID, timeoutProviderID, "assignment_timeout", &timeoutExpiresAt); err != nil {
+		t.Fatalf("exclude timeout provider: %v", err)
+	}
+	if err := handles.broadcastRepo.ExcludeProvider(order.ID, oldBroadcast.ID, declinedProviderID, "assignment_declined"); err != nil {
+		t.Fatalf("exclude declined provider: %v", err)
+	}
+	if err := handles.broadcastRepo.UpdateFields(oldBroadcast.ID, map[string]interface{}{"status": broadcastStatusExpired}); err != nil {
+		t.Fatalf("expire original broadcast: %v", err)
+	}
+	if err := handles.orderRepo.UpdateFields(order.ID, map[string]interface{}{"status": "dispatch_failed"}); err != nil {
+		t.Fatalf("mark dispatch failed: %v", err)
+	}
+	order.Status = "dispatch_failed"
+
+	result, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{
+		PriceBumpPercent: 10,
+		RadiusBumpKM:     10,
+	})
+	if err != nil {
+		t.Fatalf("redispatch order: %v", err)
+	}
+	if result.Broadcast.ID == oldBroadcast.ID {
+		t.Fatalf("expected redispatch to create a new broadcast row")
+	}
+	if result.Broadcast.Status != broadcastStatusOpen || result.Broadcast.EstimatedTotalCents != 184800 {
+		t.Fatalf("unexpected redispatch broadcast: %#v", result.Broadcast)
+	}
+	if result.Order.Status != "pending_dispatch" || result.Order.TotalAmount != 184800 {
+		t.Fatalf("expected order to return pending_dispatch with bumped price, got status=%s amount=%d", result.Order.Status, result.Order.TotalAmount)
+	}
+	if result.MatchingRadiusKM != 40 {
+		t.Fatalf("expected matching radius 40km, got %.1f", result.MatchingRadiusKM)
+	}
+
+	var timeoutCount int64
+	if err := handles.broadcastRepo.DB().Model(&model.OrderBroadcastExclusion{}).
+		Where("order_id = ? AND reason = ?", order.ID, "assignment_timeout").
+		Count(&timeoutCount).Error; err != nil {
+		t.Fatalf("count timeout exclusions: %v", err)
+	}
+	if timeoutCount != 0 {
+		t.Fatalf("expected timeout exclusions to be cleared, got %d", timeoutCount)
+	}
+	declinedExcluded, err := handles.broadcastRepo.IsProviderExcluded(order.ID, result.Broadcast.ID, declinedProviderID)
+	if err != nil {
+		t.Fatalf("check declined exclusion: %v", err)
+	}
+	if !declinedExcluded {
+		t.Fatalf("expected declined provider to remain excluded")
+	}
+	timeoutExcluded, err := handles.broadcastRepo.IsProviderExcluded(order.ID, result.Broadcast.ID, timeoutProviderID)
+	if err != nil {
+		t.Fatalf("check timeout exclusion: %v", err)
+	}
+	if timeoutExcluded {
+		t.Fatalf("expected timed-out provider to be eligible after redispatch")
+	}
+
+	candidate, ok, err := service.selectAutoAssignCandidate(result.Broadcast, result.Order, map[int64]struct{}{}, time.Now(), handles.broadcastRepo)
+	if err != nil {
+		t.Fatalf("select redispatch candidate: %v", err)
+	}
+	if !ok || candidate.presence.UserID != timeoutProviderID {
+		t.Fatalf("expected timed-out provider to be reselected after radius bump, got ok=%v candidate=%#v", ok, candidate)
+	}
+}
+
+func TestRedispatchOrderRejectsNonDispatchFailedStatus(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-REDISPATCH-BAD-STATE", "light_heavy", 22.5431, 114.0579, 168000)
+
+	_, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{PriceBumpPercent: 10})
+	if !errors.Is(err, ErrBroadcastConflict) || !errors.Is(err, ErrBroadcastStatusInvalid) {
+		t.Fatalf("expected status invalid broadcast conflict, got %v", err)
+	}
+}
+
+func TestRedispatchOrderCountAccumulatesAndCapsFourthAttempt(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	config := NewSystemConfigService(handles.orderRepo.DB())
+	service.SetSystemConfigService(config)
+	if _, err := config.Upsert("broadcast.redispatch.cooldown_seconds", "0", "disable cooldown for count test"); err != nil {
+		t.Fatalf("set cooldown config: %v", err)
+	}
+	order := seedRedispatchableOrder(t, handles.orderRepo, "WRJ-H3-REDISPATCH-COUNT", 100000, `{"matching_radius_km":30}`)
+
+	for want := 1; want <= defaultRedispatchMaxCountPerOrder; want++ {
+		if _, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{PriceBumpPercent: 10}); err != nil {
+			t.Fatalf("redispatch attempt %d: %v", want, err)
+		}
+		if got := redispatchCountForOrder(t, handles.orderRepo, order.ID); got != want {
+			t.Fatalf("expected redispatch_count=%d, got %d", want, got)
+		}
+		markOrderDispatchFailed(t, handles.orderRepo, order.ID)
+	}
+
+	_, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{PriceBumpPercent: 10})
+	if !errors.Is(err, ErrBroadcastConflict) || !errors.Is(err, ErrRedispatchCapped) {
+		t.Fatalf("expected capped broadcast conflict on fourth attempt, got %v", err)
+	}
+}
+
+func TestRedispatchOrderCooldownRateLimitsAndAllowsAfterWindow(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	order := seedRedispatchableOrder(
+		t,
+		handles.orderRepo,
+		"WRJ-H3-REDISPATCH-COOLDOWN",
+		100000,
+		`{"matching_radius_km":30,"redispatch_count":1,"redispatch_last_at":"`+time.Now().Format(time.RFC3339)+`"}`,
+	)
+
+	_, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{RadiusBumpKM: 10})
+	if !errors.Is(err, ErrBroadcastConflict) || !errors.Is(err, ErrRedispatchRateLimited) {
+		t.Fatalf("expected rate limited broadcast conflict, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "秒后再试") {
+		t.Fatalf("expected remaining seconds in rate limit message, got %v", err)
+	}
+	if got := redispatchCountForOrder(t, handles.orderRepo, order.ID); got != 1 {
+		t.Fatalf("rate-limited attempt must not increment count, got %d", got)
+	}
+
+	oldLastAt := time.Now().Add(-2 * time.Minute).Format(time.RFC3339)
+	if err := handles.orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"price_breakdown_json": model.JSON(`{"matching_radius_km":30,"redispatch_count":1,"redispatch_last_at":"` + oldLastAt + `"}`),
+	}); err != nil {
+		t.Fatalf("move last redispatch time back: %v", err)
+	}
+	if _, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{RadiusBumpKM: 10}); err != nil {
+		t.Fatalf("redispatch after cooldown: %v", err)
+	}
+	if got := redispatchCountForOrder(t, handles.orderRepo, order.ID); got != 2 {
+		t.Fatalf("expected count to increment after cooldown, got %d", got)
+	}
+}
+
+func TestRedispatchOrderMaxCountZeroDisablesCap(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	config := NewSystemConfigService(handles.orderRepo.DB())
+	service.SetSystemConfigService(config)
+	if _, err := config.Upsert("broadcast.redispatch.max_count_per_order", "0", "disable max count for test"); err != nil {
+		t.Fatalf("set max count config: %v", err)
+	}
+	if _, err := config.Upsert("broadcast.redispatch.cooldown_seconds", "0", "disable cooldown for test"); err != nil {
+		t.Fatalf("set cooldown config: %v", err)
+	}
+	order := seedRedispatchableOrder(t, handles.orderRepo, "WRJ-H3-REDISPATCH-NO-CAP", 100000, `{"matching_radius_km":30,"redispatch_count":99}`)
+
+	if _, err := service.RedispatchOrder(order.ID, RedispatchOrderOptions{PriceBumpPercent: 10}); err != nil {
+		t.Fatalf("redispatch with max_count=0: %v", err)
+	}
+	if got := redispatchCountForOrder(t, handles.orderRepo, order.ID); got != 100 {
+		t.Fatalf("expected redispatch_count to continue from 99 to 100, got %d", got)
 	}
 }
 
@@ -688,6 +1048,39 @@ func seedBroadcastOrder(t *testing.T, orderRepo *repository.OrderRepo, orderNo, 
 		t.Fatalf("create order %s: %v", orderNo, err)
 	}
 	return order
+}
+
+func seedRedispatchableOrder(t *testing.T, orderRepo *repository.OrderRepo, orderNo string, amount int64, priceBreakdownJSON string) *model.Order {
+	t.Helper()
+	order := seedBroadcastOrder(t, orderRepo, orderNo, "light_heavy", 22.5431, 114.0579, amount)
+	if strings.TrimSpace(priceBreakdownJSON) == "" {
+		priceBreakdownJSON = `{"matching_radius_km":30}`
+	}
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"status":               "dispatch_failed",
+		"price_breakdown_json": model.JSON(priceBreakdownJSON),
+	}); err != nil {
+		t.Fatalf("make order redispatchable: %v", err)
+	}
+	order.Status = "dispatch_failed"
+	order.PriceBreakdownJSON = model.JSON(priceBreakdownJSON)
+	return order
+}
+
+func markOrderDispatchFailed(t *testing.T, orderRepo *repository.OrderRepo, orderID int64) {
+	t.Helper()
+	if err := orderRepo.UpdateFields(orderID, map[string]interface{}{"status": "dispatch_failed"}); err != nil {
+		t.Fatalf("mark order dispatch_failed: %v", err)
+	}
+}
+
+func redispatchCountForOrder(t *testing.T, orderRepo *repository.OrderRepo, orderID int64) int {
+	t.Helper()
+	order, err := orderRepo.GetByID(orderID)
+	if err != nil {
+		t.Fatalf("reload order: %v", err)
+	}
+	return readRedispatchMeta(order).count
 }
 
 func seedProviderPresence(t *testing.T, service *BroadcastService, userID int64, lat, lng float64, serviceClasses []string, radiusKM float64) {

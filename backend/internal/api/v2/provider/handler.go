@@ -2,6 +2,7 @@ package provider
 
 import (
 	"errors"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,28 @@ type presenceRequest struct {
 
 type declineAssignmentRequest struct {
 	Reason string `json:"reason"`
+}
+
+const (
+	broadcastCodeLockedByAssign      = "BROADCAST_LOCKED_BY_ASSIGN"
+	broadcastCodeTaken               = "BROADCAST_TAKEN"
+	broadcastCodeStatusInvalid       = "BROADCAST_STATUS_INVALID"
+	broadcastCodePreviouslyCancelled = "BROADCAST_PREVIOUSLY_CANCELLED"
+)
+
+func broadcastConflictCode(err error) string {
+	switch {
+	case errors.Is(err, service.ErrBroadcastLockedByAssign):
+		return broadcastCodeLockedByAssign
+	case errors.Is(err, service.ErrBroadcastTakenByOther):
+		return broadcastCodeTaken
+	case errors.Is(err, service.ErrBroadcastStatusInvalid):
+		return broadcastCodeStatusInvalid
+	case errors.Is(err, service.ErrBroadcastPreviouslyCancelled):
+		return broadcastCodePreviouslyCancelled
+	default:
+		return response.V2CodeConflict
+	}
 }
 
 func (h *Handler) Online(c *gin.Context) {
@@ -125,7 +148,7 @@ func (h *Handler) GrabBroadcast(c *gin.Context) {
 	order, err := h.broadcastService.Grab(broadcastID, userID)
 	if err != nil {
 		if errors.Is(err, service.ErrBroadcastConflict) {
-			response.V2Conflict(c, err.Error())
+			response.V2Error(c, http.StatusConflict, broadcastConflictCode(err), err.Error())
 			return
 		}
 		if errors.Is(err, service.ErrProviderNotSelfExecutable) {

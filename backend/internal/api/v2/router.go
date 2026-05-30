@@ -110,7 +110,7 @@ func NewHandlers(authService *service.AuthService, userService *service.UserServ
 		Owner:        v2owner.NewHandler(ownerService, droneService),
 		Pilot:        v2pilot.NewHandler(pilotService, uploadService),
 		Provider:     v2provider.NewHandler(broadcastService),
-		Order:        v2order.NewHandler(orderService, dispatchService, flightService, pricingService, settlementService),
+		Order:        v2order.NewHandler(orderService, dispatchService, flightService, pricingService, settlementService, broadcastService),
 		Dispatch:     v2dispatch.NewHandler(dispatchService, orderService),
 		Flight:       v2flight.NewHandler(flightService, orderService),
 		Message:      v2message.NewHandler(messageService),
@@ -209,6 +209,11 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 				clientGroup.GET("/admin/pending", lt.Client.AdminListPendingVerification)
 				clientGroup.GET("/admin/cargo/pending", lt.Client.AdminListPendingCargoDeclarations)
 			}
+		}
+
+		customerOrderGroup := authenticated.Group("/customer/orders")
+		{
+			customerOrderGroup.POST("/:order_id/redispatch", h.Order.Redispatch)
 		}
 
 		supplyGroup := authenticated.Group("/supplies")
@@ -387,6 +392,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.POST("/:order_id/provider-reject", h.Order.ProviderReject)
 			orderGroup.POST("/:order_id/pay", h.Payment.CreateOrderPayment)
 			orderGroup.POST("/:order_id/cancel", h.Order.Cancel)
+			orderGroup.POST("/:order_id/redispatch", h.Order.Redispatch)
 			orderGroup.POST("/:order_id/start-preparing", h.Order.StartPreparing)
 			orderGroup.POST("/:order_id/start-flight", h.Order.StartFlight)
 			orderGroup.POST("/:order_id/confirm-delivery", h.Order.ConfirmDelivery)

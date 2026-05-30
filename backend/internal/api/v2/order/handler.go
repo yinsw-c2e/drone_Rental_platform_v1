@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -27,6 +29,7 @@ type Handler struct {
 	flightService     *service.FlightService
 	pricingService    *service.PricingService
 	settlementService *service.SettlementService
+	broadcastService  *service.BroadcastService
 	contractService   *service.ContractService
 }
 
@@ -44,13 +47,14 @@ type aggregatedOrderTimelineEvent struct {
 	Payload      gin.H     `json:"payload,omitempty"`
 }
 
-func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, settlementService *service.SettlementService) *Handler {
+func NewHandler(orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, settlementService *service.SettlementService, broadcastService *service.BroadcastService) *Handler {
 	return &Handler{
 		orderService:      orderService,
 		dispatchService:   dispatchService,
 		flightService:     flightService,
 		pricingService:    pricingService,
 		settlementService: settlementService,
+		broadcastService:  broadcastService,
 	}
 }
 
@@ -420,6 +424,147 @@ func (h *Handler) Cancel(c *gin.Context) {
 		}
 	}
 	response.V2Success(c, buildOrderSummary(updated))
+}
+
+type redispatchOrderRequest struct {
+	PriceBumpYuan    *float64 `json:"price_bump_yuan"`
+	PriceBumpPercent *float64 `json:"price_bump_percent"`
+	RadiusBumpKM     *float64 `json:"radius_bump_km"`
+}
+
+const (
+	broadcastCodeLockedByAssign      = "BROADCAST_LOCKED_BY_ASSIGN"
+	broadcastCodeTaken               = "BROADCAST_TAKEN"
+	broadcastCodeStatusInvalid       = "BROADCAST_STATUS_INVALID"
+	broadcastCodePreviouslyCancelled = "BROADCAST_PREVIOUSLY_CANCELLED"
+	redispatchCodeRateLimited        = "REDISPATCH_RATE_LIMITED"
+	redispatchCodeCapped             = "REDISPATCH_CAPPED"
+)
+
+func (req redispatchOrderRequest) toOptions(defaultPriceBumpPercent, defaultRadiusBumpKM float64, operatorUserID int64) (service.RedispatchOrderOptions, error) {
+	hasPrice := req.PriceBumpYuan != nil || req.PriceBumpPercent != nil
+	hasRadius := req.RadiusBumpKM != nil
+	if !hasPrice && !hasRadius {
+		return service.RedispatchOrderOptions{}, errors.New("请至少选择加价或扩大半径")
+	}
+	opts := service.RedispatchOrderOptions{OperatorUserID: operatorUserID}
+	if req.PriceBumpYuan != nil && req.PriceBumpPercent != nil && *req.PriceBumpYuan > 0 && *req.PriceBumpPercent > 0 {
+		return opts, errors.New("加价金额和加价百分比不能同时传")
+	}
+	if req.PriceBumpPercent != nil {
+		if *req.PriceBumpPercent < 0 {
+			return opts, errors.New("加价百分比不能小于0")
+		}
+		opts.PriceBumpPercent = *req.PriceBumpPercent
+		if opts.PriceBumpPercent == 0 {
+			opts.PriceBumpPercent = defaultPriceBumpPercent
+		}
+	}
+	if req.PriceBumpYuan != nil && opts.PriceBumpPercent == 0 {
+		if *req.PriceBumpYuan < 0 {
+			return opts, errors.New("加价金额不能小于0")
+		}
+		if *req.PriceBumpYuan == 0 {
+			opts.PriceBumpPercent = defaultPriceBumpPercent
+		} else {
+			opts.PriceBumpCents = int64(math.Round(*req.PriceBumpYuan * 100))
+		}
+	}
+	if req.RadiusBumpKM != nil {
+		if *req.RadiusBumpKM < 0 {
+			return opts, errors.New("扩大半径不能小于0")
+		}
+		opts.RadiusBumpKM = *req.RadiusBumpKM
+		if opts.RadiusBumpKM == 0 {
+			opts.RadiusBumpKM = defaultRadiusBumpKM
+		}
+	}
+	return opts, nil
+}
+
+func redispatchConflictResponse(err error) (int, string) {
+	switch {
+	case errors.Is(err, service.ErrRedispatchRateLimited):
+		return http.StatusTooManyRequests, redispatchCodeRateLimited
+	case errors.Is(err, service.ErrRedispatchCapped):
+		return http.StatusConflict, redispatchCodeCapped
+	case errors.Is(err, service.ErrBroadcastLockedByAssign):
+		return http.StatusConflict, broadcastCodeLockedByAssign
+	case errors.Is(err, service.ErrBroadcastTakenByOther):
+		return http.StatusConflict, broadcastCodeTaken
+	case errors.Is(err, service.ErrBroadcastStatusInvalid):
+		return http.StatusConflict, broadcastCodeStatusInvalid
+	case errors.Is(err, service.ErrBroadcastPreviouslyCancelled):
+		return http.StatusConflict, broadcastCodePreviouslyCancelled
+	default:
+		return http.StatusConflict, response.V2CodeConflict
+	}
+}
+
+func broadcastConflictMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	return strings.TrimPrefix(err.Error(), service.ErrBroadcastConflict.Error()+": ")
+}
+
+func (h *Handler) Redispatch(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	if h.broadcastService == nil {
+		response.V2InternalError(c, "重发广播服务未初始化")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+
+	var req redispatchOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "invalid redispatch payload")
+		return
+	}
+	opts, err := req.toOptions(
+		h.broadcastService.RedispatchBumpPercentDefault(),
+		h.broadcastService.RedispatchRadiusBumpKMDefault(),
+		userID,
+	)
+	if err != nil {
+		response.V2ValidationError(c, err.Error())
+		return
+	}
+
+	if _, err := h.orderService.GetAuthorizedOrder(orderID, userID, "client"); err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	result, err := h.broadcastService.RedispatchOrder(orderID, opts)
+	if err != nil {
+		if errors.Is(err, service.ErrBroadcastConflict) {
+			status, code := redispatchConflictResponse(err)
+			response.V2Error(c, status, code, broadcastConflictMessage(err))
+			return
+		}
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, gin.H{
+		"order": buildOrderSummary(result.Order),
+		"broadcast": gin.H{
+			"id":           result.Broadcast.ID,
+			"status":       result.Broadcast.Status,
+			"expires_at":   result.Broadcast.ExpiresAt,
+			"total_amount": result.Broadcast.EstimatedTotalCents,
+			"created_at":   result.Broadcast.CreatedAt,
+			"matching_km":  result.MatchingRadiusKM,
+			"price_bump":   result.PriceBumpCents,
+		},
+	})
 }
 
 func (h *Handler) Dispatch(c *gin.Context) {

@@ -4,7 +4,7 @@ import "time"
 
 type OrderBroadcast struct {
 	ID                  int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID             int64      `gorm:"uniqueIndex;not null" json:"order_id"`
+	OrderID             int64      `gorm:"index;not null" json:"order_id"`
 	OriginLatitude      float64    `gorm:"type:decimal(10,7);index" json:"origin_latitude"`
 	OriginLongitude     float64    `gorm:"type:decimal(10,7);index" json:"origin_longitude"`
 	ServiceClassCode    string     `gorm:"type:varchar(50);index" json:"service_class_code"`
@@ -25,12 +25,13 @@ func (OrderBroadcast) TableName() string {
 }
 
 type OrderBroadcastExclusion struct {
-	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID        int64     `gorm:"uniqueIndex:uk_broadcast_exclusion_order_provider;index;not null" json:"order_id"`
-	BroadcastID    int64     `gorm:"index;not null" json:"broadcast_id"`
-	ProviderUserID int64     `gorm:"uniqueIndex:uk_broadcast_exclusion_order_provider;index;not null" json:"provider_user_id"`
-	Reason         string    `gorm:"type:varchar(64);not null;default:''" json:"reason"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID        int64      `gorm:"uniqueIndex:uk_broadcast_exclusion_order_provider;index;not null" json:"order_id"`
+	BroadcastID    int64      `gorm:"index;not null" json:"broadcast_id"`
+	ProviderUserID int64      `gorm:"uniqueIndex:uk_broadcast_exclusion_order_provider;index;not null" json:"provider_user_id"`
+	Reason         string     `gorm:"type:varchar(64);not null;default:''" json:"reason"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ExpiresAt      *time.Time `gorm:"index" json:"expires_at"`
 }
 
 func (OrderBroadcastExclusion) TableName() string {

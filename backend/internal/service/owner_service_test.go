@@ -473,14 +473,14 @@ func TestOwnerServiceListRecommendedDemandsSortsByOwnerSupplyDistance(t *testing
 	if err != nil {
 		t.Fatalf("ListRecommendedDemands() error = %v", err)
 	}
-	if total != 2 || len(demands) != 2 {
-		t.Fatalf("expected 2 demands, got total=%d len=%d", total, len(demands))
+	if total != 1 || len(demands) != 1 {
+		t.Fatalf("expected only in-range demand, got total=%d len=%d", total, len(demands))
 	}
 	if demands[0].ID != nearDemand.ID {
 		t.Fatalf("expected nearest demand first, got %d", demands[0].ID)
 	}
 
-	metrics, err := ownerService.GetRecommendedDemandMetrics(ownerUser.ID, demands)
+	metrics, err := ownerService.GetRecommendedDemandMetrics(ownerUser.ID, []model.Demand{*nearDemand, *farDemand})
 	if err != nil {
 		t.Fatalf("GetRecommendedDemandMetrics() error = %v", err)
 	}
@@ -509,5 +509,108 @@ func TestOwnerServiceListRecommendedDemandsSortsByOwnerSupplyDistance(t *testing
 	}
 	if farMetric.EstimatedArrivalMin != nil {
 		t.Fatalf("expected far demand to omit estimated arrival when out of range, got %#v", farMetric.EstimatedArrivalMin)
+	}
+}
+
+func TestOwnerServiceListRecommendedDemandsFallsBackToDroneDistance(t *testing.T) {
+	now := time.Now()
+	db := newServiceTestDB(t,
+		&model.User{},
+		&model.Drone{},
+		&model.OwnerSupply{},
+		&model.Demand{},
+	)
+
+	ownerUser := &model.User{ID: 1201, Phone: "13800001201", Nickname: "无供给服务商", Status: "active"}
+	clientUser := &model.User{ID: 1202, Phone: "13800001202", Nickname: "客户", Status: "active"}
+	if err := db.Create([]*model.User{ownerUser, clientUser}).Error; err != nil {
+		t.Fatalf("create users: %v", err)
+	}
+	drone := &model.Drone{
+		ID:                    2201,
+		OwnerID:               ownerUser.ID,
+		Brand:                 "E2E",
+		Model:                 "HeavyLift",
+		SerialNumber:          "DIST-DRONE-FALLBACK",
+		MTOWKG:                180,
+		MaxPayloadKG:          80,
+		MaxDistance:           30,
+		MaxFlightTime:         60,
+		Latitude:              23.0674,
+		Longitude:             113.1264,
+		AvailabilityStatus:    "available",
+		CertificationStatus:   "approved",
+		UOMVerified:           "verified",
+		InsuranceVerified:     "verified",
+		AirworthinessVerified: "verified",
+	}
+	if err := db.Create(drone).Error; err != nil {
+		t.Fatalf("create drone: %v", err)
+	}
+
+	expiresAt := now.Add(24 * time.Hour)
+	nearDemand := &model.Demand{
+		ID:                     3201,
+		DemandNo:               "DMDISTFALLBACK1",
+		ClientUserID:           clientUser.ID,
+		Title:                  "佛山近距离需求",
+		ServiceType:            "heavy_cargo_lift_transport",
+		CargoScene:             "power_grid",
+		ServiceAddressSnapshot: model.JSON(`{"text":"佛山近点","latitude":23.0678,"longitude":113.1270}`),
+		CargoWeightKG:          60,
+		BudgetMax:              100000,
+		ExpiresAt:              &expiresAt,
+		Status:                 "published",
+		CreatedAt:              now.Add(-2 * time.Hour),
+	}
+	farDemand := &model.Demand{
+		ID:                     3202,
+		DemandNo:               "DMDISTFALLBACK2",
+		ClientUserID:           clientUser.ID,
+		Title:                  "长沙远距离需求",
+		ServiceType:            "heavy_cargo_lift_transport",
+		CargoScene:             "power_grid",
+		ServiceAddressSnapshot: model.JSON(`{"text":"长沙远点","latitude":28.2391,"longitude":112.8739}`),
+		CargoWeightKG:          60,
+		BudgetMax:              100000,
+		ExpiresAt:              &expiresAt,
+		Status:                 "published",
+		CreatedAt:              now.Add(-1 * time.Hour),
+	}
+	if err := db.Create([]*model.Demand{farDemand, nearDemand}).Error; err != nil {
+		t.Fatalf("create demands: %v", err)
+	}
+
+	ownerService := NewOwnerService(
+		repository.NewUserRepo(db),
+		repository.NewDroneRepo(db),
+		repository.NewPilotRepo(db),
+		repository.NewRoleProfileRepo(db),
+		repository.NewOwnerDomainRepo(db),
+		repository.NewDemandDomainRepo(db),
+	)
+
+	demands, total, err := ownerService.ListRecommendedDemands(ownerUser.ID, 1, 20, RecommendedDemandQuery{
+		ServiceType: "heavy_cargo_lift_transport",
+		Sort:        "distance",
+	})
+	if err != nil {
+		t.Fatalf("ListRecommendedDemands() error = %v", err)
+	}
+	if total != 1 || len(demands) != 1 || demands[0].ID != nearDemand.ID {
+		t.Fatalf("expected only near demand from drone fallback, total=%d demands=%#v", total, demands)
+	}
+
+	metrics, err := ownerService.GetRecommendedDemandMetrics(ownerUser.ID, []model.Demand{*nearDemand, *farDemand})
+	if err != nil {
+		t.Fatalf("GetRecommendedDemandMetrics() error = %v", err)
+	}
+	nearMetric := metrics[nearDemand.ID]
+	farMetric := metrics[farDemand.ID]
+	if nearMetric.DistanceKM == nil || nearMetric.ServiceCoverageStatus != "in_range" || nearMetric.MatchedDroneID != drone.ID {
+		t.Fatalf("expected near demand in range through drone fallback, got %#v", nearMetric)
+	}
+	if farMetric.DistanceKM == nil || farMetric.ServiceCoverageStatus != "out_of_range" {
+		t.Fatalf("expected far demand to be measured but out of range, got %#v", farMetric)
 	}
 }

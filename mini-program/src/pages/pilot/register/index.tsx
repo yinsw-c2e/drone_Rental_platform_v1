@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Taro from "@tarojs/taro";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Image, Input, ScrollView, Text, View } from "@tarojs/components";
 
 import StatusBadge from "../../../components/business/StatusBadge";
@@ -48,6 +48,16 @@ const formatServiceBaseSubtitle = (lat: number, lng: number) => {
   return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 };
 
+const formatDateValue = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function PilotRegisterPage() {
   const [licenseType, setLicenseType] = useState("VLOS");
   const [licenseNo, setLicenseNo] = useState("");
@@ -64,6 +74,33 @@ export default function PilotRegisterPage() {
   const [healthExpireDate, setHealthExpireDate] = useState("");
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    pilotV2Service
+      .getProfile()
+      .then((profile: any) => {
+        if (cancelled || !profile) return;
+        if (profile.caac_license_type) setLicenseType(profile.caac_license_type);
+        setLicenseNo(profile.caac_license_no || "");
+        setLicenseExpireDate(formatDateValue(profile.caac_license_expire_at));
+        setLicenseImage(profile.caac_license_image || "");
+        setServiceRadius(
+          String(profile.service_radius_km || profile.service_radius || 50),
+        );
+        setCurrentCity(profile.current_city || "");
+        setServiceBaseAddress(profile.service_base_address || "");
+        setServiceBaseLatitude(Number(profile.service_base_latitude || 0));
+        setServiceBaseLongitude(Number(profile.service_base_longitude || 0));
+        if (Array.isArray(profile.special_skills) && profile.special_skills.length) {
+          setSpecialSkills(profile.special_skills.map(String));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const progress = useMemo(
     () =>

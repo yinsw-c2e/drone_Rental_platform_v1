@@ -981,6 +981,10 @@ grep -nE "client_request|duplicate|idx_orders_client_request_id|orders/instant|$
 - [ ] settlement 生成并入账
 - [ ] A 重启后仍登录
 - [ ] 双击下单只生成一单
+- [ ] dispatch_failed 触发后客户能取消
+- [ ] 排除表三种 reason 都写入
+- [ ] 退款 income_reversal 流水可追溯到原 income
+- [ ] 资金守恒：每个 user 的 net = 0
 
 ### 异常
 | 步骤 | 手机 | 现象 | 截图 | SQL/日志摘要 | 是否阻塞 |
@@ -1004,3 +1008,552 @@ SELECT '将清理订单' AS note, id, order_no FROM orders WHERE id IN ($ORDER_I
 ```
 
 如确需清理，请先确认相关外键和业务记录；建议保留数据用于后续回归，不提供默认删除脚本。
+
+## 13. 派单失败 + 客户取消
+
+目的：验证所有候选服务商拒绝或超时后，订单进入 `dispatch_failed`，A 能感知并取消。
+
+### 13.1 准备多个服务商号
+
+操作：
+
+- 准备至少 2 个服务商号 X / Y，资质均为 approved。
+- 确保 X / Y 服务半径覆盖 A 起吊点，且 accepted_service_classes 覆盖本单机型。
+- 用 admin/SQL 或脚本把其它在线服务商先下线，避免被非目标账号接单。
+- 建议先设置：
+
+```bash
+export X_PHONE="13900010004"
+export Y_PHONE="13900010003"
+
+export X_TOKEN=$(curl -s "$BASE_URL/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"phone\":\"$X_PHONE\",\"password\":\"$B_PASSWORD\"}" | jq -r '.data.token.access_token')
+
+export Y_TOKEN=$(curl -s "$BASE_URL/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"phone\":\"$Y_PHONE\",\"password\":\"$B_PASSWORD\"}" | jq -r '.data.token.access_token')
+```
+
+期望前端：
+
+- X / Y 进入服务商工作台后均可上线。
+- X / Y 工作台状态显示在线或综合就绪。
+- 其它服务商不会在工作台看到本轮订单。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, phone, nickname, status
+FROM users
+WHERE phone IN ('$X_PHONE', '$Y_PHONE');
+
+UPDATE provider_presences p
+LEFT JOIN users u ON u.id = p.user_id
+SET p.online = 0, p.status = 'offline', p.last_offline_at = NOW(3), p.updated_at = NOW(3)
+WHERE u.phone NOT IN ('$X_PHONE', '$Y_PHONE');
+
+SELECT
+  u.phone, p.online, p.status, p.accepted_service_classes,
+  p.max_radius_km, p.last_latitude, p.last_longitude
+FROM provider_presences p
+JOIN users u ON u.id = p.user_id
+WHERE u.phone IN ('$X_PHONE', '$Y_PHONE');
+"
+```
+
+期望：只有 X / Y 处于在线候选范围，坐标和半径能覆盖 A 起吊点。
+
+异常 catch grep：
+
+```bash
+grep -nE "provider_presences|online|offline|accepted_service_classes|radius|$X_PHONE|$Y_PHONE|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -160
+```
+
+### 13.2 A 下一单，所有服务商均拒绝
+
+操作：
+
+- A 按第 2 节重新下一单，记录新的 `ORDER_ID` / `BROADCAST_ID`。
+- X 收到一对一指派时主动拒绝；下一轮到 Y 时 Y 也主动拒绝。
+- 如果要走超时分支，让 X / Y 都不响应，等待 `accept_deadline_at` 超时。
+- 手动 curl 拒绝时先查 assignment id，再调用 decline：
+
+```bash
+$MYSQL -e "
+SELECT
+  a.id, a.order_id, a.provider_user_id, a.status,
+  a.assignment_seq, a.accept_deadline_at
+FROM broadcast_assignments a
+WHERE a.order_id=$ORDER_ID
+ORDER BY a.id DESC;
+"
+
+export X_ASSIGNMENT_ID="替换为 X 的 assignment id"
+
+curl -s "$BASE_URL/provider/broadcast-assignments/$X_ASSIGNMENT_ID/decline" \
+  -H "Authorization: Bearer $X_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"E2E 主动拒绝"}' | jq '{code,message,data}'
+```
+
+期望前端：
+
+- A 订单详情/列表逐渐变成“暂无服务商”状态。
+- A 仍停留在订单详情或订单列表，不应白屏。
+- X / Y 拒绝后不应再次收到同一单指派。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, order_no, status, provider_user_id, grabbed_by_user_id, updated_at
+FROM orders
+WHERE id=$ORDER_ID;
+
+SELECT id, order_id, status, expires_at, grabbed_by_user_id, grabbed_at
+FROM order_broadcasts
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT
+  e.order_id, e.broadcast_id, e.provider_user_id, u.phone,
+  e.reason, e.created_at
+FROM order_broadcast_exclusions e
+JOIN users u ON u.id = e.provider_user_id
+WHERE e.order_id=$ORDER_ID
+ORDER BY e.id;
+
+SELECT
+  id, provider_user_id, status, assignment_seq,
+  accept_deadline_at, responded_at
+FROM broadcast_assignments
+WHERE order_id=$ORDER_ID
+ORDER BY id;
+"
+```
+
+期望：
+
+- `orders.status = dispatch_failed`
+- 最新 `order_broadcasts.status = expired`
+- `order_broadcast_exclusions` 里 X / Y 都有记录。
+- 拒绝分支 reason 为 `assignment_declined`，超时分支 reason 为 `assignment_timeout`。
+
+异常 catch grep：
+
+```bash
+grep -nE "dispatch_failed|候选耗尽|exclusion|expired|assignment_declined|assignment_timeout|$ORDER_ID|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -200
+```
+
+### 13.3 客户在 dispatch_failed 状态下取消
+
+操作：
+
+- A 打开该订单详情。
+- 确认状态显示“暂无服务商”。
+- 点击“取消订单”。
+- 如果前端不方便操作，可用 curl 验证同一路径：
+
+```bash
+curl -s "$BASE_URL/orders/$ORDER_ID/cancel" \
+  -H "Authorization: Bearer $A_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"E2E dispatch_failed 后客户取消"}' | jq '{code,message,data}'
+```
+
+期望前端：
+
+- 详情页能看到“取消订单”按钮，不再灰态。
+- 点击后 toast 或弹层提示取消成功。
+- 订单详情/列表状态变成“已取消 / cancelled”。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, order_no, status, cancel_by, cancel_reason, updated_at
+FROM orders
+WHERE id=$ORDER_ID;
+
+SELECT status, note, operator_type, created_at
+FROM order_timelines
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC
+LIMIT 10;
+"
+```
+
+期望：`orders.status=cancelled`，timeline 有 `cancelled` 记录；若订单已支付，继续按 13.4 验退款。
+
+异常 catch grep：
+
+```bash
+grep -nE "$ORDER_ID|dispatch_failed|cancel|RefundPayment|refund|403|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -200
+```
+
+### 13.4 假支付场景下验取消触发的退款
+
+操作：
+
+- 因为支付是 mock，先用 SQL 把一张 `dispatch_failed` 订单标记为 paid。
+- 同时写入一笔 mock payment 和一笔用户 wallet income 流水，记录原 income id。
+- 再按 13.3 触发取消。
+
+```bash
+export MOCK_PAYMENT_NO="PAY-E2E-$ORDER_ID-$(date +%H%M%S)"
+export MOCK_TX_NO="TX-E2E-$ORDER_ID-$(date +%H%M%S)"
+
+$MYSQL -e "
+INSERT INTO payments (
+  payment_no, order_id, user_id, payment_type, payment_method,
+  amount, status, third_party_no, paid_at, created_at, updated_at
+)
+SELECT
+  '$MOCK_PAYMENT_NO', o.id, o.client_user_id, 'order', 'mock',
+  o.total_amount, 'paid', '$MOCK_PAYMENT_NO', NOW(3), NOW(3), NOW(3)
+FROM orders o
+WHERE o.id=$ORDER_ID
+  AND NOT EXISTS (
+    SELECT 1 FROM payments p
+    WHERE p.order_id=o.id AND p.payment_type='order' AND p.status='paid'
+  );
+
+UPDATE orders SET paid_at=COALESCE(paid_at, NOW(3)), updated_at=NOW(3)
+WHERE id=$ORDER_ID;
+
+INSERT INTO user_wallets (
+  user_id, wallet_type, available_balance, frozen_balance,
+  total_income, total_withdrawn, total_frozen, status, created_at, updated_at
+)
+SELECT o.client_user_id, 'general', 0, 0, 0, 0, 0, 'active', NOW(3), NOW(3)
+FROM orders o
+WHERE o.id=$ORDER_ID
+ON DUPLICATE KEY UPDATE updated_at=VALUES(updated_at);
+
+INSERT INTO wallet_transactions (
+  transaction_no, wallet_id, user_id, type, amount,
+  balance_before, balance_after, related_order_id,
+  related_settlement_id, related_transaction_id, description, created_at
+)
+SELECT
+  '$MOCK_TX_NO', w.id, o.client_user_id, 'income', o.total_amount,
+  0, o.total_amount, o.id, 0, 0, 'E2E mock paid income', NOW(3)
+FROM orders o
+JOIN user_wallets w ON w.user_id=o.client_user_id
+WHERE o.id=$ORDER_ID
+  AND NOT EXISTS (
+    SELECT 1 FROM wallet_transactions wt
+    WHERE wt.related_order_id=o.id AND wt.type='income' AND wt.transaction_no='$MOCK_TX_NO'
+  );
+"
+
+export ORIGINAL_TX_ID=$($MYSQL -N -e "
+SELECT id
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID AND type='income'
+ORDER BY id DESC
+LIMIT 1;
+")
+
+echo "$ORIGINAL_TX_ID"
+```
+
+期望前端：
+
+- A 取消后看到订单取消成功。
+- 退款处理后订单详情能看到退款或取消记录。
+- 不应出现重复退款 toast 或页面卡死。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, refund_no, order_id, payment_id, related_transaction_id, amount, status, created_at, updated_at
+FROM refunds
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT
+  id, transaction_no, user_id, type, amount,
+  related_order_id, related_transaction_id, description, created_at
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+ORDER BY id;
+
+SELECT user_id,
+       SUM(CASE WHEN type='income' THEN amount
+                WHEN type='income_reversal' THEN amount
+                ELSE 0 END) AS net_for_order
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+GROUP BY user_id;
+"
+```
+
+期望：
+
+- `wallet_transactions` 多一条 `type=income_reversal`。
+- `income_reversal.amount` 是负数。
+- `income_reversal.related_transaction_id = $ORIGINAL_TX_ID`。
+- 每个 user 的 `net_for_order = 0`。
+
+异常 catch grep：
+
+```bash
+grep -nE "$ORDER_ID|RefundPayment|income_reversal|related_transaction_id|wallet_transactions|refunds|资金守恒|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -240
+```
+
+## 14. 退款资金守恒专项
+
+目的：单独把退款链路从端到端跑一次，覆盖取消和异常退款的 4 个状态场景。
+
+### 14.1 pending_dispatch 取消（无服务商）
+
+操作：
+
+- A 下一张即时单，记录新的 `ORDER_ID`。
+- 保持订单未被服务商抢到，确认 `orders.status=pending_dispatch`。
+- 如需模拟已支付，复用 13.4 的 mock payment + income SQL。
+- A 在订单详情点击“取消订单”。
+
+期望前端：
+
+- 取消按钮可用。
+- 取消成功后订单状态变为“已取消 / cancelled”。
+- 如果已支付，订单详情能看到退款记录或取消退款提示。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, order_no, status, paid_at, cancel_by, cancel_reason, updated_at
+FROM orders
+WHERE id=$ORDER_ID;
+
+SELECT id, refund_no, related_transaction_id, amount, status, created_at
+FROM refunds
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT
+  id, user_id, type, amount, related_order_id,
+  related_transaction_id, created_at
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+ORDER BY id;
+
+SELECT status, total_amount, final_amount, platform_fee, pilot_fee, owner_fee
+FROM order_settlements
+WHERE order_id=$ORDER_ID;
+
+SELECT user_id,
+       SUM(CASE WHEN type='income' THEN amount
+                WHEN type='income_reversal' THEN amount
+                ELSE 0 END) AS net_for_order
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+GROUP BY user_id;
+"
+```
+
+期望：未支付单无退款流水；已支付单有 `income_reversal`，每个 user 的 `net_for_order=0`。
+
+异常 catch grep：
+
+```bash
+grep -nE "$ORDER_ID|pending_dispatch|cancel|RefundPayment|income_reversal|refunds|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -220
+```
+
+### 14.2 assigned 取消（服务商已接但未起飞）
+
+操作：
+
+- A 下一单，B 或 Y 抢单成功，确认 `orders.status=assigned`。
+- 如需模拟已支付，复用 13.4 的 mock payment + income SQL。
+- A 在服务商未点“开始准备”前取消订单。
+
+期望前端：
+
+- 免费取消期内应能取消成功。
+- 超过免费取消期时，前端应显示扣费或取消失败提示，按当前规则记录。
+- 取消成功后 B/Y 不应还能推进该订单。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT
+  id, order_no, status, provider_user_id,
+  grabbed_by_user_id, grabbed_at, cancel_by, cancel_reason, updated_at
+FROM orders
+WHERE id=$ORDER_ID;
+
+SELECT id, refund_no, related_transaction_id, amount, status, reason, created_at
+FROM refunds
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT
+  id, user_id, type, amount, balance_before, balance_after,
+  related_order_id, related_transaction_id, created_at
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+ORDER BY id;
+
+SELECT status, total_amount, final_amount, platform_fee, pilot_fee, owner_fee
+FROM order_settlements
+WHERE order_id=$ORDER_ID;
+
+SELECT user_id,
+       SUM(CASE WHEN type='income' THEN amount
+                WHEN type='income_reversal' THEN amount
+                ELSE 0 END) AS net_for_order
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+GROUP BY user_id;
+"
+```
+
+期望：免费取消场景资金守恒为 0；扣费场景记录实际扣费原因，不能重复写退款。
+
+异常 catch grep：
+
+```bash
+grep -nE "$ORDER_ID|assigned|cancel|grace_window|RefundPayment|income_reversal|403|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -240
+```
+
+### 14.3 in_transit 取消（飞行中进入争议）
+
+操作：
+
+- A 下一单，B/Y 抢单并推进到“开始飞行”，确认 `orders.status=in_transit`。
+- A 在飞行中点击“取消订单”。
+- 如果前端没有取消入口，用 curl 调接口验证后端行为：
+
+```bash
+curl -s "$BASE_URL/orders/$ORDER_ID/cancel" \
+  -H "Authorization: Bearer $A_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"E2E 飞行中取消争议验证"}' | jq '{code,message,data}'
+```
+
+期望前端：
+
+- 不应直接取消成功并退款。
+- 应提示服务已开始、进入争议或需要平台处理。
+- 订单不应从 `in_transit` 直接变为 `cancelled`。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, order_no, status, cancel_by, cancel_reason, updated_at
+FROM orders
+WHERE id=$ORDER_ID;
+
+SELECT id, order_id, initiator_user_id, dispute_type, status, summary, created_at
+FROM dispute_records
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT id, refund_no, related_transaction_id, amount, status, reason, created_at
+FROM refunds
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT
+  id, user_id, type, amount, related_order_id,
+  related_transaction_id, created_at
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+ORDER BY id;
+
+SELECT status, total_amount, final_amount, platform_fee, pilot_fee, owner_fee
+FROM order_settlements
+WHERE order_id=$ORDER_ID;
+
+SELECT user_id,
+       SUM(CASE WHEN type='income' THEN amount
+                WHEN type='income_reversal' THEN amount
+                ELSE 0 END) AS net_for_order
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+GROUP BY user_id;
+"
+```
+
+期望：`orders.status` 保持 `in_transit`；`dispute_records` 有 `cancel_request`；不应新增直接退款。
+
+异常 catch grep：
+
+```bash
+grep -nE "$ORDER_ID|in_transit|cancel_request|dispute|refund|income_reversal|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -240
+```
+
+### 14.4 completed 后申请退款（异常路径）
+
+操作：
+
+- 跑完一单到 `completed`，确认 settlement 已生成。
+- A 在订单完成后尝试申请退款。
+- 如果前端没有入口，用接口直接验证：
+
+```bash
+curl -s "$BASE_URL/orders/$ORDER_ID/refund" \
+  -H "Authorization: Bearer $A_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"reason":"E2E completed 后异常退款验证"}' | jq '{code,message,data}'
+```
+
+期望前端：
+
+- 如果当前版本没有售后退款入口，记录为前端入口缺失。
+- 如果有入口，应进入售后/争议流程，不应直接扣回服务商钱包。
+- 页面不能白屏，不能重复提交多笔退款。
+
+后端/DB 验证：
+
+```bash
+$MYSQL -e "
+SELECT id, order_no, status, completed_at, updated_at
+FROM orders
+WHERE id=$ORDER_ID;
+
+SELECT
+  id, order_id, status, total_amount, final_amount,
+  platform_fee, pilot_fee, owner_fee, settled_at, updated_at
+FROM order_settlements
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT id, refund_no, related_transaction_id, amount, status, reason, created_at
+FROM refunds
+WHERE order_id=$ORDER_ID
+ORDER BY id DESC;
+
+SELECT
+  id, user_id, type, amount, balance_before, balance_after,
+  related_order_id, related_settlement_id, related_transaction_id, created_at
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+ORDER BY id;
+
+SELECT user_id,
+       SUM(CASE WHEN type='income' THEN amount
+                WHEN type='income_reversal' THEN amount
+                ELSE 0 END) AS net_for_order
+FROM wallet_transactions
+WHERE related_order_id=$ORDER_ID
+GROUP BY user_id;
+"
+```
+
+期望：完成后退款不得绕过售后/争议规则；若创建退款，必须有 `related_transaction_id`，且资金守恒可解释。
+
+异常 catch grep：
+
+```bash
+grep -nE "$ORDER_ID|completed|refund|RefundPayment|income_reversal|settlement|dispute|售后|ERROR|panic" /tmp/wurenji-backend-e2e.log | tail -260
+```

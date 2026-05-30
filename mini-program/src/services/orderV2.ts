@@ -23,6 +23,12 @@ export type OrderV2ListParams = {
   page_size?: number;
 };
 
+export type RedispatchOrderPayload = {
+  price_bump_percent?: number;
+  price_bump_yuan?: number;
+  radius_bump_km?: number;
+};
+
 export const orderV2Service = {
   listServiceClasses: () =>
     apiV2.get<V2ServiceClass[]>('/service-classes'),
@@ -70,6 +76,9 @@ export const orderV2Service = {
 
   cancel: (orderId: number, reason?: string) =>
     apiV2.post<V2OrderSummary>(`/orders/${orderId}/cancel`, { reason }),
+
+  redispatch: (orderId: number, payload: RedispatchOrderPayload) =>
+    apiV2.post<{ order: V2OrderSummary }>(`/customer/orders/${orderId}/redispatch`, payload),
 
   addTip: (orderId: number, amount: number) =>
     apiV2.post(`/orders/${orderId}/tip`, { amount, payment_method: 'mock' }),

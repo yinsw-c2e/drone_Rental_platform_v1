@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,12 +44,53 @@ const (
 	defaultAutoAssignDistanceWeight   = 0.6
 	defaultAutoAssignRatingWeight     = 0.2
 	defaultAutoAssignCompletionWeight = 0.2
+
+	defaultRedispatchBumpPercent      = 10.0
+	defaultRedispatchRadiusBumpKM     = 10.0
+	defaultRedispatchRadiusMaxKM      = 50.0
+	defaultRedispatchMaxCountPerOrder = 3
+	defaultRedispatchCooldownSeconds  = 60
+	redispatchMatchingRadiusJSONKey   = "matching_radius_km"
+	redispatchLegacyRadiusJSONKey     = "redispatch_matching_radius_km"
+	redispatchPriceBumpCentsJSONKey   = "redispatch_price_bump_cents"
+	redispatchPriceBumpPercentJSONKey = "redispatch_price_bump_percent"
+	redispatchCountJSONKey            = "redispatch_count"
+	redispatchLastAtJSONKey           = "redispatch_last_at"
 )
 
 var (
-	ErrBroadcastConflict         = errors.New("广播单已被抢或已失效")
-	ErrProviderNotSelfExecutable = errors.New("provider_not_self_executable")
+	ErrBroadcastConflict            = errors.New("广播单已被抢或已失效")
+	ErrBroadcastLockedByAssign      = errors.New("broadcast_locked_by_assign")
+	ErrBroadcastTakenByOther        = errors.New("broadcast_taken")
+	ErrBroadcastStatusInvalid       = errors.New("broadcast_status_invalid")
+	ErrBroadcastPreviouslyCancelled = errors.New("broadcast_previously_cancelled")
+	ErrRedispatchRateLimited        = errors.New("redispatch_rate_limited")
+	ErrRedispatchCapped             = errors.New("redispatch_capped")
+	ErrProviderNotSelfExecutable    = errors.New("provider_not_self_executable")
 )
+
+type broadcastConflictReasonError struct {
+	reason  error
+	message string
+}
+
+func (e broadcastConflictReasonError) Error() string {
+	if strings.TrimSpace(e.message) == "" {
+		return ErrBroadcastConflict.Error()
+	}
+	return fmt.Sprintf("%s: %s", ErrBroadcastConflict.Error(), e.message)
+}
+
+func (e broadcastConflictReasonError) Unwrap() []error {
+	if e.reason == nil {
+		return []error{ErrBroadcastConflict}
+	}
+	return []error{ErrBroadcastConflict, e.reason}
+}
+
+func newBroadcastConflictError(reason error, message string) error {
+	return broadcastConflictReasonError{reason: reason, message: message}
+}
 
 type BroadcastService struct {
 	presenceRepo        *repository.ProviderPresenceRepo
@@ -91,6 +133,20 @@ type ProviderStats struct {
 	TodayIncomeCents       int64    `json:"today_income_cents"`
 	TotalCompletedOrders   int      `json:"total_completed_orders"`
 	PendingSettlementCents int64    `json:"pending_settlement_cents"`
+}
+
+type RedispatchOrderOptions struct {
+	PriceBumpPercent float64 `json:"price_bump_percent"`
+	PriceBumpCents   int64   `json:"price_bump_cents"`
+	RadiusBumpKM     float64 `json:"radius_bump_km"`
+	OperatorUserID   int64   `json:"operator_user_id"`
+}
+
+type RedispatchOrderResult struct {
+	Order            *model.Order          `json:"order"`
+	Broadcast        *model.OrderBroadcast `json:"broadcast"`
+	PriceBumpCents   int64                 `json:"price_bump_cents"`
+	MatchingRadiusKM float64               `json:"matching_radius_km"`
 }
 
 func NewBroadcastService(
@@ -263,6 +319,66 @@ func (s *BroadcastService) autoAssignWeights() (float64, float64, float64) {
 	return distance, rating, completion
 }
 
+func (s *BroadcastService) redispatchBumpPercentDefault() float64 {
+	value := defaultRedispatchBumpPercent
+	if s != nil && s.systemConfigService != nil {
+		value = s.systemConfigService.GetFloat("broadcast.redispatch.bump_percent_default", value)
+	}
+	if value <= 0 {
+		value = defaultRedispatchBumpPercent
+	}
+	return value
+}
+
+func (s *BroadcastService) RedispatchBumpPercentDefault() float64 {
+	return s.redispatchBumpPercentDefault()
+}
+
+func (s *BroadcastService) redispatchRadiusBumpKMDefault() float64 {
+	value := defaultRedispatchRadiusBumpKM
+	if s != nil && s.systemConfigService != nil {
+		value = s.systemConfigService.GetFloat("broadcast.redispatch.radius_bump_km_default", value)
+	}
+	if value <= 0 {
+		value = defaultRedispatchRadiusBumpKM
+	}
+	return value
+}
+
+func (s *BroadcastService) RedispatchRadiusBumpKMDefault() float64 {
+	return s.redispatchRadiusBumpKMDefault()
+}
+
+func (s *BroadcastService) redispatchRadiusMaxKM() float64 {
+	value := defaultRedispatchRadiusMaxKM
+	if s != nil && s.systemConfigService != nil {
+		value = s.systemConfigService.GetFloat("broadcast.redispatch.radius_max_km", value)
+	}
+	if value <= 0 {
+		value = defaultRedispatchRadiusMaxKM
+	}
+	return value
+}
+
+func (s *BroadcastService) redispatchMaxCountPerOrder() int {
+	value := defaultRedispatchMaxCountPerOrder
+	if s != nil && s.systemConfigService != nil {
+		value = s.systemConfigService.GetInt("broadcast.redispatch.max_count_per_order", value)
+	}
+	return value
+}
+
+func (s *BroadcastService) redispatchCooldown() time.Duration {
+	seconds := defaultRedispatchCooldownSeconds
+	if s != nil && s.systemConfigService != nil {
+		seconds = s.systemConfigService.GetInt("broadcast.redispatch.cooldown_seconds", seconds)
+	}
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 func (s *BroadcastService) SetOnline(userID int64, input ProviderPresenceInput) (*model.ProviderPresence, error) {
 	return s.upsertPresence(userID, true, input)
 }
@@ -320,6 +436,10 @@ func (s *BroadcastService) ListOpenForProvider(userID int64, limit int) ([]Provi
 		}
 		distanceKM := haversineKM(presence.LastLatitude, presence.LastLongitude, item.OriginLatitude, item.OriginLongitude)
 		if radius > 0 && distanceKM > radius {
+			continue
+		}
+		matchingRadius := s.orderMatchingRadiusKM(item.Order)
+		if matchingRadius > 0 && distanceKM > matchingRadius {
 			continue
 		}
 		excluded, err := s.broadcastRepo.IsProviderExcluded(item.OrderID, item.ID, userID)
@@ -405,6 +525,41 @@ func (s *BroadcastService) grabOnce(broadcastID, providerUserID int64) (*model.O
 
 func (s *BroadcastService) CreateForOrder(order *model.Order) (*model.OrderBroadcast, error) {
 	return s.createForOrderWithRepos(order, s.orderRepo, s.broadcastRepo, s.artifactRepo, time.Now())
+}
+
+func (s *BroadcastService) RedispatchOrder(orderID int64, opts RedispatchOrderOptions) (*RedispatchOrderResult, error) {
+	if s == nil || s.orderRepo == nil || s.broadcastRepo == nil {
+		return nil, errors.New("抢单广播依赖未初始化")
+	}
+	if orderID <= 0 {
+		return nil, errors.New("订单ID无效")
+	}
+	now := time.Now()
+	db := s.orderRepo.DB()
+	if db == nil {
+		return s.redispatchOrderWithRepos(orderID, opts, now, s.orderRepo, s.broadcastRepo, s.artifactRepo)
+	}
+
+	var result *RedispatchOrderResult
+	err := db.Transaction(func(tx *gorm.DB) error {
+		item, txErr := s.redispatchOrderWithRepos(
+			orderID,
+			opts,
+			now,
+			repository.NewOrderRepo(tx),
+			repository.NewOrderBroadcastRepo(tx),
+			repository.NewOrderArtifactRepo(tx),
+		)
+		if txErr != nil {
+			return txErr
+		}
+		result = item
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (s *BroadcastService) EnqueueDueReservations(now time.Time, limit int) (int, error) {
@@ -783,7 +938,7 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 	for _, attempt := range attempts {
 		attempted[attempt.ProviderUserID] = struct{}{}
 	}
-	candidate, ok, err := s.selectAutoAssignCandidate(broadcast, attempted, now, broadcastRepo)
+	candidate, ok, err := s.selectAutoAssignCandidate(broadcast, order, attempted, now, broadcastRepo)
 	if err != nil {
 		return outcome, err
 	}
@@ -947,7 +1102,14 @@ func (s *BroadcastService) expireAssignmentWithRepos(
 	}); err != nil {
 		return 0, 0, false, err
 	}
-	if err := broadcastRepo.ExcludeProvider(assignment.OrderID, assignment.BroadcastID, assignment.ProviderUserID, "assignment_timeout"); err != nil {
+	timeoutExclusionExpiresAt := now.Add(s.autoAssignAcceptWindow() * 3)
+	if err := broadcastRepo.ExcludeProvider(
+		assignment.OrderID,
+		assignment.BroadcastID,
+		assignment.ProviderUserID,
+		"assignment_timeout",
+		&timeoutExclusionExpiresAt,
+	); err != nil {
 		return 0, 0, false, err
 	}
 	if err := broadcastRepo.UpdateFields(assignment.BroadcastID, map[string]interface{}{
@@ -958,6 +1120,124 @@ func (s *BroadcastService) expireAssignmentWithRepos(
 		return 0, 0, false, err
 	}
 	return assignment.BroadcastID, assignment.ProviderUserID, true, nil
+}
+
+func (s *BroadcastService) redispatchOrderWithRepos(
+	orderID int64,
+	opts RedispatchOrderOptions,
+	now time.Time,
+	orderRepo *repository.OrderRepo,
+	broadcastRepo *repository.OrderBroadcastRepo,
+	artifactRepo *repository.OrderArtifactRepo,
+) (*RedispatchOrderResult, error) {
+	if orderRepo == nil || broadcastRepo == nil {
+		return nil, errors.New("抢单广播依赖未初始化")
+	}
+	order, err := orderRepo.LockByID(orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("订单不存在")
+		}
+		return nil, err
+	}
+	if order.Status != "dispatch_failed" {
+		return nil, newBroadcastConflictError(ErrBroadcastStatusInvalid, "订单当前状态不可重发")
+	}
+	if order.ProviderUserID != 0 || order.GrabbedByUserID != 0 {
+		return nil, newBroadcastConflictError(ErrBroadcastStatusInvalid, "订单已被服务商接单，无法重发")
+	}
+	if err := s.enforceRedispatchGuards(order, now); err != nil {
+		return nil, err
+	}
+
+	priceBumpCents, matchingRadiusKM, err := s.resolveRedispatchAdjustments(order, opts)
+	if err != nil {
+		return nil, err
+	}
+	newTotalAmount := order.TotalAmount + priceBumpCents
+	if newTotalAmount < 0 {
+		newTotalAmount = 0
+	}
+	commission := int64(math.Round(float64(newTotalAmount) * order.PlatformCommissionRate / 100))
+	ownerAmount := newTotalAmount - commission
+	priceBreakdown := s.buildRedispatchPriceBreakdown(order, newTotalAmount, priceBumpCents, matchingRadiusKM, opts.PriceBumpPercent, now)
+
+	if err := broadcastRepo.DeleteTimeoutExclusionsByOrder(order.ID); err != nil {
+		return nil, err
+	}
+
+	broadcast := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      order.ServiceLatitude,
+		OriginLongitude:     order.ServiceLongitude,
+		ServiceClassCode:    order.ServiceClassCode,
+		WeightKG:            order.CargoWeightKG,
+		EstimatedTotalCents: newTotalAmount,
+		Status:              broadcastStatusOpen,
+		ExpiresAt:           now.Add(s.broadcastTTL()),
+		GrabbedByUserID:     0,
+	}
+	if err := broadcastRepo.Create(broadcast); err != nil {
+		return nil, err
+	}
+
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"status":                 "pending_dispatch",
+		"total_amount":           newTotalAmount,
+		"platform_commission":    commission,
+		"owner_amount":           ownerAmount,
+		"price_breakdown_json":   priceBreakdown,
+		"broadcast_pool_id":      broadcast.ID,
+		"provider_user_id":       int64(0),
+		"owner_id":               int64(0),
+		"drone_owner_user_id":    int64(0),
+		"executor_pilot_user_id": int64(0),
+		"grabbed_by_user_id":     int64(0),
+		"grabbed_at":             nil,
+		"provider_confirmed_at":  nil,
+		"updated_at":             now,
+	}); err != nil {
+		return nil, err
+	}
+
+	order.Status = "pending_dispatch"
+	order.TotalAmount = newTotalAmount
+	order.PlatformCommission = commission
+	order.OwnerAmount = ownerAmount
+	order.PriceBreakdownJSON = priceBreakdown
+	order.BroadcastPoolID = &broadcast.ID
+	order.ProviderUserID = 0
+	order.OwnerID = 0
+	order.DroneOwnerUserID = 0
+	order.ExecutorPilotUserID = 0
+	order.GrabbedByUserID = 0
+	order.GrabbedAt = nil
+	order.ProviderConfirmedAt = nil
+	order.UpdatedAt = now
+
+	operatorType := "system"
+	if opts.OperatorUserID > 0 {
+		operatorType = "client"
+	}
+	if err := orderRepo.AddTimeline(&model.OrderTimeline{
+		OrderID:      order.ID,
+		Status:       "pending_dispatch",
+		Note:         buildRedispatchTimelineNote(priceBumpCents, matchingRadiusKM),
+		OperatorID:   opts.OperatorUserID,
+		OperatorType: operatorType,
+	}); err != nil {
+		return nil, err
+	}
+	if artifactRepo != nil {
+		_ = repository.UpsertOrderSnapshotBundle(artifactRepo, order, nil, nil)
+	}
+
+	return &RedispatchOrderResult{
+		Order:            order,
+		Broadcast:        broadcast,
+		PriceBumpCents:   priceBumpCents,
+		MatchingRadiusKM: matchingRadiusKM,
+	}, nil
 }
 
 func (s *BroadcastService) expireBroadcastWithTimeline(
@@ -996,7 +1276,191 @@ func (s *BroadcastService) expireBroadcastWithTimeline(
 	})
 }
 
-func (s *BroadcastService) selectAutoAssignCandidate(broadcast *model.OrderBroadcast, attempted map[int64]struct{}, now time.Time, broadcastRepo *repository.OrderBroadcastRepo) (autoAssignCandidate, bool, error) {
+func (s *BroadcastService) resolveRedispatchAdjustments(order *model.Order, opts RedispatchOrderOptions) (int64, float64, error) {
+	if opts.PriceBumpPercent < 0 || opts.PriceBumpCents < 0 || opts.RadiusBumpKM < 0 {
+		return 0, 0, errors.New("重发调整参数必须大于等于0")
+	}
+	if opts.PriceBumpPercent == 0 && opts.PriceBumpCents == 0 && opts.RadiusBumpKM == 0 {
+		return 0, 0, errors.New("请至少选择加价或扩大半径")
+	}
+
+	priceBumpCents := opts.PriceBumpCents
+	if opts.PriceBumpPercent > 0 && order != nil && order.TotalAmount > 0 {
+		priceBumpCents += int64(math.Round(float64(order.TotalAmount) * opts.PriceBumpPercent / 100))
+	}
+
+	matchingRadiusKM := s.orderMatchingRadiusKM(order)
+	if opts.RadiusBumpKM > 0 {
+		matchingRadiusKM += opts.RadiusBumpKM
+	}
+	maxRadius := s.redispatchRadiusMaxKM()
+	if maxRadius > 0 && matchingRadiusKM > maxRadius {
+		matchingRadiusKM = maxRadius
+	}
+	if matchingRadiusKM <= 0 {
+		matchingRadiusKM = defaultProviderRadiusKM
+	}
+	return priceBumpCents, matchingRadiusKM, nil
+}
+
+type redispatchMeta struct {
+	count  int
+	lastAt time.Time
+}
+
+func (s *BroadcastService) enforceRedispatchGuards(order *model.Order, now time.Time) error {
+	meta := readRedispatchMeta(order)
+	if maxCount := s.redispatchMaxCountPerOrder(); maxCount > 0 && meta.count >= maxCount {
+		return newBroadcastConflictError(ErrRedispatchCapped, "重发次数已达上限，请取消订单后重新下单")
+	}
+
+	cooldown := s.redispatchCooldown()
+	if cooldown <= 0 || meta.lastAt.IsZero() {
+		return nil
+	}
+	elapsed := now.Sub(meta.lastAt)
+	if elapsed >= cooldown {
+		return nil
+	}
+	remaining := int(math.Ceil((cooldown - elapsed).Seconds()))
+	if remaining <= 0 {
+		remaining = 1
+	}
+	return newBroadcastConflictError(ErrRedispatchRateLimited, fmt.Sprintf("操作过于频繁，请 %d 秒后再试", remaining))
+}
+
+func (s *BroadcastService) buildRedispatchPriceBreakdown(order *model.Order, totalAmount int64, priceBumpCents int64, matchingRadiusKM float64, priceBumpPercent float64, now time.Time) model.JSON {
+	breakdown := decodePriceBreakdownJSON(nil)
+	if order != nil {
+		breakdown = decodePriceBreakdownJSON(order.PriceBreakdownJSON)
+	}
+	meta := redispatchMetaFromBreakdown(breakdown)
+	breakdown["total_estimated_cents"] = totalAmount
+	breakdown[redispatchMatchingRadiusJSONKey] = math.Round(matchingRadiusKM*10) / 10
+	if priceBumpCents > 0 {
+		breakdown[redispatchPriceBumpCentsJSONKey] = priceBumpCents
+	}
+	if priceBumpPercent > 0 {
+		breakdown[redispatchPriceBumpPercentJSONKey] = priceBumpPercent
+	}
+	breakdown[redispatchCountJSONKey] = meta.count + 1
+	breakdown[redispatchLastAtJSONKey] = now.Format(time.RFC3339)
+	raw, err := json.Marshal(breakdown)
+	if err != nil {
+		return model.JSON("null")
+	}
+	return model.JSON(raw)
+}
+
+func readRedispatchMeta(order *model.Order) redispatchMeta {
+	if order == nil {
+		return redispatchMeta{}
+	}
+	return redispatchMetaFromBreakdown(decodePriceBreakdownJSON(order.PriceBreakdownJSON))
+}
+
+func redispatchMetaFromBreakdown(breakdown map[string]interface{}) redispatchMeta {
+	meta := redispatchMeta{}
+	if count, ok := numericJSONField(breakdown, redispatchCountJSONKey); ok && count > 0 {
+		meta.count = int(math.Floor(count))
+	}
+	if lastAt, ok := timeJSONField(breakdown, redispatchLastAtJSONKey); ok {
+		meta.lastAt = lastAt
+	}
+	return meta
+}
+
+func (s *BroadcastService) orderMatchingRadiusKM(order *model.Order) float64 {
+	radius := defaultProviderRadiusKM
+	if order != nil {
+		breakdown := decodePriceBreakdownJSON(order.PriceBreakdownJSON)
+		if value, ok := numericJSONField(breakdown, redispatchMatchingRadiusJSONKey); ok && value > 0 {
+			radius = value
+		} else if value, ok := numericJSONField(breakdown, redispatchLegacyRadiusJSONKey); ok && value > 0 {
+			radius = value
+		}
+	}
+	maxRadius := s.redispatchRadiusMaxKM()
+	if maxRadius > 0 && radius > maxRadius {
+		return maxRadius
+	}
+	return radius
+}
+
+func decodePriceBreakdownJSON(raw model.JSON) map[string]interface{} {
+	breakdown := map[string]interface{}{}
+	text := strings.TrimSpace(string(raw))
+	if text == "" || text == "null" {
+		return breakdown
+	}
+	if err := json.Unmarshal([]byte(text), &breakdown); err != nil {
+		return map[string]interface{}{}
+	}
+	return breakdown
+}
+
+func numericJSONField(values map[string]interface{}, key string) (float64, bool) {
+	if len(values) == 0 {
+		return 0, false
+	}
+	switch value := values[key].(type) {
+	case float64:
+		return value, true
+	case float32:
+		return float64(value), true
+	case int:
+		return float64(value), true
+	case int64:
+		return float64(value), true
+	case json.Number:
+		parsed, err := value.Float64()
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func timeJSONField(values map[string]interface{}, key string) (time.Time, bool) {
+	if len(values) == 0 {
+		return time.Time{}, false
+	}
+	raw, ok := values[key]
+	if !ok || raw == nil {
+		return time.Time{}, false
+	}
+	switch value := raw.(type) {
+	case time.Time:
+		return value, !value.IsZero()
+	case string:
+		text := strings.TrimSpace(value)
+		if text == "" {
+			return time.Time{}, false
+		}
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05"} {
+			parsed, err := time.Parse(layout, text)
+			if err == nil {
+				return parsed, true
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
+func buildRedispatchTimelineNote(priceBumpCents int64, matchingRadiusKM float64) string {
+	parts := []string{"客户主动重发订单"}
+	if priceBumpCents > 0 {
+		parts = append(parts, fmt.Sprintf("加价¥%.2f", float64(priceBumpCents)/100))
+	}
+	if matchingRadiusKM > 0 {
+		parts = append(parts, fmt.Sprintf("匹配半径%.1fkm", matchingRadiusKM))
+	}
+	return strings.Join(parts, "，")
+}
+
+func (s *BroadcastService) selectAutoAssignCandidate(broadcast *model.OrderBroadcast, order *model.Order, attempted map[int64]struct{}, now time.Time, broadcastRepo *repository.OrderBroadcastRepo) (autoAssignCandidate, bool, error) {
 	if s == nil || s.presenceRepo == nil {
 		return autoAssignCandidate{}, false, errors.New("服务商在线状态依赖未初始化")
 	}
@@ -1015,8 +1479,12 @@ func (s *BroadcastService) selectAutoAssignCandidate(broadcast *model.OrderBroad
 			continue
 		}
 		radius := normalizeProviderRadius(presence.MaxRadiusKM)
+		matchingRadius := s.orderMatchingRadiusKM(order)
 		distanceKM := haversineKM(presence.LastLatitude, presence.LastLongitude, broadcast.OriginLatitude, broadcast.OriginLongitude)
 		if radius > 0 && distanceKM > radius {
+			continue
+		}
+		if matchingRadius > 0 && distanceKM > matchingRadius {
 			continue
 		}
 		candidates = append(candidates, autoAssignCandidate{
@@ -1236,8 +1704,14 @@ func (s *BroadcastService) grabWithRepos(
 		return nil, err
 	}
 	acceptableStatus := broadcast.Status == broadcastStatusOpen || (skipPresenceCheck && broadcast.Status == broadcastStatusAutoAssigning)
-	if !acceptableStatus || (!skipPresenceCheck && !broadcast.ExpiresAt.After(now)) || broadcast.GrabbedByUserID != 0 {
-		return nil, fmt.Errorf("%w: 广播单已被抢或已过期", ErrBroadcastConflict)
+	if !skipPresenceCheck && broadcast.Status == broadcastStatusAutoAssigning {
+		return nil, newBroadcastConflictError(ErrBroadcastLockedByAssign, "广播单正在自动指派")
+	}
+	if broadcast.GrabbedByUserID != 0 || broadcast.Status == broadcastStatusGrabbed {
+		return nil, newBroadcastConflictError(ErrBroadcastTakenByOther, "广播单已被抢")
+	}
+	if !acceptableStatus || (!skipPresenceCheck && !broadcast.ExpiresAt.After(now)) {
+		return nil, newBroadcastConflictError(ErrBroadcastStatusInvalid, "广播单已过期或状态已变化")
 	}
 
 	order, err := orderRepo.LockByID(broadcast.OrderID)
@@ -1245,19 +1719,19 @@ func (s *BroadcastService) grabWithRepos(
 		return nil, err
 	}
 	if !canBroadcastOrderBeGrabbed(order) {
-		return nil, fmt.Errorf("%w: 订单当前状态不可抢", ErrBroadcastConflict)
+		return nil, newBroadcastConflictError(ErrBroadcastStatusInvalid, "订单当前状态不可抢")
 	}
 	excluded, err := broadcastRepo.IsProviderExcluded(broadcast.OrderID, broadcast.ID, providerUserID)
 	if err != nil {
 		return nil, err
 	}
 	if excluded {
-		return nil, fmt.Errorf("%w: 已取消过该订单，不能再次抢单", ErrBroadcastConflict)
+		return nil, newBroadcastConflictError(ErrBroadcastPreviouslyCancelled, "已取消过该订单，不能再次抢单")
 	}
 	if err := s.requireProviderSelfExecutableAccess(providerUserID); err != nil {
 		return nil, err
 	}
-	if !skipPresenceCheck && !providerCanGrabBroadcast(presence, broadcast) {
+	if !skipPresenceCheck && !s.providerCanGrabBroadcast(presence, broadcast, order) {
 		return nil, errors.New("当前服务商不在接单范围或不支持该机型档")
 	}
 
@@ -1369,7 +1843,7 @@ func canBroadcastOrderBeGrabbed(order *model.Order) bool {
 	return order.GrabbedByUserID == 0 && order.ProviderUserID == 0
 }
 
-func providerCanGrabBroadcast(presence *model.ProviderPresence, broadcast *model.OrderBroadcast) bool {
+func (s *BroadcastService) providerCanGrabBroadcast(presence *model.ProviderPresence, broadcast *model.OrderBroadcast, order *model.Order) bool {
 	if presence == nil || broadcast == nil {
 		return false
 	}
@@ -1379,7 +1853,11 @@ func providerCanGrabBroadcast(presence *model.ProviderPresence, broadcast *model
 	}
 	radius := normalizeProviderRadius(presence.MaxRadiusKM)
 	distanceKM := haversineKM(presence.LastLatitude, presence.LastLongitude, broadcast.OriginLatitude, broadcast.OriginLongitude)
-	return radius <= 0 || distanceKM <= radius
+	if radius > 0 && distanceKM > radius {
+		return false
+	}
+	matchingRadius := s.orderMatchingRadiusKM(order)
+	return matchingRadius <= 0 || distanceKM <= matchingRadius
 }
 
 func providerAcceptsServiceClass(accepted []string, serviceClassCode string) bool {

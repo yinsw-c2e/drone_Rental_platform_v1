@@ -1,0 +1,117 @@
+.pw-assign-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.pw-assign-card {
+  width: 100%;
+  padding: 40rpx;
+  border-radius: 40rpx;
+  background: #ffffff;
+  box-shadow: 0 25rpx 50rpx -12rpx rgba(0, 0, 0, 0.25);
+}
+
+.pw-assign-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64rpx;
+  border-radius: 16rpx;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.pw-assign-countdown {
+  display: block;
+  margin-top: 32rpx;
+  color: #f97316;
+  font-size: 64rpx;
+  line-height: 72rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
+.pw-assign-route {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 32rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: #f8fafc;
+  border: 1rpx solid #f1f5f9;
+}
+
+.pw-assign-route-start,
+.pw-assign-route-end {
+  flex: 1;
+  color: #0f172a;
+  font-size: 28rpx;
+  line-height: 38rpx;
+  font-weight: 800;
+}
+
+.pw-assign-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.pw-assign-meta text {
+  padding: 8rpx 16rpx;
+  border-radius: 12rpx;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.pw-assign-price {
+  display: block;
+  margin-top: 32rpx;
+  color: #f97316;
+  font-size: 48rpx;
+  font-weight: 900;
+  text-align: right;
+}
+
+.pw-assign-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 40rpx;
+}
+
+.pw-assign-decline,
+.pw-assign-accept {
+  flex: 1;
+  height: 96rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+.pw-assign-decline {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.pw-assign-accept {
+  color: #ffffff;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 12rpx 24rpx -6rpx rgba(16, 185, 129, 0.4);
+}

@@ -26,6 +26,7 @@ type RequestError = Error & {
   code?: number | string;
   statusCode?: number;
   errno?: number;
+  body?: any;
 };
 
 let isRefreshing = false;
@@ -73,7 +74,7 @@ function hasOwn(value: Record<string, any>, key: string) {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function createRequestError(message: string, statusCode?: number, code?: number | string): RequestError {
+function createRequestError(message: string, statusCode?: number, code?: number | string, body?: any): RequestError {
   const error = new Error(message) as RequestError;
   if (code !== undefined) {
     error.code = code;
@@ -81,6 +82,9 @@ function createRequestError(message: string, statusCode?: number, code?: number 
   if (statusCode) {
     error.statusCode = statusCode;
     error.errno = statusCode;
+  }
+  if (body !== undefined) {
+    error.body = body;
   }
   return error;
 }
@@ -107,7 +111,7 @@ function unwrapResponseBody<T = any>(body: any): T {
       return body as T;
     }
     const numericCode = typeof envelope.code === 'number' ? envelope.code : undefined;
-    throw createRequestError(envelope.message || envelope.error || '请求失败', numericCode, envelope.code);
+    throw createRequestError(envelope.message || envelope.error || '请求失败', numericCode, envelope.code, body);
   }
 
   // 兼容部分旧形态响应：HTTP 2xx 已成功，但响应体没有 code，只包了一层 data。
@@ -166,11 +170,11 @@ async function request<T = any>(opts: RequestOptions): Promise<T> {
     const body = res.data as any;
 
     if (res.statusCode === 401) {
-      throw createRequestError(getResponseMessage(body, '登录已过期，请重新登录'), 401);
+      throw createRequestError(getResponseMessage(body, '登录已过期，请重新登录'), 401, undefined, body);
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw createRequestError(getResponseMessage(body, `请求失败(${res.statusCode})`), res.statusCode, isRecord(body) ? body.code : undefined);
+      throw createRequestError(getResponseMessage(body, `请求失败(${res.statusCode})`), res.statusCode, isRecord(body) ? body.code : undefined, body);
     }
 
     return unwrapResponseBody<T>(body);

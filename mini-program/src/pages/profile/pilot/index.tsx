@@ -68,6 +68,15 @@ const formatServiceBaseSubtitle = (lat: number, lng: number) => {
   return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 };
 
+const getBlockerActionText = (blockers: any[] = []) => {
+  const codes = blockers.map((item) => String(item?.code || ""));
+  if (codes.includes("pilot_license_image_required")) return "去上传执照图片";
+  if (codes.includes("pilot_license_no_required")) return "去补执照编号";
+  if (codes.includes("pilot_license_type_required")) return "去补执照类型";
+  if (codes.includes("pilot_verification_rejected")) return "重新提交资料";
+  return "去完善履约资质";
+};
+
 export default function PilotProfilePage() {
   const [pilot, setPilot] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -268,6 +277,9 @@ export default function PilotProfilePage() {
   const isOnline = ["online", "available"].includes(
     pilot?.availability_status || "offline",
   );
+  const openPilotRegister = () => {
+    Taro.navigateTo({ url: "/pages/pilot/register/index?from=readiness" });
+  };
 
   if (loading) {
     return (
@@ -371,9 +383,16 @@ export default function PilotProfilePage() {
 
               {eligibility?.blockers?.length ? (
                 <View className="pilot-blocker-box">
-                  <Text className="pilot-blocker-title">
-                    需要处理以下事项：
-                  </Text>
+                  <View className="pilot-blocker-head">
+                    <Text className="pilot-blocker-title">
+                      需要处理以下事项：
+                    </Text>
+                    <View className="pilot-blocker-action" onClick={openPilotRegister}>
+                      <Text className="pilot-blocker-action-text">
+                        {getBlockerActionText(eligibility.blockers)}
+                      </Text>
+                    </View>
+                  </View>
                   {eligibility.blockers.map((blocker: any) => (
                     <Text
                       key={blocker.code || blocker.message}
@@ -382,6 +401,12 @@ export default function PilotProfilePage() {
                       • {blocker.message}
                     </Text>
                   ))}
+                  <View className="pilot-blocker-footer" onClick={openPilotRegister}>
+                    <Text className="pilot-blocker-footer-text">
+                      按提示补齐后提交审核
+                    </Text>
+                    <Text className="pilot-blocker-footer-arrow">›</Text>
+                  </View>
                 </View>
               ) : null}
             </View>

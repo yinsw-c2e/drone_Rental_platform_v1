@@ -530,6 +530,16 @@ func (s *OwnerService) listRecommendedDemandsByDistance(ownerUserID int64, page,
 	if err != nil {
 		return nil, 0, err
 	}
+	filtered := make([]model.Demand, 0, len(demands))
+	for i := range demands {
+		metric, ok := metrics[demands[i].ID]
+		if !ok || metric.DistanceKM == nil || metric.ServiceCoverageStatus != "in_range" {
+			continue
+		}
+		filtered = append(filtered, demands[i])
+	}
+	demands = filtered
+	total = int64(len(demands))
 	sort.SliceStable(demands, func(i, j int) bool {
 		left, leftOK := recommendedMetricDistance(metrics[demands[i].ID])
 		right, rightOK := recommendedMetricDistance(metrics[demands[j].ID])
@@ -565,11 +575,11 @@ func (s *OwnerService) GetRecommendedDemandMetrics(ownerUserID int64, demands []
 	if len(demands) == 0 || s.ownerDomainRepo == nil {
 		return result, nil
 	}
-	supplies, err := s.ownerDomainRepo.ListActiveSuppliesByOwner(ownerUserID)
+	anchors, err := s.recommendedDemandAnchors(ownerUserID)
 	if err != nil {
 		return nil, err
 	}
-	if len(supplies) == 0 {
+	if len(anchors) == 0 {
 		return result, nil
 	}
 
@@ -579,27 +589,24 @@ func (s *OwnerService) GetRecommendedDemandMetrics(ownerUserID int64, demands []
 			continue
 		}
 		var best RecommendedDemandMetric
-		for j := range supplies {
-			supplyPoint, ok := ownerSupplyPoint(&supplies[j])
-			if !ok {
-				continue
-			}
-			distance := ownerHaversineKM(demandPoint.lat, demandPoint.lng, supplyPoint.lat, supplyPoint.lng)
+		for j := range anchors {
+			anchor := anchors[j]
+			distance := ownerHaversineKM(demandPoint.lat, demandPoint.lng, anchor.point.lat, anchor.point.lng)
 			if distance <= 0 {
 				continue
 			}
-			serviceRange, hasRange := ownerSupplyRangeKM(&supplies[j])
+			serviceRange, hasRange := anchor.rangeKM, anchor.hasRange
 			coverageStatus := ownerCoverageStatus(distance, serviceRange, hasRange)
 			if shouldReplaceRecommendedMetric(best, distance, coverageStatus) {
 				value := math.Round(distance*10) / 10
 				best = RecommendedDemandMetric{
 					DistanceKM:            &value,
 					ServiceCoverageStatus: coverageStatus,
-					MatchedSupplyID:       supplies[j].ID,
-					MatchedSupplyTitle:    supplies[j].Title,
+					MatchedSupplyID:       anchor.supplyID,
+					MatchedSupplyTitle:    anchor.title,
 				}
-				if coverageStatus != "out_of_range" && supplies[j].Drone != nil {
-					if minutes, ok := ownerEstimatedArrivalMinutes(distance, supplies[j].Drone); ok {
+				if coverageStatus != "out_of_range" && anchor.drone != nil {
+					if minutes, ok := ownerEstimatedArrivalMinutes(distance, anchor.drone); ok {
 						best.EstimatedArrivalMin = &minutes
 					}
 				}
@@ -607,9 +614,7 @@ func (s *OwnerService) GetRecommendedDemandMetrics(ownerUserID int64, demands []
 					rangeValue := math.Round(serviceRange*10) / 10
 					best.ServiceRangeKM = &rangeValue
 				}
-				if supplies[j].Drone != nil {
-					best.MatchedDroneID = supplies[j].Drone.ID
-				}
+				best.MatchedDroneID = anchor.droneID
 			}
 		}
 		if best.DistanceKM != nil {
@@ -617,6 +622,67 @@ func (s *OwnerService) GetRecommendedDemandMetrics(ownerUserID int64, demands []
 		}
 	}
 	return result, nil
+}
+
+type recommendedDemandAnchor struct {
+	point    ownerGeoPoint
+	rangeKM  float64
+	hasRange bool
+	supplyID int64
+	droneID  int64
+	title    string
+	drone    *model.Drone
+}
+
+func (s *OwnerService) recommendedDemandAnchors(ownerUserID int64) ([]recommendedDemandAnchor, error) {
+	supplies, err := s.ownerDomainRepo.ListActiveSuppliesByOwner(ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	anchors := make([]recommendedDemandAnchor, 0, len(supplies))
+	for i := range supplies {
+		point, ok := ownerSupplyPoint(&supplies[i])
+		if !ok {
+			continue
+		}
+		rangeKM, hasRange := ownerSupplyRangeKM(&supplies[i])
+		anchor := recommendedDemandAnchor{
+			point:    point,
+			rangeKM:  rangeKM,
+			hasRange: hasRange,
+			supplyID: supplies[i].ID,
+			title:    supplies[i].Title,
+		}
+		if supplies[i].Drone != nil {
+			anchor.droneID = supplies[i].Drone.ID
+			anchor.drone = supplies[i].Drone
+		}
+		anchors = append(anchors, anchor)
+	}
+	if len(anchors) > 0 || s.droneRepo == nil {
+		return anchors, nil
+	}
+
+	drones, _, err := s.droneRepo.ListByOwner(ownerUserID, 1, 100)
+	if err != nil {
+		return nil, err
+	}
+	for i := range drones {
+		if !drones[i].EligibleForMarketplace() || !ownerValidCoordinate(drones[i].Latitude, drones[i].Longitude) {
+			continue
+		}
+		rangeKM := drones[i].MaxDistance
+		title := strings.TrimSpace(strings.Join([]string{drones[i].Brand, drones[i].Model}, " "))
+		anchors = append(anchors, recommendedDemandAnchor{
+			point:    ownerGeoPoint{lat: drones[i].Latitude, lng: drones[i].Longitude},
+			rangeKM:  rangeKM,
+			hasRange: rangeKM > 0,
+			droneID:  drones[i].ID,
+			title:    title,
+			drone:    &drones[i],
+		})
+	}
+	return anchors, nil
 }
 
 func (s *OwnerService) ListLatestQuotesByDemandIDsAndOwner(demandIDs []int64, ownerUserID int64) (map[int64]*model.DemandQuote, error) {

@@ -154,6 +154,21 @@ function isProviderNotSelfExecutableError(error: any) {
   return error?.statusCode === 403 && String(error?.message || '').includes('provider_not_self_executable');
 }
 
+function getGrabConflictToast(code?: unknown) {
+  switch (code) {
+    case 'BROADCAST_LOCKED_BY_ASSIGN':
+      return '该单正在指派给其他服务商，请稍候';
+    case 'BROADCAST_TAKEN':
+      return '已被其他服务商抢走';
+    case 'BROADCAST_STATUS_INVALID':
+      return '订单状态已变化，刷新后重试';
+    case 'BROADCAST_PREVIOUSLY_CANCELLED':
+      return '您曾取消过该订单，不能再次抢单';
+    default:
+      return '已被其他服务商抢走';
+  }
+}
+
 function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boolean; onGrabbed?: (orderId: number) => void }) {
   const [items, setItems] = useState<V2ProviderBroadcastView[]>([]);
   const [tick, setTick] = useState(0);
@@ -216,7 +231,7 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
       }
     } catch (error: any) {
       if (error?.statusCode === 409 || error?.errno === 409) {
-        Taro.showToast({ title: '已被其他服务商抢走', icon: 'none' });
+        Taro.showToast({ title: getGrabConflictToast(error?.body?.code || error?.code), icon: 'none' });
         pullBroadcasts();
       } else if (isProviderNotSelfExecutableError(error)) {
         Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
@@ -283,132 +298,6 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
   );
 }
 
-function AssignmentModal({ onAccepted }: { onAccepted?: (orderId: number) => void }) {
-  const [assignment, setAssignment] = useState<V2ProviderAssignmentView | null>(null);
-  const [responding, setResponding] = useState(false);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const pull = async () => {
-      try {
-        const res = await providerService.listAssignments(5);
-        const items = normalizeProviderItems<V2ProviderAssignmentView>(res)
-          .filter(item => item.status === 'pending_accept')
-          .sort((a, b) => b.attempt_seq - a.attempt_seq);
-        if (!cancelled) {
-          setAssignment(items[0] || null);
-        }
-      } catch {
-        // 静默重试。
-      }
-    };
-    pull();
-    const timer = setInterval(pull, 3_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => setTick(value => value + 1), 1_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const remaining = assignment
-    ? getRemainingSeconds(assignment.accept_deadline_at, assignment.remaining_seconds)
-    : 0;
-
-  useEffect(() => {
-    void tick;
-    if (assignment && remaining <= 0) {
-      setAssignment(null);
-    }
-  }, [assignment, remaining, tick]);
-
-  const accept = useCallback(async () => {
-    if (responding || !assignment) return;
-    setResponding(true);
-    try {
-      const res = await providerService.acceptAssignment(assignment.id);
-      const orderId = getOrderIdFromPayload(res, assignment.order_id);
-      Taro.showToast({ title: '已接受', icon: 'success' });
-      setAssignment(null);
-      if (orderId > 0) {
-        onAccepted?.(orderId);
-      }
-    } catch (error: any) {
-      if (error?.statusCode === 409 || error?.errno === 409) {
-        Taro.showToast({ title: '指派已失效或超时', icon: 'none' });
-        setAssignment(null);
-      } else if (isProviderNotSelfExecutableError(error)) {
-        Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
-        setAssignment(null);
-      } else {
-        Taro.showToast({ title: String(error?.message || '接受失败'), icon: 'none' });
-      }
-    } finally {
-      setResponding(false);
-    }
-  }, [assignment, onAccepted, responding]);
-
-  const decline = useCallback(async () => {
-    if (responding || !assignment) return;
-    const res = await Taro.showModal({
-      title: '确认拒绝指派',
-      content: '拒绝后系统会指派给其他服务商',
-      confirmText: '确认拒绝',
-      confirmColor: '#dc2626',
-    });
-    if (!res.confirm) return;
-    setResponding(true);
-    try {
-      await providerService.declineAssignment(assignment.id, '服务商主动拒绝');
-      Taro.showToast({ title: '已拒绝', icon: 'none' });
-      setAssignment(null);
-    } catch (error: any) {
-      Taro.showToast({ title: String(error?.message || '拒绝失败'), icon: 'none' });
-    } finally {
-      setResponding(false);
-    }
-  }, [assignment, responding]);
-
-  if (!assignment || remaining <= 0) return null;
-
-  const order = assignment.order;
-  return (
-    <View className='pw-assign-mask'>
-      <View className='pw-assign-card'>
-        <View className='pw-assign-title'>
-          <Text>平台为你指派了订单 · 第 {assignment.attempt_seq} 轮</Text>
-        </View>
-        <Text className='pw-assign-countdown'>{remaining}s 内响应</Text>
-        <View className='pw-assign-route'>
-          <Text className='pw-assign-route-start'>{order?.service_address || '起点待确认'}</Text>
-          <Text className='pw-assign-route-arrow'>→</Text>
-          <Text className='pw-assign-route-end'>{order?.dest_address || '终点待确认'}</Text>
-        </View>
-        <View className='pw-assign-meta'>
-          <Text>{formatBroadcastDistance(assignment.distance_km)}</Text>
-          <Text>{formatWeight(order?.cargo_weight_kg || assignment.broadcast?.weight_kg)}</Text>
-          <Text>{formatDuration(order?.estimated_duration_min)}</Text>
-          <Text>{formatRouteDistance(order?.estimated_distance_m)}</Text>
-        </View>
-        <Text className='pw-assign-price'>{formatAmountYuan(getBroadcastAmount(assignment))}</Text>
-        <View className='pw-assign-actions'>
-          <View className={`pw-assign-decline ${responding ? 'is-loading' : ''}`} onClick={decline}>
-            <Text>拒绝</Text>
-          </View>
-          <View className={`pw-assign-accept ${responding ? 'is-loading' : ''}`} onClick={accept}>
-            <Text>{responding ? '处理中…' : '接受'}</Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 export default function ProviderWorkbench() {
   const dispatch = useAppDispatch();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -429,7 +318,7 @@ export default function ProviderWorkbench() {
     const nickname = String(user?.nickname || '').trim();
     return nickname || '服务商工作台';
   }, [user?.nickname]);
-  const { presence, goOnline, goOffline } = useProviderPresence();
+  const { presence, goOnline, goOffline } = useProviderPresence({ managedByGlobalShell: true });
   const providerCertLabel = useMemo(() => {
     if (providerCapabilities.canSelfExecute) return '综合就绪';
     if (providerCapabilities.canPublishSupply) return '设备就绪';
@@ -1022,10 +911,6 @@ export default function ProviderWorkbench() {
 
         <View className='pw-scroll-spacer' />
       </ScrollView>
-
-      {presence.online ? (
-        <AssignmentModal onAccepted={openGrabbedOrder} />
-      ) : null}
     </View>
   );
 }

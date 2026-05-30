@@ -41,6 +41,9 @@ const formatMoney = (amount?: number | null) => {
   return `¥${value.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`;
 };
 
+const REDISPATCH_PRICE_BUMP_PERCENT = 10;
+const REDISPATCH_RADIUS_BUMP_KM = 10;
+
 const settlementStatusLabelOf = (status?: string) => {
   if (status === 'pending') return '待计算';
   if (status === 'calculated') return '已计算';
@@ -175,7 +178,7 @@ const statusDescOf = (status: string) => {
   if (status === 'completed') return '本次吊运服务已完成';
   if (status === 'delivered') return '货物已送达，请确认完成';
   if (status === 'cancelled') return '订单已结束';
-  if (status === 'dispatch_failed') return '暂未匹配到合适服务商，可取消订单或稍后重试';
+  if (status === 'dispatch_failed') return '暂未匹配到合适服务商，可加价或扩大半径重发';
   if (status === 'pending_provider_confirmation') return '服务商正在确认方案，请耐心等待';
   if (status === 'pending_payment') return '请完成支付后继续履约流程';
   if (status === 'pending_dispatch') return '服务商待开始履约';
@@ -400,6 +403,7 @@ export default function OrderProgressPage() {
   const canViewLive = ['instant', 'reservation'].includes(String(detail?.order_mode || ''))
     && ['pending_dispatch', 'assigned', 'preparing', 'in_transit', 'delivered', 'completed'].includes(String(detail?.status || ''));
   const providerAdvanceAction = isProviderViewer ? providerAdvanceActionOf(detail) : null;
+  const showRedispatchActions = Boolean(detail && !isProviderViewer && normalizedStatus(detail) === 'dispatch_failed');
   const needsContractSign = canPay && !detail?.payment_ready;
   const contactTargetLabel = isProviderViewer ? '客户' : '服务商';
   const contactPhone = isProviderViewer ? customerPhone : providerPhone;
@@ -502,6 +506,47 @@ export default function OrderProgressPage() {
       load();
     } catch (error: any) {
       Taro.showToast({ title: String(error?.message || '加价失败'), icon: 'none' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const redispatchOrder = async (mode: 'price' | 'radius') => {
+    if (!detail || !orderId || actionLoading) return;
+    const isPriceMode = mode === 'price';
+    const res = await Taro.showModal({
+      title: isPriceMode ? '确认加价重发？' : '确认扩大半径？',
+      content: isPriceMode
+        ? `将在当前价格基础上加价 ${REDISPATCH_PRICE_BUMP_PERCENT}% 并重新匹配服务商。`
+        : `将把匹配半径扩大 ${REDISPATCH_RADIUS_BUMP_KM}km 后重新匹配服务商。`,
+      confirmText: '确认重发',
+    });
+    if (!res.confirm) return;
+    setActionLoading(true);
+    try {
+      await orderV2Service.redispatch(
+        orderId,
+        isPriceMode
+          ? { price_bump_percent: 0 }
+          : { radius_bump_km: 0 },
+      );
+      Taro.showToast({ title: '已重新发起匹配', icon: 'success' });
+      await load();
+    } catch (error: any) {
+      const code = error?.body?.code || error?.code;
+      if (code === 'REDISPATCH_RATE_LIMITED') {
+        Taro.showToast({ title: String(error?.body?.message || '操作过于频繁'), icon: 'none' });
+        return;
+      }
+      if (code === 'REDISPATCH_CAPPED') {
+        Taro.showModal({
+          title: '重发次数已达上限',
+          content: '建议取消当前订单后重新下单',
+          showCancel: false,
+        });
+        return;
+      }
+      Taro.showToast({ title: String(error?.message || '重发失败'), icon: 'none' });
     } finally {
       setActionLoading(false);
     }
@@ -718,6 +763,16 @@ export default function OrderProgressPage() {
                   </View>
                 ) : (
                   <>
+                    {showRedispatchActions ? (
+                      <>
+                        <View className="op-button op-button-warn" onClick={() => redispatchOrder('price')}>
+                          <Text>{actionLoading ? '重发中…' : `加价 +${REDISPATCH_PRICE_BUMP_PERCENT}% 重发`}</Text>
+                        </View>
+                        <View className="op-button op-button-primary" onClick={() => redispatchOrder('radius')}>
+                          <Text>{actionLoading ? '重发中…' : `扩大 ${REDISPATCH_RADIUS_BUMP_KM}km 重发`}</Text>
+                        </View>
+                      </>
+                    ) : null}
                     {canCancelOrder(detail) ? (
                       <View className="op-button op-button-ghost" onClick={cancelOrder}>
                         <Text>{actionLoading ? '取消中…' : isProviderViewer ? '取消接单' : '取消订单'}</Text>

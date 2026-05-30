@@ -14,18 +14,34 @@ import { RootState, useAppDispatch } from '../store/store';
 const HEARTBEAT_INTERVAL_MS = 10_000;
 const MAX_HEARTBEAT_FAILURES_BEFORE_TOAST = 3;
 
+type HeartbeatLifecycle = 'page' | 'manual';
+
 type PresenceLocation = {
   latitude: number;
   longitude: number;
 };
 
-export function useProviderPresence() {
+export interface UseProviderPresenceOptions {
+  /**
+   * Set this for page-level consumers once ProviderGlobalShell owns heartbeat
+   * lifecycle. The hook will still expose state and online/offline actions.
+   */
+  managedByGlobalShell?: boolean;
+  heartbeatLifecycle?: HeartbeatLifecycle;
+  showHeartbeatFailureToast?: boolean;
+}
+
+export function useProviderPresence(options: UseProviderPresenceOptions = {}) {
   const dispatch = useAppDispatch();
   const state = useSelector((s: RootState) => s.providerPresence);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stateRef = useRef(state);
   const lastLocationErrorRef = useRef<string | null>(null);
   const failureToastShownRef = useRef(false);
+  const heartbeatLifecycle: HeartbeatLifecycle = options.heartbeatLifecycle
+    ?? (options.managedByGlobalShell ? 'manual' : 'page');
+  const managesHeartbeatLifecycle = heartbeatLifecycle !== 'manual';
+  const showHeartbeatFailureToast = options.showHeartbeatFailureToast ?? managesHeartbeatLifecycle;
 
   useEffect(() => {
     stateRef.current = state;
@@ -92,30 +108,34 @@ export function useProviderPresence() {
       });
       failureToastShownRef.current = false;
       dispatch(wentOnline({ presence, location: loc }));
-      startHeartbeat();
+      if (managesHeartbeatLifecycle) {
+        startHeartbeat();
+      }
       return true;
     } catch (error: any) {
       dispatch(setError(String(error?.message || '上线失败')));
       return false;
     }
-  }, [acquireLocation, dispatch, startHeartbeat]);
+  }, [acquireLocation, dispatch, managesHeartbeatLifecycle, startHeartbeat]);
 
   const goOffline = useCallback(async () => {
     stopHeartbeat();
+    dispatch(wentOffline());
     try {
       await providerPresenceService.offline();
     } catch {
       // 后端失败不阻塞本地下线。
     }
-    dispatch(wentOffline());
   }, [dispatch, stopHeartbeat]);
 
   useDidHide(() => {
-    stopHeartbeat();
+    if (heartbeatLifecycle === 'page') {
+      stopHeartbeat();
+    }
   });
 
   useDidShow(() => {
-    if (stateRef.current.online && !timerRef.current) {
+    if (heartbeatLifecycle === 'page' && stateRef.current.online && !timerRef.current) {
       startHeartbeat();
     }
   });
@@ -124,6 +144,7 @@ export function useProviderPresence() {
 
   useEffect(() => {
     if (
+      showHeartbeatFailureToast &&
       state.online &&
       state.heartbeatFailureCount >= MAX_HEARTBEAT_FAILURES_BEFORE_TOAST &&
       !failureToastShownRef.current
@@ -131,12 +152,14 @@ export function useProviderPresence() {
       failureToastShownRef.current = true;
       Taro.showToast({ title: '定位心跳异常，系统将自动重试', icon: 'none' });
     }
-  }, [state.heartbeatFailureCount, state.online]);
+  }, [showHeartbeatFailureToast, state.heartbeatFailureCount, state.online]);
 
   return {
     presence: state,
     goOnline,
     goOffline,
+    startHeartbeat,
+    stopHeartbeat,
   };
 }
 
