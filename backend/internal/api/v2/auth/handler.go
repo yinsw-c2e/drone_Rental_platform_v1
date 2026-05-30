@@ -31,7 +31,7 @@ type RegisterRequest struct {
 	Phone    string `json:"phone" binding:"required"`
 	Password string `json:"password" binding:"required,min=6"`
 	Nickname string `json:"nickname"`
-	Code     string `json:"code"`
+	Code     string `json:"code" binding:"required,len=6"`
 }
 
 type LoginRequest struct {
@@ -80,12 +80,10 @@ func (h *Handler) Register(c *gin.Context) {
 		response.V2ValidationError(c, "invalid register payload")
 		return
 	}
-	if req.Code != "" {
-		ok, err := h.authService.VerifyCode(req.Phone, req.Code)
-		if err != nil || !ok {
-			response.V2ValidationError(c, "验证码错误")
-			return
-		}
+	ok, err := h.authService.VerifyCode(req.Phone, req.Code)
+	if err != nil || !ok {
+		response.V2ValidationError(c, "验证码错误或已过期")
+		return
 	}
 
 	user, tokens, err := h.authService.Register(req.Phone, req.Password, req.Nickname)

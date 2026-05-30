@@ -13,6 +13,7 @@ import providerOrder from '../../../assets/haul/ill_mode_provider_order.png';
 import chevronRightIcon from '../../../assets/haul/icon_chevron_right.png';
 import shieldIcon from '../../../assets/haul/icon_shield.png';
 import wechatIcon from '../../../assets/haul/icon_wechat.png';
+import { performWeChatLogin } from '../../../utils/wechatLogin';
 import './index.scss';
 
 type RoleOption = {
@@ -41,6 +42,7 @@ const roleOptions: RoleOption[] = [
 
 export default function ModeSelectionPage() {
   const [brandTop, setBrandTop] = useState(109);
+  const [wechatSubmitting, setWechatSubmitting] = useState(false);
   const hasRedirectedRef = useRef(false);
   const dispatch = useDispatch();
   const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
@@ -82,6 +84,16 @@ export default function ModeSelectionPage() {
 
   const openRegister = () => {
     Taro.navigateTo({ url: `/pages/auth/register/index?roleMode=${selectedMode}` });
+  };
+
+  const handleWeChatLogin = () => {
+    if (wechatSubmitting) return;
+    performWeChatLogin({
+      dispatch,
+      mode: selectedMode,
+      beginSubmit: () => setWechatSubmitting(true),
+      endSubmit: () => setWechatSubmitting(false),
+    });
   };
 
   return (
@@ -136,9 +148,9 @@ export default function ModeSelectionPage() {
             <Text className='mode-login-link' onClick={openLogin}>立即登录</Text>
           </View>
 
-          <View className='mode-wechat-button' onClick={openLogin}>
+          <View className='mode-wechat-button' onClick={handleWeChatLogin}>
             <Image className='mode-wechat-icon' src={wechatIcon} mode='aspectFit' />
-            <Text className='mode-wechat-text'>微信一键登录</Text>
+            <Text className='mode-wechat-text'>{wechatSubmitting ? '正在登录…' : '微信一键登录'}</Text>
           </View>
 
           <View className='mode-footer'>

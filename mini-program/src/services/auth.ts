@@ -11,8 +11,8 @@ export const authService = {
   sendCode: (phone: string) =>
     apiV2.post<any>('/auth/send-code', { phone }),
 
-  register: (phone: string, password: string, nickname?: string) =>
-    apiV2.post<AuthPayload>('/auth/register', { phone, password, nickname }),
+  register: (phone: string, password: string, nickname: string | undefined, code: string) =>
+    apiV2.post<AuthPayload>('/auth/register', { phone, password, nickname, code }),
 
   login: (phone: string, password?: string, code?: string) =>
     apiV2.post<AuthPayload>('/auth/login', { phone, password, code }),
