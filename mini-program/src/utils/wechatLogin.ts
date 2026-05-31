@@ -6,6 +6,7 @@ import { setCredentials } from '../store/slices/authSlice';
 import { HaulRoleMode, setHaulRoleMode } from '../store/slices/roleSlice';
 import { canEnterMode } from './roleSummary';
 import { friendlyErrorMessage } from './errorMessage';
+import { syncPreferredModeWithBackend } from './preferredMode';
 
 type PerformWeChatLoginOptions = {
   dispatch: Dispatch;
@@ -45,6 +46,8 @@ export async function performWeChatLogin({
     }
     dispatch(setHaulRoleMode(mode));
     dispatch(setCredentials({ user: res.user, token: res.token, roleSummary }));
+    // 登录态已就绪,把双端意向身份补传后端(在管理端做需求/供给分群)。
+    syncPreferredModeWithBackend(mode);
     Taro.showToast({ title: '登录成功', icon: 'success' });
     Taro.switchTab({ url: '/pages/home/index' });
     return true;

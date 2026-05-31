@@ -102,12 +102,28 @@ func (h *Handler) UserList(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		filters["status"] = status
 	}
-	users, total, err := h.userService.ListUsers(page, pageSize, filters)
+	if kw := c.Query("keyword"); kw != "" {
+		filters["__keyword"] = kw
+	}
+	users, total, err := h.userService.ListUsersWithRoles(page, pageSize, filters)
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}
 	response.SuccessWithPage(c, users, total, page, pageSize)
+}
+
+// ProviderList 返回服务商候选用户的聚合列表(机主资料 / 飞手资料 / 持有无人机)。
+// 与小程序端 role_summary.provider 共用同一口径,运营据此推动入驻审核。
+func (h *Handler) ProviderList(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	providers, total, err := h.userService.ListProviders(page, pageSize)
+	if err != nil {
+		response.Error(c, response.CodeDBError, err.Error())
+		return
+	}
+	response.SuccessWithPage(c, providers, total, page, pageSize)
 }
 
 func (h *Handler) UpdateUserStatus(c *gin.Context) {

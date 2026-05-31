@@ -14,6 +14,7 @@ import chevronRightIcon from '../../../assets/haul/icon_chevron_right.png';
 import shieldIcon from '../../../assets/haul/icon_shield.png';
 import wechatIcon from '../../../assets/haul/icon_wechat.png';
 import { performWeChatLogin } from '../../../utils/wechatLogin';
+import { syncPreferredModeWithBackend } from '../../../utils/preferredMode';
 import './index.scss';
 
 type RoleOption = {
@@ -76,6 +77,8 @@ export default function ModeSelectionPage() {
 
   const selectMode = (mode: HaulRoleMode) => {
     dispatch(setHaulRoleMode(mode));
+    // 若已登录,把意向身份同步到后端;未登录则会在登录/注册完成后自动重新同步。
+    syncPreferredModeWithBackend(mode);
   };
 
   const openLogin = () => {

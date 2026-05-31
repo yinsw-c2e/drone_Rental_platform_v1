@@ -58,6 +58,26 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+type SetPreferredModeReq struct {
+	Mode string `json:"mode"`
+}
+
+// SetPreferredMode 落库用户在小程序双端选择的意向身份(customer/provider)。
+// 仅记录用户意向,管理端据此分群,不影响 role_summary 能力位。
+func (h *Handler) SetPreferredMode(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	var req SetPreferredModeReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if err := h.userService.SetPreferredMode(userID, req.Mode); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"preferred_mode": req.Mode})
+}
+
 func (h *Handler) UploadAvatar(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	file, err := c.FormFile("file")

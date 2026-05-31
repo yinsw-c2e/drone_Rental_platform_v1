@@ -30,4 +30,9 @@ export const authService = {
 
   qqLogin: (accessToken: string) =>
     apiV2.post<{ user: User; token: TokenPair }>('/auth/qq-login', { access_token: accessToken }),
+
+  // 落库用户在小程序选择的意向身份(customer/provider),用于管理端分群和登录态恢复。
+  // 不影响 role_summary 能力位,失败时静默丢弃即可(不阻塞主流程)。
+  setPreferredMode: (mode: 'customer' | 'provider') =>
+    apiV2.post<{ preferred_mode: string }>('/user/preferred-mode', { mode }),
 };

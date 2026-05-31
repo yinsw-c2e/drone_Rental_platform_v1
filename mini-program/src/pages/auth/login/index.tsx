@@ -10,6 +10,7 @@ import {
 } from '../../../store/slices/roleSlice';
 import { RootState } from '../../../store/store';
 import { canEnterMode } from '../../../utils/roleSummary';
+import { syncPreferredModeWithBackend } from '../../../utils/preferredMode';
 import loginBg from '../../../assets/login/images/login_page_bg.jpg';
 import phoneIcon from '../../../assets/login/icons/phone.png';
 import lockIcon from '../../../assets/login/icons/lock.png';
@@ -125,6 +126,8 @@ export default function LoginPage() {
     }
     dispatch(setHaulRoleMode(mode));
     dispatch(setCredentials({ user: res.user, token: res.token, roleSummary }));
+    // 登录态就绪后,把双端意向身份补传后端(供运营分群)。
+    syncPreferredModeWithBackend(mode);
     Taro.showToast({ title: '登录成功', icon: 'success' });
     Taro.switchTab({ url: '/pages/home/index' });
     return true;

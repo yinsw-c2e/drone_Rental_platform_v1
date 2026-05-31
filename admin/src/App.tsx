@@ -39,6 +39,7 @@ const DroneList = lazy(() => import('./pages/Drone/DroneList'));
 const OrderList = lazy(() => import('./pages/Order/OrderList'));
 const PilotList = lazy(() => import('./pages/Pilot/PilotList'));
 const ClientList = lazy(() => import('./pages/Client/ClientList'));
+const ProviderList = lazy(() => import('./pages/Provider/ProviderList'));
 const CargoDeclarationList = lazy(() => import('./pages/Cargo/CargoDeclarationList'));
 const DemandList = lazy(() => import('./pages/Demand/DemandList'));
 const SupplyList = lazy(() => import('./pages/Supply/SupplyList'));
@@ -135,9 +136,10 @@ const menuGroups = [
     label: '资质审核',
     children: [
       { key: '/users', icon: <UserOutlined />, label: '用户实名' },
-      { key: '/clients', icon: <IdcardOutlined />, label: '客户认证' },
-      { key: '/pilots', icon: <TeamOutlined />, label: '飞手认证' },
-      { key: '/drones', icon: <RocketOutlined />, label: '无人机认证' },
+      { key: '/clients', icon: <IdcardOutlined />, label: '客户认证（需求端）' },
+      { key: '/providers', icon: <DeploymentUnitOutlined />, label: '服务商入驻（聚合）' },
+      { key: '/pilots', icon: <TeamOutlined />, label: '飞手认证（服务商）' },
+      { key: '/drones', icon: <RocketOutlined />, label: '无人机认证（服务商）' },
     ],
   },
   {
@@ -245,6 +247,7 @@ function AdminLayout({ onLogout }: { onLogout: () => void }) {
               <Route path="/insurance/claims" element={<InsuranceClaimPage />} />
               <Route path="/users" element={<UserList />} />
               <Route path="/clients" element={<ClientList />} />
+              <Route path="/providers" element={<ProviderList />} />
               <Route path="/pilots" element={<PilotList />} />
               <Route path="/drones" element={<DroneList />} />
               <Route path="/risk/credit-scores" element={<CreditScorePage />} />

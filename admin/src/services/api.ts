@@ -228,6 +228,11 @@ export const adminApi = {
   approvePilotHealthCheck: (id: number, approved: boolean) =>
     api.put(`/admin/pilots/${id}/health-check`, { approved }),
 
+  // ========== 服务商入驻审核（聚合视图） ==========
+  // 与小程序端 role_summary.provider 同口径,一处看到资产(机主)和执行(飞手)两条线的进度。
+  getProviders: (params?: { page?: number; page_size?: number }) =>
+    api.get('/admin/providers', { params }),
+
   // ========== 客户管理 ==========
   getClients: (params?: {
     page?: number;

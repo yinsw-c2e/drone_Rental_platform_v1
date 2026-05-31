@@ -318,6 +318,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			{
 				userGroup.GET("/profile", lt.User.GetProfile)
 				userGroup.PUT("/profile", lt.User.UpdateProfile)
+				userGroup.POST("/preferred-mode", lt.User.SetPreferredMode)
 				userGroup.POST("/avatar", lt.User.UploadAvatar)
 				userGroup.POST("/id-verify", lt.User.SubmitIDVerify)
 				userGroup.GET("/id-verify/status", lt.User.GetIDVerifyStatus)
@@ -451,6 +452,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			pushGroup.POST("/device", h.Push.RegisterDevice)
 			pushGroup.POST("/test", h.Push.SendTest)
 			pushGroup.POST("/wechat-subscribe", h.Push.GrantWeChatSubscribe)
+			pushGroup.POST("/wechat-subscribe/dev-trigger", h.Push.DevTriggerWeChatSubscribe)
 		}
 
 		conversationGroup := authenticated.Group("/conversations")
@@ -737,6 +739,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			{
 				adminGroup.GET("/dashboard", lt.Admin.Dashboard)
 				adminGroup.GET("/users", lt.Admin.UserList)
+				adminGroup.GET("/providers", lt.Admin.ProviderList)
 				adminGroup.PUT("/users/:id/status", lt.Admin.UpdateUserStatus)
 				adminGroup.PUT("/users/:id/verify", lt.Admin.ApproveIDVerification)
 				adminGroup.GET("/drones", lt.Admin.DroneList)

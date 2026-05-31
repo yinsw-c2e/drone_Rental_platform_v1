@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -50,11 +51,12 @@ type RoleSummary struct {
 }
 
 type MeUser struct {
-	ID         int64  `json:"id"`
-	Phone      string `json:"phone"`
-	Nickname   string `json:"nickname"`
-	AvatarURL  string `json:"avatar_url"`
-	IDVerified string `json:"id_verified"`
+	ID            int64  `json:"id"`
+	Phone         string `json:"phone"`
+	Nickname      string `json:"nickname"`
+	AvatarURL     string `json:"avatar_url"`
+	IDVerified    string `json:"id_verified"`
+	PreferredMode string `json:"preferred_mode"`
 }
 
 type MeSummary struct {
@@ -210,11 +212,12 @@ func (s *UserService) GetMe(userID int64) (*MeSummary, error) {
 
 	return &MeSummary{
 		User: MeUser{
-			ID:         user.ID,
-			Phone:      user.Phone,
-			Nickname:   user.Nickname,
-			AvatarURL:  user.AvatarURL,
-			IDVerified: user.IDVerified,
+			ID:            user.ID,
+			Phone:         user.Phone,
+			Nickname:      user.Nickname,
+			AvatarURL:     user.AvatarURL,
+			IDVerified:    user.IDVerified,
+			PreferredMode: user.PreferredMode,
 		},
 		RoleSummary: *roleSummary,
 	}, nil
@@ -479,6 +482,98 @@ func (s *UserService) GetPublicProfile(userID int64) (*model.User, error) {
 
 func (s *UserService) ListUsers(page, pageSize int, filters map[string]interface{}) ([]model.User, int64, error) {
 	return s.userRepo.List(page, pageSize, filters)
+}
+
+// SetPreferredMode 落库用户在小程序选择的意向身份("customer"/"provider")。
+// 与 role_summary 解耦:仅作为运营分群和登录态恢复参考,不影响能力位。
+func (s *UserService) SetPreferredMode(userID int64, mode string) error {
+	switch mode {
+	case "customer", "provider", "":
+		// 允许空串表示用户主动清空选择
+	default:
+		return fmt.Errorf("invalid preferred_mode: %s", mode)
+	}
+	return s.userRepo.UpdatePreferredMode(userID, mode)
+}
+
+// AdminProviderView 用于管理端"服务商入驻审核"聚合视图。
+// 同时携带用户基础信息、双侧能力位汇总,以及资产和执行两条线的快照数据,
+// 让运营可以一处看到"机主资料 / 飞手资料 / 持有无人机数"三方面进展。
+type AdminProviderView struct {
+	User                model.User          `json:"user"`
+	RoleSummary         RoleSummary         `json:"role_summary"`
+	DroneTotal          int64               `json:"drone_total"`
+	MarketEligibleTotal int64               `json:"market_eligible_drone_total"`
+	OwnerProfile        *model.OwnerProfile `json:"owner_profile,omitempty"`
+	PilotProfile        *model.PilotProfile `json:"pilot_profile,omitempty"`
+	Pilot               *model.Pilot        `json:"pilot,omitempty"`
+}
+
+// ListProviders 分页返回服务商候选用户聚合视图,供管理端"服务商入驻审核"页使用。
+// 与 GetRoleSummary 共用同一口径,确保管理端看到的状态和小程序端用户看到的一致。
+func (s *UserService) ListProviders(page, pageSize int) ([]AdminProviderView, int64, error) {
+	users, total, err := s.userRepo.ListProviderCandidates(page, pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	views := make([]AdminProviderView, 0, len(users))
+	for i := range users {
+		view := AdminProviderView{User: users[i]}
+		if summary, err := s.GetRoleSummary(users[i].ID); err == nil {
+			view.RoleSummary = *summary
+		}
+		if s.roleProfileRepo != nil {
+			if op, err := s.roleProfileRepo.GetOwnerProfileByUserID(users[i].ID); err == nil {
+				view.OwnerProfile = op
+			}
+			if pp, err := s.roleProfileRepo.GetPilotProfileByUserID(users[i].ID); err == nil {
+				view.PilotProfile = pp
+			}
+		}
+		if s.pilotRepo != nil {
+			if p, err := s.pilotRepo.GetByUserID(users[i].ID); err == nil {
+				view.Pilot = p
+			}
+		}
+		if s.droneRepo != nil {
+			if total, err := s.droneRepo.CountByOwner(users[i].ID); err == nil {
+				view.DroneTotal = total
+			}
+			if mt, err := s.droneRepo.CountMarketplaceEligibleByOwner(users[i].ID); err == nil {
+				view.MarketEligibleTotal = mt
+			}
+		}
+		views = append(views, view)
+	}
+	return views, total, nil
+}
+
+// AdminUserView 在用户基础信息上附带与小程序端一致的角色能力汇总。
+// 双端改造后注册不再写入有意义的 user_type（统一默认 renter），身份改由
+// client/owner/pilot 能力位体现，管理端需按同一口径（客户 / 服务商）展示。
+type AdminUserView struct {
+	model.User
+	RoleSummary *RoleSummary `json:"role_summary"`
+}
+
+// ListUsersWithRoles 在分页用户列表基础上逐条附加角色汇总，使管理端“身份”口径
+// 与小程序端 /auth/me 返回的 role_summary 完全一致（复用同一 GetRoleSummary）。
+// 注意：当前实现逐用户查询能力位，列表页 20 条规模可接受；如需更大页或更高频，
+// 可在仓储层补批量查询（见服务商聚合视图的后续规划）。
+func (s *UserService) ListUsersWithRoles(page, pageSize int, filters map[string]interface{}) ([]AdminUserView, int64, error) {
+	users, total, err := s.userRepo.List(page, pageSize, filters)
+	if err != nil {
+		return nil, 0, err
+	}
+	views := make([]AdminUserView, 0, len(users))
+	for i := range users {
+		view := AdminUserView{User: users[i]}
+		if summary, err := s.GetRoleSummary(users[i].ID); err == nil {
+			view.RoleSummary = summary
+		}
+		views = append(views, view)
+	}
+	return views, total, nil
 }
 
 func (s *UserService) UpdateUserStatus(userID int64, status string) error {

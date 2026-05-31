@@ -4,30 +4,101 @@ import { SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/api';
 
+interface ProviderRoleSummary {
+  status: string;          // none / pending_review / approved / rejected / suspended
+  asset_status: string;    // 机主（资产）侧
+  executor_status: string; // 飞手（执行）侧
+}
+
+interface RoleSummary {
+  has_client_role: boolean;
+  has_owner_role: boolean;
+  has_pilot_role: boolean;
+  provider: ProviderRoleSummary;
+}
+
 interface User {
   id: number;
   phone: string;
   nickname: string;
   user_type: string;
+  // 用户在小程序双端模式下选择的意向身份(customer / provider)。
+  // 仅作运营分群参考,展示为"意向"标签,实际能力位仍以 role_summary 为准。
+  preferred_mode?: string;
   id_verified: string;
   credit_score: number;
   status: string;
   created_at: string;
+  role_summary?: RoleSummary | null;
 }
 
-const USER_TYPE_MAP: Record<string, string> = {
-  renter: '租客',
-  drone_owner: '无人机主',
-  cargo_owner: '货主',
-  both: '双重身份',
-  admin: '管理员',
+const PREFERRED_MODE_META: Record<string, { text: string; color: string }> = {
+  customer: { text: '意向·需求端', color: 'cyan' },
+  provider: { text: '意向·服务商', color: 'purple' },
 };
+
+// 服务商各能力位的审核态展示。与小程序端 role_summary.provider 口径一致。
+const PROVIDER_STATUS_MAP: Record<string, { text: string; color: string }> = {
+  approved: { text: '已通过', color: 'green' },
+  pending_review: { text: '审核中', color: 'orange' },
+  rejected: { text: '已驳回', color: 'red' },
+  suspended: { text: '已暂停', color: 'volcano' },
+  none: { text: '未申请', color: 'default' },
+};
+
+const providerStatusMeta = (status?: string) =>
+  PROVIDER_STATUS_MAP[status || 'none'] || PROVIDER_STATUS_MAP.none;
 
 const VERIFY_STATUS_MAP: Record<string, { text: string; color: string }> = {
   approved: { text: '已认证', color: 'green' },
   pending: { text: '待审核', color: 'orange' },
   rejected: { text: '未通过', color: 'red' },
   none: { text: '未提交', color: 'default' },
+};
+
+// 双端模型下身份不再由 user_type 表达：每个非管理员用户默认即“客户（需求端）”，
+// 是否“服务商（供给端）”由 role_summary.provider 决定，与小程序端口径保持一致。
+const renderIdentityTags = (u: User): React.ReactNode => {
+  if (u.user_type === 'admin') {
+    return <Tag color="gold">管理员</Tag>;
+  }
+  const rs = u.role_summary;
+  if (!rs) {
+    return <Tag color="blue">客户</Tag>;
+  }
+  const tags: React.ReactNode[] = [];
+  if (rs.has_client_role) {
+    tags.push(<Tag key="client" color="blue">客户</Tag>);
+  }
+  const providerStatus = rs.provider?.status || 'none';
+  if (providerStatus !== 'none') {
+    const meta = providerStatusMeta(providerStatus);
+    tags.push(<Tag key="provider" color={meta.color}>服务商·{meta.text}</Tag>);
+  }
+  if (!tags.length) {
+    tags.push(<Tag key="client" color="blue">客户</Tag>);
+  }
+  const preferredMeta = u.preferred_mode ? PREFERRED_MODE_META[u.preferred_mode] : null;
+  if (preferredMeta) {
+    tags.push(<Tag key="preferred" color={preferredMeta.color}>{preferredMeta.text}</Tag>);
+  }
+  return <Space size={4} wrap>{tags}</Space>;
+};
+
+// 身份筛选在当前页数据上本地过滤（与下方实名/账户状态的本地筛选一致）。
+const IDENTITY_FILTER_OPTIONS = [
+  { value: 'provider', label: '服务商' },
+  { value: 'client_only', label: '纯客户' },
+  { value: 'admin', label: '管理员' },
+];
+
+const matchesIdentity = (u: User, filter: string): boolean => {
+  if (!filter) return true;
+  if (filter === 'admin') return u.user_type === 'admin';
+  const providerStatus = u.role_summary?.provider?.status || 'none';
+  if (filter === 'provider') return u.user_type !== 'admin' && providerStatus !== 'none';
+  if (filter === 'client_only') return u.user_type !== 'admin' && providerStatus === 'none';
+  return true;
 };
 
 const UserList: React.FC = () => {
@@ -39,7 +110,7 @@ const UserList: React.FC = () => {
   // 搜索筛选
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [identityFilter, setIdentityFilter] = useState<string>('');
   const [verifyFilter, setVerifyFilter] = useState<string>('');
 
   // 详情抽屉
@@ -71,7 +142,7 @@ const UserList: React.FC = () => {
   const handleReset = () => {
     setKeyword('');
     setStatusFilter('');
-    setTypeFilter('');
+    setIdentityFilter('');
     setVerifyFilter('');
     setPage(1);
     fetchUsers(1);
@@ -120,9 +191,9 @@ const UserList: React.FC = () => {
     setDetailVisible(true);
   };
 
-  // 本地筛选（类型和认证状态在前端过滤）
+  // 本地筛选（身份和认证状态在前端过滤）
   const filteredUsers = users.filter(u => {
-    if (typeFilter && u.user_type !== typeFilter) return false;
+    if (identityFilter && !matchesIdentity(u, identityFilter)) return false;
     if (verifyFilter && u.id_verified !== verifyFilter) return false;
     return true;
   });
@@ -132,8 +203,8 @@ const UserList: React.FC = () => {
     { title: '手机号', dataIndex: 'phone', width: 130 },
     { title: '昵称', dataIndex: 'nickname', width: 120 },
     {
-      title: '用户类型', dataIndex: 'user_type', width: 100,
-      render: (v: string) => <Tag>{USER_TYPE_MAP[v] || v}</Tag>,
+      title: '身份', dataIndex: 'role_summary', width: 220,
+      render: (_: unknown, record: User) => renderIdentityTags(record),
     },
     {
       title: '实名认证', dataIndex: 'id_verified', width: 100,
@@ -202,13 +273,13 @@ const UserList: React.FC = () => {
           </Col>
           <Col>
             <Select
-              placeholder="用户类型"
+              placeholder="身份"
               allowClear
               style={{ width: 130 }}
-              value={typeFilter || undefined}
-              onChange={v => setTypeFilter(v || '')}>
-              {Object.entries(USER_TYPE_MAP).map(([k, v]) => (
-                <Select.Option key={k} value={k}>{v}</Select.Option>
+              value={identityFilter || undefined}
+              onChange={v => setIdentityFilter(v || '')}>
+              {IDENTITY_FILTER_OPTIONS.map(opt => (
+                <Select.Option key={opt.value} value={opt.value}>{opt.label}</Select.Option>
               ))}
             </Select>
           </Col>
@@ -269,8 +340,34 @@ const UserList: React.FC = () => {
               <Col span={16}>{detailUser.phone}</Col>
               <Col span={8}><strong>昵称:</strong></Col>
               <Col span={16}>{detailUser.nickname || '未设置'}</Col>
-              <Col span={8}><strong>用户类型:</strong></Col>
-              <Col span={16}><Tag>{USER_TYPE_MAP[detailUser.user_type] || detailUser.user_type}</Tag></Col>
+              <Col span={8}><strong>身份:</strong></Col>
+              <Col span={16}>{renderIdentityTags(detailUser)}</Col>
+              <Col span={8}><strong>小程序意向:</strong></Col>
+              <Col span={16}>
+                {detailUser.preferred_mode
+                  ? (
+                    <Tag color={PREFERRED_MODE_META[detailUser.preferred_mode]?.color}>
+                      {PREFERRED_MODE_META[detailUser.preferred_mode]?.text || detailUser.preferred_mode}
+                    </Tag>
+                  )
+                  : <span style={{ color: '#bfbfbf' }}>未选择</span>}
+              </Col>
+              {detailUser.user_type !== 'admin' && (
+                <>
+                  <Col span={8}><strong>服务商·资产(机主):</strong></Col>
+                  <Col span={16}>
+                    <Tag color={providerStatusMeta(detailUser.role_summary?.provider?.asset_status).color}>
+                      {providerStatusMeta(detailUser.role_summary?.provider?.asset_status).text}
+                    </Tag>
+                  </Col>
+                  <Col span={8}><strong>服务商·执行(飞手):</strong></Col>
+                  <Col span={16}>
+                    <Tag color={providerStatusMeta(detailUser.role_summary?.provider?.executor_status).color}>
+                      {providerStatusMeta(detailUser.role_summary?.provider?.executor_status).text}
+                    </Tag>
+                  </Col>
+                </>
+              )}
               <Col span={8}><strong>实名认证:</strong></Col>
               <Col span={16}>
                 <Tag color={VERIFY_STATUS_MAP[detailUser.id_verified]?.color || 'default'}>

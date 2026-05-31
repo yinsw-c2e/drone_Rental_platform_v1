@@ -17,6 +17,9 @@ type User struct {
 	IDVerified    string         `gorm:"type:varchar(20);default:unverified" json:"id_verified"` // unverified, pending, approved, rejected
 	CreditScore   int            `gorm:"default:100" json:"credit_score"`
 	Status        string         `gorm:"type:varchar(20);default:active" json:"status"` // active, suspended, banned
+	// PreferredMode 记录用户在小程序选择的意向身份("customer"=我要吊运 / "provider"=我要接单)。
+	// 仅作运营分群参考,不代替 role_summary 中的能力位。
+	PreferredMode string         `gorm:"type:varchar(20);index" json:"preferred_mode"`
 	WechatOpenID  string         `gorm:"type:varchar(100);index" json:"-"`
 	WechatUnionID string         `gorm:"type:varchar(100);index" json:"-"`
 	QQOpenID      string         `gorm:"type:varchar(100);index" json:"-"`

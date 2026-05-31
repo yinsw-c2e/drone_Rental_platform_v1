@@ -9,6 +9,7 @@ import {
   HaulRoleMode,
   setHaulRoleMode,
 } from '../../../store/slices/roleSlice';
+import { syncPreferredModeWithBackend } from '../../../utils/preferredMode';
 
 const normalizeRoleMode = (value?: string): HaulRoleMode | null =>
   value === 'provider' || value === 'customer' ? value : null;
@@ -102,6 +103,8 @@ export default function RegisterPage() {
         token: (res as any).token,
         roleSummary: (res as any).role_summary || null,
       }));
+      // 注册后即写入意向身份(若路径里没传 roleMode,则按 store 当前选中态同步)。
+      syncPreferredModeWithBackend(routeRoleMode || 'customer');
       Taro.showToast({ title: '注册成功', icon: 'success' });
       if (routeRoleMode === 'provider') {
         Taro.redirectTo({ url: '/pages/provider/onboarding/index?from=register' }).catch(() => {

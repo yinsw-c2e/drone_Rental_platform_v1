@@ -71,6 +71,9 @@ func (h *Handler) UserList(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		filters["status"] = status
 	}
+	if kw := c.Query("keyword"); kw != "" {
+		filters["__keyword"] = kw
+	}
 	users, total, err := h.userService.ListUsers(page, pageSize, filters)
 	if err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
