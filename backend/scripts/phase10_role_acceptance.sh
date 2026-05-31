@@ -132,11 +132,11 @@ read_code() {
 
 mysql_exec() {
   if command -v mysql >/dev/null 2>&1; then
-    mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" "$@"
+    mysql --default-character-set=utf8mb4 -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USER" -p"$MYSQL_PASS" -D "$MYSQL_DB" "$@"
     return
   fi
   if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -qx "$MYSQL_CONTAINER"; then
-    docker exec -i "$MYSQL_CONTAINER" mysql -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" "$@"
+    docker exec -i "$MYSQL_CONTAINER" mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASS" "$MYSQL_DB" "$@"
     return
   fi
   echo "missing required binary: mysql or running docker container $MYSQL_CONTAINER" >&2
