@@ -23,6 +23,7 @@ import {RootState} from '../../store/store';
 import {setHaulRoleMode} from '../../store/slices/roleSlice';
 import {V2SettlementSummary} from '../../types';
 import {canUseProviderWorkbench, getEffectiveRoleSummary} from '../../utils/roleSummary';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
 
 type DesignTextProps = React.PropsWithChildren<{
   style?: TextStyle | TextStyle[];
@@ -130,7 +131,7 @@ const statusTitleOf = (status?: string) => {
     return '待客户支付';
   }
   if (status === 'pending_dispatch') {
-    return '待安排执行';
+    return '待开始履约';
   }
   if (['assigned', 'preparing'].includes(String(status))) {
     return '履约准备中';
@@ -159,16 +160,10 @@ const statusDescOf = (detail: any) => {
     return '您已确认承接，等待客户完成支付';
   }
   if (status === 'pending_dispatch') {
-    if (detail?.current_dispatch?.status === 'pending_response') {
-      return '正式派单已发出，等待执行人员确认';
-    }
-    if (detail?.current_dispatch?.status === 'accepted') {
-      return '执行人员已确认，订单正在进入执行准备';
-    }
-    return detail?.needs_dispatch ? '订单待派单，请安排执行人员' : '订单已进入执行准备';
+    return '订单已付款，请服务商开始履约';
   }
   if (['assigned', 'preparing'].includes(String(status))) {
-    return '执行团队正在准备本次履约';
+    return '服务商正在准备本次履约';
   }
   if (['loading', 'in_transit'].includes(String(status))) {
     return '吊运作业正在进行';
@@ -197,27 +192,15 @@ const executorNameOf = (detail: any) =>
 const providerNameOf = (detail: any) =>
   detail?.participants?.provider?.nickname || detail?.provider?.nickname || '';
 
-const dispatchPilotNameOf = (detail: any) =>
-  detail?.current_dispatch?.target_pilot?.nickname ||
-  (detail?.current_dispatch?.target_pilot_user_id
-    ? `执行人员 ${detail.current_dispatch.target_pilot_user_id}`
-    : '');
-
-const dispatchStatusMetaOf = (detail: any) => {
-  const status = String(detail?.current_dispatch?.status || '');
-  if (status === 'pending_response') {
-    return {label: '待确认', tone: 'orange' as const};
+const fulfillmentStatusMetaOf = (detail: any) => {
+  const status = String(detail?.status || '').toLowerCase();
+  if (status === 'pending_dispatch') return {label: '待开始', tone: 'orange' as const};
+  if (['assigned', 'preparing', 'loading', 'in_transit'].includes(status)) {
+    return {label: '履约中', tone: 'green' as const};
   }
-  if (status === 'accepted') {
-    return {label: '已确认', tone: 'green' as const};
-  }
-  if (status === 'rejected') {
-    return {label: '待重派', tone: 'orange' as const};
-  }
-  if (detail?.needs_dispatch && !dispatchPilotNameOf(detail)) {
-    return {label: '待安排', tone: 'orange' as const};
-  }
-  return {label: '已确认', tone: 'green' as const};
+  if (['delivered', 'completed'].includes(status)) return {label: '已送达', tone: 'green' as const};
+  if (status === 'pending_payment') return {label: '待支付', tone: 'orange' as const};
+  return {label: '已接单', tone: 'green' as const};
 };
 
 const airspaceMetaOf = (detail: any) => {
@@ -251,9 +234,9 @@ const airspaceMetaOf = (detail: any) => {
     return {tag: '已复核', tone: 'green' as const, desc: '执行状态已推进，现场复核已完成'};
   }
   if (inProgress) {
-    return {tag: '待复核', tone: 'orange' as const, desc: '等待执行人员到场进行安全复核'};
+    return {tag: '待复核', tone: 'orange' as const, desc: '等待服务商到场进行安全复核'};
   }
-  return {tag: '待确认', tone: 'orange' as const, desc: '订单未返回空域或现场复核状态'};
+  return {tag: '待确认', tone: 'orange' as const, desc: '暂无空域或现场复核状态'};
 };
 
 const insuranceMetaOf = (detail: any) => {
@@ -280,9 +263,9 @@ const insuranceMetaOf = (detail: any) => {
     return {tag: '未通过', tone: 'orange' as const, desc: reason ? `未通过：${reason}` : '无人机保险资料未通过审核'};
   }
   if (detail?.contract?.payment_ready) {
-    return {tag: '待核验', tone: 'orange' as const, desc: '合同已就绪，订单未返回无人机保单状态'};
+    return {tag: '待核验', tone: 'orange' as const, desc: '合同已就绪，暂无无人机保单状态'};
   }
-  return {tag: '待确认', tone: 'orange' as const, desc: '订单未返回无人机保单信息'};
+  return {tag: '待确认', tone: 'orange' as const, desc: '暂无无人机保单信息'};
 };
 
 const droneDescOf = (detail: any) => {
@@ -296,7 +279,7 @@ const droneDescOf = (detail: any) => {
   if (supply?.drone_id) {
     return `供给无人机 #${supply.drone_id}`;
   }
-  return '订单未返回无人机信息';
+  return '暂无无人机信息';
 };
 
 const settlementStatusLabelOf = (status?: string) => {
@@ -603,7 +586,7 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
         setDetail(null);
         setOrderId(0);
         setSettlement(null);
-        setErrorText('当前没有后端返回的待确认或待履约订单');
+        setErrorText('暂无待确认或待履约订单');
         return;
       }
 
@@ -633,7 +616,7 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
     } catch (error: any) {
       setDetail(null);
       setSettlement(null);
-      setErrorText(error?.message || '订单履约信息加载失败');
+      setErrorText(friendlyErrorMessage(error, '订单履约信息加载失败'));
     } finally {
       setLoading(false);
     }
@@ -729,7 +712,7 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
     const address = type === 'pickup' ? detail?.service_address : detail?.dest_address;
     const name = type === 'pickup' ? '起吊点' : '落放点';
     const coordinateText = point ? `\n坐标：${point.latitude}, ${point.longitude}` : '';
-    Alert.alert(name, `${address || '订单未返回地址'}${coordinateText}`);
+    Alert.alert(name, `${address || '地址待确认'}${coordinateText}`);
   };
   const contactCustomer = () => {
     const phone = clientPhoneOf(detail);
@@ -746,13 +729,6 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
     ]);
   };
 
-  const dispatchArrangementParams = () => {
-    const nextDispatchId = Number(detail?.current_dispatch?.id || detail?.dispatch_task_id || 0);
-    return nextDispatchId
-      ? {orderId, id: orderId, dispatchId: nextDispatchId}
-      : {orderId, id: orderId};
-  };
-
   const confirmSafetyCheck = () => {
     if (!detail || !orderId) {
       Alert.alert('现场复核', '暂无可复核订单');
@@ -762,11 +738,7 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
       Alert.alert('现场复核', '订单尚未进入复核阶段');
       return;
     }
-    const meta = airspaceMetaOf(detail);
-    Alert.alert('空域 / 安全检查', meta.desc, [
-      {text: '查看空域', onPress: () => navigation.navigate('AirspaceApplication')},
-      {text: '关闭', style: 'cancel'},
-    ]);
+    navigation.navigate('SafetyCheck', {orderId, id: orderId});
   };
 
   const openInsuranceAction = () => {
@@ -801,11 +773,28 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
       return;
     }
     if (detail.status === 'pending_dispatch') {
-      navigation.navigate('CreateDispatchTask', dispatchArrangementParams());
+      Alert.alert('开始履约', '确认由当前服务商开始履约？确认后订单会进入履约推进。', [
+        {text: '取消', style: 'cancel'},
+        {
+          text: '开始履约',
+          onPress: async () => {
+            setSubmitting(true);
+            try {
+              await orderV2Service.startSelfFulfillment(orderId);
+              Alert.alert('已开始履约', '订单已进入履约推进。');
+              loadDetail();
+            } catch (error: any) {
+              Alert.alert('开始履约失败', error?.message || '请稍后重试');
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        },
+      ]);
       return;
     }
     if (detail.status === 'pending_payment') {
-      Alert.alert('安排履约', '等待客户支付后再安排执行');
+      Alert.alert('安排履约', '等待客户支付后再开始履约');
       return;
     }
     if (detail.status !== 'pending_provider_confirmation') {
@@ -838,11 +827,11 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
   const feeTip = settlementLoading
     ? '正在同步结算明细'
     : finance.source === 'settlement'
-      ? `结算${finance.statusLabel} · 执行服务 ${formatMoney(finance.pilotFee)} · 设备服务 ${formatMoney(finance.ownerFee)}`
+      ? `结算${finance.statusLabel} · 履约服务 ${formatMoney(finance.pilotFee)} · 设备服务 ${formatMoney(finance.ownerFee)}`
       : '完成后生成结算明细，当前为订单预估金额';
-  const dispatchMeta = detail ? dispatchStatusMetaOf(detail) : {label: '待安排', tone: 'orange' as const};
-  const airspaceMeta = detail ? airspaceMetaOf(detail) : {tag: '待确认', tone: 'orange' as const, desc: '订单未返回空域或现场复核状态'};
-  const insuranceMeta = detail ? insuranceMetaOf(detail) : {tag: '待确认', tone: 'orange' as const, desc: '订单未返回无人机保单信息'};
+  const fulfillmentMeta = detail ? fulfillmentStatusMetaOf(detail) : {label: '待开始', tone: 'orange' as const};
+  const airspaceMeta = detail ? airspaceMetaOf(detail) : {tag: '待确认', tone: 'orange' as const, desc: '暂无空域或现场复核状态'};
+  const insuranceMeta = detail ? insuranceMetaOf(detail) : {tag: '待确认', tone: 'orange' as const, desc: '暂无无人机保单信息'};
   const submitText = (() => {
     if (submitting) {
       return '提交中...';
@@ -851,12 +840,12 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
       return '确认接单';
     }
     if (detail?.status === 'pending_dispatch') {
-      return detail?.current_dispatch ? '调整派单' : '安排执行';
+      return '开始履约';
     }
     if (detail?.status === 'pending_payment') {
       return '等待支付';
     }
-    return '安排履约';
+    return '履约推进';
   })();
 
   const orderRows: InfoRow[] = detail ? [
@@ -900,18 +889,18 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
       iconSize: [48, 48],
       tag: detail?.drone?.availability_status === 'available' ? '可用' : '待确认',
       tone: detail?.drone?.availability_status === 'available' ? 'green' : 'orange',
-      onPress: () => navigation.navigate('CreateDispatchTask', dispatchArrangementParams()),
+      onPress: () => Alert.alert('选择无人机', '无人机由服务商负责履约。'),
     },
     {
-      key: 'executor',
-      title: '安排执行人员',
-      desc: dispatchPilotNameOf(detail) || executorNameOf(detail) || providerNameOf(detail) || (detail?.needs_dispatch ? '待指派执行人员' : '服务商自执行'),
+      key: 'service',
+      title: '服务商履约',
+      desc: providerNameOf(detail) || executorNameOf(detail) || '当前服务商负责本单履约',
       icon: 'executor',
       iconColor: '#0B4AA2',
       iconSize: [48, 50],
-      tag: dispatchMeta.label,
-      tone: dispatchMeta.tone,
-      onPress: () => navigation.navigate('CreateDispatchTask', dispatchArrangementParams()),
+      tag: fulfillmentMeta.label,
+      tone: fulfillmentMeta.tone,
+      onPress: () => Alert.alert('服务商履约', '本单由当前服务商履约。'),
     },
     {
       key: 'safety',
@@ -1001,7 +990,7 @@ export default function FulfillmentHubScreen({navigation, route}: any) {
                 {loading ? '正在同步履约订单' : '暂无可安排订单'}
               </DesignText>
               <DesignText style={textFrame(72, loading ? 164 : 114, 660, 64, 21, 32, '400', '#7A869E', 'center')}>
-                {loading ? '请稍候，正在读取真实订单数据。' : errorText || '当前账号没有后端返回的待履约订单。'}
+                {loading ? '加载中...' : errorText || '暂无待履约订单。'}
               </DesignText>
             </View>
           ) : (

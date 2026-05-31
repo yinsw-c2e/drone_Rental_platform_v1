@@ -52,8 +52,13 @@ const ACTIVE_EXECUTION_STATUSES = [
   'airspace_approved',
   'loading',
   'in_transit',
+];
+
+const TERMINAL_ORDER_STATUSES = [
   'delivered',
   'completed',
+  'cancelled',
+  'provider_rejected',
 ];
 
 const formatDateTime = (value?: string | null) => {
@@ -120,9 +125,9 @@ function DispatchSection({ task }: { task?: V2DispatchTaskSummary | null }) {
   if (!task) {
     return (
       <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>当前没有在途正式派单</Text>
+        <Text style={styles.noticeTitle}>当前没有在途履约任务</Text>
         <Text style={styles.noticeDesc}>
-          如果订单需要调度执行方，后续生成的新正式派单会在这里同步展示。
+          如果订单需要履约推进，后续生成的新任务会在这里同步展示。
         </Text>
       </View>
     );
@@ -138,13 +143,13 @@ function DispatchSection({ task }: { task?: V2DispatchTaskSummary | null }) {
         />
       </View>
       <Text style={styles.noticeDesc}>
-        派单来源：{task.dispatch_source || '-'}
+        履约来源：{task.dispatch_source || '-'}
       </Text>
       <Text style={styles.noticeDesc}>
-        目标执行人员：
+        履约人员：
         {task.target_pilot?.nickname ||
           (task.target_pilot?.user_id
-            ? `执行人员 #${task.target_pilot.user_id}`
+            ? `履约人员 #${task.target_pilot.user_id}`
             : '待确认')}
       </Text>
       <Text style={styles.noticeDesc}>
@@ -213,7 +218,7 @@ function PositionSection({
   if (!position) {
     return (
       <Text style={styles.emptyHint}>
-        当前还没有位置上报数据。测试环境下，可先到执行人员工作台启动一段测试飞行。
+        当前还没有位置上报数据。开始履约飞行后，这里会同步展示实时位置。
       </Text>
     );
   }
@@ -326,6 +331,14 @@ export default function FlightMonitoringScreen({ route, navigation }: any) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const stopAutoRefresh = useCallback(() => {
+    setAutoRefresh(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
   const resolveOrderId = useCallback(async () => {
     if (initialOrderId > 0) {
       setResolvedOrderId(initialOrderId);
@@ -354,7 +367,12 @@ export default function FlightMonitoringScreen({ route, navigation }: any) {
         return;
       }
       const res = await orderV2Service.getMonitor(orderId);
-      setMonitor(res.data || null);
+      const nextMonitor = res.data || null;
+      setMonitor(nextMonitor);
+      const nextStatus = String(nextMonitor?.order?.status || '').toLowerCase();
+      if (TERMINAL_ORDER_STATUSES.includes(nextStatus)) {
+        stopAutoRefresh();
+      }
     } catch (error) {
       console.error('获取飞行监控数据失败:', error);
       setMonitor(null);
@@ -362,7 +380,7 @@ export default function FlightMonitoringScreen({ route, navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [resolveOrderId]);
+  }, [resolveOrderId, stopAutoRefresh]);
 
   useFocusEffect(
     useCallback(() => {
@@ -457,7 +475,7 @@ export default function FlightMonitoringScreen({ route, navigation }: any) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.centerState}>
           <Text style={styles.emptyText}>
-            请从订单详情或正式派单详情进入飞行监控。
+            请从订单详情或履约订单进入飞行监控。
           </Text>
         </View>
       </SafeAreaView>
@@ -533,7 +551,7 @@ export default function FlightMonitoringScreen({ route, navigation }: any) {
                   })
                 }
               >
-                <Text style={styles.secondaryBtnText}>查看派单</Text>
+                <Text style={styles.secondaryBtnText}>查看履约任务</Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -567,7 +585,7 @@ export default function FlightMonitoringScreen({ route, navigation }: any) {
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>当前正式派单</Text>
+          <Text style={styles.sectionTitle}>当前履约任务</Text>
           <DispatchSection task={currentDispatch} />
         </ObjectCard>
 

@@ -24,6 +24,7 @@ import {orderFinanceV2Service} from '../../services/orderFinanceV2';
 import {confirmReceipt, orderV2Service} from '../../services/orderV2';
 import {store} from '../../store/store';
 import {V2SettlementSummary} from '../../types';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
 
 const DESIGN_WIDTH = 941;
 const DESIGN_HEIGHT = 1672;
@@ -90,11 +91,12 @@ const serviceLevelOf = (detail: any) => {
 };
 
 const getStepState = (detail: any) => {
-  const status = detail?.status || '';
+  const status = String(detail?.status || '').toLowerCase();
   if (status === 'completed') return 6;
-  if (status === 'delivered' || status === 'in_transit') return 5;
-  if (['preparing', 'assigned', 'pending_dispatch'].includes(status)) return 3;
-  if (['pending_payment', 'paid'].includes(status)) return 2;
+  if (status === 'delivered') return 5;
+  if (status === 'in_transit') return 4;
+  if (['preparing', 'assigned'].includes(status)) return 3;
+  if (['pending_dispatch', 'dispatch_failed', 'paid', 'pending_payment'].includes(status)) return 2;
   return 1;
 };
 
@@ -102,9 +104,11 @@ const statusTitleOf = (status: string) => {
   if (status === 'completed') return '订单已完成';
   if (status === 'delivered') return '等待客户确认';
   if (status === 'cancelled') return '订单已取消';
+  if (status === 'dispatch_failed') return '暂未匹配到服务商';
   if (status === 'pending_provider_confirmation') return '等待服务商接单';
   if (status === 'pending_payment') return '等待支付';
-  if (status === 'pending_dispatch') return '等待派单';
+  if (status === 'pending_dispatch') return '等待服务商开始履约';
+  if (['assigned', 'preparing'].includes(status)) return '服务商已接单';
   if (['loading', 'in_transit'].includes(status)) return '吊运进行中';
   if (!status) return '订单状态未知';
   return '服务商已接单';
@@ -114,26 +118,55 @@ const statusDescOf = (status: string) => {
   if (status === 'completed') return '本次吊运服务已完成';
   if (status === 'delivered') return '货物已送达，请确认完成';
   if (status === 'cancelled') return '订单已结束';
+  if (status === 'dispatch_failed') return '暂未匹配到合适服务商，可加价或扩大半径重发';
   if (status === 'pending_provider_confirmation') return '服务商正在确认方案，请耐心等待';
   if (status === 'pending_payment') return '请完成支付后继续履约流程';
-  if (status === 'pending_dispatch') return '服务商正在安排执行团队';
+  if (status === 'pending_dispatch') return '服务商待开始履约';
   if (['loading', 'in_transit'].includes(status)) return '吊运作业正在进行';
   if (!status) return '正在等待订单状态同步';
   return '服务商正在安排准备，请耐心等待';
 };
 
+const STATUS_LABEL_MAP: Record<string, string> = {
+  created: '已创建',
+  pending_provider_confirmation: '待服务商确认',
+  pending_payment: '待支付',
+  pending_dispatch: '待开始履约',
+  auto_assigning: '匹配中',
+  dispatch_failed: '暂无服务商',
+  assigned: '服务商已接单',
+  preparing: '准备中',
+  loading: '装载中',
+  in_transit: '吊运中',
+  in_progress: '进行中',
+  delivered: '待确认收货',
+  completed: '已完成',
+  cancelled: '已取消',
+  scheduled: '已预约',
+  rejected: '已拒绝',
+  provider_rejected: '服务未确认',
+  airspace_applying: '空域申请中',
+  airspace_approved: '空域已批',
+  airspace_rejected: '空域被拒',
+  paid: '已支付',
+  refunded: '已退款',
+  settled: '已入账',
+  calculated: '已计算',
+  confirmed: '已确认',
+  disputed: '争议中',
+  pending: '待处理',
+  settlement_failed: '结算失败',
+  dispatched: '已派单',
+  takeoff: '已起飞',
+  landed: '已降落',
+  aborted: '已中止',
+  failed: '失败',
+  success: '成功',
+};
+
 const statusLabelOf = (status?: string) => {
-  if (status === 'pending_provider_confirmation') return '待服务商确认';
-  if (status === 'pending_payment') return '待支付';
-  if (status === 'pending_dispatch') return '待派单';
-  if (status === 'assigned') return '已派单';
-  if (status === 'preparing') return '准备中';
-  if (status === 'loading') return '装载中';
-  if (status === 'in_transit') return '吊运中';
-  if (status === 'delivered') return '待确认收货';
-  if (status === 'completed') return '已完成';
-  if (status === 'cancelled') return '已取消';
-  return status || '状态已更新';
+  if (!status) return '状态已更新';
+  return STATUS_LABEL_MAP[String(status).toLowerCase()] || status;
 };
 
 const formatMoney = (amount?: number | null) => {
@@ -240,7 +273,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
       setRemoteDetail(null);
       setRemoteTimeline([]);
       setSettlement(null);
-      setErrorText(error?.message || '订单加载失败，请稍后重试');
+      setErrorText(friendlyErrorMessage(error, '订单加载失败，请稍后重试'));
     } finally {
       setLoading(false);
     }
@@ -254,12 +287,20 @@ export default function OrderDetailScreen({route, navigation}: any) {
   const orderNo = detail?.order_no || '';
   const createdAt = formatFullDateTime(detail?.created_at);
   const providerConfirmedAt = detail?.provider_confirmed_at ? formatFullDateTime(detail?.provider_confirmed_at) : '等待确认';
-  const teamArrangedAt = detail?.current_dispatch?.created_at ? formatFullDateTime(detail?.current_dispatch?.created_at) : '待安排';
+  const serviceStartedAt = detail?.updated_at ? formatFullDateTime(detail.updated_at) : '待开始';
   const stepState = detail ? getStepState(detail) : 0;
   const canConfirm = detail?.status === 'delivered';
   const canPay = detail?.status === 'pending_payment';
   const canReview = detail?.status === 'completed';
   const needsContractSign = canPay && !(detail?.payment_ready || detail?.contract?.payment_ready);
+  const orderMode = String((detail as any)?.order_mode || '').toLowerCase();
+  const orderStatus = String(detail?.status || '').toLowerCase();
+  const canViewLive = Boolean(
+    orderId &&
+    detail &&
+    (!orderMode || ['instant', 'reservation'].includes(orderMode)) &&
+    ['pending_dispatch', 'assigned', 'preparing', 'in_transit', 'delivered', 'completed'].includes(orderStatus),
+  );
   const supplyId = detail ? sourceSupplyIdOf(detail) : 0;
   const demandId = Number(detail?.source_info?.demand_id || detail?.demand_id || 0);
   const providerPhone = detail ? providerPhoneOf(detail) : '';
@@ -283,6 +324,14 @@ export default function OrderDetailScreen({route, navigation}: any) {
       return;
     }
     Alert.alert('暂无方案详情', '当前订单没有可打开的服务方案。');
+  };
+
+  const viewLive = () => {
+    if (!orderId) {
+      Alert.alert('缺少订单信息', '无法查看实时进度');
+      return;
+    }
+    navigation.navigate('OrderLive', {orderId, id: orderId});
   };
 
   const copyOrderNo = () => {
@@ -342,22 +391,21 @@ export default function OrderDetailScreen({route, navigation}: any) {
     {key: 'pickup', icon: orderProgressAssets.pickupPinGreen, label: '起吊点', value: detail?.service_address || '-'},
     {key: 'dropoff', icon: orderProgressAssets.dropoffPinOrange, label: '落放点', value: detail?.dest_address || '-'},
     {key: 'service', icon: orderProgressAssets.droneServiceBlue, label: '预计服务', value: serviceLevelOf(detail)},
-    {key: 'team', icon: orderProgressAssets.teamBlue, label: '服务团队', value: stepState >= 3 ? '服务团队已安排' : '等待服务团队安排'},
+    {key: 'team', icon: orderProgressAssets.teamBlue, label: '服务商履约', value: stepState >= 3 ? '服务商已接单' : '等待服务商开始履约'},
   ] : [];
 
   const timeline = detail ? [
     {idx: 1, title: '已提交吊运需求', time: createdAt, desc: '您已提交吊运需求', icon: orderProgressAssets.timelineCheck, done: stepState >= 1},
     {idx: 2, title: '服务商已确认方案', time: providerConfirmedAt, desc: '服务商已确认并提交方案', icon: orderProgressAssets.timelineCheck, done: stepState >= 2},
-    {idx: 3, title: '服务团队已安排', time: teamArrangedAt, desc: '服务团队已安排完毕', icon: orderProgressAssets.timelineActive3, active: stepState === 3, done: stepState >= 3},
-    {idx: 4, title: '到场安全评估', time: '服务团队到达现场后进行', desc: '待开始', icon: orderProgressAssets.timelinePending4, done: stepState >= 4},
-    {idx: 5, title: '开始吊运', time: '吊运作业进行中', desc: '待开始', icon: orderProgressAssets.timelinePending5, done: stepState >= 5},
+    {idx: 3, title: '服务商开始履约', time: serviceStartedAt, desc: stepState >= 3 ? '服务商进入履约推进' : '等待服务商开始', icon: orderProgressAssets.timelineActive3, active: stepState === 3, done: stepState >= 3},
+    {idx: 4, title: '开始吊运', time: '吊运作业进行中', desc: stepState >= 4 ? '吊运作业已进行' : '等待开始吊运', icon: orderProgressAssets.timelinePending5, done: stepState >= 4},
     {
-      idx: 6,
+      idx: 5,
       title: '已完成，等待确认',
       time: '作业完成，请您确认',
-      desc: settlement?.id ? `结算${settlementStatusLabelOf(settlement.status)}` : stepState >= 6 ? '已完成' : '待完成',
+      desc: settlement?.id ? `结算${settlementStatusLabelOf(settlement.status)}` : stepState >= 6 ? '订单已完成' : '等待客户确认完成',
       icon: orderProgressAssets.timelinePending6,
-      done: stepState >= 6,
+      done: stepState >= 5,
     },
   ] : [];
   const timelineRows = remoteTimeline.length > 0
@@ -461,7 +509,7 @@ export default function OrderDetailScreen({route, navigation}: any) {
                 {loading ? '正在同步订单信息' : '无法展示订单进度'}
               </DesignText>
               <DesignText style={[frame(96, loading ? 182 : 124, 748, 64), type(23, 32, '400', '#5D6B85'), styles.centerText]}>
-                {loading ? '请稍候，正在读取真实订单数据。' : errorText || '订单不存在或当前账号无权查看。'}
+                {loading ? '加载中...' : errorText || '订单不存在或当前账号无权查看。'}
               </DesignText>
             </View>
           ) : (
@@ -477,6 +525,11 @@ export default function OrderDetailScreen({route, navigation}: any) {
           <TouchableOpacity activeOpacity={0.76} onPress={viewPlan} style={[frame(758, 166, 130, 48), styles.planButton, {borderRadius: x(11)}]}>
             <DesignText style={type(23, 30, '700', '#003B93')}>查看方案</DesignText>
           </TouchableOpacity>
+          {canViewLive ? (
+            <TouchableOpacity activeOpacity={0.76} onPress={viewLive} style={[frame(565, 166, 180, 48), styles.planButton, {borderRadius: x(11)}]}>
+              <DesignText style={type(22, 30, '700', '#003B93')}>查看实时进度</DesignText>
+            </TouchableOpacity>
+          ) : null}
           <View style={[styles.line, frame(49, 245, 839, 1)]} />
           <DesignText style={[frame(50, 265, 88, 32), type(24, 32, '500', '#0B1836')]}>订单号</DesignText>
           <DesignText style={[frame(138, 265, 210, 32), type(24, 32, '400', '#0B1836')]}>{orderNo}</DesignText>

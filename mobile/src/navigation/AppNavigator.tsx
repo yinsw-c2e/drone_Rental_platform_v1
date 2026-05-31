@@ -1,18 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../store/store';
-import { markMeInitialized, setMeSummary } from '../store/slices/authSlice';
+import { AppDispatch, RootState } from '../store/store';
+import { bootstrapAuth, markMeInitialized, setMeSummary } from '../store/slices/authSlice';
 import {
   HAUL_ROLE_MODE_STORAGE_KEY,
   hydrateHaulRoleMode,
 } from '../store/slices/roleSlice';
-import { pushService } from '../services/pushFacade';
+import { pushService, type PushMessage } from '../services/pushFacade';
 import { sessionService } from '../services/session';
 import { wsService } from '../services/websocket';
 import { useTheme } from '../theme/ThemeContext';
+import { isNotificationOpenEvent, resolveNotificationRoute } from '../utils/notificationRoute';
+import { consumePostAuthRedirect, setPostAuthRedirect } from '../utils/postAuthRedirect';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../utils/roleSummary';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 
@@ -31,7 +34,7 @@ const shouldPromptVerification = (status?: string | null) =>
 
 export default function AppNavigator() {
   const { theme } = useTheme();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const isAuthenticated = useSelector(
     (state: RootState) => state.auth.isAuthenticated,
   );
@@ -39,14 +42,93 @@ export default function AppNavigator() {
     (state: RootState) => state.auth.meInitialized,
   );
   const user = useSelector((state: RootState) => state.auth.user);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const [authBootstrapping, setAuthBootstrapping] = useState(true);
   const [bootstrapping, setBootstrapping] = useState(false);
   const navigatorKey = isAuthenticated ? 'main' : 'auth';
+  const effectiveRoleSummary = useMemo(
+    () => getEffectiveRoleSummary(roleSummary),
+    [roleSummary],
+  );
+  const providerCapabilities = useMemo(
+    () => resolveProviderCapabilities(effectiveRoleSummary),
+    [effectiveRoleSummary],
+  );
+  const notificationRoutingContext = useMemo(
+    () => ({
+      canUseProviderWorkbench: providerCapabilities.canUseWorkbench,
+      canManageProviderBindings: providerCapabilities.canUseWorkbench,
+      hasExecutorCapability: Boolean(
+        effectiveRoleSummary.has_pilot_role ||
+          effectiveRoleSummary.can_accept_dispatch ||
+          providerCapabilities.canAcceptDispatch,
+      ),
+      hasProviderApplication: providerCapabilities.hasProviderApplication,
+    }),
+    [
+      effectiveRoleSummary.can_accept_dispatch,
+      effectiveRoleSummary.has_pilot_role,
+      providerCapabilities.canAcceptDispatch,
+      providerCapabilities.canUseWorkbench,
+      providerCapabilities.hasProviderApplication,
+    ],
+  );
 
   useEffect(() => {
     pushService.init().catch((error: any) => {
       console.warn('[AppNavigator] Push init failed', error);
     });
   }, []);
+
+  const navigateOrQueue = useCallback(
+    (route: {name: string; params?: Record<string, unknown>}) => {
+      if (!isAuthenticated || !navigationRef.isReady()) {
+        setPostAuthRedirect(route);
+        return;
+      }
+      navigationRef.navigate(route.name, route.params);
+    },
+    [isAuthenticated],
+  );
+
+  const handleNavigationReady = useCallback(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    const redirect = consumePostAuthRedirect();
+    if (redirect) {
+      navigationRef.navigate(redirect.name, redirect.params);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const unsubscribe = pushService.subscribe((message: PushMessage) => {
+      if (!isNotificationOpenEvent(message.notificationEventType)) {
+        return;
+      }
+      const route = resolveNotificationRoute(message.extras, notificationRoutingContext);
+      if (route) {
+        navigateOrQueue(route);
+      }
+    });
+    return unsubscribe;
+  }, [navigateOrQueue, notificationRoutingContext]);
+
+  useEffect(() => {
+    let active = true;
+    dispatch(bootstrapAuth())
+      .catch((error: unknown) => {
+        console.warn('[AppNavigator] Auth bootstrap failed', error);
+      })
+      .finally(() => {
+        if (active) {
+          setAuthBootstrapping(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     let active = true;
@@ -118,6 +200,19 @@ export default function AppNavigator() {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      const redirect = consumePostAuthRedirect();
+      if (redirect && navigationRef.isReady()) {
+        navigationRef.navigate(redirect.name, redirect.params);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
       hasPromptedVerificationThisSession = false;
       return;
     }
@@ -149,8 +244,16 @@ export default function AppNavigator() {
     }, 300);
   }, [isAuthenticated, meInitialized, user]);
 
+  if (authBootstrapping) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
-    <NavigationContainer key={navigatorKey} ref={navigationRef}>
+    <NavigationContainer key={navigatorKey} ref={navigationRef} onReady={handleNavigationReady}>
       {isAuthenticated && bootstrapping ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />

@@ -61,6 +61,35 @@ interface PendingAliasOperation {
   timeout: ReturnType<typeof setTimeout>;
 }
 
+const normalizeExtras = (rawExtras: unknown): Record<string, string> => {
+  if (!rawExtras) {
+    return {};
+  }
+
+  let extras = rawExtras;
+  if (typeof rawExtras === 'string') {
+    try {
+      extras = JSON.parse(rawExtras);
+    } catch {
+      return {};
+    }
+  }
+
+  if (!extras || typeof extras !== 'object' || Array.isArray(extras)) {
+    return {};
+  }
+
+  return Object.entries(extras as Record<string, unknown>).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      if (value !== undefined && value !== null) {
+        acc[key] = String(value);
+      }
+      return acc;
+    },
+    {},
+  );
+};
+
 class PushNotificationService {
   private initialized = false;
   private listenersRegistered = false;
@@ -346,7 +375,7 @@ class PushNotificationService {
     const message: PushMessage = {
       title: result.title || '',
       content: result.alertContent || result.content || result.alert || '',
-      extras: result.extras || {},
+      extras: normalizeExtras(result.extras || result.extra || result.notificationExtras),
       notificationEventType: result.notificationEventType,
     };
 
@@ -596,6 +625,10 @@ class PushNotificationService {
     return () => {
       this.callbacks = this.callbacks.filter(item => item !== callback);
     };
+  }
+
+  subscribe(callback: PushCallback) {
+    return this.addListener(callback);
   }
 }
 

@@ -56,7 +56,7 @@ const pickLocationCity = (...values: any[]) =>
 
 const formatServiceBaseSubtitle = (lat: number, lng: number) => {
   if (!lat || !lng) {
-    return '后续派单会以该地点和服务半径计算覆盖范围';
+    return '后续履约会以该地点和服务半径计算覆盖范围';
   }
   return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 };
@@ -114,7 +114,7 @@ export default function PilotRegisterScreen({ navigation }: any) {
       });
       const uploadedUrl = uploadRes.data?.url || uploadRes.url || '';
       if (!uploadedUrl) {
-        throw new Error('上传成功但未返回文件地址，请重试');
+        throw new Error('上传后暂时无法获取文件地址，请重试');
       }
       setter(uploadedUrl);
       Alert.alert('上传成功', `${label}已上传。`);

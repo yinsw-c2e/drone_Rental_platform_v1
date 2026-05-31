@@ -48,15 +48,15 @@ const formatDateTime = (value?: string | null) => {
 const getPilotEntryMeta = (entryMode: string) => {
   if (entryMode === 'assigned') {
     return {
-      title: '待响应正式派单',
-      hint: '这里只显示已经派到你名下、等待你确认的正式派单。',
-      empty: '当前没有待响应的正式派单',
+      title: '待确认履约任务',
+      hint: '这里只显示已经安排到你名下、等待你确认的履约任务。',
+      empty: '当前没有待确认的履约任务',
     };
   }
   return {
-    title: '我的正式派单',
-    hint: '这里只展示正式派单，不再混公开需求、候选报名和旧任务池。',
-    empty: '当前没有分配给你的正式派单',
+    title: '我的履约任务',
+    hint: '这里集中展示分配给你的履约任务和执行状态。',
+    empty: '当前没有分配给你的履约任务',
   };
 };
 
@@ -97,7 +97,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
       const anomalyRes = await orderAnomalyV2Service.list({role: 'pilot', page: 1, page_size: 50});
       setAnomalyLookup(buildOrderAnomalyLookup(anomalyRes.data?.items || []));
     } catch (error) {
-      console.error('获取执行人员正式派单失败:', error);
+      console.error('获取执行人员履约任务失败:', error);
       setAnomalyLookup({});
     } finally {
       setLoading(false);
@@ -126,7 +126,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
   }, [entryMode, tasks]);
 
   const handleAccept = (task: V2DispatchTaskSummary) => {
-    Alert.alert('确认接单', '接受正式派单即表示你已阅读设备操作责任说明，并承诺按平台流程安全执行。确认继续吗？', [
+    Alert.alert('确认接单', '接受履约任务即表示你已阅读设备操作责任说明，并承诺按平台流程安全执行。确认继续吗？', [
       {text: '取消', style: 'cancel'},
       {
                 text: '确认接单',
@@ -134,7 +134,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
                   try {
                     await dispatchV2Service.accept(task.id);
                     await loadData();
-                    Alert.alert('接单成功', '正式派单已接受，你现在可以直接进入执行工作台，继续推进本次任务。', [
+                    Alert.alert('接单成功', '履约任务已接受，你现在可以直接进入执行工作台，继续推进本次任务。', [
                       {
                         text: '进入执行',
                         onPress: () => navigation.navigate('PilotOrderExecution', {taskId: task.id}),
@@ -163,7 +163,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
     }
     try {
       await dispatchV2Service.reject(selectedTask.id, rejectReason.trim() || undefined);
-      Alert.alert('已拒绝', '这条正式派单已回退，系统可能会自动重派。');
+      Alert.alert('已拒绝', '这条履约任务已回退，系统可能会自动重派。');
       setSelectedTask(null);
       setRejectReason('');
       loadData();
@@ -193,7 +193,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
           <Text style={styles.timeText}>{formatDateTime(item.sent_at)} 发出</Text>
         </View>
 
-        <Text style={styles.cardTitle} numberOfLines={2}>{item.order?.title || '正式派单任务'}</Text>
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.order?.title || '履约任务'}</Text>
 
         {anomaly ? (
           <OrderAnomalyBanner
@@ -303,7 +303,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
               <EmptyState
                 icon="🧭"
                 title={providerCapabilities.hasExecutorRole ? entryMeta.empty : '执行人员认证未通过'}
-                description={providerCapabilities.hasExecutorRole ? '正式派单会在这里统一收口。上线后才能确认待响应派单。' : '完成执行人员认证并通过审核后，才能查看和确认正式派单。'}
+                description={providerCapabilities.hasExecutorRole ? '履约任务会在这里统一收口。上线后才能确认待接任务。' : '完成执行人员认证并通过审核后，才能查看和确认履约任务。'}
                 actionText={providerCapabilities.hasExecutorRole ? undefined : '去认证'}
                 onAction={providerCapabilities.hasExecutorRole ? undefined : () => navigation.navigate('ProviderOnboarding')}
               />
@@ -314,7 +314,7 @@ export default function PilotTaskListScreen({navigation, route}: any) {
 
       {selectedTask ? (
         <View style={styles.rejectSheet}>
-          <Text style={styles.rejectTitle}>拒绝正式派单</Text>
+          <Text style={styles.rejectTitle}>拒绝履约任务</Text>
           <TextInput
             style={styles.rejectInput}
             placeholder="选填：说明拒绝原因，便于服务商判断是否需要重派"

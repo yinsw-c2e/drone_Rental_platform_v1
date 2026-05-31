@@ -34,6 +34,15 @@ type FlowStep = {
   tone: StatusTone;
 };
 
+type StatusOverviewRow = {
+  key: string;
+  label: string;
+  title: string;
+  status: string;
+  tone: StatusTone;
+  desc: string;
+};
+
 const STATUS_META: Record<ProviderReviewStatus, StatusMeta> = {
   none: {
     label: '未开始',
@@ -120,7 +129,7 @@ export default function ProviderOnboardingScreen({navigation}: any) {
         label: '已通过',
         tone: 'green' as StatusTone,
         title: '服务商能力已开通',
-        desc: '你的账号已具备正式接单能力，工作台只展示真实需求、派单、履约和结算数据。',
+        desc: '你的账号已具备正式接单能力，可进入工作台查看需求、履约和结算信息。',
         action: '进入工作台',
       };
     }
@@ -129,7 +138,7 @@ export default function ProviderOnboardingScreen({navigation}: any) {
         label: providerMeta.label,
         tone: providerMeta.tone,
         title: '服务商资质审核中',
-        desc: '审核通过前不能进入正式工作台，也不会展示假订单、假收入或静态示例数据。',
+        desc: '审核通过后即可进入正式工作台，查看需求、履约和结算信息。',
         action: '查看可补充资料',
       };
     }
@@ -157,27 +166,57 @@ export default function ProviderOnboardingScreen({navigation}: any) {
     providerMeta.tone,
   ]);
 
+  const statusOverviewRows = useMemo<StatusOverviewRow[]>(
+    () => [
+      {
+        key: 'overall',
+        label: '整体',
+        title: '整体服务商状态',
+        status: providerMeta.label,
+        tone: providerMeta.tone,
+        desc: providerMeta.desc,
+      },
+      {
+        key: 'asset',
+        label: '资产',
+        title: '设备服务能力',
+        status: assetMeta.label,
+        tone: assetMeta.tone,
+        desc: assetMeta.desc,
+      },
+      {
+        key: 'executor',
+        label: '执行',
+        title: '履约资质',
+        status: executorMeta.label,
+        tone: executorMeta.tone,
+        desc: executorMeta.desc,
+      },
+    ],
+    [assetMeta.desc, assetMeta.label, assetMeta.tone, executorMeta.desc, executorMeta.label, executorMeta.tone, providerMeta.desc, providerMeta.label, providerMeta.tone],
+  );
+
   const assetSteps = useMemo<FlowStep[]>(
     () => [
       buildStep('服务商资料', '维护联系人、服务范围和基础履约信息。', capabilities.assetStatus),
       buildStep('无人机设备与资质', '提交设备、证照、适航、保险和 UOM 相关材料。', capabilities.assetStatus),
-      buildStep('后台审核', '审核通过后可报价、发布服务和安排派单。', capabilities.assetStatus, '待提交'),
+      buildStep('平台审核', '审核通过后可报价、发布服务并承接订单。', capabilities.assetStatus, '待提交'),
     ],
     [capabilities.assetStatus],
   );
 
   const executorSteps = useMemo<FlowStep[]>(
     () => [
-      buildStep('执行人员资料', '填写执行人员实名、服务区域和联系方式。', capabilities.executorStatus),
-      buildStep('执行资质审核', '提交执行资质，后台确认后开通接派单能力。', capabilities.executorStatus),
+      buildStep('履约资料', '填写履约负责人、服务区域和联系方式。', capabilities.executorStatus),
+      buildStep('履约资质审核', '提交履约资质，平台确认后开通订单推进能力。', capabilities.executorStatus),
       {
-        title: '在线接派单',
-        desc: '审核通过后可响应派单；在线状态只影响能否接住新派单。',
-        status: capabilities.canAcceptDispatch ? '可接单' : '待开通',
-        tone: capabilities.canAcceptDispatch ? 'green' : 'gray',
+        title: '服务商履约',
+        desc: '审核通过后由服务商主体开始履约并推进订单状态。',
+        status: capabilities.canAcceptDispatch || capabilities.canUseWorkbench ? '可履约' : '待开通',
+        tone: capabilities.canAcceptDispatch || capabilities.canUseWorkbench ? 'green' : 'gray',
       },
     ],
-    [capabilities.canAcceptDispatch, capabilities.executorStatus],
+    [capabilities.canAcceptDispatch, capabilities.canUseWorkbench, capabilities.executorStatus],
   );
 
   const runPrimaryAction = () => {
@@ -221,6 +260,13 @@ export default function ProviderOnboardingScreen({navigation}: any) {
           </View>
         </LinearGradient>
 
+        <StatusOverviewCard
+          rows={statusOverviewRows}
+          actionLabel={headerCopy.action}
+          onAction={runPrimaryAction}
+          styles={styles}
+        />
+
         <CapabilityCard
           title="设备服务能力"
           desc="适合自有或可调度无人机的服务商。"
@@ -236,14 +282,14 @@ export default function ProviderOnboardingScreen({navigation}: any) {
         />
 
         <CapabilityCard
-          title="执行人员能力"
-          desc="适合承接派单并完成现场履约的人员。"
+          title="履约资质"
+          desc="用于证明服务商具备现场履约和订单推进能力。"
           note={executorMeta.desc}
           status={executorMeta.label}
           tone={executorMeta.tone}
           steps={executorSteps}
           actions={[
-            {label: '执行人员认证', onPress: () => navigation.navigate('PilotRegister'), highlighted: true},
+            {label: '履约资质认证', onPress: () => navigation.navigate('PilotRegister'), highlighted: true},
           ]}
           styles={styles}
         />
@@ -268,6 +314,46 @@ export default function ProviderOnboardingScreen({navigation}: any) {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function StatusOverviewCard({
+  rows,
+  actionLabel,
+  onAction,
+  styles,
+}: {
+  rows: StatusOverviewRow[];
+  actionLabel: string;
+  onAction: () => void;
+  styles: ReturnType<typeof getStyles>;
+}) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardCopy}>
+          <Text style={styles.cardTitle}>资质审核状态</Text>
+          <Text style={styles.cardDesc}>资产、执行和整体服务商状态会共同决定工作台能力。</Text>
+        </View>
+      </View>
+      <View style={styles.overviewList}>
+        {rows.map(row => (
+          <View key={row.key} style={styles.overviewRow}>
+            <View style={[styles.overviewBadge, (styles as any)[`overviewBadge_${row.tone}`]]}>
+              <Text style={[styles.overviewBadgeText, (styles as any)[`overviewBadgeText_${row.tone}`]]}>{row.label}</Text>
+            </View>
+            <View style={styles.overviewMain}>
+              <Text style={styles.overviewTitle}>{row.title}</Text>
+              <Text style={styles.overviewDesc}>{row.desc}</Text>
+            </View>
+            <Text style={[styles.overviewStatus, (styles as any)[`stepStatus_${row.tone}`]]}>{row.status}</Text>
+          </View>
+        ))}
+      </View>
+      <TouchableOpacity activeOpacity={0.86} style={styles.overviewAction} onPress={onAction}>
+        <Text style={styles.overviewActionText}>{actionLabel}</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -482,6 +568,81 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
     color: theme.textSub,
     fontSize: 13,
     lineHeight: 20,
+  },
+  overviewList: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: theme.cardBorder,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  overviewRow: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.cardBorder,
+    backgroundColor: theme.card,
+  },
+  overviewBadge: {
+    width: 42,
+    height: 28,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overviewBadge_gray: {backgroundColor: theme.isDark ? 'rgba(255,255,255,0.07)' : '#EEF2F7'},
+  overviewBadge_blue: {backgroundColor: theme.primaryBg},
+  overviewBadge_orange: {backgroundColor: theme.isDark ? 'rgba(255,179,64,0.12)' : '#FFF0DB'},
+  overviewBadge_green: {backgroundColor: theme.isDark ? 'rgba(0,229,122,0.12)' : '#DCF7E5'},
+  overviewBadge_red: {backgroundColor: theme.isDark ? 'rgba(255,107,107,0.12)' : '#FFE7E5'},
+  overviewBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  overviewBadgeText_gray: {color: theme.textSub},
+  overviewBadgeText_blue: {color: theme.primaryText},
+  overviewBadgeText_orange: {color: theme.warning},
+  overviewBadgeText_green: {color: theme.success},
+  overviewBadgeText_red: {color: theme.danger},
+  overviewMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  overviewTitle: {
+    color: theme.text,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '800',
+  },
+  overviewDesc: {
+    marginTop: 3,
+    color: theme.textSub,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  overviewStatus: {
+    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  overviewAction: {
+    height: 42,
+    marginTop: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.primaryBg,
+    borderWidth: 1,
+    borderColor: theme.primary,
+  },
+  overviewActionText: {
+    color: theme.primaryText,
+    fontSize: 14,
+    fontWeight: '900',
   },
   pill: {
     minWidth: 58,

@@ -51,8 +51,8 @@ export default function WithdrawalScreen({navigation}: any) {
     if (isNaN(amount) || amount <= 0) {
       return Alert.alert('提示', '请输入正确的提现金额');
     }
-    if (amount < 100) {
-      return Alert.alert('提示', '最低提现1元');
+    if (amount < 200) {
+      return Alert.alert('提示', '最低提现2元');
     }
 
     if (method === 'bank_card') {
@@ -114,7 +114,7 @@ export default function WithdrawalScreen({navigation}: any) {
             onChangeText={setAmountStr}
           />
         </View>
-        <Text style={styles.hint}>手续费: 0.1% (最低1元)</Text>
+        <Text style={styles.hint}>手续费: 0.1% (最低1元)，最低提现2元</Text>
 
         <Text style={styles.sectionTitle}>提现方式</Text>
         <View style={styles.methodRow}>
@@ -145,8 +145,6 @@ export default function WithdrawalScreen({navigation}: any) {
           <>
             <Text style={styles.label}>支付宝账号 *</Text>
             <TextInput style={styles.input} placeholder="手机号或邮箱" value={alipayAccount} onChangeText={setAlipayAccount} />
-            <Text style={styles.label}>真实姓名 *</Text>
-            <TextInput style={styles.input} placeholder="请输入真实姓名" value={accountName} onChangeText={setAccountName} />
           </>
         )}
 
@@ -154,8 +152,6 @@ export default function WithdrawalScreen({navigation}: any) {
           <>
             <Text style={styles.label}>微信账号 *</Text>
             <TextInput style={styles.input} placeholder="微信号" value={wechatAccount} onChangeText={setWechatAccount} />
-            <Text style={styles.label}>真实姓名 *</Text>
-            <TextInput style={styles.input} placeholder="请输入真实姓名" value={accountName} onChangeText={setAccountName} />
           </>
         )}
 

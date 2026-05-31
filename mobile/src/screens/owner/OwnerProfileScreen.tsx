@@ -132,9 +132,9 @@ export default function OwnerProfileScreen({navigation}: any) {
         desc: providerCapabilities.canPublishSupply ? '无人机与关键资质已满足主市场准入。' : '先完善无人机与关键资质，才能把供给上架到主市场。',
       },
       {
-        label: '可自执行',
+        label: '服务商履约',
         enabled: providerCapabilities.canSelfExecute,
-        desc: providerCapabilities.canSelfExecute ? '你已同时具备服务商与执行人员能力，可直接选择自执行。' : '如需自执行，还需要同步具备执行人员能力。',
+        desc: providerCapabilities.canSelfExecute ? '你已具备设备服务和履约推进能力，可由服务商主体直接履约。' : '请继续完善设备资质和履约资质，审核通过后再推进履约。',
       },
     ],
     [providerCapabilities.canPublishSupply, providerCapabilities.canSelfExecute],
@@ -180,9 +180,9 @@ export default function OwnerProfileScreen({navigation}: any) {
       })),
       ...(workbench?.pending_dispatch_orders || []).slice(0, 1).map((item: any) => ({
         key: `dispatch-${item.id}`,
-        eyebrow: '待安排执行',
+        eyebrow: '待开始履约',
         title: item.title || item.order_no,
-        desc: `${item.service_address || '待补地址'} · 成交后待指派执行方`,
+        desc: `${item.service_address || '待补地址'} · 成交后待服务商开始履约`,
         actionText: '查看订单',
         onPress: () => navigation.navigate('OrderDetail', {id: item.id, orderId: item.id}),
       })),
@@ -243,14 +243,14 @@ export default function OwnerProfileScreen({navigation}: any) {
               </View>
               <View style={styles.statsCard}>
                 <Text style={styles.statsValue}>{stats.bindings}</Text>
-                <Text style={styles.statsLabel}>协作执行人员</Text>
+                <Text style={styles.statsLabel}>履约资质</Text>
               </View>
             </View>
           ) : (
             <View style={styles.onboardingNotice}>
               <Text style={styles.onboardingNoticeTitle}>当前不能进入正式工作台</Text>
               <Text style={styles.onboardingNoticeText}>
-                未审核账号只能查看入驻资料、设备资质、执行人员认证和审核状态，不展示报价、收入或正式经营待办。
+                未审核账号只能查看入驻资料、设备资质、履约资质和审核状态，不展示报价、收入或正式经营待办。
               </Text>
             </View>
           )}
@@ -276,7 +276,7 @@ export default function OwnerProfileScreen({navigation}: any) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOrders', {roleFilter: 'owner', statusFilter: 'in_progress'})}>
                 <Text style={[styles.wbSummaryValue, {color: theme.success}]}>{workbench?.summary?.pending_dispatch_order_count || 0}</Text>
-                <Text style={styles.wbSummaryLabel}>待派人</Text>
+                <Text style={styles.wbSummaryLabel}>待开始</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.wbSummaryCard} onPress={() => navigation.navigate('MyOffers', {activeGroup: 'draft'})}>
                 <Text style={styles.wbSummaryValue}>{workbench?.summary?.draft_supply_count || 0}</Text>
@@ -327,8 +327,8 @@ export default function OwnerProfileScreen({navigation}: any) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.onboardingStep} onPress={() => navigation.navigate('PilotRegister')}>
                 <View style={styles.capabilityInfo}>
-                  <Text style={styles.capabilityLabel}>执行人员认证</Text>
-                  <Text style={styles.capabilityDesc}>需要接派单或自执行时，补充执行人员资质。</Text>
+                  <Text style={styles.capabilityLabel}>履约资质</Text>
+                  <Text style={styles.capabilityDesc}>完善履约资料后，服务商可推进订单履约。</Text>
                 </View>
                 <StatusBadge label={executorStatusMeta.label} tone={executorStatusMeta.tone} />
               </TouchableOpacity>
@@ -358,11 +358,11 @@ export default function OwnerProfileScreen({navigation}: any) {
                 </View>
                 <Text style={styles.quickActionTitle}>发布服务</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('OwnerPilotBindings')}>
+              <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('PilotRegister')}>
                 <View style={[styles.quickIconBg, {backgroundColor: '#f9f0ff'}]}>
                   <Text style={styles.quickIconText}>🤝</Text>
                 </View>
-                <Text style={styles.quickActionTitle}>协作执行人员</Text>
+                <Text style={styles.quickActionTitle}>履约资质</Text>
               </TouchableOpacity>
             </View>
           </View>

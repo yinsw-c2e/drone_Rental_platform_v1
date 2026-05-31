@@ -45,7 +45,7 @@ const STATUS_TABS: {key: StatusFilter; label: string}[] = [
 const roleLabelMap: Record<Exclude<RoleFilter, 'all'>, string> = {
   client: '吊运订单',
   owner: '服务商订单',
-  pilot: '执行任务',
+  pilot: '履约订单',
 };
 
 const formatAmount = (amount?: number | null) => `¥${((amount || 0) / 100).toFixed(2)}`;
@@ -150,11 +150,11 @@ const getOrderProgressHint = (order: V2OrderSummary) => {
     case 'pending_provider_confirmation':
       return '等待服务商确认，通常 2 小时内回复';
     case 'pending_payment':
-      return '完成支付后才会继续安排执行';
+      return '完成支付后才会继续履约流程';
     case 'pending_dispatch':
-      return '平台正在安排执行团队';
+      return '等待服务商开始履约';
     case 'assigned':
-      return '执行团队已就位，待进入准备阶段';
+      return '服务商已接单，待进入准备阶段';
     case 'preparing':
     case 'loading':
     case 'airspace_applying':
@@ -391,7 +391,7 @@ export default function OrderListScreen({navigation, route}: any) {
                     style={[styles.toolEntryChip, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
                     onPress={() => navigation.navigate('DispatchTaskList')}>
                     <Text style={styles.toolEntryIcon}>📡</Text>
-                    <Text style={[styles.toolEntryText, {color: theme.text}]}>执行安排</Text>
+                    <Text style={[styles.toolEntryText, {color: theme.text}]}>履约安排</Text>
                   </TouchableOpacity>
                 )}
                 {canViewExecutorOrders && (
@@ -399,7 +399,7 @@ export default function OrderListScreen({navigation, route}: any) {
                     style={[styles.toolEntryChip, {backgroundColor: theme.card, borderColor: theme.cardBorder}]}
                     onPress={() => navigation.navigate('PilotTaskList')}>
                     <Text style={styles.toolEntryIcon}>🧭</Text>
-                    <Text style={[styles.toolEntryText, {color: theme.text}]}>执行任务</Text>
+                    <Text style={[styles.toolEntryText, {color: theme.text}]}>履约订单</Text>
                   </TouchableOpacity>
                 )}
                 {canViewExecutorOrders && (

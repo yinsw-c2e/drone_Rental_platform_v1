@@ -121,7 +121,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
       setDetail(orderDetail);
       setBindings(activeBindings);
     } catch (error) {
-      console.error('获取正式派单上下文失败:', error);
+      console.error('获取履约任务上下文失败:', error);
       setDetail(null);
       setBindings([]);
     } finally {
@@ -163,7 +163,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
 
   const submit = async () => {
     if (!isAuthenticated || !canArrangeDispatch) {
-      Alert.alert('无法派单', isAuthenticated ? '设备服务能力审核通过后才能发起正式派单。' : '请先登录服务商账号。');
+      Alert.alert('无法安排', isAuthenticated ? '设备服务能力审核通过后才能发起履约安排。' : '请先登录服务商账号。');
       return;
     }
     if (!detail || !canSubmit) {
@@ -182,15 +182,15 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
         ? await dispatchV2Service.reassign(dispatchId, payload)
         : await orderV2Service.dispatch(detail.id, payload);
       const nextDispatchId = getDispatchResultId(res.data);
-      const successTitle = isReassign ? '已发起重派' : '已发起正式派单';
+      const successTitle = isReassign ? '已发起重派' : '已发起履约安排';
       const successDesc = isReassign
-        ? '系统已按新的派单来源重新生成正式派单，你可以继续查看详情。'
-        : '正式派单已发出，执行人员会在待响应列表中看到这条指令。';
+        ? '系统已按新的执行来源重新生成履约任务，你可以继续查看详情。'
+        : '履约任务已发出，执行人员会在待确认列表中看到这条安排。';
 
       Alert.alert(successTitle, successDesc, [
         nextDispatchId > 0
           ? {
-              text: '查看派单详情',
+              text: '查看任务详情',
               onPress: () => {
                 if (typeof navigation.replace === 'function') {
                   navigation.replace('DispatchTaskDetail', {id: nextDispatchId, dispatchId: nextDispatchId});
@@ -231,7 +231,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
         <View style={styles.centerState}>
           <Text style={styles.sectionTitle}>{isAuthenticated ? '设备服务能力未开通' : '请先登录'}</Text>
           <Text style={styles.emptyText}>
-            {isAuthenticated ? '审核通过后才能为订单发起正式派单。' : '登录服务商账号后才能发起正式派单。'}
+            {isAuthenticated ? '审核通过后才能为订单发起履约安排。' : '登录服务商账号后才能发起履约安排。'}
           </Text>
         </View>
       </SafeAreaView>
@@ -242,7 +242,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <Text style={styles.emptyText}>订单不存在，或当前账号无法对它发起正式派单。</Text>
+          <Text style={styles.emptyText}>订单不存在，或当前账号无法对它发起履约安排。</Text>
         </View>
       </SafeAreaView>
     );
@@ -252,10 +252,10 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
     <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.heroEyebrow}>{isReassign ? '正式派单重派' : '发起正式派单'}</Text>
+          <Text style={styles.heroEyebrow}>{isReassign ? '履约任务重派' : '发起履约任务'}</Text>
           <Text style={styles.heroTitle}>{isReassign ? '切换执行来源' : '从订单发出执行指令'}</Text>
           <Text style={styles.heroDesc}>
-            这里只处理正式派单。需求撮合和供给成交已经结束，现在要做的是决定从哪一层执行来源里选执行人员。
+            需求撮合和供给成交完成后，在这里选择执行来源并安排履约人员。
           </Text>
         </View>
 
@@ -283,7 +283,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
           </View>
           {detail.current_dispatch?.dispatch_no ? (
             <View style={styles.noticeBox}>
-              <Text style={styles.noticeTitle}>当前已有正式派单</Text>
+              <Text style={styles.noticeTitle}>当前已有履约任务</Text>
               <Text style={styles.noticeText}>
                 {detail.current_dispatch.dispatch_no} · {getObjectStatusMeta('dispatch_task', detail.current_dispatch.status).label}
               </Text>
@@ -292,7 +292,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>选择派单来源</Text>
+          <Text style={styles.sectionTitle}>选择执行来源</Text>
           {MODE_OPTIONS.map(option => {
             const disabled = option.key === 'bound_pilot' && bindings.length === 0;
             const active = option.key === selectedMode;
@@ -344,8 +344,8 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
         ) : null}
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>派单说明</Text>
-          <Text style={styles.sectionHint}>这段说明会进入正式派单日志，便于执行人员和后续售后理解本次调度原因。</Text>
+          <Text style={styles.sectionTitle}>安排说明</Text>
+          <Text style={styles.sectionHint}>这段说明会进入履约任务记录，便于执行人员和后续售后理解本次安排原因。</Text>
           <TextInput
             style={styles.textInput}
             multiline
@@ -361,7 +361,7 @@ export default function CreateDispatchTaskScreen({navigation, route}: any) {
           style={[styles.submitBtn, (!canSubmit || submitting) && styles.submitBtnDisabled]}
           disabled={!canSubmit || submitting}
           onPress={submit}>
-          {submitting ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.submitBtnText}>{isReassign ? '确认重派' : '确认发起正式派单'}</Text>}
+          {submitting ? <ActivityIndicator color={theme.btnPrimaryText} /> : <Text style={styles.submitBtnText}>{isReassign ? '确认重派' : '确认发起履约任务'}</Text>}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

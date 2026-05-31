@@ -25,6 +25,7 @@ import {RootState} from '../../store/store';
 import {setHaulRoleMode} from '../../store/slices/roleSlice';
 import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {providerDemandListAssets} from '../../assets/haul/providerDemandList';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
 
 type FilterKey = 'region' | 'weight' | 'time' | 'scene';
 type SortKey = 'distance' | 'price';
@@ -439,7 +440,7 @@ export default function DemandListScreen({navigation}: any) {
       if (refresh || nextPage === 1) {
         setDemands([]);
       }
-      setFetchError(error?.message || '真实需求加载失败，请稍后重试');
+      setFetchError(friendlyErrorMessage(error, '需求加载失败，请稍后重试'));
       setHasMore(false);
     } finally {
       setLoading(false);
@@ -654,7 +655,7 @@ export default function DemandListScreen({navigation}: any) {
               top={398}
               frame={frame}
               type={type}
-              title="正在同步真实需求"
+              title="正在同步需求"
               desc="请稍候，正在读取服务商可接需求。"
             />
           ) : null}
@@ -664,7 +665,7 @@ export default function DemandListScreen({navigation}: any) {
               top={398}
               frame={frame}
               type={type}
-              title="无法加载真实需求"
+              title="无法加载需求"
               desc={fetchError}
             />
           ) : null}
@@ -675,7 +676,7 @@ export default function DemandListScreen({navigation}: any) {
               frame={frame}
               type={type}
               title={demands.length ? '暂无符合筛选的需求' : '暂无可接需求'}
-              desc={demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '后端当前没有返回真实可报价需求。'}
+              desc={demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '暂无可报价需求。'}
             />
           ) : null}
 

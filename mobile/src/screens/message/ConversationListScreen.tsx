@@ -20,6 +20,7 @@ import {messageService} from '../../services/message';
 import {notificationV2Service} from '../../services/notificationV2';
 import {RootState} from '../../store/store';
 import {ConversationSummary, V2NotificationSummary} from '../../types';
+import {resolveNotificationRoute} from '../../utils/notificationRoute';
 import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -47,7 +48,7 @@ const notificationBucketMap: Record<string, NotificationBucket> = {
   demand_quote: {key: 'quote', title: '报价动态', icon: '💬'},
   quote: {key: 'quote', title: '报价动态', icon: '💬'},
   order: {key: 'order', title: '订单动态', icon: '📦'},
-  dispatch: {key: 'dispatch', title: '派单动态', icon: '🛫'},
+  dispatch: {key: 'dispatch', title: '履约动态', icon: '🛫'},
   refund: {key: 'refund', title: '退款售后', icon: '💸'},
   dispute: {key: 'refund', title: '退款售后', icon: '💸'},
   qualification: {key: 'qualification', title: '资质审核', icon: '📋'},
@@ -328,45 +329,14 @@ export default function ConversationListScreen({navigation}: any) {
         }
       }
 
-      const extra = notification.extra_data || {};
-      if (extra.order_id) {
-        const preferOrderView = !canUseProviderWorkbench && !hasExecutorCapability;
-        if (preferOrderView || !extra.dispatch_task_id) {
-          navigation.navigate('OrderDetail', {orderId: Number(extra.order_id)});
-          return;
-        }
-      }
-      if (extra.dispatch_task_id) {
-        navigation.navigate('DispatchTaskDetail', {dispatchId: Number(extra.dispatch_task_id)});
-        return;
-      }
-      if (extra.order_id) {
-        navigation.navigate('OrderDetail', {orderId: Number(extra.order_id)});
-        return;
-      }
-      if (extra.demand_id) {
-        navigation.navigate('DemandDetail', {demandId: Number(extra.demand_id)});
-        return;
-      }
-      if (extra.binding_id) {
-        if (canManageProviderBindings) {
-          navigation.navigate('OwnerPilotBindings');
-          return;
-        }
-        if (hasExecutorCapability) {
-          navigation.navigate('PilotOwnerBindings');
-          return;
-        }
-      }
-      if (resolveNotificationBucket(notification).key === 'qualification') {
-        if (hasExecutorCapability) {
-          navigation.navigate('PilotProfile');
-          return;
-        }
-        if (providerCapabilities.hasProviderApplication || canUseProviderWorkbench) {
-          navigation.navigate(canUseProviderWorkbench ? 'OwnerProfile' : 'ProviderOnboarding');
-          return;
-        }
+      const route = resolveNotificationRoute(notification.extra_data || {}, {
+        canUseProviderWorkbench,
+        canManageProviderBindings,
+        hasExecutorCapability,
+        hasProviderApplication: providerCapabilities.hasProviderApplication,
+      });
+      if (route) {
+        navigation.navigate(route.name, route.params);
       }
     },
     [
@@ -507,7 +477,7 @@ export default function ConversationListScreen({navigation}: any) {
             <EmptyState
               icon="🔔"
               title={loading ? '正在加载通知' : '暂无系统通知'}
-              description="需求、报价、订单、派单、资质等业务事件会统一出现在这里。"
+              description="需求、报价、订单、履约、资质等业务事件会统一出现在这里。"
             />
           }
           contentContainerStyle={notificationSections.length ? styles.listContent : styles.emptyListContent}
@@ -521,7 +491,7 @@ export default function ConversationListScreen({navigation}: any) {
           ListHeaderComponent={
             <View style={styles.chatHint}>
               <Text style={styles.chatHintTitle}>聊天只用于沟通</Text>
-              <Text style={styles.chatHintText}>订单确认、派单接受、退款处理等正式状态，请以系统通知和业务页面为准。</Text>
+              <Text style={styles.chatHintText}>订单确认、履约接受、退款处理等正式状态，请以系统通知和业务页面为准。</Text>
             </View>
           }
           ListEmptyComponent={

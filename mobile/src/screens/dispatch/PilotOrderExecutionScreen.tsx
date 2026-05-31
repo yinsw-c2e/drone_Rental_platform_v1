@@ -28,8 +28,8 @@ import {V2OrderAnomaly} from '../../types';
 const EXEC_STEPS = [
   {
     status: 'assigned',
-    label: '已派单',
-    desc: '已分配派单，等待确认',
+    label: '已安排',
+    desc: '履约任务已分配，等待确认',
     icon: '📨',
   },
   {
@@ -514,12 +514,12 @@ export default function PilotOrderExecutionScreen({ route, navigation }: any) {
           <View style={styles.simCard}>
             <View style={styles.simHeader}>
               <View style={styles.simHeaderText}>
-                <Text style={styles.simEyebrow}>测试态飞行模拟</Text>
+                <Text style={styles.simEyebrow}>飞行轨迹模拟</Text>
                 <Text style={styles.simTitle}>
-                  用订单起终点生成一条真实感更强的飞行轨迹
+                  用订单起终点生成一条接近现场路线的飞行轨迹
                 </Text>
                 <Text style={styles.simDesc}>
-                  会按当前订单的两个地理位置持续上报起飞、爬升、巡航、下降和着陆数据，并插入一两条示例告警，方便你直接联调飞行监控。
+                  会按当前订单的两个地理位置持续上报起飞、爬升、巡航、下降和着陆数据，并插入一两条模拟告警，方便核对飞行监控。
                 </Text>
               </View>
               <View

@@ -95,7 +95,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
       const res = await dispatchV2Service.list({role: 'owner', page: 1, page_size: 50});
       setTasks(res.data?.items || []);
     } catch (error) {
-      console.error('获取正式派单列表失败:', error);
+      console.error('获取履约任务列表失败:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -128,7 +128,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
               <Text style={styles.code}>{item.dispatch_no}</Text>
             </View>
 
-            <Text style={styles.title}>{item.order?.title || '正式派单任务'}</Text>
+            <Text style={styles.title}>{item.order?.title || '履约任务'}</Text>
             <Text style={styles.route} numberOfLines={2}>
               {item.order?.service_address || '未设置起点'}
               {item.order?.dest_address ? ` -> ${item.order.dest_address}` : ''}
@@ -136,7 +136,7 @@ export default function DispatchTaskListScreen({navigation}: any) {
 
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>目标执行人员：{getPilotLabel(item)}</Text>
-              <Text style={styles.metaText}>派单来源：{item.dispatch_source || '-'}</Text>
+              <Text style={styles.metaText}>安排来源：{item.dispatch_source || '-'}</Text>
             </View>
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>订单状态：{getObjectStatusMeta('order', item.order?.status).label}</Text>
@@ -156,10 +156,10 @@ export default function DispatchTaskListScreen({navigation}: any) {
         ListHeaderComponent={
           <View>
             <View style={styles.hero}>
-              <Text style={styles.heroEyebrow}>正式派单</Text>
-              <Text style={styles.heroTitle}>这里只看执行指令</Text>
+              <Text style={styles.heroEyebrow}>执行安排</Text>
+              <Text style={styles.heroTitle}>履约任务一目了然</Text>
               <Text style={styles.heroDesc}>
-                派单任务不再混需求、订单创建或候选匹配过程。这里展示的是已经发出的正式派单，以及它当前的响应和执行状态。
+                这里展示已安排的履约任务，以及当前确认和执行状态。
               </Text>
             </View>
 
@@ -185,8 +185,8 @@ export default function DispatchTaskListScreen({navigation}: any) {
             <ObjectCard>
               <EmptyState
                 icon="📡"
-                title={canManageDispatch ? '当前没有正式派单' : '设备服务能力未开通'}
-                description={canManageDispatch ? '如果订单还没进入派单阶段，请先去订单页确认待处理订单；只有正式发出的派单，才会出现在这里。' : '审核通过后才能查看派单管理和发起正式派单。'}
+                title={canManageDispatch ? '当前没有执行安排' : '设备服务能力未开通'}
+                description={canManageDispatch ? '如果订单还没进入履约阶段，请先去订单页确认待处理订单；已安排的履约任务会出现在这里。' : '审核通过后才能查看执行安排和发起履约任务。'}
                 actionText={canManageDispatch ? '查看订单' : undefined}
                 onAction={canManageDispatch ? () => navigation.navigate('MyOrders', {roleFilter: 'owner'}) : undefined}
               />

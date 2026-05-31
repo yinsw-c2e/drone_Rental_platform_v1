@@ -14,28 +14,28 @@ type TabGlyphProps = {
 };
 
 const customerIconFrames: Record<TabGlyphName, {width: number; height: number}> = {
-  home: {width: 23, height: 24},
-  orders: {width: 22, height: 24},
-  messages: {width: 23, height: 22},
-  profile: {width: 23, height: 24},
+  home: {width: 29, height: 30},
+  orders: {width: 28, height: 30},
+  messages: {width: 29, height: 28},
+  profile: {width: 29, height: 30},
 };
 
 const providerIconFrames: Record<TabGlyphName, {active: {width: number; height: number}; inactive: {width: number; height: number}}> = {
   home: {
-    active: {width: 27, height: 22},
-    inactive: {width: 28, height: 23},
+    active: {width: 28.5, height: 26.5},
+    inactive: {width: 27, height: 29.5},
   },
   orders: {
-    active: {width: 36, height: 25},
-    inactive: {width: 31, height: 22},
+    active: {width: 35, height: 30},
+    inactive: {width: 28, height: 25.5},
   },
   messages: {
-    active: {width: 31, height: 22},
-    inactive: {width: 31, height: 22},
+    active: {width: 29, height: 28},
+    inactive: {width: 29, height: 28},
   },
   profile: {
-    active: {width: 29, height: 24},
-    inactive: {width: 29, height: 24},
+    active: {width: 27, height: 30.5},
+    inactive: {width: 27, height: 30.5},
   },
 };
 

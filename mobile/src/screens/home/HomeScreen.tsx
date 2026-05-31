@@ -231,7 +231,7 @@ const getPriorityFilterLabel = (role: RoleView, filter: PriorityQueueFilter) => 
     case 'payment':
       return '待付款';
     case 'dispatch':
-      return role === 'pilot' ? '待接单' : '待派单';
+      return role === 'pilot' ? '待接单' : '待安排执行';
     case 'progress':
       return '进行中';
     case 'anomaly':
@@ -700,7 +700,7 @@ export default function HomeScreen({ navigation }: any) {
                   bucket === 'confirm'
                     ? '待确认'
                     : bucket === 'dispatch'
-                      ? '待派单'
+                      ? '待安排执行'
                       : '进行中',
                 tagTone:
                   bucket === 'confirm'
@@ -731,9 +731,9 @@ export default function HomeScreen({ navigation }: any) {
                   key: `pilot-dispatch-${task.id}`,
                   role: 'pilot',
                   category: 'dispatch',
-                  title: task.order?.title || '待响应派单',
+                  title: task.order?.title || '待确认任务',
                   subtitle: `${task.order?.service_address || '起点待确认'}${task.order?.dest_address ? ` → ${task.order.dest_address}` : ''}`,
-                  meta: '正式派单已发到你名下，超时可能会自动回退',
+                  meta: '履约任务已发到你名下，超时可能会自动回退',
                   tagLabel: '待接单',
                   tagTone: 'orange',
                   urgency: 98,
@@ -971,7 +971,7 @@ export default function HomeScreen({ navigation }: any) {
           subtitle:
             '待接单、执行中和飞行记录都在这里，先处理快超时的任务。',
           primaryAction: {
-            title: '查看待接派单',
+            title: '查看待接任务',
             onPress: () =>
               navigation.navigate('PilotTaskList', { entry: 'assigned' }),
           },
@@ -1018,7 +1018,7 @@ export default function HomeScreen({ navigation }: any) {
         }
         if (hasPilot) {
           allSecondaryActions.push({
-            title: '待接派单',
+            title: '待接任务',
             onPress: () =>
               navigation.navigate('PilotTaskList', { entry: 'assigned' }),
           });
@@ -1042,7 +1042,7 @@ export default function HomeScreen({ navigation }: any) {
         if (hasPilot) {
           allMetrics.push({
             key: 'all-pending',
-            label: '待接派单',
+            label: '待接任务',
             value:
               currentDashboard.role_views.pilot.pending_response_dispatch_count,
             hint: '等你确认的任务',
@@ -1078,7 +1078,7 @@ export default function HomeScreen({ navigation }: any) {
               ? '发布任务'
               : hasOwner
               ? '查看新需求'
-              : '待接派单',
+              : '待接任务',
             onPress: hasClient
               ? () => navigation.navigate('PublishCargo')
               : hasOwner
@@ -1184,7 +1184,7 @@ export default function HomeScreen({ navigation }: any) {
           ...platformEntries,
           {
             key: 'pilot-assigned',
-            title: '待接派单',
+            title: '待接任务',
             desc: '处理系统正式指派任务',
             icon: '🎯',
             tone: 'orange',
@@ -1256,8 +1256,8 @@ export default function HomeScreen({ navigation }: any) {
         if (hasPilot) {
           actions.push({
             key: 'all-pilot',
-            title: '待接派单',
-            desc: '执行人员优先处理正式派单',
+            title: '待接任务',
+            desc: '执行人员优先处理履约任务',
             icon: '🎯',
             tone: 'orange',
             onPress: () =>

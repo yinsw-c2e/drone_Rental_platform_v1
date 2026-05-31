@@ -12,6 +12,7 @@ import {
 import {useFocusEffect} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
+import {providerService} from '../../services/provider';
 import {
   getWallet,
   getWalletTransactions,
@@ -21,6 +22,7 @@ import {
   OrderSettlement,
 } from '../../services/settlement';
 import {RootState} from '../../store/store';
+import type {V2ProviderStats} from '../../types';
 import {getEffectiveRoleSummary, resolveProviderCapabilities} from '../../utils/roleSummary';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
@@ -58,6 +60,7 @@ export default function WalletScreen({navigation}: any) {
   const [wallet, setWallet] = useState<UserWallet | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [settlements, setSettlements] = useState<OrderSettlement[]>([]);
+  const [providerStats, setProviderStats] = useState<V2ProviderStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -65,18 +68,21 @@ export default function WalletScreen({navigation}: any) {
       setWallet(null);
       setTransactions([]);
       setSettlements([]);
+      setProviderStats(null);
       setRefreshing(false);
       return;
     }
     try {
-      const [walletData, txData, settleData] = await Promise.all([
-        getWallet(),
-        getWalletTransactions({page: 1, page_size: 50}),
-        listMySettlements({page: 1, page_size: 50}),
+      const [walletData, txData, settleData, statsRes] = await Promise.all([
+        getWallet().catch(() => null),
+        getWalletTransactions({page: 1, page_size: 50}).catch(() => ({data: []})),
+        listMySettlements({page: 1, page_size: 50}).catch(() => ({data: []})),
+        providerService.getStats().catch(() => null),
       ]);
       setWallet(walletData);
       setTransactions(txData.data || []);
       setSettlements(settleData.data || []);
+      setProviderStats(((statsRes as any)?.data || statsRes || null) as V2ProviderStats | null);
     } catch (err: any) {
       console.log('加载钱包数据失败:', err.message);
     } finally {
@@ -93,6 +99,21 @@ export default function WalletScreen({navigation}: any) {
   const formatAmount = (amountFen: number) => {
     return (amountFen / 100).toFixed(2);
   };
+
+  const renderHighlightCards = () => (
+    <View style={styles.highlightGrid}>
+      <View style={styles.highlightCard}>
+        <Text style={styles.highlightLabel}>今日预估收入</Text>
+        <Text style={styles.highlightValue}>¥{formatAmount(providerStats?.today_income_cents || 0)}</Text>
+        <Text style={styles.highlightHint}>基于今日已完成订单，订单完成后入账</Text>
+      </View>
+      <View style={styles.highlightCard}>
+        <Text style={styles.highlightLabel}>待结算</Text>
+        <Text style={styles.highlightValue}>¥{formatAmount(providerStats?.pending_settlement_cents || 0)}</Text>
+        <Text style={styles.highlightHint}>含已计算和待处理的结算单</Text>
+      </View>
+    </View>
+  );
 
   const renderWalletCard = () => {
     if (!wallet) return null;
@@ -161,13 +182,13 @@ export default function WalletScreen({navigation}: any) {
           </View>
           {item.pilot_fee > 0 && (
             <View style={styles.settleRow}>
-              <Text style={styles.settleLabel}>执行人员劳务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text>
+              <Text style={styles.settleLabel}>履约服务费({(item.pilot_fee_rate * 100).toFixed(0)}%)</Text>
               <Text style={[styles.settleValue, {color: theme.success}]}>{formatAmount(item.pilot_fee)}</Text>
             </View>
           )}
           {item.owner_fee > 0 && (
             <View style={styles.settleRow}>
-              <Text style={styles.settleLabel}>服务商设备费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text>
+              <Text style={styles.settleLabel}>设备服务费({(item.owner_fee_rate * 100).toFixed(0)}%)</Text>
               <Text style={[styles.settleValue, {color: theme.success}]}>{formatAmount(item.owner_fee)}</Text>
             </View>
           )}
@@ -187,8 +208,8 @@ export default function WalletScreen({navigation}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <ProviderAccessNotice
-          title={isAuthenticated ? '服务商财务能力未开通' : '请先登录服务商账号'}
-          description={isAuthenticated ? '服务商审核通过后，才能查看收入、结算和提现记录。' : '登录后才能查看服务商财务信息。'}
+          title={isAuthenticated ? '服务商财务未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '服务商资质审核通过后，才能查看结算、流水和提现。' : '登录后才能查看服务商财务。'}
           actionText={isAuthenticated ? '查看服务商入驻' : undefined}
           onAction={isAuthenticated ? () => navigation.navigate('ProviderOnboarding') : undefined}
         />
@@ -233,7 +254,7 @@ export default function WalletScreen({navigation}: any) {
           renderItem={renderSettlementItem}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); loadData();}} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>暂无结算记录</Text>}
+          ListEmptyComponent={<Text style={styles.emptyText}>暂无结算单</Text>}
         />
       )}
 
@@ -241,6 +262,7 @@ export default function WalletScreen({navigation}: any) {
         <ScrollView
           style={styles.overview}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); loadData();}} />}>
+          {renderHighlightCards()}
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.actionItem} onPress={() => setActiveTab('transactions')}>
               <Text style={styles.actionIcon}>{'$'}</Text>
@@ -321,6 +343,11 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   settleTime: {fontSize: 11, color: theme.textHint, marginTop: 6},
 
   overview: {flex: 1},
+  highlightGrid: {flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4},
+  highlightCard: {flex: 1, backgroundColor: theme.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: theme.cardBorder},
+  highlightLabel: {fontSize: 12, color: theme.textSub, marginBottom: 6},
+  highlightValue: {fontSize: 18, fontWeight: '700', color: theme.primaryText, marginBottom: 6},
+  highlightHint: {fontSize: 11, color: theme.textHint, lineHeight: 16},
   quickActions: {flexDirection: 'row', backgroundColor: theme.card, paddingVertical: 16, marginBottom: 10},
   actionItem: {flex: 1, alignItems: 'center'},
   actionIcon: {fontSize: 24, marginBottom: 4},

@@ -95,7 +95,7 @@ const ORDER_STATUS: Record<string, BadgeMeta> = {
   provider_rejected: {label: '已拒绝', tone: 'red'},
   pending_payment: {label: '待支付', tone: 'blue'},
   paid: {label: '已支付', tone: 'green'},
-  pending_dispatch: {label: '待派单', tone: 'orange'},
+  pending_dispatch: {label: '待开始履约', tone: 'orange'},
   assigned: {label: '已分配', tone: 'green'},
   confirmed: {label: '已确认', tone: 'green'},
   airspace_applying: {label: '申请空域中', tone: 'blue'},
@@ -110,11 +110,11 @@ const ORDER_STATUS: Record<string, BadgeMeta> = {
 };
 
 const DISPATCH_STATUS: Record<string, BadgeMeta> = {
-  pending: {label: '待响应', tone: 'orange'},
-  pending_response: {label: '待响应', tone: 'orange'},
+  pending: {label: '待确认', tone: 'orange'},
+  pending_response: {label: '待确认', tone: 'orange'},
   notified: {label: '请确认接单', tone: 'orange'},
   matching: {label: '匹配中', tone: 'blue'},
-  dispatching: {label: '派单中', tone: 'blue'},
+  dispatching: {label: '安排中', tone: 'blue'},
   assigned: {label: '已指派', tone: 'green'},
   accepted: {label: '已接单', tone: 'green'},
   confirmed: {label: '已确认接单', tone: 'green'},

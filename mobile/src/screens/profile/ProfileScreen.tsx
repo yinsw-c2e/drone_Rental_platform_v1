@@ -112,13 +112,13 @@ const identityCatalog: IdentityItem[] = [
   },
   {
     key: 'pilot',
-    label: '执行人员能力',
-    heldText: '已认证',
-    missingText: '去认证',
+    label: '履约资质',
+    heldText: '已完善',
+    missingText: '去完善',
     screen: 'PilotProfile',
     fallbackScreen: 'PilotRegister',
-    actionLabel: '执行人员中心',
-    fallbackActionLabel: '执行人员认证',
+    actionLabel: '履约资质',
+    fallbackActionLabel: '履约资质认证',
   },
 ] as const;
 
@@ -130,13 +130,13 @@ const capabilityCatalog = [
   },
   {
     key: 'dispatch',
-    label: '可接执行任务',
-    desc: '通过执行人员认证并开启接单后，可响应正式派单。',
+    label: '可推进履约',
+    desc: '通过履约资质审核后，可推进正式订单履约。',
   },
   {
     key: 'selfExecute',
-    label: '可自执行',
-    desc: '同时具备服务商与执行人员能力后，可选择自执行。',
+    label: '服务商履约',
+    desc: '同时具备设备服务和履约资质后，可由服务商主体直接履约。',
   },
 ] as const;
 
@@ -426,13 +426,13 @@ export default function ProfileScreen({navigation}: any) {
         lines = [
           `可用无人机 ${stats.drones}`,
           providerCapabilities.canUseWorkbench ? `生效中服务 ${stats.supplies}` : `服务商状态 ${providerStatusText}`,
-          providerCapabilities.canUseWorkbench ? `绑定执行人员 ${stats.bindings}` : '审核通过后才能进入正式工作台。',
+          providerCapabilities.canUseWorkbench ? `待开始履约 ${stats.pendingDispatches}` : '审核通过后才能进入正式工作台。',
         ];
       } else {
         lines = [
-          `待响应派单 ${stats.pendingDispatches}`,
-          `真实飞行记录 ${stats.flightRecords}`,
-          hasRole ? '执行人员认证已建立，可继续管理接单能力。' : '完成执行人员认证后才能响应正式派单。',
+          `待开始履约 ${stats.pendingDispatches}`,
+          `飞行记录 ${stats.flightRecords}`,
+          hasRole ? '履约资质已建立，可继续维护服务范围。' : '完善后用于服务商履约推进。',
         ];
       }
 
@@ -464,7 +464,6 @@ export default function ProfileScreen({navigation}: any) {
     providerCapabilities.hasExecutorRole,
     providerCapabilities.hasProviderApplication,
     providerStatusText,
-    stats.bindings,
     stats.demands,
     stats.drones,
     stats.flightRecords,
@@ -557,13 +556,13 @@ export default function ProfileScreen({navigation}: any) {
 
     identityItems.push({
       key: providerCapabilities.hasExecutorRole ? 'pilot' : 'pilot-register',
-      title: providerCapabilities.hasExecutorRole ? '执行人员中心' : '执行人员认证',
+      title: providerCapabilities.hasExecutorRole ? '履约资质' : '履约资质认证',
       desc: providerCapabilities.hasExecutorRole
-        ? '接单状态、飞行统计'
-        : '认证后才能接正式派单',
+        ? '履约状态、统计与服务范围'
+        : '完善后用于服务商履约推进',
       icon: providerCapabilities.hasExecutorRole ? '🎮' : '🪪',
       screen: providerCapabilities.hasExecutorRole ? 'PilotProfile' : 'PilotRegister',
-      rightText: providerCapabilities.hasExecutorRole ? '已认证' : '去认证',
+      rightText: providerCapabilities.hasExecutorRole ? '已完善' : '去完善',
     });
 
     const assetItems: ShortcutItem[] = [];
@@ -637,7 +636,7 @@ export default function ProfileScreen({navigation}: any) {
       tone: providerCapabilities.canUseWorkbench ? 'green' : providerCapabilities.hasProviderApplication ? 'orange' : 'gray',
     });
     items.push({
-      label: providerCapabilities.hasExecutorRole ? '执行人员已认证' : '执行人员未认证',
+      label: providerCapabilities.hasExecutorRole ? '履约资质已完善' : '履约资质待完善',
       tone: providerCapabilities.hasExecutorRole ? 'green' : 'gray',
     });
     return items;
@@ -812,8 +811,8 @@ export default function ProfileScreen({navigation}: any) {
               <View style={styles.capabilityNotice}>
                 <Text style={styles.capabilityNoticeText}>
                   {canApplySelfExecute
-                    ? '当前账号已经具备服务商与执行人员双能力，后续订单可走自执行链路。'
-                  : '要实现自执行，需要同时具备发布服务和接正式派单两种能力。'}
+                    ? '你已经具备供给发布和履约推进能力，可由服务商主体承接并履约。'
+                    : '要完整履约，需要同时完善设备资质和履约资质。'}
                 </Text>
               </View>
             </View>

@@ -274,7 +274,7 @@ export default function SettingsScreen({ navigation }: any) {
       '仍未开启',
       status === 'blocked'
         ? '系统已拒绝并不再询问，请到系统设置中手动开启通知权限。'
-        : '系统通知权限尚未开启，测试推送不会显示在系统通知栏。',
+        : '系统通知权限尚未开启，试发通知不会显示在系统通知栏。',
       [
         { text: '知道了', style: 'cancel' },
         { text: '去系统设置', onPress: handleOpenSystemSettings },
@@ -319,13 +319,13 @@ export default function SettingsScreen({ navigation }: any) {
     try {
       const res = await pushTestService.send();
       Alert.alert(
-        '测试请求已提交',
-        `已提交到 ${res.data.provider} 推送通道。\n\n这一步表示服务端和极光都已受理，不等于系统通知栏一定立刻展示。\n\n请切到桌面、锁屏，或下拉通知栏查看是否出现“${res.data.title}”通知。`,
+        '推送请求已提交',
+        `已提交到 ${res.data.provider} 推送通道。\n\n这一步表示平台和极光都已受理，不等于系统通知栏一定立刻展示。\n\n请切到桌面、锁屏，或下拉通知栏查看是否出现“${res.data.title}”通知。`,
       );
     } catch (error: any) {
       Alert.alert(
         '发送失败',
-        error?.message || '测试推送发送失败，请检查后端配置。',
+        error?.message || '消息推送发送失败，请检查配置或稍后重试。',
       );
     } finally {
       setSendingTestPush(false);
@@ -448,7 +448,7 @@ export default function SettingsScreen({ navigation }: any) {
                   styles.diagnosticBannerText,
                   { color: canSendTestPush ? theme.success : theme.warning }
                 ]}>
-                  {canSendTestPush ? '环境已就绪，可进行推送验收' : '环境未就绪，请检查以下配置项'}
+                  {canSendTestPush ? '消息推送已就绪，可试发通知' : '消息推送未就绪，请检查以下配置项'}
                 </Text>
               </View>
 
@@ -526,7 +526,7 @@ export default function SettingsScreen({ navigation }: any) {
               {!pushDiagnostics?.configured ? (
                 <View style={styles.diagnosticWarningBox}>
                   <Text style={styles.diagnosticWarningText}>
-                    提示：当前安装包未启用极光推送。需配置 JPUSH_APP_KEY 并重新打包后，方可获取真实终端标识进行验收。
+                    提示：当前安装包未启用消息推送，启用后可获取终端标识。
                   </Text>
                 </View>
               ) : null}
@@ -554,11 +554,11 @@ export default function SettingsScreen({ navigation }: any) {
                     <Text style={[
                       styles.primaryAcceptanceButtonText,
                       (!canSendTestPush || sendingTestPush) && styles.primaryAcceptanceButtonTextDisabled,
-                    ]}>执行测试推送</Text>
+                    ]}>试发通知</Text>
                   )}
                 </TouchableOpacity>
                 <Text style={styles.diagnosticFootnote}>
-                  点击后会先收到“请求已提交”提示，这代表推送通道已受理。真正的验收结果，请看系统通知栏、横幅或锁屏通知。
+                  点击后会先收到“请求已提交”提示，这代表推送通道已受理。实际接收结果，请看系统通知栏、横幅或锁屏通知。
                 </Text>
               </View>
             </View>

@@ -91,7 +91,7 @@ export default function TrajectoryScreen({route}: any) {
 
   const handleStartRecording = async () => {
     if (!orderId) {
-      Alert.alert('提示', '请从订单详情或正式派单详情进入轨迹记录');
+      Alert.alert('提示', '请从订单详情或履约任务详情进入轨迹记录');
       return;
     }
     try {

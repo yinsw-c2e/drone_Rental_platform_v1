@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   Alert,
   Image,
@@ -17,7 +17,8 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {useFocusEffect} from '@react-navigation/native';
+import {StackActions, useFocusEffect} from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useSelector} from 'react-redux';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {customerHomeAssets} from '../../assets/haul/customerHome';
@@ -84,7 +85,9 @@ const trustItems = [
 
 type AddressTarget = 'pickup' | 'dropoff';
 
-const CITY_OPTIONS = ['深圳', '广州', '东莞', '惠州', '佛山', '珠海'];
+const CITY_STORAGE_KEY = 'customer_home_city';
+const DEFAULT_CITY_OPTIONS = ['深圳', '广州', '佛山', '东莞', '惠州', '珠海'];
+const CITY_MAP_PICKER_OPTION = '从地图选择城市';
 const SCHEDULE_TIME_OPTIONS = ['09:00', '10:30', '14:00', '16:00', '18:00'];
 
 const weightDraftValueMap: Record<WeightOption, number> = {
@@ -183,6 +186,34 @@ const normalizeAddressResponse = (response: unknown): AddressData[] => {
   return [];
 };
 
+const normalizeCityLabel = (value?: string | null) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.replace(/市$/, '');
+};
+
+const inferCityFromText = (value?: string | null) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const match = text.match(/([\u4e00-\u9fa5]{2,})市/);
+  return normalizeCityLabel(match?.[1] || '');
+};
+
+const cityFromAddress = (address?: AddressData | null) =>
+  normalizeCityLabel(address?.city) || inferCityFromText(address?.address) || inferCityFromText(address?.name);
+
+const uniqueTextList = (items: string[]) => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  items.forEach(item => {
+    const text = String(item || '').trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    result.push(text);
+  });
+  return result;
+};
+
 const formatOrderDate = (value?: string | null) => {
   if (!value) return '--';
   const date = new Date(String(value));
@@ -211,8 +242,8 @@ const getRecentOrderStatus = (order?: V2OrderSummary | null) => {
     in_transit: '运输中',
     loading: '装货中',
     preparing: '准备中',
-    assigned: '已派单',
-    pending_dispatch: '待派单',
+    assigned: '已安排履约',
+    pending_dispatch: '等待服务商',
     pending_payment: '待付款',
     pending_provider_confirmation: '待确认',
     cancelled: '已取消',
@@ -295,6 +326,13 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
     setCommonAddresses(dedupeAddresses([...savedAddresses, ...localHistory]).slice(0, 2));
   }, [isAuthenticated]);
 
+  const refreshStoredCity = useCallback(async () => {
+    const storedCity = await AsyncStorage.getItem(CITY_STORAGE_KEY).catch(() => null);
+    if (storedCity) {
+      setCity(storedCity);
+    }
+  }, []);
+
   const refreshRecentOrder = useCallback(async () => {
     if (!isAuthenticated) {
       setRecentOrder(null);
@@ -311,9 +349,10 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
 
   useFocusEffect(
     useCallback(() => {
+      refreshStoredCity();
       refreshCommonAddresses();
       refreshRecentOrder();
-    }, [refreshCommonAddresses, refreshRecentOrder]),
+    }, [refreshCommonAddresses, refreshRecentOrder, refreshStoredCity]),
   );
 
   const applySelectedAddress = (target: AddressTarget, address: AddressData) => {
@@ -322,8 +361,10 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
     } else {
       setDropoff(address);
     }
-    if (address.city) {
-      setCity(address.city);
+    const nextCity = cityFromAddress(address);
+    if (nextCity) {
+      setCity(nextCity);
+      AsyncStorage.setItem(CITY_STORAGE_KEY, nextCity).catch(() => null);
     }
   };
 
@@ -341,6 +382,27 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
 
   const chooseCity = () => {
     setShowCityPicker(true);
+  };
+
+  const selectCity = (selectedCity: string) => {
+    setCity(selectedCity);
+    AsyncStorage.setItem(CITY_STORAGE_KEY, selectedCity).catch(() => null);
+    setShowCityPicker(false);
+  };
+
+  const pickCityFromMap = () => {
+    setShowCityPicker(false);
+    navigation.navigate('MapPicker', {
+      onSelect: (address: AddressData) => {
+        const nextCity = cityFromAddress(address);
+        if (!nextCity) {
+          Alert.alert('提示', '未识别到城市，请手动选择。');
+          return;
+        }
+        selectCity(nextCity);
+      },
+      returnSteps: 1,
+    });
   };
 
   const selectTimeOption = (option: TimeOption) => {
@@ -365,7 +427,17 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
 
   const openRecentOrder = () => {
     if (recentOrder?.id) {
-      navigation.navigate('OrderDetail', {id: recentOrder.id, orderId: recentOrder.id});
+      const params = {id: recentOrder.id, orderId: recentOrder.id};
+      const rootNavigation = navigation.getParent?.();
+      if (rootNavigation) {
+        rootNavigation.dispatch(StackActions.replace('OrderLive', params));
+        return;
+      }
+      if (navigation.replace) {
+        navigation.replace('OrderLive', params);
+        return;
+      }
+      navigation.navigate('OrderLive', params);
       return;
     }
     navigation.navigate('Orders');
@@ -431,6 +503,16 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
 
   const canvasHeight = dp(DESIGN_CONTENT_BOTTOM);
   const scheduleChoices = buildScheduleChoices();
+  const cityOptions = useMemo(
+    () => uniqueTextList([
+      city,
+      cityFromAddress(pickup),
+      cityFromAddress(dropoff),
+      ...commonAddresses.map(cityFromAddress),
+      ...DEFAULT_CITY_OPTIONS,
+    ]),
+    [city, commonAddresses, dropoff, pickup],
+  );
 
   return (
     <View style={styles.root}>
@@ -480,7 +562,11 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
             客服
           </DesignText>
           <TouchableOpacity activeOpacity={1} onPress={chooseCity} style={[frame(28, 118, 118, 64), styles.touchOverlay]} />
-          <TouchableOpacity activeOpacity={1} style={[frame(704, 116, 130, 68), styles.touchOverlay]} />
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('MainTabs', {screen: 'Messages'})}
+            style={[frame(704, 116, 130, 68), styles.touchOverlay]}
+          />
 
           <View
             style={[
@@ -609,6 +695,11 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
           ))}
           <View style={[frame(269, 1168, 1, 70), styles.verticalDivider]} />
           <View style={[frame(568, 1168, 1, 70), styles.verticalDivider]} />
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => navigation.navigate('ServiceHub')}
+            style={[frame(286, 1138, 270, 130), styles.touchOverlay]}
+          />
 
           <View
             style={[
@@ -739,19 +830,19 @@ export default function CustomerHaulHomeScreen({navigation}: any) {
           <View style={styles.modalPanel}>
             <Text style={styles.modalTitle}>选择城市</Text>
             <View style={styles.modalGrid}>
-              {CITY_OPTIONS.map(item => (
+              {cityOptions.map(item => (
                 <TouchableOpacity
                   key={item}
                   activeOpacity={0.82}
                   style={[styles.modalChip, city === item && styles.modalChipActive]}
-                  onPress={() => {
-                    setCity(item);
-                    setShowCityPicker(false);
-                  }}>
+                  onPress={() => selectCity(item)}>
                   <Text style={[styles.modalChipText, city === item && styles.modalChipTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <TouchableOpacity activeOpacity={0.84} style={styles.mapCityButton} onPress={pickCityFromMap}>
+              <Text style={styles.mapCityButtonText}>{CITY_MAP_PICKER_OPTION}</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -893,6 +984,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginTop: 16,
+  },
+  mapCityButton: {
+    height: 44,
+    marginTop: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF2FF',
+  },
+  mapCityButtonText: {
+    color: '#005BFF',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
   },
   modalChip: {
     minWidth: 86,

@@ -202,7 +202,7 @@ export default function PilotOwnerBindingsScreen() {
               <EmptyState
                 icon="🤝"
                 title={activeFilter === 'all' ? '还没有绑定服务商关系' : '这个分组下暂无绑定关系'}
-                description="如果你有长期合作的服务商，可以先发起绑定申请，后续在正式派单时会更顺。"
+                description="如果你有长期合作的服务商，可以先发起绑定申请，后续安排履约时会更顺。"
               />
             </ObjectCard>
           )

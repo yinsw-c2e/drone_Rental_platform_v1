@@ -131,7 +131,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
         setAnomaly(null);
       }
     } catch (error) {
-      console.error('获取正式派单详情失败:', error);
+      console.error('获取履约任务详情失败:', error);
       setDetail(null);
       setAnomaly(null);
     } finally {
@@ -223,7 +223,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
     if (canRespond) {
       actions.unshift(
         {
-          label: '拒绝派单',
+          label: '拒绝任务',
           tone: 'danger',
           onPress: () => {
             setRejectReason('');
@@ -231,10 +231,10 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
           },
         },
         {
-          label: '接受派单',
+          label: '接受任务',
           tone: 'primary',
           onPress: () => {
-            Alert.alert('接受正式派单', '确认接受这条正式派单吗？接受后订单会进入已分配状态。', [
+            Alert.alert('接受履约任务', '确认接受这条履约任务吗？接受后订单会进入已分配状态。', [
               {text: '取消', style: 'cancel'},
               {
                 text: '确认接受',
@@ -243,7 +243,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
                   try {
                     await dispatchV2Service.accept(task.id);
                     await loadData();
-                    Alert.alert('已接受', '正式派单已接受，你现在可以直接进入执行工作台继续推进任务。', [
+                    Alert.alert('已接受', '履约任务已接受，你现在可以直接进入执行工作台继续推进任务。', [
                       {
                         text: '进入执行',
                         onPress: () => navigation.navigate('PilotOrderExecution', {taskId: task.id}),
@@ -279,7 +279,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
       await dispatchV2Service.reject(task.id, rejectReason.trim() || undefined);
       setShowRejectSheet(false);
       setRejectReason('');
-      Alert.alert('已拒绝', '这条正式派单已回退。系统若找到下一位可用执行人员，会自动生成新的正式派单。', [
+      Alert.alert('已拒绝', '这条履约任务已回退。系统若找到下一位可用执行人员，会自动生成新的履约任务。', [
         {
           text: '返回待办',
           onPress: () => navigation.navigate('PilotTaskList', {entry: 'assigned', refreshedAt: Date.now()}),
@@ -310,7 +310,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.centerState}>
-          <Text style={styles.emptyText}>正式派单不存在或当前账号没有查看权限。</Text>
+          <Text style={styles.emptyText}>履约任务不存在或当前账号没有查看权限。</Text>
         </View>
       </SafeAreaView>
     );
@@ -330,9 +330,9 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
             </View>
             <Text style={styles.heroCode}>{taskData.dispatch_no}</Text>
           </View>
-          <Text style={styles.heroTitle}>{orderData?.title || '正式派单详情'}</Text>
+          <Text style={styles.heroTitle}>{orderData?.title || '履约任务详情'}</Text>
           <Text style={styles.heroDesc}>
-            正式派单只表达执行指令：派给谁、为何派、是否已响应，以及如果执行人员拒绝后系统是否已开始自动重派。
+            这里展示执行人员、安排来源、确认状态，以及后续重派进展。
           </Text>
         </View>
 
@@ -344,15 +344,15 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
         ) : null}
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>派单摘要</Text>
-          <DetailRow label="派单状态" value={getObjectStatusMeta('dispatch_task', taskData.status).label} />
-          <DetailRow label="派单来源" value={taskData.dispatch_source || '-'} />
+          <Text style={styles.sectionTitle}>任务摘要</Text>
+          <DetailRow label="任务状态" value={getObjectStatusMeta('dispatch_task', taskData.status).label} />
+          <DetailRow label="安排来源" value={taskData.dispatch_source || '-'} />
           <DetailRow label="目标执行人员" value={getPartyName(taskData.target_pilot, '执行人员')} />
           <DetailRow label="服务商" value={getPartyName(taskData.provider, '服务商')} />
           <DetailRow label="重派次数" value={String(taskData.retry_count || 0)} />
           <DetailRow label="发出时间" value={formatDateTime(taskData.sent_at)} />
           <DetailRow label="响应时间" value={formatDateTime(taskData.responded_at)} />
-          {taskData.reason ? <DetailRow label="派单说明" value={taskData.reason} /> : null}
+          {taskData.reason ? <DetailRow label="安排说明" value={taskData.reason} /> : null}
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
@@ -367,7 +367,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
         </ObjectCard>
 
         <ObjectCard style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>派单日志</Text>
+          <Text style={styles.sectionTitle}>任务日志</Text>
           {detail.logs && detail.logs.length > 0 ? (
             detail.logs.map((log, index) => {
               const isLast = index === detail.logs.length - 1;
@@ -388,7 +388,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
               );
             })
           ) : (
-            <Text style={styles.emptyLogs}>当前还没有派单日志。</Text>
+            <Text style={styles.emptyLogs}>当前还没有任务日志。</Text>
           )}
         </ObjectCard>
       </ScrollView>
@@ -423,7 +423,7 @@ export default function DispatchTaskDetailScreen({navigation, route}: any) {
 
       {showRejectSheet ? (
         <View style={styles.rejectSheet}>
-          <Text style={styles.rejectTitle}>拒绝正式派单</Text>
+          <Text style={styles.rejectTitle}>拒绝履约任务</Text>
           <TextInput
             style={styles.rejectInput}
             placeholder="选填：补充拒绝原因，方便服务商判断是否需要重派或调整执行来源"

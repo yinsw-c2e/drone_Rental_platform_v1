@@ -23,15 +23,16 @@ import {
   V2PaymentSummary,
   V2RefundSummary,
 } from '../../types';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
 import {formatRefundStatusLabel} from '../../utils/orderPresentation';
 import {APP_CONFIG} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 
 const ALL_METHODS = [
-  {key: 'mock', label: '模拟支付', icon: '🧪', desc: '当前正式联调路径，提交后立即回写支付成功'},
-  {key: 'wechat', label: '微信支付', icon: '📱', desc: '预留真实通道，当前只创建待回调支付单'},
-  {key: 'alipay', label: '支付宝', icon: '💳', desc: '预留真实通道，当前只创建待回调支付单'},
+  {key: 'wechat', label: '微信支付', icon: 'WX', desc: '生成微信待支付单'},
+  {key: 'alipay', label: '支付宝', icon: 'ALI', desc: '生成支付宝待支付单'},
+  {key: 'mock', label: '线下确认', icon: '备', desc: '确认后更新支付状态'},
 ] as const;
 
 type PaymentMethod = (typeof ALL_METHODS)[number]['key'];
@@ -162,8 +163,8 @@ export default function PaymentScreen({route, navigation}: any) {
   );
   const selectedMethod = methods.find(method => method.key === selected) || methods[0];
   const primaryActionLabel = selected === 'mock'
-    ? `确认模拟支付 ${formatMoney(totalPay)}`
-    : `创建待回调支付单 ${formatMoney(totalPay)}`;
+    ? `确认线下支付 ${formatMoney(totalPay)}`
+    : `创建支付单 ${formatMoney(totalPay)}`;
 
   useEffect(() => {
     if (!methods.some(method => method.key === selected)) {
@@ -176,7 +177,7 @@ export default function PaymentScreen({route, navigation}: any) {
       return;
     }
     if (selected === 'mock' && !APP_CONFIG.mockPaymentEnabled) {
-      Alert.alert('当前不可用', '模拟支付仅在开发环境开放。');
+      Alert.alert('当前不可用', '当前支付方式暂不可用。');
       return;
     }
     setPaying(true);
@@ -184,17 +185,16 @@ export default function PaymentScreen({route, navigation}: any) {
       const res = await orderFinanceV2Service.createPayment(detail.id, selected);
       const latestPayment = res.data?.payment;
       const paymentFlow = res.data?.payment_flow;
-      const flowNotice = paymentFlow?.notice || (
-        APP_CONFIG.mockPaymentEnabled
-          ? '当前开发环境未接真实支付 SDK，请继续使用模拟支付联调。'
-          : '支付单已创建，等待微信/支付宝真实回调。'
+      const flowNotice = friendlyErrorMessage(
+        paymentFlow?.notice,
+        '当前支付渠道仍在确认中，订单状态稍后更新。',
       );
 
       if ((paymentFlow?.auto_completed || selected === 'mock') && String(latestPayment?.status || '').toLowerCase() === 'paid') {
         setResult({
           mode: 'success',
           title: '支付成功',
-          desc: `${flowNotice} 订单 ${detail.order_no} 已完成支付，后续履约会按订单状态继续推进。`,
+          desc: `订单 ${detail.order_no} 已完成支付，后续履约会按订单状态继续推进。`,
         });
       } else {
         setResult({
@@ -205,11 +205,12 @@ export default function PaymentScreen({route, navigation}: any) {
       }
       await loadData();
     } catch (error: any) {
-      Alert.alert('支付失败', error?.message || '请稍后重试');
+      const message = friendlyErrorMessage(error, '订单支付未完成，请稍后重试。');
+      Alert.alert('支付失败', message);
       setResult({
         mode: 'fail',
         title: '支付失败',
-        desc: error?.message || '订单支付未完成，请稍后重试。',
+        desc: message,
       });
     } finally {
       setPaying(false);
@@ -253,7 +254,7 @@ export default function PaymentScreen({route, navigation}: any) {
           </View>
           <Text style={styles.heroOrderNo}>{detail.order_no}</Text>
           <Text style={styles.heroAmount}>{formatMoney(totalPay)}</Text>
-          <Text style={styles.heroHint}>当前订单支付和退款动作都挂在订单对象下，和订单状态一起推进。</Text>
+          <Text style={styles.heroHint}>支付完成后，订单会自动进入后续履约流程。</Text>
         </View>
 
         {result ? (
@@ -313,8 +314,8 @@ export default function PaymentScreen({route, navigation}: any) {
           <Text style={styles.sectionTitle}>支付方式</Text>
           <Text style={styles.sectionHint}>
             {APP_CONFIG.mockPaymentEnabled
-              ? '当前开发联调路径可使用模拟支付。微信/支付宝在本阶段只保留占位支付单与接口字段，不会发起真实扣款。'
-              : '生产环境不开放模拟支付。微信/支付宝会创建待回调支付单，真实回调仍依赖商户资质接入。'}
+              ? '可使用线下确认方式完成支付状态确认；正式渠道以支付结果确认为准。'
+              : '支付结果以正式渠道确认为准。'}
           </Text>
           {methods.map(method => (
             <TouchableOpacity
@@ -332,7 +333,7 @@ export default function PaymentScreen({route, navigation}: any) {
             </TouchableOpacity>
           ))}
           {APP_CONFIG.mockPaymentEnabled && selected !== 'mock' ? (
-            <Text style={styles.sectionHint}>当前选择的是 {selectedMethod.label}，点击主按钮后只会生成待回调支付单；如需继续推进订单，请改用模拟支付。</Text>
+            <Text style={styles.sectionHint}>当前选择的是 {selectedMethod.label}，支付结果确认后订单会继续推进。</Text>
           ) : null}
           <TouchableOpacity
             style={[styles.primaryBtn, (!canPay || paying) && styles.primaryBtnDisabled]}

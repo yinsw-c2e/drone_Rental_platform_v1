@@ -27,7 +27,7 @@ export const formatOrderCancelReason = (reason?: string | null): string => {
       return '系统已自动取消重复下单的订单';
     case 'phase10 prepare reset':
     case 'codex verification cleanup':
-      return '系统已清理测试订单';
+      return '系统已自动取消该订单';
     default:
       return String(reason || '').trim();
   }

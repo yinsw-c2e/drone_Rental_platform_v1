@@ -19,6 +19,7 @@ import {orderAnomalyV2Service} from '../../services/orderAnomalyV2';
 import {V2OrderAnomaly, V2OrderAnomalySummary} from '../../types';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
+import {getAnomalyTypeLabel} from '../../utils/orderAnomalyMeta';
 
 type RoleFilter = 'client' | 'owner' | 'pilot' | 'all';
 type SeverityFilter = 'all' | 'critical' | 'warning';
@@ -48,6 +49,7 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
   const [severity, setSeverity] = useState<SeverityFilter>('all');
 
   const loadData = useCallback(async () => {
+    setLoading(true);
     try {
       const params = {
         role: roleFilter === 'all' ? undefined : roleFilter,
@@ -87,11 +89,17 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
       case 'owner':
         return '服务商视角';
       case 'pilot':
-        return '执行人员视角';
+        return '服务商履约视角';
       default:
         return '综合视角';
     }
   }, [roleFilter]);
+
+  const tabCount = useCallback((tab: SeverityFilter) => {
+    if (tab === 'critical') return summary.critical_count || 0;
+    if (tab === 'warning') return summary.warning_count || 0;
+    return summary.total || 0;
+  }, [summary.critical_count, summary.total, summary.warning_count]);
 
   const openAnomaly = useCallback((item: V2OrderAnomaly) => {
     if (roleFilter === 'pilot' && item.dispatch_task_id) {
@@ -113,7 +121,9 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
         </View>
         <Text style={styles.stageText}>{item.stage_label || item.status}</Text>
       </View>
-      <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+      <Text style={styles.title} numberOfLines={2}>
+        {item.title || getAnomalyTypeLabel(item.anomaly_type)}
+      </Text>
       <OrderAnomalyBanner anomaly={item} compact />
     </TouchableOpacity>
   );
@@ -127,6 +137,21 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
         </Text>
       </View>
 
+      <View style={styles.summaryGrid}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryValue}>{summary.total || 0}</Text>
+          <Text style={styles.summaryLabel}>全部异常</Text>
+        </View>
+        <View style={[styles.summaryCard, styles.summaryCardCritical]}>
+          <Text style={styles.summaryValue}>{summary.critical_count || 0}</Text>
+          <Text style={styles.summaryLabel}>严重</Text>
+        </View>
+        <View style={[styles.summaryCard, styles.summaryCardWarning]}>
+          <Text style={styles.summaryValue}>{summary.warning_count || 0}</Text>
+          <Text style={styles.summaryLabel}>提醒</Text>
+        </View>
+      </View>
+
       <View style={styles.filterRow}>
         {severityTabs.map(tab => (
           <TouchableOpacity
@@ -134,7 +159,7 @@ export default function OrderAnomalyListScreen({navigation, route}: any) {
             style={[styles.filterChip, severity === tab.key && styles.filterChipActive]}
             onPress={() => setSeverity(tab.key)}>
             <Text style={[styles.filterChipText, severity === tab.key && styles.filterChipTextActive]}>
-              {tab.label}
+              {tab.label} {tabCount(tab.key)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -198,6 +223,40 @@ const getStyles = (theme: AppTheme) =>
       gap: 8,
       paddingHorizontal: 18,
       paddingBottom: 10,
+    },
+    summaryGrid: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: 18,
+      paddingBottom: 14,
+    },
+    summaryCard: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: theme.cardBorder,
+      borderRadius: 14,
+      backgroundColor: theme.card,
+      paddingVertical: 12,
+      paddingHorizontal: 10,
+    },
+    summaryCardCritical: {
+      borderColor: `${theme.danger}66`,
+      backgroundColor: `${theme.danger}12`,
+    },
+    summaryCardWarning: {
+      borderColor: `${theme.warning}66`,
+      backgroundColor: `${theme.warning}12`,
+    },
+    summaryValue: {
+      color: theme.text,
+      fontSize: 22,
+      fontWeight: '900',
+    },
+    summaryLabel: {
+      marginTop: 4,
+      color: theme.textSub,
+      fontSize: 12,
+      fontWeight: '700',
     },
     filterChip: {
       borderWidth: 1,

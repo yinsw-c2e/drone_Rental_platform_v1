@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,10 @@ import {
   SafeAreaView,
   FlatList,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import {useSelector} from 'react-redux';
+import {useFocusEffect} from '@react-navigation/native';
 import ProviderAccessNotice from '../../components/business/ProviderAccessNotice';
 import {listMyWithdrawals, WithdrawalRecord} from '../../services/settlement';
 import {RootState} from '../../store/store';
@@ -18,7 +20,7 @@ import type {AppTheme} from '../../theme/index';
 const STATUS_MAP: Record<string, {label: string; colorKey: 'warning' | 'primary' | 'success' | 'danger'}> = {
   pending: {label: '待审核', colorKey: 'warning'},
   processing: {label: '处理中', colorKey: 'primary'},
-  completed: {label: '已到账', colorKey: 'success'},
+  completed: {label: '已完成', colorKey: 'success'},
   rejected: {label: '已拒绝', colorKey: 'danger'},
   failed: {label: '失败', colorKey: 'danger'},
 };
@@ -40,27 +42,33 @@ export default function WithdrawalListScreen({navigation}: any) {
   );
   const canUseProviderFinance = Boolean(isAuthenticated && providerCapabilities.canUseWorkbench);
   const [records, setRecords] = useState<WithdrawalRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!canUseProviderFinance) {
       setRecords([]);
+      setLoading(false);
       setRefreshing(false);
       return;
     }
+    setLoading(true);
     try {
-      const result = await listMyWithdrawals(1, 50);
+      const result = await listMyWithdrawals(1, 100);
       setRecords(result.data || []);
     } catch (err: any) {
       console.log('加载提现记录失败:', err.message);
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
   }, [canUseProviderFinance]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   const formatAmount = (fen: number) => (fen / 100).toFixed(2);
 
@@ -69,13 +77,13 @@ export default function WithdrawalListScreen({navigation}: any) {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>提现 ¥{formatAmount(item.amount)}</Text>
+          <Text style={styles.cardTitle}>提现到 {METHOD_MAP[item.withdraw_method] || item.withdraw_method}</Text>
           <View style={[styles.badge, {backgroundColor: theme[statusInfo.colorKey] + '20'}]}>
             <Text style={[styles.badgeText, {color: theme[statusInfo.colorKey]}]}>{statusInfo.label}</Text>
           </View>
         </View>
+        <Text style={styles.amount}>¥{formatAmount(item.amount)}</Text>
         <View style={styles.cardBody}>
-          <Text style={styles.info}>方式: {METHOD_MAP[item.withdraw_method] || item.withdraw_method}</Text>
           <Text style={styles.info}>手续费: ¥{formatAmount(item.service_fee)}</Text>
           <Text style={styles.info}>实际到账: ¥{formatAmount(item.actual_amount)}</Text>
           {item.bank_name ? <Text style={styles.info}>银行: {item.bank_name}</Text> : null}
@@ -107,7 +115,13 @@ export default function WithdrawalListScreen({navigation}: any) {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {setRefreshing(true); loadData();}} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>暂无提现记录</Text>}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.loading} color={theme.primary} />
+          ) : (
+            <Text style={styles.emptyText}>暂无提现记录</Text>
+          )
+        }
       />
     </SafeAreaView>
   );
@@ -119,10 +133,12 @@ const getStyles = (theme: AppTheme) => StyleSheet.create({
   card: {backgroundColor: theme.card, borderRadius: 10, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8},
   cardTitle: {fontSize: 16, fontWeight: '600', color: theme.text},
+  amount: {fontSize: 24, fontWeight: '800', color: theme.text, marginBottom: 8},
   badge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4},
   badgeText: {fontSize: 11, fontWeight: '500'},
   cardBody: {},
   info: {fontSize: 13, color: theme.textSub, marginBottom: 3},
   time: {fontSize: 11, color: theme.textHint, marginTop: 6},
+  loading: {marginTop: 80},
   emptyText: {textAlign: 'center', color: theme.textHint, fontSize: 14, paddingTop: 60},
 });

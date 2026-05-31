@@ -368,6 +368,67 @@ export interface AddressSnapshot {
   longitude?: number | null;
 }
 
+export interface V2ProviderPresence {
+  user_id: number;
+  online: boolean;
+  last_latitude: number;
+  last_longitude: number;
+  last_heartbeat_at: string | null;
+  accepted_service_classes: string[];
+  max_radius_km: number;
+  status: string;
+}
+
+export interface V2ProviderStats {
+  rating: number | null;
+  completion_rate: number | null;
+  today_order_count: number;
+  today_income_cents: number;
+  total_completed_orders: number;
+  pending_settlement_cents?: number;
+}
+
+export interface V2ProviderBroadcastOrderSummary {
+  id: number;
+  order_no: string;
+  title?: string;
+  service_address: string;
+  dest_address: string;
+  cargo_weight_kg: number;
+  estimated_distance_m?: number;
+  estimated_duration_min?: number;
+  total_amount: number;
+}
+
+export interface V2ProviderBroadcastView {
+  id: number;
+  order_id: number;
+  service_class_code: string;
+  weight_kg: number;
+  estimated_total_cents: number;
+  status: string;
+  origin_latitude: number;
+  origin_longitude: number;
+  distance_km?: number;
+  remaining_seconds?: number;
+  expires_at?: string;
+  order: V2ProviderBroadcastOrderSummary | null;
+}
+
+export interface V2ProviderAssignmentView {
+  id: number;
+  broadcast_id: number;
+  order_id: number;
+  provider_user_id: number;
+  attempt_seq: number;
+  status: string;
+  distance_km: number;
+  accept_deadline_at: string;
+  remaining_seconds: number;
+  broadcast: V2ProviderBroadcastView | null;
+  order: V2ProviderBroadcastOrderSummary | null;
+}
+
 export interface SupplyOwnerSummary {
   id: number;
   nickname: string;
@@ -719,6 +780,72 @@ export interface OwnerWorkbenchView {
   draft_supplies: OwnerWorkbenchSupplyItem[];
 }
 
+export interface V2ServiceClass {
+  id?: number;
+  code: string;
+  display_name: string;
+  mtow_min_kg?: number;
+  mtow_max_kg?: number;
+  payload_min_kg: number;
+  payload_max_kg?: number;
+  base_price_cents?: number;
+  per_km_price_cents?: number;
+  per_minute_price_cents?: number;
+  min_charge_cents?: number;
+  status?: string;
+  sort_order?: number;
+}
+
+export interface V2PricingPoint {
+  latitude: number;
+  longitude: number;
+  address?: string;
+  text?: string;
+}
+
+export interface V2EstimateOrderPayload {
+  origin: V2PricingPoint;
+  destination: V2PricingPoint;
+  cargo_weight_kg: number;
+  client_request_id?: string;
+  scheduled_at?: string;
+  scheduled_start_at?: string;
+  service_class_code?: string;
+  service_class?: string;
+  cargo_scene?: string;
+  note?: string;
+  description?: string;
+}
+
+export interface V2PricingSurcharge {
+  code: string;
+  name: string;
+  rate: number;
+  amount_cents: number;
+}
+
+export interface V2PricingEstimate {
+  service_class_code: string;
+  service_class_name: string;
+  cargo_weight_kg: number;
+  distance_km: number;
+  distance_m: number;
+  estimated_duration_min: number;
+  base_price_cents: number;
+  distance_fee_cents: number;
+  duration_fee_cents: number;
+  surcharges: V2PricingSurcharge[];
+  min_charge_cents: number;
+  min_charge_adjustment_cents: number;
+  total_estimated_cents: number;
+  price_breakdown_json?: unknown;
+}
+
+export interface V2PlatformOrderResult {
+  order: V2OrderSummary;
+  estimate: V2PricingEstimate;
+}
+
 export interface V2OrderSummary {
   id: number;
   order_no: string;
@@ -897,6 +1024,27 @@ export interface V2FlightStatsSummary {
   avg_speed?: number;
   flight_start_time?: string;
   flight_end_time?: string;
+}
+
+export interface V2LivePosition {
+  flight_record_id?: number;
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  speed: number;
+  heading: number;
+  battery_level: number;
+  signal_strength: number;
+  recorded_at: string;
+  age_seconds: number;
+  signal_weak: boolean;
+}
+
+export interface V2OrderLive {
+  status?: string;
+  eta_seconds: number | null;
+  progress_pct: number;
+  last_position: V2LivePosition | null;
 }
 
 export interface V2OrderMonitor {
@@ -1081,6 +1229,27 @@ export interface V2OrderFinancialSummary {
   provider_reject_reason?: string;
 }
 
+export interface V2SiteSafetyChecklistItem {
+  key: string;
+  label: string;
+  checked: boolean;
+  note?: string;
+}
+
+export interface V2SiteSafetyCheckSummary {
+  id: number;
+  order_id: number;
+  operator_user_id: number;
+  operator_role?: string;
+  status: string;
+  checklist: V2SiteSafetyChecklistItem[];
+  photos: string[];
+  note?: string;
+  checked_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface V2OrderDetail extends V2OrderSummary {
   source_info?: {
     order_source?: string;
@@ -1101,6 +1270,8 @@ export interface V2OrderDetail extends V2OrderSummary {
   disputes?: V2DisputeSummary[];
   dispute_count?: number;
   timeline?: V2OrderTimelineItem[];
+  site_safety_check?: V2SiteSafetyCheckSummary | null;
+  live?: V2OrderLive | null;
 }
 
 export interface POIItem {

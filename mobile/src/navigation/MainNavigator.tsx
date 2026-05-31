@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
-import { useTheme } from '../theme/ThemeContext';
+import { StyleSheet, Text } from 'react-native';
 import TabGlyph from '../components/navigation/TabGlyph';
 import { RootState } from '../store/store';
 
@@ -12,6 +12,7 @@ import ProviderOnboardingScreen from '../screens/provider/ProviderOnboardingScre
 import MarketHubScreen from '../screens/market/MarketHubScreen';
 import OrderListScreen from '../screens/order/OrderListScreen';
 import OrderDetailScreen from '../screens/order/OrderDetailScreen';
+import OrderLiveScreen from '../screens/order/OrderLiveScreen';
 import OrderAnomalyListScreen from '../screens/order/OrderAnomalyListScreen';
 import ConversationListScreen from '../screens/message/ConversationListScreen';
 import ChatScreen from '../screens/message/ChatScreen';
@@ -85,10 +86,16 @@ import WalletScreen from '../screens/settlement/WalletScreen';
 import WithdrawalScreen from '../screens/settlement/WithdrawalScreen';
 import WithdrawalListScreen from '../screens/settlement/WithdrawalListScreen';
 import FulfillmentHubScreen from '../screens/fulfillment/FulfillmentHubScreen';
+import SafetyCheckScreen from '../screens/fulfillment/SafetyCheckScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 const MessageStack = createNativeStackNavigator();
+
+const TAB_ACTIVE_COLOR = '#003B8F';
+const TAB_INACTIVE_COLOR = '#6B7A99';
+const TAB_BG_COLOR = '#FFFFFF';
+const TAB_BORDER_COLOR = '#E1E6EF';
 
 function MessageStackScreen() {
   return (
@@ -118,6 +125,21 @@ const tabIcon = (name: string, focused: boolean) => {
   return <TabGlyph name={iconMap[name] || 'home'} focused={focused} />;
 };
 
+const tabLabel = (name: string, isProviderMode: boolean) => {
+  switch (name) {
+    case 'Home':
+      return isProviderMode ? '工作台' : '首页';
+    case 'Orders':
+      return isProviderMode ? '接单需求' : '订单';
+    case 'Messages':
+      return '消息';
+    case 'Profile':
+      return '我的';
+    default:
+      return '';
+  }
+};
+
 function RoleHomeScreen(props: any) {
   const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
   if (selectedMode === 'provider') {
@@ -135,7 +157,6 @@ function RoleOrderScreen(props: any) {
 }
 
 function MainTabs() {
-  const { theme } = useTheme();
   const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
   const isProviderMode = selectedMode === 'provider';
   return (
@@ -143,51 +164,52 @@ function MainTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarIcon: ({ focused }) => tabIcon(route.name, focused),
-        tabBarActiveTintColor: theme.navIconActive,
-        tabBarInactiveTintColor: theme.navIconInactive,
+        // React Navigation expects render functions for custom tab labels.
+        // eslint-disable-next-line react/no-unstable-nested-components
+        tabBarLabel: ({focused, color}) => (
+          <Text style={[styles.tabBarLabel, focused && styles.tabBarLabelActive, {color}]}>
+            {tabLabel(route.name, isProviderMode)}
+          </Text>
+        ),
+        tabBarActiveTintColor: TAB_ACTIVE_COLOR,
+        tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
         tabBarStyle: {
-          backgroundColor: theme.navBg,
-          borderTopColor: theme.navBorder,
-          height: 86,
-          paddingTop: 9,
-          paddingBottom: 15,
+          backgroundColor: TAB_BG_COLOR,
+          borderTopColor: TAB_BORDER_COLOR,
+          height: 82,
+          paddingTop: 6,
+          paddingBottom: 8,
           borderTopWidth: 1,
-          shadowColor: '#142850',
-          shadowOffset: {width: 0, height: -5},
-          shadowOpacity: 0.07,
-          shadowRadius: 16,
-          elevation: 12,
+          shadowOpacity: 0,
+          elevation: 0,
         },
         tabBarItemStyle: {
-          height: 62,
+          height: 60,
           justifyContent: 'center',
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '700',
-          marginTop: 3,
+          fontSize: 9.5,
+          lineHeight: 12.3,
+          fontWeight: '400',
+          marginTop: 2,
         },
       })}
     >
       <Tab.Screen
         name="Home"
         component={RoleHomeScreen}
-        options={{ tabBarLabel: isProviderMode ? '工作台' : '首页' }}
       />
       <Tab.Screen
         name="Orders"
         component={RoleOrderScreen}
-        options={{ tabBarLabel: isProviderMode ? '接单' : '订单' }}
       />
       <Tab.Screen
         name="Messages"
         component={MessageStackScreen}
-        options={{ tabBarLabel: '消息' }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ tabBarLabel: '我的' }}
       />
     </Tab.Navigator>
   );
@@ -250,6 +272,11 @@ export default function MainNavigator() {
         name="OrderDetail"
         component={OrderDetailScreen}
         options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="OrderLive"
+        component={OrderLiveScreen}
+        options={{ title: '路线进度' }}
       />
       <RootStack.Screen
         name="OrderAnomalyList"
@@ -402,6 +429,11 @@ export default function MainNavigator() {
         options={{ headerShown: false }}
       />
       <RootStack.Screen
+        name="SafetyCheck"
+        component={SafetyCheckScreen}
+        options={{ title: '现场安全复核' }}
+      />
+      <RootStack.Screen
         name="CreateDispatchTask"
         component={CreateDispatchTaskScreen}
         options={{ title: '安排执行' }}
@@ -549,3 +581,15 @@ export default function MainNavigator() {
     </RootStack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBarLabel: {
+    fontSize: 9.5,
+    lineHeight: 12.3,
+    fontWeight: '400',
+    marginTop: 2,
+  },
+  tabBarLabelActive: {
+    fontWeight: '700',
+  },
+});

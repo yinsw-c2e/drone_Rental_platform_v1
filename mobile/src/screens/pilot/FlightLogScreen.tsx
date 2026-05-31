@@ -93,7 +93,7 @@ export default function FlightLogScreen({navigation}: any) {
       </ObjectCard>
 
       <ObjectCard style={styles.tipCard}>
-        <Text style={styles.tipTitle}>真实履约飞行记录</Text>
+        <Text style={styles.tipTitle}>履约飞行记录</Text>
         <Text style={styles.tipText}>
           这里只展示订单执行中自动沉淀的飞行留痕，不再支持手动补录，避免统计口径和履约数据不一致。
         </Text>
@@ -157,7 +157,7 @@ export default function FlightLogScreen({navigation}: any) {
       <SafeAreaView style={[styles.container, {backgroundColor: theme.bg}]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={theme.primary} />
-          <Text style={styles.loadingText}>正在同步真实履约飞行记录...</Text>
+          <Text style={styles.loadingText}>正在同步履约飞行记录...</Text>
         </View>
       </SafeAreaView>
     );
@@ -174,9 +174,9 @@ export default function FlightLogScreen({navigation}: any) {
           <ObjectCard>
             <EmptyState
               icon="🛫"
-              title="暂无真实飞行记录"
-              description="当你接受正式派单并产生真实履约飞行后，记录会自动出现在这里。"
-              actionText="查看待接派单"
+              title="暂无飞行记录"
+              description="当你接受履约任务并产生飞行记录后，记录会自动出现在这里。"
+              actionText="查看待接任务"
               onAction={() => navigation.navigate('PilotTaskList')}
             />
           </ObjectCard>

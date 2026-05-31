@@ -21,6 +21,7 @@ import {offerListAssets} from '../../assets/haul/offerList';
 import {supplyService} from '../../services/supply';
 import {store} from '../../store/store';
 import {AddressData, QuickOrderDraft, SupplySummary} from '../../types';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
 
 const DESIGN_WIDTH = 852;
 const DESIGN_TOTAL_HEIGHT = 1847;
@@ -213,7 +214,7 @@ export default function OfferListScreen({route, navigation}: any) {
       setSupplies(normalizeSupplies(res));
     } catch (error: any) {
       setSupplies([]);
-      setErrorText(error?.message || '服务商方案加载失败，请稍后重试。');
+      setErrorText(friendlyErrorMessage(error, '服务商方案加载失败，请稍后重试。'));
     } finally {
       setLoading(false);
     }
@@ -275,7 +276,7 @@ export default function OfferListScreen({route, navigation}: any) {
           {plan.title}
         </DesignText>
         {renderImage(offerListAssets.starFilled, 548, top + 53, 34, 34)}
-        <DesignText style={[frame(590, top + 50, 86, 35), type(31, 37, '500', '#061736')]}>真实供给</DesignText>
+        <DesignText style={[frame(590, top + 50, 86, 35), type(31, 37, '500', '#061736')]}>可下单</DesignText>
         <View style={[frame(699, top + 47, 1, 43), styles.metricDivider]} />
         <DesignText style={[frame(720, top + 50, 70, 35), type(31, 37, '500', '#061736')]}>#{plan.supply.id}</DesignText>
         <View style={[frame(60, top + 118, 733, 1), styles.line]} />
@@ -310,10 +311,10 @@ export default function OfferListScreen({route, navigation}: any) {
   const renderEmptyState = () => {
     const title = loading ? '正在匹配服务商方案...' : errorText || '暂无可直达下单的服务商方案';
     const subtitle = loading
-      ? '正在根据起落点、载重和场景查询真实供给。'
+      ? '正在根据起落点、载重和场景匹配服务商。'
       : errorText
-        ? '不会展示本地兜底方案，请处理后重试。'
-        : '当前筛选条件下后端没有返回真实服务商，可调整地点、载重或改为发布任务等待报价。';
+        ? '请处理后重试。'
+        : '当前筛选条件下暂无合适服务商，可调整地点、载重或改为发布任务等待报价。';
     return (
       <React.Fragment>
         <View style={[frame(22, 539, 806, 336), styles.card, {borderRadius: dp(24)}, cardShadow(0.08)]} />

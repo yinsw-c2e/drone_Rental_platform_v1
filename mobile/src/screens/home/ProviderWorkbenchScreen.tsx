@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Alert,
   Image,
@@ -19,14 +19,26 @@ import LinearGradient from 'react-native-linear-gradient';
 import {useFocusEffect} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useDispatch, useSelector} from 'react-redux';
+import AssignmentModal from '../../components/AssignmentModal';
 import {homeService} from '../../services/home';
 import {dispatchV2Service} from '../../services/dispatchV2';
 import {ownerService} from '../../services/owner';
+import {orderV2Service} from '../../services/orderV2';
+import {providerService} from '../../services/provider';
+import {presenceConfigUpdated} from '../../store/slices/providerPresenceSlice';
+import {useProviderPresence} from '../../hooks/useProviderPresence';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
+import {formatAmountYuan} from '../../utils/supplyMeta';
+import showToast from '../../utils/toast';
 import {
   HomeDashboard,
   OwnerWorkbenchOrderItem,
   OwnerWorkbenchView,
   V2DispatchTaskSummary,
+  V2ProviderBroadcastOrderSummary,
+  V2ProviderBroadcastView,
+  V2ProviderStats,
+  V2ServiceClass,
 } from '../../types';
 import {RootState} from '../../store/store';
 import {providerWorkbenchAssets} from '../../assets/haul/providerWorkbench';
@@ -72,10 +84,108 @@ type TodoItem = {
 };
 
 const DESIGN_WIDTH = 941;
-const DESIGN_CONTENT_BOTTOM = 1532;
+const DESIGN_CONTENT_BOTTOM = 2030;
+const PROVIDER_RADIUS_OPTIONS = [5, 10, 20, 30];
+const SELF_EXECUTABLE_REQUIRED_TOAST = '需要先完善设备和履约资质';
 
 const formatMoney = (amount: number) =>
   amount.toLocaleString('zh-CN', {maximumFractionDigits: 0});
+
+const normalizeServiceClasses = (items: unknown): V2ServiceClass[] => {
+  const value = items as {data?: V2ServiceClass[]} | V2ServiceClass[];
+  const list = Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : [];
+  return list.filter((item): item is V2ServiceClass => Boolean(item?.code));
+};
+
+const normalizeProviderItems = <T,>(res: unknown): T[] => {
+  const value = res as {items?: T[]; data?: {items?: T[]}} | null;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.data?.items)) return value.data.items;
+  return [];
+};
+
+const unwrapProviderData = <T,>(res: unknown): T | null => {
+  const value = res as {data?: T} | T | null;
+  if (value && typeof value === 'object' && 'data' in value) {
+    return (value as {data?: T}).data || null;
+  }
+  return (value as T) || null;
+};
+
+const formatCompletionRate = (rate?: number | null) => {
+  if (rate === null || rate === undefined || !Number.isFinite(Number(rate))) return '新入驻';
+  return `${Math.round(Math.max(0, Math.min(1, Number(rate))) * 100)}%`;
+};
+
+const formatProviderRating = (rating?: number | null) => {
+  if (rating === null || rating === undefined || !Number.isFinite(Number(rating))) return '暂无评分';
+  return Number(rating).toFixed(1);
+};
+
+const formatBroadcastDistance = (km?: number | null) => {
+  const value = Number(km || 0);
+  if (!Number.isFinite(value) || value < 0) return '距你 --';
+  if (value < 0.05) return '距你 <0.1km';
+  return `距你 ${value.toFixed(value >= 10 ? 0 : 1)}km`;
+};
+
+const formatRouteDistance = (meters?: number | null) => {
+  const value = Number(meters || 0);
+  if (!Number.isFinite(value) || value <= 0) return '距离 --';
+  return `距离 ${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}km`;
+};
+
+const formatDuration = (minutes?: number | null) => {
+  const value = Number(minutes || 0);
+  if (!Number.isFinite(value) || value <= 0) return '时长 --';
+  return `约 ${Math.round(value)}分钟`;
+};
+
+const formatWeight = (kg?: number | null) => {
+  const value = Number(kg || 0);
+  if (!Number.isFinite(value) || value <= 0) return '--kg';
+  return `${Math.round(value)}kg`;
+};
+
+const getRemainingSeconds = (deadline?: string | null, fallback?: number | null) => {
+  const deadlineMs = deadline ? Date.parse(deadline) : NaN;
+  if (Number.isFinite(deadlineMs)) {
+    return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+  }
+  return Math.max(0, Math.ceil(Number(fallback || 0)));
+};
+
+const getBroadcastAmount = (item: V2ProviderBroadcastView) =>
+  Number(item.estimated_total_cents || item.order?.total_amount || 0);
+
+const getOrderFromBroadcast = (item: V2ProviderBroadcastView): V2ProviderBroadcastOrderSummary | null =>
+  item.order || null;
+
+const getOrderIdFromPayload = (payload: unknown, fallback: number) => {
+  const value = payload as {order?: {id?: number}; data?: {order?: {id?: number}}} | null;
+  return Number(value?.order?.id || value?.data?.order?.id || fallback || 0);
+};
+
+function isProviderNotSelfExecutableError(error: any) {
+  const message = String(error?.message || error?.response?.data?.message || '');
+  return (error?.statusCode === 403 || error?.response?.status === 403) &&
+    message.includes('provider_not_self_executable');
+}
+
+function getGrabConflictToast(code?: unknown) {
+  switch (code) {
+    case 'BROADCAST_LOCKED_BY_ASSIGN':
+      return '该单正在指派给其他服务商，请稍候';
+    case 'BROADCAST_TAKEN':
+      return '已被其他服务商抢走';
+    case 'BROADCAST_STATUS_INVALID':
+      return '订单状态已变化，刷新后重试';
+    case 'BROADCAST_PREVIOUSLY_CANCELLED':
+      return '您曾取消过该订单，不能再次抢单';
+    default:
+      return '已被其他服务商抢走';
+  }
+}
 
 const firstFulfillmentOrderOf = (workbench?: OwnerWorkbenchView | null): OwnerWorkbenchOrderItem | null =>
   workbench?.pending_provider_confirmation_orders?.[0] ||
@@ -249,6 +359,12 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
   const user = useSelector((state: RootState) => state.auth.user);
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [openedOnboardingOnce, setOpenedOnboardingOnce] = useState(false);
+  const [providerStats, setProviderStats] = useState<V2ProviderStats | null>(null);
+  const [serviceClasses, setServiceClasses] = useState<V2ServiceClass[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [broadcastItems, setBroadcastItems] = useState<V2ProviderBroadcastView[]>([]);
+  const [, setBroadcastTick] = useState(0);
+  const [grabbingId, setGrabbingId] = useState<number | null>(null);
 
   const dp = (value: number) => Number((value * scale).toFixed(2));
   const frame = (x: number, y: number, w: number, h: number): ViewStyle => ({
@@ -293,6 +409,7 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary), [roleSummary]);
   const providerCapabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
   const canUseProvider = canUseProviderWorkbench(effectiveRoleSummary);
+  const {presence, goOnline, goOffline} = useProviderPresence();
   const providerBrandName = useMemo(() => {
     const nickname = String(user?.nickname || '').trim();
     return nickname || '服务商工作台';
@@ -307,14 +424,14 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
     if (!isAuthenticated) {
       return {
         title: '登录后进入接单工作台',
-        desc: '接单工作台只展示真实订单、派单和结算数据，请先登录服务商账号。',
+        desc: '接单工作台展示服务机会、服务订单和结算信息，请先登录服务商账号。',
         primary: '去登录',
       };
     }
     if (providerCapabilities.nextAction === 'wait_review') {
       return {
         title: '服务商资质审核中',
-        desc: '你的服务商资料、设备资质或执行人员认证正在审核，通过后才能正式接单、派单和管理履约。',
+        desc: '你的服务商资料和设备资质正在审核，通过后才能正式接单和管理履约。',
         primary: '查看入驻进度',
       };
     }
@@ -327,7 +444,7 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
     }
     return {
       title: '服务商能力未开通',
-      desc: '先完善服务商资料、设备资质或执行人员认证，审核通过后才能接单、派单和管理履约。',
+      desc: '先完善服务商资料和设备资质，审核通过后才能接单和管理履约。',
       primary: '开始服务商入驻',
     };
   }, [isAuthenticated, providerCapabilities.nextAction]);
@@ -339,6 +456,8 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
       setDashboard(null);
       setWorkbench(null);
       setExecutionTasks([]);
+      setProviderStats(null);
+      setBroadcastItems([]);
       return;
     }
     Promise.all([
@@ -354,6 +473,35 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
       .catch(() => null);
   }, [canUseProvider, isAuthenticated]);
 
+  const refreshProviderStats = useCallback(() => {
+    if (!isAuthenticated || !canUseProvider) {
+      setProviderStats(null);
+      return;
+    }
+    providerService.getStats()
+      .then(res => setProviderStats(unwrapProviderData<V2ProviderStats>(res)))
+      .catch(() => null);
+  }, [canUseProvider, isAuthenticated]);
+
+  const refreshServiceClasses = useCallback(() => {
+    orderV2Service.listServiceClasses()
+      .then(res => setServiceClasses(normalizeServiceClasses(res)))
+      .catch(() => setServiceClasses([]));
+  }, []);
+
+  const pullBroadcasts = useCallback(async () => {
+    if (!isAuthenticated || !canUseProvider || !presence.online) {
+      setBroadcastItems([]);
+      return;
+    }
+    try {
+      const res = await providerService.listBroadcasts(20);
+      setBroadcastItems(normalizeProviderItems<V2ProviderBroadcastView>(res));
+    } catch {
+      // 网络抖动时保持静默，下一轮刷新自动恢复。
+    }
+  }, [canUseProvider, isAuthenticated, presence.online]);
+
   useFocusEffect(
     useCallback(() => {
       dispatch(setHaulRoleMode('provider'));
@@ -363,8 +511,40 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
         return;
       }
       refreshDashboard();
-    }, [canUseProvider, dispatch, isAuthenticated, navigation, openedOnboardingOnce, refreshDashboard]),
+      refreshProviderStats();
+      refreshServiceClasses();
+      pullBroadcasts();
+    }, [
+      canUseProvider,
+      dispatch,
+      isAuthenticated,
+      navigation,
+      openedOnboardingOnce,
+      pullBroadcasts,
+      refreshDashboard,
+      refreshProviderStats,
+      refreshServiceClasses,
+    ]),
   );
+
+  useEffect(() => {
+    const timer = setInterval(() => setBroadcastTick(value => value + 1), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!presence.online) {
+      setBroadcastItems([]);
+      return undefined;
+    }
+    pullBroadcasts();
+    refreshProviderStats();
+    const timer = setInterval(() => {
+      pullBroadcasts();
+      refreshProviderStats();
+    }, 5_000);
+    return () => clearInterval(timer);
+  }, [presence.online, pullBroadcasts, refreshProviderStats]);
 
   const stats = useMemo(() => {
     const owner = dashboard?.role_views?.owner;
@@ -454,6 +634,103 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
   const openDemandTab = () => {
     navigation.navigate('Orders');
   };
+
+  const setMaxRadius = useCallback((km: number) => {
+    dispatch(presenceConfigUpdated({maxRadiusKM: km}));
+  }, [dispatch]);
+
+  const toggleServiceClass = useCallback((code: string) => {
+    const current = presence.acceptedServiceClasses || [];
+    const next = current.includes(code)
+      ? current.filter(item => item !== code)
+      : [...current, code];
+    dispatch(presenceConfigUpdated({acceptedServiceClasses: next}));
+  }, [dispatch, presence.acceptedServiceClasses]);
+
+  const togglePresence = useCallback(async () => {
+    if (actionLoading) return;
+    setActionLoading(true);
+    try {
+      if (presence.online) {
+        await goOffline();
+        showToast('已下线');
+        return;
+      }
+      if (!presence.acceptedServiceClasses?.length) {
+        showToast('请先选择至少一个可接机型');
+        return;
+      }
+      const ok = await goOnline({
+        acceptedClasses: presence.acceptedServiceClasses,
+        maxRadiusKM: presence.maxRadiusKM,
+      });
+      if (ok) {
+        showToast('已上线接单');
+        refreshProviderStats();
+        pullBroadcasts();
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    actionLoading,
+    goOffline,
+    goOnline,
+    presence.acceptedServiceClasses,
+    presence.maxRadiusKM,
+    presence.online,
+    pullBroadcasts,
+    refreshProviderStats,
+  ]);
+
+  const openGrabbedOrder = useCallback((orderId: number) => {
+    const nextOrderId = Number(orderId || 0);
+    if (nextOrderId > 0) {
+      navigation.navigate('OrderDetail', {id: nextOrderId, orderId: nextOrderId});
+    }
+  }, [navigation]);
+
+  const grabBroadcast = useCallback(async (broadcast: V2ProviderBroadcastView) => {
+    if (grabbingId) return;
+    if (!providerCapabilities.canSelfExecute) {
+      showToast(SELF_EXECUTABLE_REQUIRED_TOAST);
+      return;
+    }
+    setGrabbingId(broadcast.id);
+    try {
+      const res = await providerService.grabBroadcast(broadcast.id);
+      const orderId = getOrderIdFromPayload(res, broadcast.order_id);
+      showToast('抢单成功');
+      if (orderId > 0) {
+        openGrabbedOrder(orderId);
+      }
+    } catch (error: any) {
+      if (error?.statusCode === 409 || error?.response?.status === 409) {
+        showToast(getGrabConflictToast(error?.body?.code || error?.code));
+        pullBroadcasts();
+      } else if (isProviderNotSelfExecutableError(error)) {
+        showToast(SELF_EXECUTABLE_REQUIRED_TOAST);
+      } else {
+        showToast(friendlyErrorMessage(error, '抢单失败'));
+      }
+    } finally {
+      setGrabbingId(null);
+    }
+  }, [
+    grabbingId,
+    openGrabbedOrder,
+    providerCapabilities.canSelfExecute,
+    pullBroadcasts,
+  ]);
+
+  const visibleBroadcasts = broadcastItems
+    .filter(item => getRemainingSeconds(item.expires_at, item.remaining_seconds) > 0)
+    .slice(0, 1);
+
+  const ctaText = actionLoading ? '处理中...' : presence.online ? '下线（停止接单）' : '上线接单';
+  const ctaHint = presence.online
+    ? '派单进行中。下线后将停止派单，仍可去「接单」Tab 主动报价。'
+    : '上线后平台会按你的机型/半径主动派单。';
 
   const metrics: MetricItem[] = [
     {
@@ -575,10 +852,10 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
         key: `dispatch-${item.id}`,
         title: item.title || item.order_no || '订单待安排执行',
         subtitle: formatOrderTodoSubtitle(item),
-        status: '待派单',
+        status: '待开始',
         icon: providerWorkbenchAssets.todoAirspace,
         tone: 'blue',
-        statusWidth: todoStatusWidth('待派单'),
+        statusWidth: todoStatusWidth('待开始'),
         onPress: () => openFulfillment(item.id),
       });
     });
@@ -598,7 +875,7 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
       return [{
         key: 'empty',
         title: '暂无待处理事项',
-        subtitle: '当前没有后端返回的待办订单或需求',
+        subtitle: '暂无待处理事项',
         status: '已同步',
         icon: providerWorkbenchAssets.todoInsurance,
         tone: 'blue',
@@ -732,7 +1009,149 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
             工作台
           </DesignText>
 
-          <View style={[frame(35, 304, 870, 360), styles.card, {borderRadius: dp(24)}, cardShadow(0.1, 28, 12, 5)]}>
+          <View style={[frame(35, 304, 870, 210), styles.card, {borderRadius: dp(24)}, cardShadow(0.1, 28, 12, 5)]}>
+            <View
+              style={[
+                relFrame(34, 28, 18, 18),
+                styles.presenceDot,
+                presence.online ? styles.presenceDotOnline : styles.presenceDotOffline,
+                {borderRadius: dp(9)},
+              ]}
+            />
+            <DesignText style={[relFrame(64, 20, 300, 36), type(28, 36, '700', '#061E4F')]}>
+              {presence.online ? '已上线，等待接单' : '已下线'}
+            </DesignText>
+            <DesignText numberOfLines={1} style={[relFrame(350, 24, 250, 30), type(21, 30, '500', '#65728F')]}>
+              今日 {formatAmountYuan(providerStats?.today_income_cents)} · {providerStats?.today_order_count ?? '--'}单 · {formatCompletionRate(providerStats?.completion_rate)} · {formatProviderRating(providerStats?.rating)}
+            </DesignText>
+            <TouchableOpacity
+              activeOpacity={0.86}
+              disabled={actionLoading}
+              onPress={togglePresence}
+              style={[
+                relFrame(622, 18, 210, 56),
+                styles.presenceButton,
+                presence.online ? styles.presenceButtonOffline : styles.presenceButtonOnline,
+                actionLoading && styles.presenceButtonDisabled,
+                {borderRadius: dp(12)},
+              ]}>
+              <DesignText style={[type(24, 32, '700', '#FFFFFF'), styles.centerText]}>{ctaText}</DesignText>
+            </TouchableOpacity>
+
+            <DesignText style={[relFrame(34, 80, 110, 30), type(23, 30, '600', '#4C6090')]}>
+              服务半径
+            </DesignText>
+            {PROVIDER_RADIUS_OPTIONS.map((km, index) => (
+              <TouchableOpacity
+                key={km}
+                activeOpacity={0.84}
+                onPress={() => setMaxRadius(km)}
+                style={[
+                  relFrame(162 + index * 96, 74, 76, 42),
+                  styles.presenceChip,
+                  presence.maxRadiusKM === km && styles.presenceChipActive,
+                  {borderRadius: dp(10)},
+                ]}>
+                <DesignText
+                  style={[
+                    type(21, 28, '700', presence.maxRadiusKM === km ? '#005BFF' : '#4C6090'),
+                    styles.centerText,
+                  ]}>
+                  {km}km
+                </DesignText>
+              </TouchableOpacity>
+            ))}
+
+            <DesignText style={[relFrame(34, 128, 110, 30), type(23, 30, '600', '#4C6090')]}>
+              可接机型
+            </DesignText>
+            {serviceClasses.slice(0, 3).map((item, index) => {
+              const checked = (presence.acceptedServiceClasses || []).includes(item.code);
+              return (
+                <TouchableOpacity
+                  key={item.code}
+                  activeOpacity={0.84}
+                  onPress={() => toggleServiceClass(item.code)}
+                  style={[
+                    relFrame(162 + index * 178, 122, 158, 42),
+                    styles.presenceChip,
+                    checked && styles.presenceChipActive,
+                    {borderRadius: dp(10)},
+                  ]}>
+                  <DesignText
+                    numberOfLines={1}
+                    style={[
+                      type(21, 28, '700', checked ? '#005BFF' : '#4C6090'),
+                      styles.centerText,
+                    ]}>
+                    {item.display_name}
+                  </DesignText>
+                </TouchableOpacity>
+              );
+            })}
+            {serviceClasses.length === 0 ? (
+              <DesignText style={[relFrame(162, 128, 240, 30), type(22, 30, '500', '#7180A0')]}>
+                暂无可选机型
+              </DesignText>
+            ) : null}
+            <DesignText
+              numberOfLines={1}
+              style={[relFrame(34, 172, 790, 28), type(21, 28, '400', presence.lastError ? '#E61616' : '#65728F')]}>
+              {presence.lastError || ctaHint}
+            </DesignText>
+          </View>
+
+          <View style={[frame(35, 536, 870, 220), styles.card, {borderRadius: dp(24)}, cardShadow(0.08, 24, 10, 4)]}>
+            <DesignText style={[relFrame(28, 22, 132, 38), type(31, 40, '700', '#061E4F')]}>
+              附近订单
+            </DesignText>
+            <DesignText style={[relFrame(632, 26, 190, 30), type(23, 30, '400', '#65728F'), styles.rightText]}>
+              {presence.online ? '自动刷新中' : '上线后可抢单'}
+            </DesignText>
+            {presence.online && visibleBroadcasts[0] ? (() => {
+              const item = visibleBroadcasts[0];
+              const order = getOrderFromBroadcast(item);
+              const remaining = getRemainingSeconds(item.expires_at, item.remaining_seconds);
+              const isGrabbing = grabbingId === item.id;
+              return (
+                <>
+                  <DesignText numberOfLines={1} style={[relFrame(28, 74, 494, 32), type(26, 34, '700', '#061E4F')]}>
+                    {order?.service_address || '起点待确认'} → {order?.dest_address || '终点待确认'}
+                  </DesignText>
+                  <DesignText numberOfLines={1} style={[relFrame(28, 117, 560, 28), type(22, 30, '400', '#4C6090')]}>
+                    {formatBroadcastDistance(item.distance_km)} · {formatWeight(order?.cargo_weight_kg || item.weight_kg)} · {formatDuration(order?.estimated_duration_min)} · {formatRouteDistance(order?.estimated_distance_m)}
+                  </DesignText>
+                  <DesignText style={[relFrame(28, 158, 188, 36), type(30, 38, '800', '#FF4B18')]}>
+                    {formatAmountYuan(getBroadcastAmount(item))}
+                  </DesignText>
+                  <DesignText style={[relFrame(582, 82, 86, 30), type(23, 30, '700', '#FF4B18'), styles.centerText]}>
+                    剩 {remaining}s
+                  </DesignText>
+                  <TouchableOpacity
+                    activeOpacity={0.86}
+                    disabled={isGrabbing}
+                    onPress={() => grabBroadcast(item)}
+                    style={[relFrame(668, 133, 160, 54), styles.grabButton, isGrabbing && styles.presenceButtonDisabled, {borderRadius: dp(12)}]}>
+                    <DesignText style={[type(24, 32, '700', '#FFFFFF'), styles.centerText]}>
+                      {isGrabbing ? '抢单中...' : '一键抢单'}
+                    </DesignText>
+                  </TouchableOpacity>
+                </>
+              );
+            })() : (
+              <>
+                <Image source={providerWorkbenchAssets.todoAirspace} style={imageFrame(34, 84, 72, 70)} resizeMode="contain" />
+                <DesignText style={[relFrame(126, 86, 620, 36), type(27, 36, '700', '#061E4F')]}>
+                  {presence.online ? '暂无附近订单，保持在线等待' : '开启在线接单后，附近订单会在这里出现'}
+                </DesignText>
+                <DesignText style={[relFrame(126, 128, 600, 30), type(22, 30, '400', '#65728F')]}>
+                  改派/指派订单会通过弹窗提醒，不需要留在本页操作。
+                </DesignText>
+              </>
+            )}
+          </View>
+
+          <View style={[frame(35, 780, 870, 360), styles.card, {borderRadius: dp(24)}, cardShadow(0.1, 28, 12, 5)]}>
             <View style={[relFrame(34, 175, 801, 1), styles.divider]} />
             <View style={[relFrame(431, 26, 1, 306), styles.divider]} />
             {metrics.map((item, index) => {
@@ -761,7 +1180,7 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
             })}
           </View>
 
-          <View style={[frame(35, 687, 870, 294), styles.card, {borderRadius: dp(24)}, cardShadow(0.08, 26, 10, 4)]}>
+          <View style={[frame(35, 1163, 870, 294), styles.card, {borderRadius: dp(24)}, cardShadow(0.08, 26, 10, 4)]}>
             <DesignText style={[frame(28, 30, 127, 44), type(34, 44, '700', '#061E4F')]}>
               快捷入口
             </DesignText>
@@ -793,7 +1212,7 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
             })}
           </View>
 
-          <View style={[frame(35, 1005, 870, 526), styles.card, {borderRadius: dp(24)}, cardShadow(0.08, 26, 10, 4)]}>
+          <View style={[frame(35, 1481, 870, 526), styles.card, {borderRadius: dp(24)}, cardShadow(0.08, 26, 10, 4)]}>
             <DesignText style={[frame(28, 28, 166, 44), type(34, 44, '700', '#061E4F')]}>
               待处理事项
             </DesignText>
@@ -840,6 +1259,7 @@ export default function ProviderWorkbenchScreen({navigation}: any) {
           </View>
         </View>
       </ScrollView>
+      <AssignmentModal onAccepted={openGrabbedOrder} />
     </View>
   );
 }
@@ -938,6 +1358,48 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  presenceDot: {
+    position: 'absolute',
+  },
+  presenceDotOnline: {
+    backgroundColor: '#12B64B',
+  },
+  presenceDotOffline: {
+    backgroundColor: '#A8B4C7',
+  },
+  presenceButton: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presenceButtonOnline: {
+    backgroundColor: '#005BFF',
+  },
+  presenceButtonOffline: {
+    backgroundColor: '#65728F',
+  },
+  presenceButtonDisabled: {
+    opacity: 0.68,
+  },
+  presenceChip: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D8E2F0',
+    backgroundColor: '#F7FAFF',
+  },
+  presenceChipActive: {
+    borderWidth: 1,
+    borderColor: '#005BFF',
+    backgroundColor: '#EAF2FF',
+  },
+  grabButton: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF5B04',
   },
   gatePrimary: {
     position: 'absolute',

@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import ObjectCard from '../../components/business/ObjectCard';
 import StatusBadge from '../../components/business/StatusBadge';
 import { dispatchV2Service } from '../../services/dispatchV2';
+import { orderV2Service } from '../../services/orderV2';
 import { pilotV2Service } from '../../services/pilotV2';
 import {
   aggregateFlightRecords,
@@ -28,19 +29,19 @@ const STATUS_MAP: Record<
   string,
   { label: string; tone: 'green' | 'orange' | 'red' | 'gray' }
 > = {
-  verified: { label: '已认证', tone: 'green' },
-  approved: { label: '已认证', tone: 'green' },
+  verified: { label: '已完善', tone: 'green' },
+  approved: { label: '已完善', tone: 'green' },
   pending: { label: '审核中', tone: 'orange' },
   rejected: { label: '未通过', tone: 'red' },
-  unverified: { label: '未认证', tone: 'gray' },
+  unverified: { label: '待完善', tone: 'gray' },
 };
 
 const availabilityMap: Record<
   string,
   { label: string; tone: 'green' | 'orange' | 'gray' }
 > = {
-  online: { label: '接单中', tone: 'green' },
-  available: { label: '接单中', tone: 'green' },
+  online: { label: '可履约', tone: 'green' },
+  available: { label: '可履约', tone: 'green' },
   busy: { label: '忙碌中', tone: 'orange' },
   offline: { label: '离线', tone: 'gray' },
 };
@@ -78,7 +79,7 @@ const pickLocationCity = (...values: any[]) =>
 
 const formatServiceBaseSubtitle = (lat: number, lng: number) => {
   if (!lat || !lng) {
-    return '派单匹配会从该地点开始计算覆盖距离';
+    return '履约覆盖会从该地点开始计算服务距离';
   }
   return `坐标 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 };
@@ -104,18 +105,16 @@ export default function PilotProfileScreen({ navigation }: any) {
     totalDistanceM: 0,
     maxAltitudeM: 0,
   });
-  const [dispatchStats, setDispatchStats] = useState({ pending: 0, active: 0 });
+  const [fulfillmentStats, setFulfillmentStats] = useState({ waiting: 0, active: 0 });
   const draftDirtyRef = useRef(false);
   const skipNextFocusReloadRef = useRef(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [profileRes, flightRecords, dispatchRes] = await Promise.all([
+      const [profileRes, flightRecords, orderRes] = await Promise.all([
         pilotV2Service.getProfile().catch(() => null),
         pilotV2Service.listAllFlightRecords({ page_size: 50 }),
-        dispatchV2Service
-          .list({ role: 'pilot', page: 1, page_size: 50 })
-          .catch(() => null),
+        orderV2Service.list({role: 'owner', page: 1, page_size: 50}).catch(() => null),
       ]);
 
       const profile = profileRes?.data || null;
@@ -126,13 +125,13 @@ export default function PilotProfileScreen({ navigation }: any) {
 
       setFlightStats(aggregateFlightRecords(flightRecords));
 
-      const dispatchItems = dispatchRes?.data?.items || [];
-      setDispatchStats({
-        pending: dispatchItems.filter(
-          (item: any) => item.status === 'pending_response',
+      const orderItems = orderRes?.data?.items || [];
+      setFulfillmentStats({
+        waiting: orderItems.filter(
+          (item: any) => ['pending_dispatch', 'paid'].includes(item.status),
         ).length,
-        active: dispatchItems.filter((item: any) =>
-          ['accepted', 'executing', 'in_progress'].includes(item.status),
+        active: orderItems.filter((item: any) =>
+          ['assigned', 'preparing', 'in_transit', 'in_progress'].includes(item.status),
         ).length,
       });
     } finally {
@@ -168,7 +167,7 @@ export default function PilotProfileScreen({ navigation }: any) {
       ) {
         Alert.alert(
           '请先设置服务基准地点',
-          '服务半径必须围绕一个明确地点计算，设置后才能上线接单。',
+          '服务半径必须围绕一个明确地点计算，设置后才能上线履约。',
         );
         return;
       }
@@ -220,7 +219,7 @@ export default function PilotProfileScreen({ navigation }: any) {
     if (!draft.service_base_latitude || !draft.service_base_longitude) {
       Alert.alert(
         '请设置服务基准地点',
-        '服务半径需要基于一个固定地点，后续派单匹配会按该地点计算。',
+        '服务半径需要基于一个固定地点，后续履约覆盖会按该地点计算。',
       );
       return;
     }
@@ -248,7 +247,7 @@ export default function PilotProfileScreen({ navigation }: any) {
       draftDirtyRef.current = false;
       setPilot(savedProfile);
       setDraft(buildDraftFromProfile(savedProfile));
-      Alert.alert('保存成功', '执行人员设置已更新。');
+      Alert.alert('保存成功', '履约资质设置已更新。');
     } catch (e: any) {
       Alert.alert('保存失败', e?.message || '请稍后重试');
     } finally {
@@ -277,11 +276,11 @@ export default function PilotProfileScreen({ navigation }: any) {
       }
       Alert.alert(
         '当前没有可监控任务',
-        '先从正式派单里接受一条执行任务，再进入飞行监控。',
+        '先从履约订单里接受一条正式任务，再进入飞行监控。',
         [
           { text: '取消', style: 'cancel' },
           {
-            text: '去派单任务',
+            text: '去履约订单',
             onPress: () => navigation.navigate('PilotTaskList'),
           },
         ],
@@ -320,7 +319,7 @@ export default function PilotProfileScreen({ navigation }: any) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.loadingWrap}>
-          <Text style={styles.loadingText}>执行人员资料加载中...</Text>
+          <Text style={styles.loadingText}>履约资质加载中...</Text>
         </View>
       </SafeAreaView>
     );
@@ -330,15 +329,15 @@ export default function PilotProfileScreen({ navigation }: any) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
         <View style={styles.emptyWrap}>
-          <Text style={styles.emptyTitle}>还没有执行人员资料</Text>
+          <Text style={styles.emptyTitle}>还没有履约资质</Text>
           <Text style={styles.emptyDesc}>
-            先完成执行人员认证，后面这里才会出现接单状态、服务区域和执行统计。
+            先完成履约资质认证，后面这里才会出现服务范围和飞行统计。
           </Text>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => navigation.navigate('PilotRegister')}
           >
-            <Text style={styles.primaryButtonText}>去做执行人员认证</Text>
+            <Text style={styles.primaryButtonText}>去完善履约资质</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -356,8 +355,8 @@ export default function PilotProfileScreen({ navigation }: any) {
         <View style={styles.headerHero}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.headerGreeting}>执行人员工作台</Text>
-              <Text style={styles.headerSubtitle}>执照、接单与飞行统计</Text>
+              <Text style={styles.headerGreeting}>履约资质</Text>
+              <Text style={styles.headerSubtitle}>执照、服务范围与飞行统计</Text>
             </View>
             <View style={styles.headerStatusRow}>
               <StatusBadge
@@ -369,11 +368,11 @@ export default function PilotProfileScreen({ navigation }: any) {
 
           <View style={styles.statsGrid}>
             <View style={styles.statsCard}>
-              <Text style={styles.statsValue}>{dispatchStats.pending}</Text>
-              <Text style={styles.statsLabel}>待办派单</Text>
+              <Text style={styles.statsValue}>{fulfillmentStats.waiting}</Text>
+              <Text style={styles.statsLabel}>待开始</Text>
             </View>
             <View style={styles.statsCard}>
-              <Text style={styles.statsValue}>{dispatchStats.active}</Text>
+              <Text style={styles.statsValue}>{fulfillmentStats.active}</Text>
               <Text style={styles.statsLabel}>进行中</Text>
             </View>
             <View style={styles.statsCard}>
@@ -388,7 +387,7 @@ export default function PilotProfileScreen({ navigation }: any) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>市场准入状态</Text>
+          <Text style={styles.sectionTitle}>履约准入状态</Text>
           <View style={styles.readinessCard}>
             <View style={styles.readinessHeader}>
               <View style={styles.readinessInfo}>
@@ -436,11 +435,11 @@ export default function PilotProfileScreen({ navigation }: any) {
         <View style={styles.section}>
           <View style={styles.switchBox}>
             <View style={styles.switchText}>
-              <Text style={styles.switchLabel}>正式派单接单开关</Text>
+              <Text style={styles.switchLabel}>当前是否可履约</Text>
               <Text style={styles.switchSub}>
                 {canUpdateAvailability
-                  ? '开启后，服务商和系统可直接向你指派任务。'
-                  : '完成执行人员认证后解锁正式接单开关。'}
+                  ? '资质完善后可切换在线状态，平台会据此判断服务商履约可用性。'
+                  : '完成履约资质认证后解锁履约状态开关。'}
               </Text>
             </View>
             <Switch
@@ -453,7 +452,7 @@ export default function PilotProfileScreen({ navigation }: any) {
         </View>
 
         <ObjectCard style={styles.settingsCard}>
-          <Text style={styles.sectionTitle}>接单偏好</Text>
+          <Text style={styles.sectionTitle}>服务设置</Text>
           <View style={styles.inputGroup}>
             <Text style={styles.fieldLabel}>服务基准地点</Text>
             <TouchableOpacity
@@ -477,7 +476,7 @@ export default function PilotProfileScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>最大服务半径 (公里)</Text>
+            <Text style={styles.fieldLabel}>服务半径（公里）</Text>
             <TextInput
               style={styles.fieldInput}
               placeholder="默认 50"
@@ -491,7 +490,7 @@ export default function PilotProfileScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.fieldLabel}>专业技能</Text>
+            <Text style={styles.fieldLabel}>技能标签</Text>
             <View style={styles.skillGrid}>
               {skillOptions.map(skill => {
                 const active = draft.special_skills.includes(skill);
@@ -521,26 +520,19 @@ export default function PilotProfileScreen({ navigation }: any) {
             disabled={saving}
           >
             <Text style={styles.saveBtnText}>
-              {saving ? '正在保存...' : '保存接单设置'}
+              {saving ? '正在保存...' : '保存履约设置'}
             </Text>
           </TouchableOpacity>
         </ObjectCard>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>任务与记录</Text>
+          <Text style={styles.sectionTitle}>快捷入口</Text>
           <View style={styles.entryGrid}>
             <EntryItem
-              title="正式派单"
+              title="履约订单"
               icon="🎯"
-              count={dispatchStats.pending}
-              onPress={() => navigation.navigate('PilotTaskList')}
-            />
-            <EntryItem
-              title="报名需求"
-              icon="🛰️"
-              onPress={() =>
-                navigation.navigate('DemandList', { mode: 'pilot' })
-              }
+              count={fulfillmentStats.waiting}
+              onPress={() => navigation.navigate('Orders')}
             />
             <EntryItem
               title="飞行监控"
@@ -553,9 +545,14 @@ export default function PilotProfileScreen({ navigation }: any) {
               onPress={() => navigation.navigate('FlightLog')}
             />
             <EntryItem
-              title="绑定服务商"
+              title="服务商档案"
               icon="🤝"
-              onPress={() => navigation.navigate('PilotOwnerBindings')}
+              onPress={() => navigation.navigate('OwnerProfile')}
+            />
+            <EntryItem
+              title="设备资质"
+              icon="🚁"
+              onPress={() => navigation.navigate('MyDrones')}
             />
           </View>
         </View>
