@@ -128,6 +128,8 @@ export const PUSH_CONFIG = {
 export const THIRD_PARTY_LOGIN = {
   // 微信登录AppID
   wechatAppId: getConfig('WECHAT_APP_ID') || '',
+  // iOS 微信登录 Universal Link，按环境从 .env 注入
+  wechatUniversalLink: getConfig('WECHAT_UNIVERSAL_LINK') || '',
   // QQ登录AppID
   qqAppId: getConfig('QQ_APP_ID') || '',
 };

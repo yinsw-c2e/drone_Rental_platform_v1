@@ -5,6 +5,8 @@ module.exports = {
     '^react-native-wechat-lib$': '<rootDir>/src/utils/wechat.jest.ts',
     '^@react-native-community/geolocation$': '<rootDir>/src/utils/geolocation.jest.ts',
     '^react-native-update$': '<rootDir>/src/utils/reactNativeUpdate.jest.tsx',
+    '^@react-native-async-storage/async-storage$':
+      '@react-native-async-storage/async-storage/jest/async-storage-mock',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|@react-navigation|react-native-.*|@react-native-community|react-redux|@reduxjs|redux|immer|reselect|redux-thunk|use-sync-external-store)/)',

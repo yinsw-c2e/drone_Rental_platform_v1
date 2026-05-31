@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import * as WeChat from 'react-native-wechat-lib';
 import {useDispatch, useSelector} from 'react-redux';
 import {authService} from '../../services/auth';
 import {setCredentials} from '../../store/slices/authSlice';
@@ -22,11 +21,14 @@ import {
   setHaulRoleMode,
 } from '../../store/slices/roleSlice';
 import {RootState} from '../../store/store';
-import {APP_CONFIG, THIRD_PARTY_LOGIN} from '../../constants';
+import {APP_CONFIG} from '../../constants';
 import {useTheme} from '../../theme/ThemeContext';
 import type {AppTheme} from '../../theme/index';
 import {loginAssets} from '../../assets/miniProgramAssets';
 import {canEnterMode} from '../../utils/roleSummary';
+import {friendlyErrorMessage} from '../../utils/errorMessage';
+import {syncPreferredModeWithBackend} from '../../utils/preferredMode';
+import {performWeChatLogin} from '../../utils/wechatLogin';
 
 const QUICK_LOGIN_ACCOUNTS = {
   client: [
@@ -112,18 +114,6 @@ export default function LoginScreen({navigation, route}: any) {
     }
   }, [dispatch, routeRoleMode]);
 
-  // 初始化微信 SDK
-  useEffect(() => {
-    const appId = THIRD_PARTY_LOGIN.wechatAppId;
-    if (appId && WeChat && WeChat.registerApp) {
-      WeChat.registerApp(appId, 'https://dronerentalplat.cpolar.top/app/')
-        .then(() => console.log('[WeChat] SDK registered'))
-        .catch((e: any) => console.warn('[WeChat] register failed:', e));
-    } else {
-      console.warn('[WeChat] SDK not available or appId empty, appId=', appId, 'WeChat=', WeChat);
-    }
-  }, []);
-
   const beginSubmit = () => {
     if (submittingRef.current) return null;
     submittingRef.current = true;
@@ -156,6 +146,10 @@ export default function LoginScreen({navigation, route}: any) {
 
   const finishLogin = (res: any, mode: HaulRoleMode) => {
     const payload = res?.data || res || {};
+    if (!payload.user || !payload.token) {
+      Alert.alert('登录失败', '登录返回数据不完整');
+      return false;
+    }
     const roleSummary = payload.role_summary || null;
     if (!ensureModeAllowed(mode, roleSummary)) {
       return false;
@@ -166,50 +160,29 @@ export default function LoginScreen({navigation, route}: any) {
       token: payload.token,
       roleSummary,
     }));
+    syncPreferredModeWithBackend(mode);
     return true;
   };
 
   const handleWeChatLogin = async () => {
-    console.log('[WeChat] handleWeChatLogin called');
-    const appId = THIRD_PARTY_LOGIN.wechatAppId;
-    console.log('[WeChat] appId =', JSON.stringify(appId));
-    console.log('[WeChat] WeChat module keys:', Object.keys(WeChat));
-    if (!appId) {
-      Alert.alert('提示', '微信登录未配置 AppID');
+    if (submittingRef.current) {
       return;
     }
-    try {
-      console.log('[WeChat] Checking isWXAppInstalled...');
-      const isInstalled = await WeChat.isWXAppInstalled();
-      console.log('[WeChat] isInstalled =', isInstalled);
-      if (!isInstalled) {
-        Alert.alert('提示', '请先安装微信 App');
-        return;
-      }
-      console.log('[WeChat] Sending auth request...');
-      const result = await WeChat.sendAuthRequest('snsapi_userinfo');
-      console.log('[WeChat] Auth result:', JSON.stringify(result));
-      if (result.errCode === 0 && result.code) {
-        const requestId = beginSubmit();
-        if (!requestId) return;
-        try {
-          const res = await authService.wechatLogin(result.code);
-          if (!isLatestRequest(requestId)) return;
-          finishLogin(res, activeMode);
-        } catch (e: any) {
-          if (isLatestRequest(requestId)) Alert.alert('微信登录失败', e.message);
-        } finally {
-          finishSubmit(requestId);
+    await performWeChatLogin({
+      dispatch,
+      mode: activeMode,
+      beginSubmit: () => {
+        submittingRef.current = true;
+        requestIdRef.current += 1;
+        setSubmitting(true);
+      },
+      endSubmit: () => {
+        submittingRef.current = false;
+        if (mountedRef.current) {
+          setSubmitting(false);
         }
-      } else if (result.errCode === -2) {
-        // 用户取消
-      } else {
-        Alert.alert('微信授权失败', `错误码: ${result.errCode}`);
-      }
-    } catch (e: any) {
-      console.log('[WeChat] Error:', e);
-      Alert.alert('微信登录失败', e.message || '无法拉起微信');
-    }
+      },
+    });
   };
 
   const sendCode = async () => {
@@ -228,7 +201,7 @@ export default function LoginScreen({navigation, route}: any) {
         });
       }, 1000);
     } catch (e: any) {
-      Alert.alert('错误', e.message);
+      Alert.alert('错误', friendlyErrorMessage(e, '验证码发送失败'));
     }
   };
 
@@ -246,7 +219,7 @@ export default function LoginScreen({navigation, route}: any) {
       if (!isLatestRequest(requestId)) return;
       finishLogin(res, activeMode);
     } catch (e: any) {
-      if (isLatestRequest(requestId)) Alert.alert('登录失败', e.message);
+      if (isLatestRequest(requestId)) Alert.alert('登录失败', friendlyErrorMessage(e, '登录失败'));
     } finally {
       finishSubmit(requestId);
     }
@@ -269,8 +242,7 @@ export default function LoginScreen({navigation, route}: any) {
       finishLogin(res, roleMode);
     } catch (e: any) {
       if (!isLatestRequest(requestId)) return;
-      const errorMsg = e.message || '未知错误';
-      Alert.alert('快速登录失败', errorMsg);
+      Alert.alert('快速登录失败', friendlyErrorMessage(e, '登录失败'));
     } finally {
       finishSubmit(requestId);
     }

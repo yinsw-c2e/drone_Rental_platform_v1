@@ -15,6 +15,8 @@ import {useDispatch, useSelector} from 'react-redux';
 import {haulAssets} from '../../assets/haul';
 import {RootState} from '../../store/store';
 import {HaulRoleMode, setHaulRoleMode} from '../../store/slices/roleSlice';
+import {performWeChatLogin} from '../../utils/wechatLogin';
+import {syncPreferredModeWithBackend} from '../../utils/preferredMode';
 
 const DESIGN_WIDTH = 941;
 const DESIGN_HEIGHT = 1672;
@@ -27,12 +29,17 @@ export default function ModeSelectionScreen({navigation}: any) {
     [height, insets.bottom, width],
   );
   const dispatch = useDispatch();
+  const [wechatSubmitting, setWechatSubmitting] = React.useState(false);
   const selectedMode = useSelector(
     (state: RootState) => state.role.selectedMode,
+  );
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated,
   );
 
   const handleSelect = (mode: HaulRoleMode) => {
     dispatch(setHaulRoleMode(mode));
+    syncPreferredModeWithBackend(mode);
   };
 
   const openLogin = () => {
@@ -41,6 +48,18 @@ export default function ModeSelectionScreen({navigation}: any) {
 
   const openRegister = () => {
     navigation.navigate('Register', {roleMode: selectedMode});
+  };
+
+  const handleWeChatLogin = () => {
+    if (wechatSubmitting || isAuthenticated) {
+      return;
+    }
+    performWeChatLogin({
+      dispatch,
+      mode: selectedMode,
+      beginSubmit: () => setWechatSubmitting(true),
+      endSubmit: () => setWechatSubmitting(false),
+    });
   };
 
   return (
@@ -132,7 +151,7 @@ export default function ModeSelectionScreen({navigation}: any) {
 
           <TouchableOpacity
             activeOpacity={0.86}
-            onPress={openRegister}
+            onPress={openLogin}
             style={styles.primaryButton}>
             <LinearGradient
               colors={['#0038A1', '#0644AD', '#023491']}
@@ -140,24 +159,25 @@ export default function ModeSelectionScreen({navigation}: any) {
               end={{x: 1, y: 0.5}}
               style={styles.primaryGradient}>
               <Text allowFontScaling={false} style={styles.primaryText}>
-                手机号登录 / 注册
+                手机号登录
               </Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <Text allowFontScaling={false} style={styles.loginHint}>
-            已有账号？
+            没有账号？
           </Text>
           <Text
             allowFontScaling={false}
-            onPress={openLogin}
+            onPress={openRegister}
             style={styles.loginLink}>
-            立即登录
+            立即注册
           </Text>
 
           <TouchableOpacity
             activeOpacity={0.82}
-            onPress={openLogin}
+            onPress={handleWeChatLogin}
+            disabled={wechatSubmitting}
             style={styles.wechatButton}>
             <Image
               source={haulAssets.wechat}
@@ -165,7 +185,7 @@ export default function ModeSelectionScreen({navigation}: any) {
               resizeMode="contain"
             />
             <Text allowFontScaling={false} style={styles.wechatText}>
-              微信一键登录
+              {wechatSubmitting ? '正在登录...' : '微信一键登录'}
             </Text>
           </TouchableOpacity>
 

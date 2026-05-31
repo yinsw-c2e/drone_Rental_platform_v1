@@ -16,6 +16,7 @@ export const authService = {
       phone,
       password,
       nickname,
+      code,
     }),
 
   login: (phone: string, password?: string, code?: string) =>
@@ -34,11 +35,14 @@ export const authService = {
 
   // 微信登录
   wechatLogin: (code: string) =>
-    apiV2.post<any, V2ApiResponse<{user: User; token: TokenPair}>>('/auth/wechat-login', {code}),
+    apiV2.post<any, V2ApiResponse<AuthPayload>>('/auth/wechat-login', {code}),
 
   // QQ登录
   qqLogin: (accessToken: string) =>
     apiV2.post<any, V2ApiResponse<{user: User; token: TokenPair}>>('/auth/qq-login', {
       access_token: accessToken,
     }),
+
+  setPreferredMode: (mode: 'customer' | 'provider') =>
+    apiV2.post<any, V2ApiResponse<{preferred_mode: string}>>('/user/preferred-mode', {mode}),
 };
