@@ -126,6 +126,13 @@ type ProviderAssignmentView struct {
 	RemainingSeconds int64                      `json:"remaining_seconds"`
 }
 
+type DispatchState struct {
+	OnlineProvidersCount int   `json:"online_providers_count"`
+	ElapsedSeconds       int64 `json:"elapsed_seconds"`
+	EstimatedWaitSeconds int64 `json:"estimated_wait_seconds"`
+	TriedProvidersCount  int   `json:"tried_providers_count"`
+}
+
 type ProviderStats struct {
 	Rating                 *float64 `json:"rating"`
 	CompletionRate         *float64 `json:"completion_rate"`
@@ -220,6 +227,54 @@ func (s *BroadcastService) GetProviderStats(userID int64) *ProviderStats {
 		}
 	}
 	return stats
+}
+
+func (s *BroadcastService) GetDispatchState(order *model.Order, now time.Time) (*DispatchState, error) {
+	state := &DispatchState{}
+	if order == nil {
+		return state, nil
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if !order.CreatedAt.IsZero() && now.After(order.CreatedAt) {
+		state.ElapsedSeconds = int64(now.Sub(order.CreatedAt).Seconds())
+	}
+	if s == nil || s.broadcastRepo == nil {
+		return state, nil
+	}
+
+	broadcast, err := s.broadcastRepo.GetByOrderID(order.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return state, nil
+		}
+		return nil, err
+	}
+	if broadcast.ExpiresAt.After(now) && (broadcast.Status == broadcastStatusOpen || broadcast.Status == broadcastStatusAutoAssigning) {
+		state.EstimatedWaitSeconds = int64(broadcast.ExpiresAt.Sub(now).Seconds())
+	}
+
+	if s.presenceRepo != nil {
+		presences, err := s.presenceRepo.ListOnlineSince(now.Add(-s.presenceStaleTimeout()))
+		if err != nil {
+			return nil, err
+		}
+		for i := range presences {
+			if s.providerCanGrabBroadcast(&presences[i], broadcast, order) {
+				state.OnlineProvidersCount++
+			}
+		}
+	}
+
+	if s.assignmentRepo != nil {
+		tried, err := s.assignmentRepo.CountDistinctProviders(order.ID, broadcast.ID)
+		if err != nil {
+			return nil, err
+		}
+		state.TriedProvidersCount = int(tried)
+	}
+	return state, nil
 }
 
 func (s *BroadcastService) shouldAutoAssign() bool {

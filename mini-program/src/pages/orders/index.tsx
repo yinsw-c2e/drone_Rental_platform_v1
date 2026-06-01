@@ -11,6 +11,7 @@ import { getDemandSceneLabel, getObjectStatusMeta } from '../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
 import DemandListPage from '../demand/list';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
+import { getProviderAdvanceConfirmCopy } from '../../utils/providerAdvance';
 import './index.scss';
 
 type StatusFilter = 'all' | 'active' | 'done';
@@ -516,6 +517,21 @@ function ProviderOrdersPage({ segmentBar }: { segmentBar: React.ReactNode }) {
     if (advancingId) return;
     const label = providerAdvanceLabelOf(order);
     if (!label) return;
+    try {
+      const copy = getProviderAdvanceConfirmCopy(label);
+      if (copy) {
+        const res = await Taro.showModal({
+          title: copy.title,
+          content: copy.content,
+          cancelText: '再想想',
+          confirmText: copy.confirmText,
+        });
+        if (!res.confirm) return;
+      }
+    } catch (error: any) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '操作确认失败'), icon: 'none' });
+      return;
+    }
     setAdvancingId(order.id);
     try {
       if (label === '开始准备') await orderV2Service.startPreparing(order.id);

@@ -1,6 +1,7 @@
 import { apiV2 } from './api';
 import {
   V2DispatchActionResult,
+  V2DispatchState,
   V2EstimateOrderPayload,
   V2OrderMonitor,
   V2OrderDetail,
@@ -47,6 +48,9 @@ export const orderV2Service = {
 
   get: (orderId: number) =>
     apiV2.get<V2OrderDetail>(`/orders/${orderId}`),
+
+  getDispatchState: (orderId: number) =>
+    apiV2.get<V2DispatchState>(`/orders/${orderId}/dispatch-state`),
 
   getTimeline: (orderId: number) =>
     apiV2.get<V2OrderTimelineResponse>(`/orders/${orderId}/timeline`),

@@ -56,6 +56,24 @@ func (r *BroadcastAssignmentRepo) ListAttempts(broadcastID int64) ([]model.Broad
 	return items, err
 }
 
+func (r *BroadcastAssignmentRepo) CountDistinctProviders(orderID, broadcastID int64) (int64, error) {
+	if r == nil || r.db == nil {
+		return 0, nil
+	}
+	query := r.db.Model(&model.BroadcastAssignment{}).
+		Distinct("provider_user_id").
+		Where("provider_user_id > 0")
+	if orderID > 0 {
+		query = query.Where("order_id = ?", orderID)
+	}
+	if broadcastID > 0 {
+		query = query.Where("broadcast_id = ?", broadcastID)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count, err
+}
+
 func (r *BroadcastAssignmentRepo) ListPendingByProvider(providerUserID int64, now time.Time, limit int) ([]model.BroadcastAssignment, error) {
 	var items []model.BroadcastAssignment
 	limit = limits.NormalizeLimit(limit, 20, 100)

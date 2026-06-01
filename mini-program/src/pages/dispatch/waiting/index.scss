@@ -1,0 +1,232 @@
+.dispatch-waiting-page {
+  min-height: 100vh;
+  background: #f6f8fb;
+}
+
+.dispatch-waiting-content {
+  min-height: 100vh;
+  padding: 40rpx 28rpx 56rpx;
+  box-sizing: border-box;
+}
+
+.dispatch-waiting-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 44rpx 24rpx 28rpx;
+}
+
+.dispatch-spinner {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  border: 8rpx solid rgba(43, 114, 229, 0.14);
+  border-top-color: #2b72e5;
+  animation: dispatch-spin 0.9s linear infinite;
+  margin-bottom: 28rpx;
+}
+
+@keyframes dispatch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dispatch-title {
+  display: block;
+  font-size: 40rpx;
+  line-height: 52rpx;
+  font-weight: 700;
+  color: #152238;
+  text-align: center;
+}
+
+.dispatch-subtitle {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: #718096;
+  text-align: center;
+}
+
+.dispatch-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.dispatch-stat {
+  min-height: 132rpx;
+  padding: 22rpx 12rpx;
+  border-radius: 8rpx;
+  background: #ffffff;
+  box-shadow: 0 12rpx 28rpx rgba(28, 43, 72, 0.06);
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.dispatch-stat-value {
+  display: block;
+  min-height: 44rpx;
+  font-size: 30rpx;
+  line-height: 44rpx;
+  font-weight: 700;
+  color: #172033;
+}
+
+.dispatch-stat-label {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  color: #7b8798;
+}
+
+.dispatch-panel {
+  margin-top: 24rpx;
+  padding: 28rpx;
+  border-radius: 8rpx;
+  background: #ffffff;
+  box-shadow: 0 14rpx 32rpx rgba(28, 43, 72, 0.07);
+  box-sizing: border-box;
+}
+
+.dispatch-panel-warning {
+  border: 2rpx solid #f0c36a;
+  background: #fffaf0;
+}
+
+.dispatch-panel-danger {
+  border: 2rpx solid #ee9b98;
+  background: #fff6f5;
+}
+
+.dispatch-panel-success {
+  border: 2rpx solid #7bcfa3;
+  background: #f1fff6;
+}
+
+.dispatch-panel-title {
+  display: block;
+  font-size: 30rpx;
+  line-height: 42rpx;
+  font-weight: 700;
+  color: #172033;
+}
+
+.dispatch-panel-copy {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 38rpx;
+  color: #4d5b6c;
+}
+
+.dispatch-progress-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+  min-height: 94rpx;
+}
+
+.dispatch-progress-line + .dispatch-progress-line {
+  margin-top: 18rpx;
+}
+
+.dispatch-progress-dot {
+  flex: 0 0 auto;
+  width: 24rpx;
+  height: 24rpx;
+  margin-top: 8rpx;
+  border-radius: 50%;
+  background: #d7dde8;
+  box-shadow: 0 0 0 8rpx rgba(215, 221, 232, 0.34);
+}
+
+.dispatch-progress-dot.is-active {
+  background: #2b72e5;
+  box-shadow: 0 0 0 8rpx rgba(43, 114, 229, 0.14);
+}
+
+.dispatch-progress-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.dispatch-progress-title {
+  display: block;
+  font-size: 28rpx;
+  line-height: 38rpx;
+  font-weight: 600;
+  color: #172033;
+}
+
+.dispatch-progress-desc {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: #6b7788;
+}
+
+.dispatch-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.dispatch-button {
+  min-height: 80rpx;
+  padding: 0 20rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  line-height: 34rpx;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.dispatch-button-primary {
+  background: #2b72e5;
+  color: #ffffff;
+}
+
+.dispatch-button-secondary {
+  background: #23a06b;
+  color: #ffffff;
+}
+
+.dispatch-button-ghost {
+  color: #2b72e5;
+  border: 2rpx solid rgba(43, 114, 229, 0.28);
+  background: #ffffff;
+}
+
+.dispatch-button-wide {
+  margin-top: 18rpx;
+}
+
+.dispatch-button.is-disabled {
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.dispatch-bottom-actions {
+  margin-top: 28rpx;
+}
+
+.dispatch-link {
+  min-height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18rpx;
+  color: #5b6676;
+  font-size: 24rpx;
+  line-height: 32rpx;
+}

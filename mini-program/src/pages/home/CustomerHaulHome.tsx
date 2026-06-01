@@ -16,13 +16,13 @@ import {
   V2ServiceClass,
 } from '../../types';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
+import { QUICK_ORDER_PREFILL_STORAGE_KEY } from '../../utils/orderPrefill';
 import './CustomerHaulHome.scss';
 
 type AddressTarget = 'pickup' | 'dropoff';
 type TimeMode = 'now' | 'reservation';
 
 const ADDRESS_TARGET_STORAGE_KEY = 'customer_home_address_target';
-const QUICK_ORDER_PREFILL_STORAGE_KEY = 'customer_home_quick_order_prefill_v1';
 const CITY_STORAGE_KEY = 'customer_home_city';
 const DEFAULT_CITY_OPTIONS = ['深圳', '广州', '佛山', '东莞', '惠州', '珠海'];
 const CITY_MAP_PICKER_OPTION = '从地图选择城市';
@@ -525,7 +525,11 @@ export default function CustomerHaulHome() {
         throw new Error('订单创建成功但缺少订单号');
       }
       setClientRequestId(generateClientRequestId());
-      Taro.redirectTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
+      Taro.redirectTo({
+        url: timeMode === 'reservation'
+          ? `/pages/orders/live/index?orderId=${orderId}`
+          : `/pages/dispatch/waiting/index?orderId=${orderId}`,
+      });
     } catch (error: any) {
       Taro.showToast({ title: friendlyErrorMessage(error, '下单失败'), icon: 'none' });
     } finally {

@@ -278,6 +278,95 @@ func TestRedispatchAPIValidationAndState(t *testing.T) {
 	})
 }
 
+func TestGetDispatchStateAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler, db, orderRepo := newDispatchStateAPIHandler(t)
+	now := time.Now()
+	createdAt := now.Add(-45 * time.Second)
+	expiresAt := now.Add(75 * time.Second)
+	order := seedRedispatchAPIOrder(t, orderRepo, "WRJ-API-DISPATCH-STATE", "pending_dispatch", 101, 100000)
+	if err := orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"created_at": createdAt,
+		"updated_at": createdAt,
+	}); err != nil {
+		t.Fatalf("set order time: %v", err)
+	}
+	broadcast := model.OrderBroadcast{
+		OrderID:          order.ID,
+		OriginLatitude:   22.5431,
+		OriginLongitude:  114.0579,
+		ServiceClassCode: "light_heavy",
+		WeightKG:         80,
+		Status:           "open",
+		ExpiresAt:        expiresAt,
+		CreatedAt:        createdAt,
+	}
+	if err := db.Create(&broadcast).Error; err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+	heartbeat := now.Add(-10 * time.Second)
+	if err := db.Create(&model.ProviderPresence{
+		UserID:                 201,
+		Online:                 true,
+		LastLatitude:           22.5432,
+		LastLongitude:          114.0580,
+		LastHeartbeatAt:        &heartbeat,
+		AcceptedServiceClasses: model.JSON(`["light_heavy"]`),
+		MaxRadiusKM:            20,
+		Status:                 "active",
+	}).Error; err != nil {
+		t.Fatalf("create matching presence: %v", err)
+	}
+	if err := db.Create(&model.ProviderPresence{
+		UserID:                 202,
+		Online:                 true,
+		LastLatitude:           22.5433,
+		LastLongitude:          114.0581,
+		LastHeartbeatAt:        &heartbeat,
+		AcceptedServiceClasses: model.JSON(`["super_heavy"]`),
+		MaxRadiusKM:            20,
+		Status:                 "active",
+	}).Error; err != nil {
+		t.Fatalf("create nonmatching presence: %v", err)
+	}
+	for idx, providerID := range []int64{301, 302} {
+		if err := db.Create(&model.BroadcastAssignment{
+			BroadcastID:      broadcast.ID,
+			OrderID:          order.ID,
+			ProviderUserID:   providerID,
+			AttemptSeq:       idx + 1,
+			Status:           "expired",
+			AcceptDeadlineAt: now.Add(-time.Minute),
+			CreatedAt:        createdAt.Add(time.Duration(idx) * time.Second),
+		}).Error; err != nil {
+			t.Fatalf("create assignment %d: %v", providerID, err)
+		}
+	}
+
+	status, payload := callDispatchStateAPI(handler, order.ID, 101)
+	if status != http.StatusOK || payload["code"] != "OK" {
+		t.Fatalf("expected success, got status=%d payload=%#v", status, payload)
+	}
+	data, ok := payload["data"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected data map, got %#v", payload["data"])
+	}
+	if got := int(data["online_providers_count"].(float64)); got != 1 {
+		t.Fatalf("expected one matching online provider, got %d", got)
+	}
+	if got := int(data["tried_providers_count"].(float64)); got != 2 {
+		t.Fatalf("expected two tried providers, got %d", got)
+	}
+	elapsed := int(data["elapsed_seconds"].(float64))
+	if elapsed < 40 || elapsed > 60 {
+		t.Fatalf("expected elapsed around 45s, got %d", elapsed)
+	}
+	remaining := int(data["estimated_wait_seconds"].(float64))
+	if remaining < 60 || remaining > 90 {
+		t.Fatalf("expected remaining around 75s, got %d", remaining)
+	}
+}
+
 func newRedispatchAPIHandler(t *testing.T) (*Handler, *repository.OrderRepo) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))), &gorm.Config{})
@@ -322,6 +411,52 @@ func newRedispatchAPIHandler(t *testing.T) (*Handler, *repository.OrderRepo) {
 		zap.NewNop(),
 	)
 	return NewHandler(orderService, nil, nil, nil, nil, broadcastService), orderRepo
+}
+
+func newDispatchStateAPIHandler(t *testing.T) (*Handler, *gorm.DB, *repository.OrderRepo) {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err := db.AutoMigrate(
+		&model.ProviderPresence{},
+		&model.OrderBroadcast{},
+		&model.OrderBroadcastExclusion{},
+		&model.BroadcastAssignment{},
+		&model.Order{},
+		&model.OrderTimeline{},
+		&model.OrderSnapshot{},
+		&model.Review{},
+		&model.SystemConfig{},
+	); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	orderRepo := repository.NewOrderRepo(db)
+	artifactRepo := repository.NewOrderArtifactRepo(db)
+	broadcastService := service.NewBroadcastService(
+		repository.NewProviderPresenceRepo(db),
+		repository.NewOrderBroadcastRepo(db),
+		repository.NewBroadcastAssignmentRepo(db),
+		orderRepo,
+		artifactRepo,
+		nil,
+		zap.NewNop(),
+	)
+	orderService := service.NewOrderService(
+		orderRepo,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		artifactRepo,
+		nil,
+		zap.NewNop(),
+	)
+	return NewHandler(orderService, nil, nil, nil, nil, broadcastService), db, orderRepo
 }
 
 func seedRedispatchAPIOrder(t *testing.T, orderRepo *repository.OrderRepo, orderNo, status string, clientUserID int64, amount int64) *model.Order {
@@ -373,6 +508,20 @@ func callRedispatchAPI(handler *Handler, orderID, userID int64, body string) (in
 	c.Request = httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/v2/customer/orders/%d/redispatch", orderID), strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	handler.Redispatch(c)
+
+	var payload map[string]interface{}
+	_ = json.Unmarshal(w.Body.Bytes(), &payload)
+	return w.Code, payload
+}
+
+func callDispatchStateAPI(handler *Handler, orderID, userID int64) (int, map[string]interface{}) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_id", userID)
+	c.Set("user_type", "client")
+	c.Params = gin.Params{{Key: "order_id", Value: fmt.Sprintf("%d", orderID)}}
+	c.Request = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v2/orders/%d/dispatch-state", orderID), nil)
+	handler.GetDispatchState(c)
 
 	var payload map[string]interface{}
 	_ = json.Unmarshal(w.Body.Bytes(), &payload)

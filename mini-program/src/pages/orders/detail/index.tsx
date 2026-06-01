@@ -6,6 +6,8 @@ import { orderV2Service, confirmReceipt } from '../../../services/orderV2';
 import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
 import { store } from '../../../store/store';
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
+import { writeQuickOrderPrefillFromOrder } from '../../../utils/orderPrefill';
+import { getProviderAdvanceConfirmCopy } from '../../../utils/providerAdvance';
 import './index.scss';
 
 import iconBack from '../../../assets/haul/order-progress/icon_nav_back.png';
@@ -517,31 +519,13 @@ export default function OrderProgressPage() {
       Taro.showToast({ title: '订单数据未加载', icon: 'none' });
       return;
     }
-    const weight = Number(detail.cargo_weight_kg || (detail as any)?.cargo_weight || 0);
-    const scheduledStartAt = String((detail as any)?.start_time || (detail as any)?.scheduled_start_at || '');
-    const pickupLat = Number(detail.service_latitude || 0);
-    const pickupLng = Number(detail.service_longitude || 0);
-    const pickupText = String(detail.service_address || '').trim();
-    const dropoffLat = Number(detail.dest_latitude || 0);
-    const dropoffLng = Number(detail.dest_longitude || 0);
-    const dropoffText = String(detail.dest_address || '').trim();
-    const hasPickup = pickupLat !== 0 && pickupLng !== 0 && pickupText.length > 0;
-    const hasDropoff = dropoffLat !== 0 && dropoffLng !== 0 && dropoffText.length > 0;
     try {
-      Taro.setStorageSync('customer_home_quick_order_prefill_v1', {
-        pickupAddress: hasPickup
-          ? { address: pickupText, name: pickupText, latitude: pickupLat, longitude: pickupLng }
-          : undefined,
-        deliveryAddress: hasDropoff
-          ? { address: dropoffText, name: dropoffText, latitude: dropoffLat, longitude: dropoffLng }
-          : undefined,
-        cargoWeight: weight > 0 ? String(weight) : '',
-        scheduledStartAt: scheduledStartAt || undefined,
-        timeOption: scheduledStartAt ? '预约' : '尽快',
-      });
-      Taro.setStorageSync('customer_order_redispatch_hint_v1', hasPickup && hasDropoff ? 'full' : 'partial');
-    } catch {
-      // 存储失败也不挡跳转，用户重新填即可
+      const completeness = writeQuickOrderPrefillFromOrder(detail);
+      if (completeness === 'partial') {
+        Taro.showToast({ title: '已带入部分订单信息', icon: 'none' });
+      }
+    } catch (error: any) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '预填失败，请重新填写'), icon: 'none' });
     }
     Taro.navigateTo({ url: '/pages/publish/quick-order/index?fromOrder=1' });
   };
@@ -612,6 +596,21 @@ export default function OrderProgressPage() {
 
   const advanceProviderOrder = async () => {
     if (!providerAdvanceAction || !orderId || actionLoading || providerAdvanceLoading) return;
+    try {
+      const copy = getProviderAdvanceConfirmCopy(providerAdvanceAction.label);
+      if (copy) {
+        const res = await Taro.showModal({
+          title: copy.title,
+          content: copy.content,
+          cancelText: '再想想',
+          confirmText: copy.confirmText,
+        });
+        if (!res.confirm) return;
+      }
+    } catch (error: any) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '操作确认失败'), icon: 'none' });
+      return;
+    }
     setProviderAdvanceLoading(true);
     try {
       await providerAdvanceAction.run();

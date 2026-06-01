@@ -316,6 +316,34 @@ func (h *Handler) Get(c *gin.Context) {
 	response.V2Success(c, detail)
 }
 
+func (h *Handler) GetDispatchState(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	if h.broadcastService == nil {
+		response.V2InternalError(c, "匹配状态服务未初始化")
+		return
+	}
+
+	orderID, ok := parseOrderID(c)
+	if !ok {
+		return
+	}
+	order, err := h.orderService.GetAuthorizedOrder(orderID, userID, "client")
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	state, err := h.broadcastService.GetDispatchState(order, time.Now())
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
+	response.V2Success(c, state)
+}
+
 func (h *Handler) ProviderConfirm(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

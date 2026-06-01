@@ -389,6 +389,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			orderGroup.POST("/instant", h.Order.CreateInstant)
 			orderGroup.POST("/reservation", h.Order.CreateReservation)
 			orderGroup.GET("/:order_id", h.Order.Get)
+			orderGroup.GET("/:order_id/dispatch-state", h.Order.GetDispatchState)
 			orderGroup.POST("/:order_id/provider-confirm", h.Order.ProviderConfirm)
 			orderGroup.POST("/:order_id/provider-reject", h.Order.ProviderReject)
 			orderGroup.POST("/:order_id/pay", h.Payment.CreateOrderPayment)

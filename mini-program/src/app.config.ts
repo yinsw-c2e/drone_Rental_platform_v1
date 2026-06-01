@@ -21,6 +21,7 @@ export default defineAppConfig({
     'pages/orders/anomaly-list/index',
     'pages/orders/contract/index',
     'pages/orders/live/index',
+    'pages/dispatch/waiting/index',
     'pages/dispatch/list/index','pages/dispatch/detail/index','pages/dispatch/create/index',
     'pages/payment/index','pages/after-sale/index','pages/review/index',
     'pages/publish/demand/index','pages/publish/supply/index','pages/publish/cargo/index',

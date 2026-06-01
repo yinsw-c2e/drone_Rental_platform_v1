@@ -1323,6 +1323,13 @@ export interface V2SiteSafetyCheckSummary {
   updated_at?: string;
 }
 
+export interface V2DispatchState {
+  online_providers_count: number;
+  elapsed_seconds: number;
+  estimated_wait_seconds: number;
+  tried_providers_count: number;
+}
+
 export interface V2OrderDetail extends V2OrderSummary {
   source_info?: {
     order_source?: string;
