@@ -436,11 +436,17 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-### Phase 3 — 通知 / 客服 / 触达
+### ✓ Phase 3 — 通知 / 客服 / 触达（已完成，commit `67f0c85`）
 
 > 目标：用户不用反复回查、平台能主动找上门。
 
-#### 3.1 TabBar 红点
+完成记录：
+- TabBar 角标已从消息未读扩展到客户订单 tab / 服务商接单 tab：客户侧统计未结束需求 + 待操作订单，服务商侧统计可报价需求；消息 tab 保留未读通知 + 会话未读。
+- 微信订阅消息事件白名单、env 模板装载、`config.example.yaml` 模板示例和小程序模板组已覆盖首条报价、选定、取消、运输中、送达、完成、自动匹配耗尽等关键事件；需求发布链路会在点击发布时申请客户侧模板授权。
+- 新增独立平台客服页，并从客户首页、订单详情联系弹窗、我的页三处可达；客服微信支持复制并保留消息中心入口。
+- 需求详情在客户自己的可接单需求且 `quote_count=0` 时显示分享按钮，分享标题为「{客户昵称}发布了一个吊运任务」，已结束/草稿需求从系统分享菜单落回首页。
+
+#### ✓ 3.1 TabBar 红点
 
 **用户痛点**：客户的 demand 收到首条报价、服务商收到新派单，UI 上没有任何提示，要靠用户主动进 tab 查。
 
@@ -475,7 +481,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 3.2 关键事件订阅消息模板
+#### ✓ 3.2 关键事件订阅消息模板
 
 **用户痛点**：核心状态变化（首条报价、被选定、派单成功 / 失败、订单送达）应该主动 push 给用户，目前只有部分模板。
 
@@ -502,7 +508,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 3.3 客服入口独立
+#### ✓ 3.3 客服入口独立
 
 **用户痛点**：客户首页右上角"客服"按钮跳消息 tab，但消息 tab 没有显式的客服会话入口，新用户找不到。
 
@@ -531,7 +537,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 3.4 demand 没人报时分享按钮
+#### ✓ 3.4 demand 没人报时分享按钮
 
 **用户痛点**：客户发了 demand 没人报，想分享给认识的服务商但没入口。
 
@@ -651,7 +657,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 | Phase 1 - 1b（立即单等待 + 履约 helper） | 1.4 + 1.6 | 2.5 天 |
 | Phase 1 - 1c（服务商首启 + 错误页） | 1.5 + 1.7p | 2 天 |
 | Phase 2 - 决策辅助 | 2.1 - 2.6 | 4 天 |
-| Phase 3 - 通知 / 客服 | 3.1 - 3.4 | 3 天 + 微信审核缓冲 |
+| Phase 3 - 通知 / 客服（已完成） | 3.1 - 3.4 | 3 天 + 微信审核缓冲 |
 | Phase 4 - 文案 / 命名 / 视觉收尾 | 4.1 - 4.5 | 3 天 |
 | **合计** | | **约 14-17 工作日** |
 
@@ -714,6 +720,8 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 14. Settings 的“重看新手引导”会清除 `provider_workbench_onboarding_seen_v1` 并切到服务商首页；审核失败可执行卡片复用 [mini-program/src/utils/providerReview.ts](mini-program/src/utils/providerReview.ts)
 15. Phase 2 数据契约已确认：`service_classes` API 直接序列化 [backend/internal/model/service_class.go](backend/internal/model/service_class.go) 的价目字段；预估价接口返回 `base_price_cents / distance_fee_cents / duration_fee_cents / surcharges / min_charge_adjustment_cents / total_estimated_cents`；报价列表由 [backend/internal/api/v2/demand/handler.go](backend/internal/api/v2/demand/handler.go) 的 `buildQuoteSummaryWithProviderStats` 补充服务商决策统计。
 16. Phase 2 验证通过：`cd mini-program && npx tsc --noEmit`、`cd mini-program && npm run build:weapp:e2e`、`cd backend && go build ./...`、`cd backend && go test ./internal/api/v2/demand -count=1`、`cd backend && go test ./internal/api/v2/order/...`、`cd backend && go test ./internal/service -run TestGetRoleSummaryIncludesProviderReviewReasons -count=1`。`go test ./...` 仍受第 11 条的 `finance_anomaly_records` 测试表缺失影响。
+17. Phase 3 代码提交 `67f0c85` 已覆盖：TabBar 角标刷新 [mini-program/src/utils/tabBar.ts](mini-program/src/utils/tabBar.ts)、平台客服页 [mini-program/src/pages/customer-service/index.tsx](mini-program/src/pages/customer-service/index.tsx)、需求分享按钮 [mini-program/src/pages/demand/detail/index.tsx](mini-program/src/pages/demand/detail/index.tsx)、订阅模板常量 [mini-program/src/constants/subscribeTemplates.ts](mini-program/src/constants/subscribeTemplates.ts)、微信订阅事件白名单 [backend/internal/service/wechat_subscribe_service.go](backend/internal/service/wechat_subscribe_service.go) 和 push allowlist [backend/internal/service/event_service.go](backend/internal/service/event_service.go)。
+18. Phase 3 验证通过：`cd mini-program && npx tsc --noEmit`、`cd mini-program && npm run build:weapp:e2e`、dist 检查确认 `mini-program/dist/common.js` 仍为 `https://dronerentalplat.cpolar.top/api/v2` 且新增客服/分享/订阅模板文案已入产物、`cd backend && go build ./...`、`cd backend && go test ./internal/service -run 'TestShouldSendPushEvent|TestEventService_WeChatSubscribe_Integration|TestWeChatSubscribeService_GrantAcceptedTemplates_PersistsAndDedupes|TestBuildWeChatSubscribeData' -count=1`。`go test ./...` 仍受第 11 条的 `finance_anomaly_records` 测试表缺失影响。
 
 ---
 
