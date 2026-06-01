@@ -565,11 +565,29 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-### Phase 4 — 文案 / 命名 / 视觉收尾
+### ✓ Phase 4 — 文案 / 命名 / 视觉收尾（已完成，commit `a4b7fe6`）
 
 > 目标：消除所有"系统术语"，统一品牌语言。
 
-#### 4.1 全应用术语扫描 + 替换
+**完成记录**
+
+- 用户可见文案已清理：小程序页面、后端错误消息、通知内容中的"广播 / 自动指派 / 复杂工况 / 暂无..."等系统视角表达已替换为面向客户或服务商可理解的下一步。
+- 组件收口：`StatusBadge` 补齐 `info / success / warning / muted / error` 语义 tone；`StepBar` 支持 `<StepBar steps={[...]} currentIndex={n} />` 与浅色主题，需求详情页已改用公共组件。
+- 角色切换：个人中心与设置页接入 `RoleModeCard`，兼具客户/服务商身份时可切换，单身份用户展示开通另一身份入口。
+
+**替换前 → 替换后对照**
+
+| 替换前 | 替换后 |
+|---|---|
+| 广播单 / 广播池 / 重发广播 | 派单记录 / 派单信息 / 重新匹配 |
+| 抢单广播依赖未初始化 | 抢单服务暂不可用 |
+| 收到自动指派订单 | 收到派单订单 |
+| 自动指派已超时 | 接单确认已超时 |
+| 复杂工况 / 复杂或不急 | 需要先看现场 / 路线或时间还需要商量 |
+| 暂无系统通知 / 暂无会话消息 | 还没有系统通知，新报价和订单进度会在这里提醒 / 还没有会话消息，可从订单详情联系对方或找平台客服 |
+| 暂无报价 | 还没有服务商报价，你可以分享给认识的服务商 |
+
+#### ✓ 4.1 全应用术语扫描 + 替换
 
 **范围**：grep 全应用，按 § 1 业务术语表替换
 
@@ -585,7 +603,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 4.2 空状态 / toast 全部加可执行下一步
+#### ✓ 4.2 空状态 / toast 全部加可执行下一步
 
 **用户痛点**：所有空状态显示"暂无 XX"，所有 catch 显示"操作失败"，没告诉用户怎么办。
 
@@ -603,7 +621,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 4.3 统一进度条 / 状态徽章视觉规范
+#### ✓ 4.3 统一进度条 / 状态徽章视觉规范
 
 **范围**：
 - 抽 `<StepBar steps={[...]} currentIndex={n} />` 公共组件
@@ -619,7 +637,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 4.4 角色切换 UI
+#### ✓ 4.4 角色切换 UI
 
 **用户痛点**：老用户先注册成服务商再回头想下单，找不到入口。
 
@@ -636,7 +654,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 4.5 替换所有"系统视角"文案
+#### ✓ 4.5 替换所有"系统视角"文案
 
 **目标**：和 4.1 配合。4.1 是关键字 grep，4.5 是更广泛的"系统化思维"扫描。
 
@@ -658,7 +676,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 | Phase 1 - 1c（服务商首启 + 错误页） | 1.5 + 1.7p | 2 天 |
 | Phase 2 - 决策辅助 | 2.1 - 2.6 | 4 天 |
 | Phase 3 - 通知 / 客服（已完成） | 3.1 - 3.4 | 3 天 + 微信审核缓冲 |
-| Phase 4 - 文案 / 命名 / 视觉收尾 | 4.1 - 4.5 | 3 天 |
+| Phase 4 - 文案 / 命名 / 视觉收尾（已完成） | 4.1 - 4.5 | 3 天 |
 | **合计** | | **约 14-17 工作日** |
 
 ---
@@ -722,6 +740,8 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 16. Phase 2 验证通过：`cd mini-program && npx tsc --noEmit`、`cd mini-program && npm run build:weapp:e2e`、`cd backend && go build ./...`、`cd backend && go test ./internal/api/v2/demand -count=1`、`cd backend && go test ./internal/api/v2/order/...`、`cd backend && go test ./internal/service -run TestGetRoleSummaryIncludesProviderReviewReasons -count=1`。`go test ./...` 仍受第 11 条的 `finance_anomaly_records` 测试表缺失影响。
 17. Phase 3 代码提交 `67f0c85` 已覆盖：TabBar 角标刷新 [mini-program/src/utils/tabBar.ts](mini-program/src/utils/tabBar.ts)、平台客服页 [mini-program/src/pages/customer-service/index.tsx](mini-program/src/pages/customer-service/index.tsx)、需求分享按钮 [mini-program/src/pages/demand/detail/index.tsx](mini-program/src/pages/demand/detail/index.tsx)、订阅模板常量 [mini-program/src/constants/subscribeTemplates.ts](mini-program/src/constants/subscribeTemplates.ts)、微信订阅事件白名单 [backend/internal/service/wechat_subscribe_service.go](backend/internal/service/wechat_subscribe_service.go) 和 push allowlist [backend/internal/service/event_service.go](backend/internal/service/event_service.go)。
 18. Phase 3 验证通过：`cd mini-program && npx tsc --noEmit`、`cd mini-program && npm run build:weapp:e2e`、dist 检查确认 `mini-program/dist/common.js` 仍为 `https://dronerentalplat.cpolar.top/api/v2` 且新增客服/分享/订阅模板文案已入产物、`cd backend && go build ./...`、`cd backend && go test ./internal/service -run 'TestShouldSendPushEvent|TestEventService_WeChatSubscribe_Integration|TestWeChatSubscribeService_GrantAcceptedTemplates_PersistsAndDedupes|TestBuildWeChatSubscribeData' -count=1`。`go test ./...` 仍受第 11 条的 `finance_anomaly_records` 测试表缺失影响。
+19. Phase 4 代码提交 `a4b7fe6` 已覆盖：角色切换卡片 [mini-program/src/components/business/RoleModeCard.tsx](mini-program/src/components/business/RoleModeCard.tsx)、个人中心/设置页入口 [mini-program/src/pages/profile/index.tsx](mini-program/src/pages/profile/index.tsx) / [mini-program/src/pages/settings/index.tsx](mini-program/src/pages/settings/index.tsx)、公共状态徽章与进度条 [mini-program/src/components/business/StatusBadge.tsx](mini-program/src/components/business/StatusBadge.tsx) / [mini-program/src/components/business/StepBar.tsx](mini-program/src/components/business/StepBar.tsx)、需求详情页公共组件替换 [mini-program/src/pages/demand/detail/index.tsx](mini-program/src/pages/demand/detail/index.tsx)、后端用户可见派单错误文案 [backend/internal/service/broadcast_service.go](backend/internal/service/broadcast_service.go)。
+20. Phase 4 验证通过：`cd mini-program && npx tsc --noEmit`、`cd mini-program && npm run build:weapp:e2e`、dist 检查确认 `mini-program/dist/common.js` 仍为 `https://dronerentalplat.cpolar.top/api/v2` 且 `RoleModeCard / StepBar / 消息空状态 / 需求分享报价文案` 已入产物、`cd backend && go build ./...`、`cd backend && go test ./internal/service -run 'TestBroadcast|TestRedispatch|TestIncreaseOrderPrice|TestShouldSendPushEvent|TestEventService_WeChatSubscribe_Integration' -count=1`、`cd backend && go test ./internal/api/v2/order -run 'TestRedispatch|TestDispatchState' -count=1`、`git diff --check`。术语扫描中仅剩后端迁移注释和 `dispatch_failed: '暂无服务商'` 状态标签；`go test ./...` 仍受第 11 条的 `finance_anomaly_records` 测试表缺失影响。
 
 ---
 
