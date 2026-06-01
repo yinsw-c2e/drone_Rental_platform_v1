@@ -295,7 +295,7 @@ func (s *UserService) GetRoleSummary(userID int64) (*RoleSummary, error) {
 	summary.Provider = buildProviderRoleSummary(assetStatus, executorStatus, executorOnline)
 	summary.CanPublishSupply = summary.Provider.CanQuote
 	summary.CanAcceptDispatch = summary.Provider.CanAcceptDispatch
-	summary.CanSelfExecute = summary.CanPublishSupply && summary.CanAcceptDispatch
+	summary.CanSelfExecute = summary.Provider.CanSelfExecute
 	return summary, nil
 }
 
@@ -367,35 +367,39 @@ func buildProviderRoleSummary(assetStatus, executorStatus string, executorOnline
 	assetStatus = normalizeProviderCapabilityStatus(assetStatus)
 	executorStatus = normalizeProviderCapabilityStatus(executorStatus)
 	status := combinedProviderStatus(assetStatus, executorStatus)
-	canQuote := assetStatus == providerStatusApproved
+	assetApproved := assetStatus == providerStatusApproved
 	executorApproved := executorStatus == providerStatusApproved
-	canAcceptDispatch := executorApproved && executorOnline
+	qualificationApproved := assetApproved && executorApproved
+	canAcceptDispatch := qualificationApproved && executorOnline
 
 	return ProviderRoleSummary{
 		Status:             status,
 		AssetStatus:        assetStatus,
 		ExecutorStatus:     executorStatus,
-		CanUseWorkbench:    status == providerStatusApproved,
-		CanQuote:           canQuote,
-		CanArrangeDispatch: canQuote,
+		CanUseWorkbench:    qualificationApproved,
+		CanQuote:           qualificationApproved,
+		CanArrangeDispatch: qualificationApproved,
 		CanAcceptDispatch:  canAcceptDispatch,
-		CanSelfExecute:     canQuote && executorApproved,
+		CanSelfExecute:     qualificationApproved,
 		NextAction:         providerNextActionForStatus(status),
 	}
 }
 
 func combinedProviderStatus(assetStatus, executorStatus string) string {
-	if assetStatus == providerStatusApproved || executorStatus == providerStatusApproved {
-		return providerStatusApproved
-	}
 	if assetStatus == providerStatusSuspended || executorStatus == providerStatusSuspended {
 		return providerStatusSuspended
+	}
+	if assetStatus == providerStatusRejected || executorStatus == providerStatusRejected {
+		return providerStatusRejected
+	}
+	if assetStatus == providerStatusApproved && executorStatus == providerStatusApproved {
+		return providerStatusApproved
 	}
 	if assetStatus == providerStatusPendingReview || executorStatus == providerStatusPendingReview {
 		return providerStatusPendingReview
 	}
-	if assetStatus == providerStatusRejected || executorStatus == providerStatusRejected {
-		return providerStatusRejected
+	if assetStatus == providerStatusApproved || executorStatus == providerStatusApproved {
+		return providerStatusPendingReview
 	}
 	return providerStatusNone
 }

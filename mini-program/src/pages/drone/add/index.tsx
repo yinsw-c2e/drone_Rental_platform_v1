@@ -76,7 +76,7 @@ export default function AddDronePage() {
     }
     setLoading(true);
     try {
-      await droneService.create({
+      const created = await droneService.create({
         brand: form.brand,
         model: form.model,
         serial_number: form.serial_number,
@@ -88,8 +88,13 @@ export default function AddDronePage() {
         description: form.description,
         images,
       });
-      Taro.showToast({ title: '添加成功', icon: 'success' });
-      setTimeout(() => Taro.navigateBack(), 1500);
+      const createdDrone = (created as any)?.data || created;
+      const droneId = Number(createdDrone?.id || (created as any)?.id || 0);
+      if (!droneId) {
+        throw new Error('未获取到无人机ID');
+      }
+      Taro.showToast({ title: '已保存，正在为你打开资质认证页', icon: 'success' });
+      setTimeout(() => Taro.redirectTo({ url: `/pages/drone/certification/index?id=${droneId}` }), 1500);
     } catch (e: any) {
       Taro.showToast({ title: friendlyErrorMessage(e, '添加失败'), icon: 'none' });
     } finally {
@@ -165,9 +170,14 @@ export default function AddDronePage() {
         <Input className="form-textarea" placeholder="填写设备状况、配件、特殊说明等" value={form.description} onInput={e => setForm({ ...form, description: e.detail.value })} />
       </View>
 
+      <View className="add-drone-cert-hint">
+        <Text className="add-drone-cert-hint-title">完成基础信息后还需补充资质</Text>
+        <Text className="add-drone-cert-hint-text">UOM 实名、无人机保险、适航证明 三项资质需在设备添加后于"资质认证"页面提交，三项资质审核通过后此设备方可参与接单。</Text>
+      </View>
+
       <View className="submit-wrap">
         <View className={`btn-primary ${loading ? 'disabled' : ''}`} onClick={handleSubmit}>
-          <Text className="btn-text">{loading ? '提交中...' : '添加无人机'}</Text>
+          <Text className="btn-text">{loading ? '提交中...' : '保存并去填资质'}</Text>
         </View>
       </View>
     </ScrollView>

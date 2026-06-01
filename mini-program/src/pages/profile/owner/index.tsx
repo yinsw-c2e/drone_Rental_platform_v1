@@ -91,28 +91,30 @@ export default function OwnerProfilePage() {
   const capabilityItems = useMemo(
     () => [
       {
-        label: '可发布供给',
-        enabled: effectiveRoleSummary.can_publish_supply,
-        desc: effectiveRoleSummary.can_publish_supply
-          ? '无人机与关键资质已满足主市场准入。'
-          : '先完善无人机与关键资质，才能把供给上架到主市场。',
+        label: '接单资质',
+        enabled: providerCapabilities.canUseWorkbench,
+        desc: providerCapabilities.canUseWorkbench
+          ? '设备资质和履约资质均已通过，可正式接单。'
+          : '需设备资质和履约资质全部通过后，才能正式接单。',
       },
       {
-        label: '服务商履约',
-        enabled: effectiveRoleSummary.can_self_execute,
-        desc: effectiveRoleSummary.can_self_execute
-          ? '你已具备设备服务和履约推进能力，可由服务商主体直接履约。'
-          : '请继续完善设备资质和履约资质，审核通过后再推进履约。',
+        label: '履约推进',
+        enabled: providerCapabilities.canSelfExecute,
+        desc: providerCapabilities.canSelfExecute
+          ? '你已具备服务商主体履约推进能力。'
+          : '接单资质通过后可推进订单履约。',
       },
     ],
-    [effectiveRoleSummary.can_publish_supply, effectiveRoleSummary.can_self_execute],
+    [providerCapabilities.canSelfExecute, providerCapabilities.canUseWorkbench],
   );
 
   const onboardingStatus = useMemo(() => {
-    if (providerCapabilities.nextAction === 'wait_review') {
+    const hasReviewingQualification = providerCapabilities.assetStatus === 'pending_review'
+      || providerCapabilities.executorStatus === 'pending_review';
+    if (providerCapabilities.nextAction === 'wait_review' && hasReviewingQualification) {
       return {
-        title: '服务商资质审核中',
-        desc: '资料已进入服务商入驻流程。审核通过后，这里会切换为正式经营工作台。',
+        title: '接单资质审核中',
+        desc: '资料已进入服务商入驻流程。全部审核通过后，这里会切换为正式经营工作台。',
         badge: '审核中',
         badgeTone: 'orange' as const,
       };
@@ -126,12 +128,12 @@ export default function OwnerProfilePage() {
       };
     }
     return {
-      title: '开始服务商入驻',
+      title: '接单资质未完成',
       desc: '完成服务商资料、设备资质和履约资质后，才能正式接单和管理履约。',
       badge: '未开通',
       badgeTone: 'gray' as const,
     };
-  }, [providerCapabilities.nextAction]);
+  }, [providerCapabilities.assetStatus, providerCapabilities.executorStatus, providerCapabilities.nextAction]);
 
   const onboardingItems = useMemo(
     () => [
@@ -143,15 +145,15 @@ export default function OwnerProfilePage() {
         onClick: () => null,
       },
       {
-        title: '设备与资质',
-        desc: '提交无人机、保险、适航和 UOM 等资料，审核通过后可报价。',
+        title: '设备资质',
+        desc: '提交无人机、保险、适航和 UOM 等资料。',
         status: providerCapabilities.assetStatus === 'approved' ? '已通过' : providerCapabilities.assetStatus === 'pending_review' ? '审核中' : '去完善',
         ready: providerCapabilities.assetStatus === 'approved',
         onClick: () => Taro.navigateTo({ url: '/pages/profile/drones/index' }),
       },
       {
         title: '履约资质',
-        desc: '完善履约资料后，服务商可推进订单履约。',
+        desc: '设备资质与履约资质全部通过后才开通接单。',
         status: providerCapabilities.executorStatus === 'approved' ? '已通过' : providerCapabilities.executorStatus === 'pending_review' ? '审核中' : '去完善',
         ready: providerCapabilities.executorStatus === 'approved',
         onClick: () => Taro.navigateTo({ url: '/pages/pilot/register/index' }),
@@ -330,8 +332,8 @@ export default function OwnerProfilePage() {
                 <Text className='owner-hero-sub'>管理设备、服务与履约进度</Text>
               </View>
               <StatusBadge
-                label={effectiveRoleSummary.can_publish_supply ? '主市场准入' : '供给待就绪'}
-                tone={effectiveRoleSummary.can_publish_supply ? 'blue' : 'gray'}
+                label={providerCapabilities.canUseWorkbench ? '接单已开通' : '接单待开通'}
+                tone={providerCapabilities.canUseWorkbench ? 'blue' : 'gray'}
               />
             </View>
 

@@ -75,6 +75,13 @@ func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) 
 	if err := db.Create(drone).Error; err != nil {
 		t.Fatalf("create drone: %v", err)
 	}
+	if err := db.Create(&model.Pilot{
+		UserID:             ownerUser.ID,
+		VerificationStatus: "verified",
+		AvailabilityStatus: "online",
+	}).Error; err != nil {
+		t.Fatalf("create owner pilot profile: %v", err)
+	}
 
 	expiresAt := now.Add(24 * time.Hour)
 	demand := &model.Demand{
@@ -341,8 +348,8 @@ func TestOwnerServiceFormalProviderOperationsRequireApprovedAssetProvider(t *tes
 		if err == nil {
 			t.Fatalf("%s expected provider gate error", label)
 		}
-		if !strings.Contains(err.Error(), "设备能力审核") {
-			t.Fatalf("%s expected device capability gate error, got %v", label, err)
+		if !strings.Contains(err.Error(), "接单资质审核") {
+			t.Fatalf("%s expected intake qualification gate error, got %v", label, err)
 		}
 	}
 
@@ -370,6 +377,7 @@ func TestOwnerServiceListRecommendedDemandsSortsByOwnerSupplyDistance(t *testing
 	db := newServiceTestDB(t,
 		&model.User{},
 		&model.Drone{},
+		&model.Pilot{},
 		&model.OwnerSupply{},
 		&model.Demand{},
 	)
@@ -403,6 +411,13 @@ func TestOwnerServiceListRecommendedDemandsSortsByOwnerSupplyDistance(t *testing
 	}
 	if err := db.Create(drone).Error; err != nil {
 		t.Fatalf("create drone: %v", err)
+	}
+	if err := db.Create(&model.Pilot{
+		UserID:             ownerUser.ID,
+		VerificationStatus: "verified",
+		AvailabilityStatus: "online",
+	}).Error; err != nil {
+		t.Fatalf("create owner pilot profile: %v", err)
 	}
 	supply := &model.OwnerSupply{
 		ID:                 7101,
@@ -517,6 +532,7 @@ func TestOwnerServiceListRecommendedDemandsFallsBackToDroneDistance(t *testing.T
 	db := newServiceTestDB(t,
 		&model.User{},
 		&model.Drone{},
+		&model.Pilot{},
 		&model.OwnerSupply{},
 		&model.Demand{},
 	)
@@ -546,6 +562,13 @@ func TestOwnerServiceListRecommendedDemandsFallsBackToDroneDistance(t *testing.T
 	}
 	if err := db.Create(drone).Error; err != nil {
 		t.Fatalf("create drone: %v", err)
+	}
+	if err := db.Create(&model.Pilot{
+		UserID:             ownerUser.ID,
+		VerificationStatus: "verified",
+		AvailabilityStatus: "online",
+	}).Error; err != nil {
+		t.Fatalf("create owner pilot profile: %v", err)
 	}
 
 	expiresAt := now.Add(24 * time.Hour)

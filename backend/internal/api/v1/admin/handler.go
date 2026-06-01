@@ -161,10 +161,12 @@ func (h *Handler) DroneList(c *gin.Context) {
 func (h *Handler) ApproveDroneCertification(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	var req struct {
-		Approved bool `json:"approved"`
+		Approved       bool   `json:"approved"`
+		Force          bool   `json:"force"`
+		OverrideReason string `json:"override_reason"`
 	}
 	c.ShouldBindJSON(&req)
-	if err := h.droneService.ApproveCertification(id, req.Approved); err != nil {
+	if err := h.droneService.ApproveCertification(id, c.GetInt64("user_id"), req.Approved, req.Force, req.OverrideReason); err != nil {
 		response.Error(c, response.CodeDBError, err.Error())
 		return
 	}

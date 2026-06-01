@@ -38,11 +38,11 @@ export default function MyOffersPage() {
   useDidShow(() => { load(); });
   const filtered = useMemo(() => offers.filter(o => activeGroup === 'all' || o.status === activeGroup), [offers, activeGroup]);
 
-  const handleStatus = async (item: SupplySummary) => {
-    if (!canManageServices) {
-      Taro.showToast({ title: '服务商设备能力审核通过后才能管理正式服务', icon: 'none' });
-      return;
-    }
+	  const handleStatus = async (item: SupplySummary) => {
+	    if (!canManageServices) {
+	      Taro.showToast({ title: '接单资质通过后才能管理正式服务', icon: 'none' });
+	      return;
+	    }
     const next = NEXT[item.status]; if (!next) return;
     setUpdatingId(item.id);
     try { await supplyService.updateStatus(item.id, next.status); await load(); } catch {} finally { setUpdatingId(null); }
@@ -50,9 +50,9 @@ export default function MyOffersPage() {
 
   if (!canManageServices) {
     return (
-      <ProviderAccessNotice
-        title={isAuthenticated ? '服务商设备能力未开通' : '请先登录服务商账号'}
-        description={isAuthenticated ? '设备与关键资质审核通过后，才能查看、编辑和上架正式服务。' : '登录后才能查看服务商服务列表。'}
+	      <ProviderAccessNotice
+	        title={isAuthenticated ? '接单资质未开通' : '请先登录服务商账号'}
+	        description={isAuthenticated ? '设备资质和履约资质全部通过后，才能查看、编辑和上架正式服务。' : '登录后才能查看服务商服务列表。'}
         actionText={isAuthenticated ? '查看服务商入驻' : undefined}
         onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
       />

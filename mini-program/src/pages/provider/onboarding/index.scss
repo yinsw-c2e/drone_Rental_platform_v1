@@ -14,15 +14,32 @@
 
 .provider-onboarding-hero {
   position: relative;
-  padding: 34rpx 32rpx 30rpx;
+  padding: 32rpx;
   border-radius: 24rpx;
   background: linear-gradient(135deg, #063b8f 0%, #0b63d8 58%, #1189f5 100%);
   box-shadow: 0 18rpx 42rpx rgba(9, 68, 157, 0.22);
   overflow: hidden;
 }
 
+.provider-onboarding-hero-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.provider-onboarding-progress-label {
+  font-size: 25rpx;
+  line-height: 36rpx;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 700;
+}
+
 .provider-onboarding-status {
-  display: inline-flex;
+  flex: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   min-width: 112rpx;
@@ -59,11 +76,30 @@
   background: rgba(255, 255, 255, 0.18);
 }
 
+.provider-onboarding-progressbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 6rpx;
+  margin-top: 24rpx;
+}
+
+.provider-onboarding-progress-segment {
+  flex: 1;
+  height: 6rpx;
+  border-radius: 4rpx;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.provider-onboarding-progress-segment-active {
+  background: rgba(255, 255, 255, 0.95);
+}
+
 .provider-onboarding-title {
   position: relative;
   z-index: 1;
   display: block;
-  margin-top: 28rpx;
+  margin-top: 26rpx;
   font-size: 42rpx;
   line-height: 54rpx;
   color: #ffffff;
@@ -74,7 +110,7 @@
   position: relative;
   z-index: 1;
   display: block;
-  margin-top: 16rpx;
+  margin-top: 14rpx;
   font-size: 27rpx;
   line-height: 42rpx;
   color: rgba(255, 255, 255, 0.88);
@@ -123,162 +159,97 @@
 
 .provider-onboarding-card {
   margin-top: 24rpx;
-  padding: 28rpx 26rpx 26rpx;
+  padding: 12rpx 26rpx;
   border-radius: 20rpx;
   background: #ffffff;
   border: 1rpx solid #e4ebf5;
   box-shadow: 0 10rpx 28rpx rgba(11, 31, 58, 0.06);
 }
 
-.provider-onboarding-card-compact {
-  padding-bottom: 10rpx;
-}
-
-.provider-onboarding-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.provider-onboarding-card-title {
-  display: block;
-  font-size: 32rpx;
-  line-height: 42rpx;
-  font-weight: 800;
-  color: #0b1f3a;
-}
-
-.provider-onboarding-card-desc,
-.provider-onboarding-card-note {
-  display: block;
-  font-size: 25rpx;
-  line-height: 36rpx;
-  color: #637189;
-}
-
-.provider-onboarding-card-desc {
-  margin-top: 6rpx;
-}
-
-.provider-onboarding-card-note {
-  margin-top: 18rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 14rpx;
-  background: #f6f8fc;
-}
-
-.provider-onboarding-pill {
-  flex: none;
-  min-width: 96rpx;
-  height: 48rpx;
-  padding: 0 16rpx;
-  border-radius: 999rpx;
+.provider-onboarding-timeline-row {
+  min-height: 96rpx;
   display: flex;
   align-items: center;
+  padding: 18rpx 0;
+}
+
+.provider-onboarding-timeline-row-active {
+  cursor: pointer;
+}
+
+.provider-onboarding-timeline-rail {
+  position: relative;
+  flex: none;
+  width: 32rpx;
+  align-self: stretch;
+  margin-right: 18rpx;
+  display: flex;
   justify-content: center;
 }
 
-.provider-onboarding-pill-text {
-  font-size: 24rpx;
-  font-weight: 800;
-}
-
-.provider-onboarding-pill-gray {
-  background: #eef2f7;
-}
-
-.provider-onboarding-pill-gray .provider-onboarding-pill-text {
-  color: #667085;
-}
-
-.provider-onboarding-pill-blue {
-  background: #e6f0ff;
-}
-
-.provider-onboarding-pill-blue .provider-onboarding-pill-text {
-  color: #1266e3;
-}
-
-.provider-onboarding-pill-orange {
-  background: #fff0db;
-}
-
-.provider-onboarding-pill-orange .provider-onboarding-pill-text {
-  color: #f26a0a;
-}
-
-.provider-onboarding-pill-green {
-  background: #dcf7e5;
-}
-
-.provider-onboarding-pill-green .provider-onboarding-pill-text {
-  color: #0ba34a;
-}
-
-.provider-onboarding-pill-red {
-  background: #ffe7e5;
-}
-
-.provider-onboarding-pill-red .provider-onboarding-pill-text {
-  color: #d93025;
-}
-
-.provider-onboarding-step-list {
-  margin-top: 20rpx;
-  border: 1rpx solid #e6edf7;
-  border-radius: 16rpx;
-  overflow: hidden;
-}
-
-.provider-onboarding-step {
-  min-height: 108rpx;
+.provider-onboarding-timeline-icon {
+  position: relative;
+  z-index: 1;
+  width: 32rpx;
+  height: 32rpx;
+  margin-top: 14rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  padding: 20rpx 18rpx;
-  border-bottom: 1rpx solid #e9eef6;
-  background: #ffffff;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
-.provider-onboarding-step:last-child {
-  border-bottom: 0;
-}
-
-.provider-onboarding-dot {
-  flex: none;
-  width: 18rpx;
-  height: 18rpx;
-  border-radius: 50%;
-  margin-right: 18rpx;
-}
-
-.provider-onboarding-dot-gray {
-  background: #a8b2c3;
-}
-
-.provider-onboarding-dot-blue {
-  background: #1677ff;
-}
-
-.provider-onboarding-dot-orange {
-  background: #ff8a1f;
-}
-
-.provider-onboarding-dot-green {
+.provider-onboarding-timeline-icon-done {
   background: #10b35d;
 }
 
-.provider-onboarding-dot-red {
+.provider-onboarding-timeline-icon-current {
+  background: #1677ff;
+}
+
+.provider-onboarding-timeline-icon-future {
+  background: #ffffff;
+  border: 2rpx solid #cdd5e0;
+}
+
+.provider-onboarding-timeline-icon-review {
+  background: #ff8a1f;
+}
+
+.provider-onboarding-timeline-icon-fix {
   background: #ef4338;
 }
 
-.provider-onboarding-step-main {
+.provider-onboarding-timeline-icon-text {
+  font-size: 22rpx;
+  line-height: 32rpx;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.provider-onboarding-timeline-icon-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.provider-onboarding-timeline-line {
+  position: absolute;
+  top: 46rpx;
+  bottom: -34rpx;
+  left: 15rpx;
+  width: 2rpx;
+  background: #e6edf7;
+}
+
+.provider-onboarding-timeline-main {
   flex: 1;
   min-width: 0;
 }
 
-.provider-onboarding-step-title,
-.provider-onboarding-basic-title {
+.provider-onboarding-timeline-title {
   display: block;
   font-size: 28rpx;
   line-height: 38rpx;
@@ -286,8 +257,7 @@
   font-weight: 800;
 }
 
-.provider-onboarding-step-desc,
-.provider-onboarding-basic-desc {
+.provider-onboarding-timeline-desc {
   display: block;
   margin-top: 6rpx;
   font-size: 24rpx;
@@ -295,81 +265,63 @@
   color: #6b778c;
 }
 
-.provider-onboarding-step-status {
+.provider-onboarding-timeline-state {
   flex: none;
+  display: flex;
+  align-items: center;
   margin-left: 18rpx;
+}
+
+.provider-onboarding-timeline-status {
   font-size: 24rpx;
   font-weight: 800;
   white-space: nowrap;
 }
 
-.provider-onboarding-step-status-gray {
+.provider-onboarding-timeline-status-gray {
   color: #667085;
 }
 
-.provider-onboarding-step-status-blue {
+.provider-onboarding-timeline-status-blue {
   color: #1677ff;
 }
 
-.provider-onboarding-step-status-orange {
+.provider-onboarding-timeline-status-orange {
   color: #f26a0a;
 }
 
-.provider-onboarding-step-status-green {
+.provider-onboarding-timeline-status-green {
   color: #0ba34a;
 }
 
-.provider-onboarding-step-status-red {
+.provider-onboarding-timeline-status-red {
   color: #d93025;
 }
 
-.provider-onboarding-card-actions {
-  display: flex;
-  gap: 16rpx;
-  margin-top: 22rpx;
-}
-
-.provider-onboarding-link-btn {
-  flex: 1;
-  height: 72rpx;
-  border: 2rpx solid #17457f;
-  border-radius: 14rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.provider-onboarding-link-btn-blue {
-  border-color: #1677ff;
-  background: #eef5ff;
-}
-
-.provider-onboarding-link-text {
-  font-size: 27rpx;
+.provider-onboarding-timeline-chevron,
+.provider-onboarding-more-chevron {
+  margin-left: 10rpx;
+  font-size: 34rpx;
+  line-height: 34rpx;
+  color: #1677ff;
   font-weight: 800;
-  color: #17457f;
 }
 
-.provider-onboarding-link-text-blue {
-  color: #1266e3;
+.provider-onboarding-more {
+  margin-top: 24rpx;
 }
 
-.provider-onboarding-basic-row {
-  min-height: 116rpx;
+.provider-onboarding-more-row {
+  min-height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
-  border-bottom: 1rpx solid #e9eef6;
+  border-bottom: 1rpx solid #e4ebf5;
 }
 
-.provider-onboarding-basic-row-last {
-  border-bottom: 0;
-}
-
-.provider-onboarding-basic-action {
-  flex: none;
-  font-size: 26rpx;
-  font-weight: 800;
-  color: #1677ff;
+.provider-onboarding-more-text {
+  font-size: 28rpx;
+  line-height: 38rpx;
+  color: #10213d;
+  font-weight: 700;
 }

@@ -41,9 +41,9 @@ export default function MyQuotesPage() {
 
   if (!canViewQuotes) {
     return (
-      <ProviderAccessNotice
-        title={isAuthenticated ? '服务商报价能力未开通' : '请先登录服务商账号'}
-        description={isAuthenticated ? '设备能力审核通过后，才能查看和管理你提交的报价。' : '登录后才能查看服务商报价记录。'}
+	      <ProviderAccessNotice
+	        title={isAuthenticated ? '接单资质未开通' : '请先登录服务商账号'}
+	        description={isAuthenticated ? '设备资质和履约资质全部通过后，才能查看和管理你提交的报价。' : '登录后才能查看服务商报价记录。'}
         actionText={isAuthenticated ? '查看服务商入驻' : undefined}
         onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
       />

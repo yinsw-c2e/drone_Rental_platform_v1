@@ -116,7 +116,6 @@ func setupNegotiatedOrderFixture(t *testing.T) negotiatedOrderFixture {
 	}).Error; err != nil {
 		t.Fatalf("create owner profiles: %v", err)
 	}
-
 	droneA := &model.Drone{
 		ID:                    9201,
 		OwnerID:               ownerUser.ID,
@@ -319,6 +318,13 @@ func TestSelectProviderRejectsDifferentQuoteAfterConversion(t *testing.T) {
 
 func TestCreateDemandQuoteRepeatedSubmissionUpdatesExistingQuote(t *testing.T) {
 	fixture := setupNegotiatedOrderFixture(t)
+	if err := fixture.db.Create(&model.Pilot{
+		UserID:             fixture.ownerUser.ID,
+		VerificationStatus: "verified",
+		AvailabilityStatus: "online",
+	}).Error; err != nil {
+		t.Fatalf("create provider fulfillment profile: %v", err)
+	}
 	newAmount := int64(135700)
 
 	updated, err := fixture.ownerService.CreateDemandQuote(fixture.ownerUser.ID, fixture.demand.ID, &CreateQuoteInput{

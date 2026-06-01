@@ -217,9 +217,16 @@ export default function SettingsPage() {
                   <Text className='settings-row-label'>登录状态</Text>
                   <Text className='settings-row-value'>{user?.id ? '已登录' : '未登录'}</Text>
                 </View>
-                <View className='settings-row settings-row-last'>
+                <View className='settings-row'>
                   <Text className='settings-row-label'>本机提醒偏好</Text>
                   <Text className='settings-row-value'>{pushEnabled ? '已开启' : '已关闭'}</Text>
+                </View>
+                <View
+                  className='settings-row settings-row-clickable settings-row-last'
+                  onClick={() => Taro.navigateTo({ url: '/pages/dev/subscribe-test/index' })}
+                >
+                  <Text className='settings-row-label'>订阅消息诊断</Text>
+                  <Text className='settings-row-arrow'>›</Text>
                 </View>
               </View>
             </>

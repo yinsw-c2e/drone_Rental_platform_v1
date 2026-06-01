@@ -180,15 +180,92 @@ func (s *DroneService) SubmitCertification(userID, droneID int64, docs model.JSO
 	})
 }
 
-func (s *DroneService) ApproveCertification(droneID int64, approved bool) error {
-	status := "approved"
+func (s *DroneService) ApproveCertification(droneID, reviewerID int64, approved, force bool, overrideReason string) error {
 	if !approved {
-		status = "rejected"
+		if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
+			"certification_status":          "rejected",
+			"certification_reviewed_at":     time.Now(),
+			"certification_reviewed_by":     reviewerID,
+			"certification_force_approved":  false,
+			"certification_override_reason": "",
+		}); err != nil {
+			return err
+		}
+		s.notifyDroneQualificationResult(droneID, "drone_certification_reviewed", "无人机资质审核结果", approved, "无人机资质审核已通过。", "无人机资质审核未通过，请检查后重新提交。")
+		return nil
 	}
-	if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{"certification_status": status}); err != nil {
+
+	drone, err := s.droneRepo.GetByID(droneID)
+	if err != nil {
+		return err
+	}
+	qualified := drone.UOMVerified == "verified" && drone.InsuranceVerified == "verified" && drone.AirworthinessVerified == "verified"
+	if !qualified && !force {
+		return errors.New("资质未齐：UOM/保险/适航 均需先通过审核，或勾选强制通过并填写原因")
+	}
+
+	forceApproved := false
+	reason := ""
+	if !qualified && force {
+		trimmed := strings.TrimSpace(overrideReason)
+		if len([]rune(trimmed)) < 5 {
+			return errors.New("强制通过需填写不少于 5 个字的原因")
+		}
+		forceApproved = true
+		reason = trimmed
+	}
+
+	if err := s.updateCertificationDrivenSupplyStatus(droneID, map[string]interface{}{
+		"certification_status":          "approved",
+		"certification_reviewed_at":     time.Now(),
+		"certification_reviewed_by":     reviewerID,
+		"certification_force_approved":  forceApproved,
+		"certification_override_reason": reason,
+	}); err != nil {
 		return err
 	}
 	s.notifyDroneQualificationResult(droneID, "drone_certification_reviewed", "无人机资质审核结果", approved, "无人机资质审核已通过。", "无人机资质审核未通过，请检查后重新提交。")
+	return nil
+}
+
+func (s *DroneService) recomputeCertificationStatus(droneID int64) error {
+	drone, err := s.droneRepo.GetByID(droneID)
+	if err != nil {
+		return err
+	}
+	if drone.CertificationForceApproved {
+		return nil
+	}
+	allVerified := drone.UOMVerified == "verified" &&
+		drone.InsuranceVerified == "verified" &&
+		drone.AirworthinessVerified == "verified"
+	anyRejected := drone.UOMVerified == "rejected" ||
+		drone.InsuranceVerified == "rejected" ||
+		drone.AirworthinessVerified == "rejected"
+
+	switch {
+	case allVerified && drone.CertificationStatus != "approved":
+		now := time.Now()
+		fields := map[string]interface{}{
+			"certification_status":          "approved",
+			"certification_reviewed_at":     &now,
+			"certification_reviewed_by":     int64(0),
+			"certification_force_approved":  false,
+			"certification_override_reason": "",
+		}
+		if err := s.updateCertificationDrivenSupplyStatus(droneID, fields); err != nil {
+			return err
+		}
+		s.notifyDroneQualificationResult(droneID, "drone_certification_reviewed", "无人机资质审核结果", true, "无人机资质审核已通过。", "无人机资质审核未通过，请检查后重新提交。")
+	case anyRejected && drone.CertificationStatus == "approved":
+		fields := map[string]interface{}{
+			"certification_status":          "pending",
+			"certification_override_reason": "",
+		}
+		if err := s.updateCertificationDrivenSupplyStatus(droneID, fields); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -231,6 +308,9 @@ func (s *DroneService) ApproveUOMRegistration(droneID int64, approved bool) erro
 		return err
 	}
 	s.notifyDroneQualificationResult(droneID, "drone_uom_reviewed", "UOM 登记审核结果", approved, "UOM 登记已审核通过。", "UOM 登记审核未通过，请检查后重新提交。")
+	if err := s.recomputeCertificationStatus(droneID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -296,6 +376,9 @@ func (s *DroneService) ApproveInsurance(droneID, reviewerID int64, approved bool
 		return err
 	}
 	s.notifyDroneQualificationResult(droneID, "drone_insurance_reviewed", "保险审核结果", approved, "无人机保险审核已通过。", "无人机保险审核未通过，请检查后重新提交。")
+	if err := s.recomputeCertificationStatus(droneID); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -335,6 +418,9 @@ func (s *DroneService) ApproveAirworthiness(droneID int64, approved bool) error 
 		return err
 	}
 	s.notifyDroneQualificationResult(droneID, "drone_airworthiness_reviewed", "适航审核结果", approved, "无人机适航审核已通过。", "无人机适航审核未通过，请检查后重新提交。")
+	if err := s.recomputeCertificationStatus(droneID); err != nil {
+		return err
+	}
 	return nil
 }
 

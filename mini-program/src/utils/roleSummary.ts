@@ -44,10 +44,11 @@ export const EMPTY_ROLE_SUMMARY: RoleSummary = {
 export const buildFallbackRoleSummary = (): RoleSummary => EMPTY_ROLE_SUMMARY;
 
 const combineStatus = (assetStatus: ProviderReviewStatus, executorStatus: ProviderReviewStatus): ProviderReviewStatus => {
-  if (assetStatus === 'approved' || executorStatus === 'approved') return 'approved';
   if (assetStatus === 'suspended' || executorStatus === 'suspended') return 'suspended';
-  if (assetStatus === 'pending_review' || executorStatus === 'pending_review') return 'pending_review';
   if (assetStatus === 'rejected' || executorStatus === 'rejected') return 'rejected';
+  if (assetStatus === 'approved' && executorStatus === 'approved') return 'approved';
+  if (assetStatus === 'pending_review' || executorStatus === 'pending_review') return 'pending_review';
+  if (assetStatus === 'approved' || executorStatus === 'approved') return 'pending_review';
   return 'none';
 };
 
@@ -64,24 +65,24 @@ const deriveProviderSummary = (summary: RoleSummary): ProviderRoleSummary => {
     : summary.has_owner_role
       ? 'pending_review'
       : 'none';
-  const executorStatus: ProviderReviewStatus = summary.can_accept_dispatch
+  const executorStatus: ProviderReviewStatus = summary.can_self_execute || summary.can_accept_dispatch
     ? 'approved'
     : summary.has_pilot_role
       ? 'pending_review'
       : 'none';
   const status = combineStatus(assetStatus, executorStatus);
-  const canUseWorkbench = Boolean(summary.can_publish_supply || summary.can_accept_dispatch || summary.can_self_execute);
+  const unifiedReady = assetStatus === 'approved' && executorStatus === 'approved';
 
   return {
     status,
     asset_status: assetStatus,
     executor_status: executorStatus,
-    can_use_workbench: canUseWorkbench,
-    can_quote: Boolean(summary.can_publish_supply),
-    can_arrange_dispatch: Boolean(summary.can_publish_supply),
-    can_accept_dispatch: Boolean(summary.can_accept_dispatch),
-    can_self_execute: Boolean(summary.can_self_execute),
-    next_action: canUseWorkbench ? 'open_workbench' : nextActionOf(status),
+    can_use_workbench: unifiedReady,
+    can_quote: unifiedReady,
+    can_arrange_dispatch: unifiedReady,
+    can_accept_dispatch: unifiedReady && Boolean(summary.can_accept_dispatch),
+    can_self_execute: unifiedReady,
+    next_action: unifiedReady ? 'open_workbench' : nextActionOf(status),
   };
 };
 

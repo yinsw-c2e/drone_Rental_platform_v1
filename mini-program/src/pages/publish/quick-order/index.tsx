@@ -1,6 +1,6 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, ScrollView, Text, View } from '@tarojs/components';
+import { Image, Picker, ScrollView, Text, Textarea, View } from '@tarojs/components';
 
 import {
   AirspaceCheckResult,
@@ -362,6 +362,8 @@ export default function QuickOrderPage() {
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<ServicePlanKey>('standard');
   const [submitting, setSubmitting] = useState(false);
+  const [taskDescription, setTaskDescription] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState<'quote' | 'pick'>('quote');
   const pendingAddressTargetRef = useRef<AddressTarget | null>(null);
 
   const clearAddressSelection = useCallback(() => {
@@ -644,6 +646,9 @@ export default function QuickOrderPage() {
     if (Number(cargoWeight) <= 0) {
       return Taro.showToast({ title: '请填写有效货物重量', icon: 'none' });
     }
+    if (!taskDescription.trim()) {
+      return Taro.showToast({ title: '请填写作业说明，让服务商知道你要做什么', icon: 'none' });
+    }
     if (checkingPickup || checkingDelivery) {
       return Taro.showToast({ title: '空域检测中，请稍候', icon: 'none' });
     }
@@ -662,7 +667,6 @@ export default function QuickOrderPage() {
     setSubmitting(true);
     try {
       const weightKG = Number(cargoWeight);
-      const extraText = extraWorkPoint ? `，途经作业点：${formatAddress(extraWorkPoint)}` : '';
       const draft: QuickOrderDraft = {
         cargo_scene: cargoScene,
         cargo_type: cargoType.trim() || '重载物资',
@@ -671,8 +675,8 @@ export default function QuickOrderPage() {
         destination_address: deliveryAddress,
         scheduled_start_at: startDate.toISOString(),
         scheduled_end_at: endDate.toISOString(),
-        description: `${planTitle(selectedPlan)}：${formatAddress(pickupAddress)} 到 ${formatAddress(deliveryAddress)}吊运${extraText}`,
-        special_requirements: `服务方案：${planTitle(selectedPlan)}；预计开始：${formatDateTime(startDate)}`,
+        description: taskDescription.trim(),
+        special_requirements: `服务方案：${planTitle(selectedPlan)}${extraWorkPoint ? `；途经作业点：${formatAddress(extraWorkPoint)}` : ''}`,
         match_region: resolveMatchRegion(pickupAddress, deliveryAddress),
       };
 
@@ -681,15 +685,11 @@ export default function QuickOrderPage() {
         return;
       }
 
-      const action = await Taro.showActionSheet({
-        itemList: ['匹配服务商方案', '发布需求等服务商报价'],
-      }).catch(() => null);
-      if (!action || typeof action.tapIndex !== 'number') return;
-      if (action.tapIndex === 1) {
-        await publishDemand(draft);
+      if (selectedBranch === 'pick') {
+        continueToSupplyList(draft);
         return;
       }
-      continueToSupplyList(draft);
+      await publishDemand(draft);
     } catch (e: any) {
       Taro.showToast({ title: friendlyErrorMessage(e, '进入方案列表失败'), icon: 'none' });
     } finally {
@@ -738,6 +738,42 @@ export default function QuickOrderPage() {
 
       <ScrollView scrollY className='qo3-scroll'>
         <View className='qo3-canvas'>
+          {directSupplyId > 0 ? null : (
+            <View className='qo3-hero-tip'>
+              <Text className='qo3-hero-tip-title'>发布吊运任务</Text>
+              <Text className='qo3-hero-tip-desc'>
+                价格没把握、要先看现场、想多家比价的任务都在这里发。先选一种方式：
+              </Text>
+            </View>
+          )}
+
+          {directSupplyId > 0 ? null : (
+            <View className='qo3-card qo3-branch-card'>
+              <View
+                className={`qo3-branch-option ${selectedBranch === 'quote' ? 'is-active' : ''}`}
+                onClick={() => setSelectedBranch('quote')}
+              >
+                <View className='qo3-branch-header'>
+                  <Text className='qo3-branch-emoji'>📣</Text>
+                  <Text className='qo3-branch-title'>让多家服务商报价</Text>
+                  {selectedBranch === 'quote' ? <Text className='qo3-branch-tag'>已选</Text> : null}
+                </View>
+                <Text className='qo3-branch-desc'>发布需求，等几家服务商上门报价，再挑一家。适合想比价或不确定价格的任务。</Text>
+              </View>
+              <View
+                className={`qo3-branch-option ${selectedBranch === 'pick' ? 'is-active' : ''}`}
+                onClick={() => setSelectedBranch('pick')}
+              >
+                <View className='qo3-branch-header'>
+                  <Text className='qo3-branch-emoji'>🎯</Text>
+                  <Text className='qo3-branch-title'>指定一家服务商议价</Text>
+                  {selectedBranch === 'pick' ? <Text className='qo3-branch-tag'>已选</Text> : null}
+                </View>
+                <Text className='qo3-branch-desc'>从服务商列表里挑一家直接下单议价。适合已经有合作对象或想要特定机型的任务。</Text>
+              </View>
+            </View>
+          )}
+
           <View className='qo3-card qo3-location-card'>
             <View className='qo3-section-head qo3-location-head'>
               <Image className='qo3-section-location-icon' src={sectionLocationPinIcon} mode='aspectFit' />
@@ -811,6 +847,46 @@ export default function QuickOrderPage() {
             </View>
           </View>
 
+          <View className='qo3-card qo3-scene-card'>
+            <Picker
+              mode='selector'
+              range={SCENE_OPTIONS.map(item => item.label)}
+              value={Math.max(0, SCENE_OPTIONS.findIndex(item => item.key === cargoScene))}
+              onChange={(event: any) => {
+                const idx = Number(event.detail.value);
+                if (!Number.isNaN(idx) && SCENE_OPTIONS[idx]) setCargoScene(SCENE_OPTIONS[idx].key);
+              }}
+            >
+              <View className='qo3-scene-row'>
+                <View className='qo3-scene-text'>
+                  <Text className='qo3-scene-label'>场景类型</Text>
+                  <Text className='qo3-scene-sub'>影响服务商匹配和定价</Text>
+                </View>
+                <View className='qo3-scene-pick'>
+                  <Text className='qo3-scene-value'>
+                    {SCENE_OPTIONS.find(item => item.key === cargoScene)?.label || SCENE_OPTIONS[0].label}
+                  </Text>
+                  <Image className='qo3-scene-chevron' src={chevronRightIcon} mode='aspectFit' />
+                </View>
+              </View>
+            </Picker>
+          </View>
+
+          <View className='qo3-card qo3-desc-card'>
+            <View className='qo3-desc-head'>
+              <Text className='qo3-desc-label'>作业说明</Text>
+              <Text className='qo3-desc-sub'>必填 · 服务商靠这段文字判断要不要接、怎么报</Text>
+            </View>
+            <Textarea
+              className='qo3-desc-input'
+              value={taskDescription}
+              maxlength={500}
+              autoHeight
+              placeholder={'例如：建材吊上 5 楼楼顶，物料堆在小区门口，现场需要先看一下停机位。\n或：3 趟，每趟 60kg 农药桶送到山头 3 个点，要求当天完成。'}
+              onInput={(event: any) => setTaskDescription(String(event.detail.value || ''))}
+            />
+          </View>
+
           <View className='qo3-card qo3-plan-card'>
             <View className='qo3-section-head qo3-plan-head'>
               <Image className='qo3-section-plan-icon' src={sectionPlanClipboardIcon} mode='aspectFit' />
@@ -831,7 +907,13 @@ export default function QuickOrderPage() {
         </View>
         <View className={`qo3-submit-button ${(submitting || hasAirspaceHardBlock) ? 'disabled' : ''}`} onClick={handleSubmit}>
           <Text className='qo3-submit-button-text'>
-            {submitting ? '提交中...' : directSupplyId > 0 ? '确认下单' : '提交预约'}
+            {submitting
+              ? '提交中...'
+              : directSupplyId > 0
+                ? '确认下单'
+                : selectedBranch === 'pick'
+                  ? '去挑选服务商'
+                  : '发布需求等报价'}
           </Text>
         </View>
       </View>

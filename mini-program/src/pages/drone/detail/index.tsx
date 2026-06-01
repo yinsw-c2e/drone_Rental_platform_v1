@@ -13,6 +13,23 @@ const statusMap: Record<string, { label: string; tone: string }> = {
   offline: { label: '不可用', tone: 'gray' },
 };
 
+const getQualificationStatus = (status?: string | null) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'verified') {
+    return { statusLabel: '已通过', tone: 'verified' };
+  }
+  if (normalized === 'pending') {
+    return { statusLabel: '审核中', tone: 'pending' };
+  }
+  return { statusLabel: '未提交', tone: 'empty' };
+};
+
+const getQualificationItems = (drone: Drone) => [
+  { name: 'UOM 实名', ...getQualificationStatus(drone.uom_verified) },
+  { name: '保险', ...getQualificationStatus(drone.insurance_verified) },
+  { name: '适航', ...getQualificationStatus(drone.airworthiness_verified) },
+];
+
 export default function DroneDetailPage() {
   const params = Taro.getCurrentInstance().router?.params || {};
   const id = Number(params.id || 0);
@@ -60,6 +77,8 @@ export default function DroneDetailPage() {
   }
 
   const availability = statusMap[drone.availability_status || 'offline'] || statusMap.offline;
+  const qualificationItems = getQualificationItems(drone);
+  const qualificationComplete = qualificationItems.every(item => item.tone === 'verified');
 
   return (
     <ScrollView scrollY className="drone-detail-wrap">
@@ -86,6 +105,24 @@ export default function DroneDetailPage() {
           </View>
         </ScrollView>
       )}
+
+      <View className="drone-detail-qualification-card" onClick={() => Taro.navigateTo({ url: `/pages/drone/certification/index?id=${drone.id}` })}>
+        <View className="drone-detail-qualification-header">
+          <View className="drone-detail-qualification-title-group">
+            <Text className="drone-detail-qualification-title">资质认证</Text>
+            <Text className="drone-detail-qualification-subtitle">UOM 实名、保险、适航证明</Text>
+          </View>
+          <Text className="drone-detail-qualification-action">{qualificationComplete ? '查看资质' : '去补充'}</Text>
+        </View>
+        <View className="drone-detail-qualification-pills">
+          {qualificationItems.map(item => (
+            <View key={item.name} className={`drone-detail-qualification-pill drone-detail-qualification-pill-${item.tone}`}>
+              <Text className="drone-detail-qualification-pill-name">{item.name}</Text>
+              <Text className={`drone-detail-qualification-pill-status drone-detail-qualification-pill-status-${item.tone}`}>{item.statusLabel}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
 
       {/* ── 基本参数 ── */}
       <View className="info-card">
@@ -127,10 +164,6 @@ export default function DroneDetailPage() {
 
       {/* ── 资质与维护入口 ── */}
       <View className="action-list">
-        <View className="action-item" onClick={() => Taro.navigateTo({ url: `/pages/drone/certification/index?id=${drone.id}` })}>
-          <Text className="action-text">资质认证</Text>
-          <Text className="action-arrow">{'>'}</Text>
-        </View>
         <View className="action-item" onClick={() => Taro.navigateTo({ url: `/pages/drone/maintenance/index?id=${drone.id}` })}>
           <Text className="action-text">维护记录</Text>
           <Text className="action-arrow">{'>'}</Text>

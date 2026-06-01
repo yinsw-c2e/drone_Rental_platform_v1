@@ -148,15 +148,68 @@ const DroneList: React.FC = () => {
     fetchDrones(1);
   };
 
-  const handleCertify = (id: number, approved: boolean) => {
+  const handleCertify = (record: Drone, approved: boolean) => {
+    if (!approved) {
+      Modal.confirm({
+        title: '确认驳回该无人机认证？',
+        content: '驳回后机主需要重新提交认证',
+        okText: '驳回认证',
+        okType: 'danger',
+        onOk: async () => {
+          await adminApi.approveCertification(record.id, approved, { force: false, overrideReason: '' });
+          message.success('操作成功');
+          fetchDrones(page);
+        },
+      });
+      return;
+    }
+
+    const qualified = record.uom_verified === 'verified'
+      && record.insurance_verified === 'verified'
+      && record.airworthiness_verified === 'verified';
+    if (qualified) {
+      Modal.confirm({
+        title: `确认${approved ? '通过' : '拒绝'}该无人机认证？`,
+        content: approved ? '通过后该无人机可上线出租' : '拒绝后机主需要重新提交认证',
+        okText: approved ? '通过' : '拒绝',
+        okType: approved ? 'primary' : 'danger',
+        onOk: async () => {
+          await adminApi.approveCertification(record.id, approved);
+          message.success('操作成功');
+          fetchDrones(page);
+        },
+      });
+      return;
+    }
+
+    const missingItems = [
+      record.uom_verified !== 'verified' ? 'UOM未通过' : '',
+      record.insurance_verified !== 'verified' ? '保险未通过' : '',
+      record.airworthiness_verified !== 'verified' ? '适航未通过' : '',
+    ].filter(Boolean);
+    let overrideReasonInput = '';
     Modal.confirm({
-      title: `确认${approved ? '通过' : '拒绝'}该无人机认证？`,
-      content: approved ? '通过后该无人机可上线出租' : '拒绝后机主需要重新提交认证',
-      okText: approved ? '通过' : '拒绝',
-      okType: approved ? 'primary' : 'danger',
+      title: '资质不齐，确认强制通过？',
+      content: (
+        <div>
+          <div style={{ color: '#ff4d4f', marginBottom: 8 }}>{missingItems.join('、')}</div>
+          <Input.TextArea
+            placeholder="请输入强制通过原因"
+            autoSize={{ minRows: 3, maxRows: 5 }}
+            onChange={e => { overrideReasonInput = e.target.value; }}
+          />
+        </div>
+      ),
+      okText: '强制通过',
+      okButtonProps: { danger: true },
       onOk: async () => {
-        await adminApi.approveCertification(id, approved);
-        message.success('操作成功');
+        const trimmed = overrideReasonInput.trim();
+        if (Array.from(trimmed).length < 5) {
+          message.warning('请填写不少于 5 个字的原因');
+          return Promise.reject();
+        }
+        await adminApi.approveCertification(record.id, true, { force: true, overrideReason: trimmed });
+        message.success('已强制通过，已记录审计');
         fetchDrones(page);
       },
     });
@@ -214,25 +267,35 @@ const DroneList: React.FC = () => {
     },
     {
       title: '操作', width: 200, fixed: 'right',
-      render: (_, record) => (
-        <Space>
-          <Button size="small" onClick={() => openDetail(record)}>
-            详情
-          </Button>
-          {record.certification_status === 'pending' && (
-            <>
-              <Button size="small" type="primary" onClick={() => handleCertify(record.id, true)}>通过</Button>
-              <Button size="small" danger onClick={() => handleCertify(record.id, false)}>拒绝</Button>
-            </>
-          )}
-        </Space>
-      ),
+      render: (_, record) => {
+        const qualified = record.uom_verified === 'verified'
+          && record.insurance_verified === 'verified'
+          && record.airworthiness_verified === 'verified';
+        return (
+          <Space>
+            <Button size="small" onClick={() => openDetail(record)}>
+              详情
+            </Button>
+            {record.certification_status === 'pending' && (
+              <>
+                {!qualified && (
+                  <Button size="small" type="primary" onClick={() => handleCertify(record, true)}>强制通过</Button>
+                )}
+                <Button size="small" danger onClick={() => handleCertify(record, false)}>驳回认证</Button>
+              </>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
   return (
     <div>
       <h2>无人机管理</h2>
+      <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 12 }}>
+        三项资质齐全后系统会自动通过，无需手动操作
+      </div>
 
       {/* 搜索筛选栏 */}
       <Card size="small" style={{ marginBottom: 16 }}>

@@ -7,31 +7,35 @@ import (
 )
 
 type Drone struct {
-	ID                  int64   `gorm:"primaryKey;autoIncrement" json:"id"`
-	OwnerID             int64   `gorm:"index;not null" json:"owner_id"`
-	Brand               string  `gorm:"type:varchar(100)" json:"brand"`
-	Model               string  `gorm:"type:varchar(100)" json:"model"`
-	SerialNumber        string  `gorm:"type:varchar(100);uniqueIndex" json:"serial_number"`
-	MTOWKG              float64 `gorm:"column:mtow_kg;type:decimal(10,2)" json:"mtow_kg"`
-	MaxPayloadKG        float64 `gorm:"column:max_payload_kg;type:decimal(10,2)" json:"max_payload_kg"`
-	MaxLoad             float64 `gorm:"type:decimal(10,2)" json:"max_load"`
-	MaxFlightTime       int     `json:"max_flight_time"`
-	MaxDistance         float64 `gorm:"type:decimal(10,2)" json:"max_distance"`
-	Features            JSON    `gorm:"type:json" json:"features"`
-	Images              JSON    `gorm:"type:json" json:"images"`
-	CertificationStatus string  `gorm:"type:varchar(20);default:pending" json:"certification_status"`
-	CertificationDocs   JSON    `gorm:"type:json" json:"certification_docs"`
-	DailyPrice          int64   `json:"daily_price"`
-	HourlyPrice         int64   `json:"hourly_price"`
-	Deposit             int64   `json:"deposit"`
-	Latitude            float64 `gorm:"type:decimal(10,7)" json:"latitude"`
-	Longitude           float64 `gorm:"type:decimal(10,7)" json:"longitude"`
-	Address             string  `gorm:"type:varchar(255)" json:"address"`
-	City                string  `gorm:"type:varchar(50);index" json:"city"`
-	AvailabilityStatus  string  `gorm:"type:varchar(20);default:available" json:"availability_status"` // available, rented, maintenance, offline
-	Rating              float64 `gorm:"type:decimal(3,2);default:0" json:"rating"`
-	OrderCount          int     `gorm:"default:0" json:"order_count"`
-	Description         string  `gorm:"type:text" json:"description"`
+	ID                          int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	OwnerID                     int64      `gorm:"index;not null" json:"owner_id"`
+	Brand                       string     `gorm:"type:varchar(100)" json:"brand"`
+	Model                       string     `gorm:"type:varchar(100)" json:"model"`
+	SerialNumber                string     `gorm:"type:varchar(100);uniqueIndex" json:"serial_number"`
+	MTOWKG                      float64    `gorm:"column:mtow_kg;type:decimal(10,2)" json:"mtow_kg"`
+	MaxPayloadKG                float64    `gorm:"column:max_payload_kg;type:decimal(10,2)" json:"max_payload_kg"`
+	MaxLoad                     float64    `gorm:"type:decimal(10,2)" json:"max_load"`
+	MaxFlightTime               int        `json:"max_flight_time"`
+	MaxDistance                 float64    `gorm:"type:decimal(10,2)" json:"max_distance"`
+	Features                    JSON       `gorm:"type:json" json:"features"`
+	Images                      JSON       `gorm:"type:json" json:"images"`
+	CertificationStatus         string     `gorm:"type:varchar(20);default:pending" json:"certification_status"`
+	CertificationDocs           JSON       `gorm:"type:json" json:"certification_docs"`
+	CertificationReviewedAt     *time.Time `json:"certification_reviewed_at"`
+	CertificationReviewedBy     int64      `gorm:"index" json:"certification_reviewed_by"`
+	CertificationForceApproved  bool       `gorm:"default:false" json:"certification_force_approved"`
+	CertificationOverrideReason string     `gorm:"type:varchar(500)" json:"certification_override_reason"`
+	DailyPrice                  int64      `json:"daily_price"`
+	HourlyPrice                 int64      `json:"hourly_price"`
+	Deposit                     int64      `json:"deposit"`
+	Latitude                    float64    `gorm:"type:decimal(10,7)" json:"latitude"`
+	Longitude                   float64    `gorm:"type:decimal(10,7)" json:"longitude"`
+	Address                     string     `gorm:"type:varchar(255)" json:"address"`
+	City                        string     `gorm:"type:varchar(50);index" json:"city"`
+	AvailabilityStatus          string     `gorm:"type:varchar(20);default:available" json:"availability_status"` // available, rented, maintenance, offline
+	Rating                      float64    `gorm:"type:decimal(3,2);default:0" json:"rating"`
+	OrderCount                  int        `gorm:"default:0" json:"order_count"`
+	Description                 string     `gorm:"type:text" json:"description"`
 
 	// ==================== UOM平台登记信息 ====================
 	UOMRegistrationNo  string     `gorm:"type:varchar(100);index" json:"uom_registration_no"`   // UOM平台登记号

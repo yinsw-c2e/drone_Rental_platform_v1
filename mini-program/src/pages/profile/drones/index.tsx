@@ -2,9 +2,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState } from 'react';
 import { View, Text, ScrollView } from '@tarojs/components';
 import { droneService } from '../../../services/drone';
-import { VERIFY_STATUS } from '../../../constants';
 import { Drone } from '../../../types';
-import { formatUnknownEnumLabel } from '../../../utils';
 import './index.scss';
 
 const statusMap: Record<string, { label: string; tone: string }> = {
@@ -12,15 +10,6 @@ const statusMap: Record<string, { label: string; tone: string }> = {
   rented: { label: '忙碌中', tone: 'orange' },
   maintenance: { label: '维护中', tone: 'red' },
   offline: { label: '不可用', tone: 'gray' },
-};
-
-const CERTIFICATION_STATUS_LABELS: Record<string, string> = {
-  draft: '未提交',
-  pending: '审核中',
-  approved: '已认证',
-  rejected: '未通过',
-  verified: '已认证',
-  unverified: '未认证',
 };
 
 function StatusBadge({ label, tone }: { label: string; tone: string }) {
@@ -37,6 +26,27 @@ function StatusBadge({ label, tone }: { label: string; tone: string }) {
     </View>
   );
 }
+
+const isQualificationVerified = (status?: string | null) => String(status || '').toLowerCase() === 'verified';
+
+const getQualificationSummary = (drone: Drone) => {
+  const verifiedCount = [
+    drone.uom_verified,
+    drone.insurance_verified,
+    drone.airworthiness_verified,
+  ].filter(isQualificationVerified).length;
+
+  return {
+    verifiedCount,
+    complete: verifiedCount === 3,
+    label: verifiedCount === 3 ? '资质齐全' : `资质待补 ${verifiedCount}/3`,
+  };
+};
+
+const openCertification = (droneId: number, event?: { stopPropagation?: () => void }) => {
+  event?.stopPropagation?.();
+  Taro.navigateTo({ url: `/pages/drone/certification/index?id=${droneId}` });
+};
 
 export default function MyDronesPage() {
   const [drones, setDrones] = useState<Drone[]>([]);
@@ -78,6 +88,7 @@ export default function MyDronesPage() {
             const availability = statusMap[d.availability_status || 'offline'] || statusMap.offline;
             const mtow = d.mtow_kg || 0;
             const payload = d.max_payload_kg || d.max_load || 0;
+            const qualification = getQualificationSummary(d);
 
             return (
               <View key={d.id} className='list-item my-drones-item' onClick={() => Taro.navigateTo({ url: `/pages/drone/detail/index?id=${d.id}` })}>
@@ -107,10 +118,13 @@ export default function MyDronesPage() {
                   <Text className='md-meta-label'>序列号</Text>
                   <Text className='md-meta-value'>{d.serial_number || '-'}</Text>
                 </View>
-                <View className='md-meta-row md-meta-row-single'>
-                  <Text className='md-meta-label'>认证</Text>
-                  <Text className='md-meta-value'>
-                    {CERTIFICATION_STATUS_LABELS[String(d.certification_status || '').toLowerCase()] || VERIFY_STATUS[String(d.certification_status || '').toLowerCase()] || formatUnknownEnumLabel(d.certification_status, '状态未知')}
+                <View
+                  className={`md-meta-row md-meta-row-single my-drones-qualification-row${qualification.complete ? '' : ' my-drones-qualification-row-active'}`}
+                  onClick={qualification.complete ? undefined : (event) => openCertification(d.id, event)}
+                >
+                  <Text className='md-meta-label'>资质</Text>
+                  <Text className={`md-meta-value my-drones-qualification-value ${qualification.complete ? 'my-drones-qualification-value-complete' : 'my-drones-qualification-value-pending'}`}>
+                    {qualification.label}
                   </Text>
                 </View>
                 <View className='md-footer' />

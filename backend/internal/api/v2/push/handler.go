@@ -20,6 +20,7 @@ type Handler struct {
 
 type WeChatSubscribeGrantRecorder interface {
 	GrantAcceptedTemplates(ctx context.Context, userID int64, templateIDs []string) (int, error)
+	SendEvent(ctx context.Context, userID int64, eventType string, dataCtx map[string]interface{}) error
 }
 
 func NewHandler(pushService push.PushService, serverMode string, wechatSubscribe WeChatSubscribeGrantRecorder) *Handler {
@@ -42,6 +43,11 @@ type registerDeviceRequest struct {
 
 type wechatSubscribeRequest struct {
 	AcceptedTemplateIDs []string `json:"accepted_template_ids"`
+}
+
+type wechatSubscribeDevTriggerRequest struct {
+	EventType string                 `json:"event_type" binding:"required"`
+	Extras    map[string]interface{} `json:"extras"`
 }
 
 func (h *Handler) SendTest(c *gin.Context) {
@@ -181,6 +187,52 @@ func (h *Handler) GrantWeChatSubscribe(c *gin.Context) {
 	response.V2Success(c, gin.H{
 		"granted": granted,
 		"enabled": true,
+	})
+}
+
+// DevTriggerWeChatSubscribe 仅在非 release 模式下可用，按事件类型直接触发一次
+// WeChatSubscribeService.SendEvent，用于联调"实际能发出去 / 用户能收到"。
+// 当前用户即收件人；事件类型必须在 WeChat 订阅消息白名单内。
+func (h *Handler) DevTriggerWeChatSubscribe(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		response.V2Unauthorized(c, "missing user context")
+		return
+	}
+	if h.serverMode == "release" {
+		response.V2Forbidden(c, "dev trigger is disabled in release mode")
+		return
+	}
+	if h.wechatSubscribe == nil {
+		response.V2BadRequest(c, "wechat subscribe service not configured")
+		return
+	}
+
+	var req wechatSubscribeDevTriggerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.V2ValidationError(c, "event_type is required")
+		return
+	}
+	if req.Extras == nil {
+		req.Extras = map[string]interface{}{}
+	}
+	req.Extras["event_type"] = req.EventType
+	if _, ok := req.Extras["title"]; !ok {
+		req.Extras["title"] = "[dev] 订阅消息触发测试"
+	}
+	if _, ok := req.Extras["content"]; !ok {
+		req.Extras["content"] = "由开发者诊断页触发的一次 SendEvent 调用"
+	}
+
+	if err := h.wechatSubscribe.SendEvent(c.Request.Context(), userID, req.EventType, req.Extras); err != nil {
+		response.V2InternalError(c, err.Error())
+		return
+	}
+	response.V2Success(c, gin.H{
+		"triggered":  true,
+		"user_id":    userID,
+		"event_type": req.EventType,
+		"note":       "若 push.provider=mock 看后端日志 [MOCK]；若真模式去微信「服务通知」查收",
 	})
 }
 

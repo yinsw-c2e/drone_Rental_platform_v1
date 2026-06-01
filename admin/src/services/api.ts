@@ -200,8 +200,12 @@ export const adminApi = {
   getDroneDetail: (id: number) =>
     api.get(`/admin/drones/${id}`),
   
-  approveCertification: (id: number, approved: boolean, reason?: string) =>
-    api.put(`/admin/drones/${id}/certification`, { approved, reason }),
+  approveCertification: (id: number, approved: boolean, opts?: { force?: boolean; overrideReason?: string }) =>
+    api.put(`/admin/drones/${id}/certification`, {
+      approved,
+      force: opts?.force ?? false,
+      override_reason: opts?.overrideReason ?? '',
+    }),
 
   approveUOM: (id: number, approved: boolean) =>
     api.put(`/admin/drones/${id}/uom`, { approved }),

@@ -28,6 +28,26 @@
 .image-add-btn { width: 80px; height: 80px; border: 1px dashed #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: center; background-color: #F9FAFB; }
 .image-add-icon { font-size: 24px; color: #9CA3AF; }
 .form-textarea { height: 80px; width: 100%; font-size: 15px; padding: 12px 0; }
+.add-drone-cert-hint {
+  margin: 0 16px 12px;
+  background: #eef5ff;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+}
+.add-drone-cert-hint-title {
+  display: block;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  font-weight: 700;
+  color: #1266e3;
+}
+.add-drone-cert-hint-text {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  color: #4a5b78;
+}
 .submit-wrap { padding: 24px 16px; }
 .btn-primary { background-color: #1677FF; border-radius: 8px; padding: 14px; display: flex; align-items: center; justify-content: center; }
 .btn-text { color: #fff; font-size: 16px; font-weight: 500; }

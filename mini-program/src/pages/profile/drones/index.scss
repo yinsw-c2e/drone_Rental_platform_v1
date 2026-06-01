@@ -125,6 +125,24 @@ $primary: #1677FF;
   text-align: right;
 }
 
+.my-drones-qualification-row-active {
+  cursor: pointer;
+}
+
+.my-drones-qualification-value {
+  text-align: right;
+}
+
+.my-drones-qualification-value-complete {
+  color: #0ba34a;
+  font-weight: 700;
+}
+
+.my-drones-qualification-value-pending {
+  color: #f26a0a;
+  font-weight: 700;
+}
+
 .md-footer {
   display: flex;
   flex-direction: row;

@@ -323,11 +323,9 @@ export default function ProviderWorkbench() {
   }, [user?.nickname]);
   const { presence, goOnline, goOffline } = useProviderPresence({ managedByGlobalShell: true });
   const providerCertLabel = useMemo(() => {
-    if (providerCapabilities.canSelfExecute) return '综合就绪';
-    if (providerCapabilities.canPublishSupply) return '设备就绪';
-    if (providerCapabilities.canAcceptDispatch) return '履约就绪';
+    if (providerCapabilities.canUseWorkbench) return '接单就绪';
     return '待入驻';
-  }, [providerCapabilities.canAcceptDispatch, providerCapabilities.canPublishSupply, providerCapabilities.canSelfExecute]);
+  }, [providerCapabilities.canUseWorkbench]);
   const providerGateCopy = useMemo(() => {
     if (!isAuthenticated) {
       return {
@@ -336,10 +334,12 @@ export default function ProviderWorkbench() {
         primary: '去登录',
       };
     }
-    if (providerCapabilities.nextAction === 'wait_review') {
+    const hasReviewingQualification = providerCapabilities.assetStatus === 'pending_review'
+      || providerCapabilities.executorStatus === 'pending_review';
+    if (providerCapabilities.nextAction === 'wait_review' && hasReviewingQualification) {
       return {
-        title: '服务商资质审核中',
-        desc: '你的服务商资料和设备资质正在审核，通过后才能正式接单和管理履约。',
+        title: '接单资质审核中',
+        desc: '你的服务商资料、设备资质或履约资质正在审核，通过后才能正式接单和管理履约。',
         primary: '查看入驻进度',
       };
     }
@@ -351,11 +351,11 @@ export default function ProviderWorkbench() {
       };
     }
     return {
-      title: '服务商能力未开通',
-      desc: '先完善服务商资料和设备资质，审核通过后才能接单和管理履约。',
+      title: '接单资质未完成',
+      desc: '先完善服务商资料、设备资质和履约资质，审核通过后才能接单和管理履约。',
       primary: '开始服务商入驻',
     };
-  }, [isAuthenticated, providerCapabilities.nextAction]);
+  }, [isAuthenticated, providerCapabilities.assetStatus, providerCapabilities.executorStatus, providerCapabilities.nextAction]);
 
   const promptLogin = useCallback(() => {
     Taro.showModal({
@@ -557,7 +557,7 @@ export default function ProviderWorkbench() {
       promptLogin();
       return;
     }
-    Taro.showActionSheet({ itemList: ['设备管理', '服务资质'] })
+    Taro.showActionSheet({ itemList: ['设备资质', '接单资质'] })
       .then((res) => {
         if (res.tapIndex === 0) navigateWithAuth('/pages/profile/drones/index');
         if (res.tapIndex === 1) navigateWithAuth('/pages/provider/onboarding/index?from=workbench');
@@ -617,7 +617,7 @@ export default function ProviderWorkbench() {
     },
     {
       key: 'qualification',
-      label: '服务资质',
+      label: '接单资质',
       icon: quickQualificationIcon,
       iconClass: 'provider-quick-icon-qualification',
       onClick: openProviderOnboarding,
@@ -723,7 +723,7 @@ export default function ProviderWorkbench() {
   const ctaState = actionLoading ? 'loading' : presence.online ? 'offline' : 'online';
   const ctaHint = presence.online
     ? '派单进行中。下线后将停止派单，仍可去「接单」Tab 主动报价。'
-    : '上线后平台会按你的机型/半径主动派单。';
+    : '上线后平台会按你的接单资质、机型和半径主动派单。';
 
   return (
     <View className='pw-page'>

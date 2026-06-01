@@ -519,15 +519,14 @@ export default function ProfilePage() {
 
   const capabilityItems = useMemo(
     () => [
-      { key: 'supply', label: '可发布供给', enabled: providerCapabilities.canPublishSupply },
-      { key: 'dispatch', label: '可推进履约', enabled: providerCapabilities.canAcceptDispatch },
-      { key: 'self-execute', label: '服务商履约', enabled: providerCapabilities.canSelfExecute },
+      { key: 'qualification', label: '接单资质', enabled: providerCapabilities.canUseWorkbench },
+      { key: 'asset', label: '设备资质', enabled: providerCapabilities.assetStatus === 'approved' },
+      { key: 'executor', label: '履约资质', enabled: providerCapabilities.executorStatus === 'approved' },
     ],
-    [providerCapabilities.canAcceptDispatch, providerCapabilities.canPublishSupply, providerCapabilities.canSelfExecute],
+    [providerCapabilities.assetStatus, providerCapabilities.canUseWorkbench, providerCapabilities.executorStatus],
   );
 
-  const canApplySelfExecute =
-    providerCapabilities.canPublishSupply && providerCapabilities.canAcceptDispatch;
+  const canApplySelfExecute = providerCapabilities.canUseWorkbench;
 
   return (
     <View className='profile-page'>
@@ -682,8 +681,8 @@ export default function ProfilePage() {
                 </View>
                 <Text className='capability-note'>
                   {canApplySelfExecute
-                    ? '你已经具备供给发布和履约推进能力，可由服务商主体承接并履约。'
-                    : '要完整履约，需要同时完善设备资质和履约资质。'}
+                    ? '你已经具备接单资质，可由服务商主体承接并履约。'
+                    : '正式接单需要同时完善设备资质和履约资质。'}
                 </Text>
               </View>
             </>

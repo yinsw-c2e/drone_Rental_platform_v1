@@ -261,7 +261,7 @@ func (s *OwnerService) ensureProviderQuoteAccess(userID int64) error {
 		return err
 	}
 	if !provider.CanQuote {
-		return errors.New("无权进入服务商接单工作台，请先完成设备能力审核")
+		return errors.New("无权进入服务商接单工作台，请先完成接单资质审核")
 	}
 	return nil
 }
@@ -272,7 +272,7 @@ func (s *OwnerService) ensureProviderDispatchAccess(userID int64) error {
 		return err
 	}
 	if !provider.CanArrangeDispatch {
-		return errors.New("无权管理协作执行人员，请先完成设备能力审核")
+		return errors.New("无权管理协作执行人员，请先完成接单资质审核")
 	}
 	return nil
 }

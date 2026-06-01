@@ -11,6 +11,23 @@ import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../u
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
+const formatScheduledRange = (startISO?: string, endISO?: string): string => {
+  const fmt = (iso?: string): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}-${dd} ${hh}:${mi}`;
+  };
+  const start = fmt(startISO);
+  const end = fmt(endISO);
+  if (start && end) return `${start} → ${end}`;
+  return start || end || '-';
+};
+
 export default function DemandDetailPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
@@ -48,7 +65,7 @@ export default function DemandDetailPage() {
 
   const isOwnDemand = demand?.client_user_id === user?.id;
   const canEdit = isOwnDemand && ['draft', 'published', 'quoting'].includes(demand?.status || '');
-  const canQuote = !isOwnDemand && providerCapabilities.canPublishSupply;
+  const canQuote = !isOwnDemand && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply;
   const canCandidate = !isOwnDemand && roleSummary?.has_pilot_role && demand?.allows_pilot_candidate;
   const hasOwnQuote = Boolean((demand as any)?.my_quote);
 
@@ -136,7 +153,22 @@ export default function DemandDetailPage() {
         <View className="info-row"><Text className="info-label">场景</Text><Text className="info-value">{getDemandSceneLabel(demand.cargo_scene)}</Text></View>
         <View className="info-row"><Text className="info-label">预估重量</Text><Text className="info-value">{demand.cargo_weight_kg || 0} kg</Text></View>
         <View className="info-row"><Text className="info-label">货物类型</Text><Text className="info-value">{CARGO_TYPES[String(demand.cargo_type || '')] || demand.cargo_type || '-'}</Text></View>
-        <View className="info-row border-none"><Text className="info-label">地址</Text><Text className="info-value">{(demand as any).departure_address?.text || (demand as any).service_address_text || '-'}</Text></View>
+        <View className="info-row"><Text className="info-label">作业时间</Text><Text className="info-value">{formatScheduledRange(demand.scheduled_start_at, demand.scheduled_end_at)}</Text></View>
+        <View className="info-row"><Text className="info-label">起吊点</Text><Text className="info-value">{(demand as any).departure_address?.text || (demand as any).service_address_text || '-'}</Text></View>
+        <View className="info-row border-none"><Text className="info-label">落放点</Text><Text className="info-value">{(demand as any).destination_address?.text || '-'}</Text></View>
+      </View>
+
+      <View className="info-card">
+        <Text className="section-title">作业说明</Text>
+        <Text className={`info-desc ${(demand.description || '').trim() ? '' : 'is-empty'}`}>
+          {(demand.description || '').trim() || '客户未补充说明'}
+        </Text>
+        {((demand as any).cargo_special_requirements || '').trim() ? (
+          <View className="info-extra">
+            <Text className="info-label">特殊要求</Text>
+            <Text className="info-desc">{(demand as any).cargo_special_requirements}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View className="info-card">

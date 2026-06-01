@@ -22,6 +22,77 @@
 .images-scroll { background-color: #fff; margin-bottom: 12px; padding: 12px 0; }
 .images-row { display: flex; flex-direction: row; padding: 0 16px; }
 .drone-image { width: 120px; height: 90px; border-radius: 8px; margin-right: 12px; background-color: #F3F4F6; }
+.drone-detail-qualification-card {
+  background: #eef5ff;
+  margin: 0 16px 12px;
+  border-radius: 12px;
+  padding: 14px;
+}
+.drone-detail-qualification-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.drone-detail-qualification-title-group {
+  flex: 1;
+  min-width: 0;
+}
+.drone-detail-qualification-title {
+  display: block;
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 700;
+  color: #1266e3;
+}
+.drone-detail-qualification-subtitle {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 17px;
+  color: #4a5b78;
+}
+.drone-detail-qualification-action {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  color: #1266e3;
+}
+.drone-detail-qualification-pills {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-top: 12px;
+}
+.drone-detail-qualification-pill {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid #F3F4F6;
+}
+.drone-detail-qualification-pill-name {
+  display: block;
+  font-size: 11px;
+  line-height: 15px;
+  color: #4a5b78;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.drone-detail-qualification-pill-status {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.drone-detail-qualification-pill-status-verified { color: #0ba34a; }
+.drone-detail-qualification-pill-status-pending { color: #f26a0a; }
+.drone-detail-qualification-pill-status-empty { color: #9CA3AF; }
 .info-card {
   background-color: #fff;
   padding: 0 16px;

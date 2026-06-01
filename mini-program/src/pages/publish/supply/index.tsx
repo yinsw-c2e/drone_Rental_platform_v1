@@ -55,7 +55,7 @@ export default function PublishSupplyPage() {
 
   const handleSubmit = async () => {
     if (!canPublishSupply) {
-      Taro.showToast({ title: '服务商设备能力审核通过后才能上架服务', icon: 'none' });
+      Taro.showToast({ title: '接单资质通过后才能上架服务', icon: 'none' });
       return;
     }
     if (!title.trim()) { Taro.showToast({ title: '请输入服务标题', icon: 'none' }); return; }
@@ -91,8 +91,8 @@ export default function PublishSupplyPage() {
     return (
       <View className="publish-wrap">
         <ProviderAccessNotice
-          title={isAuthenticated ? '服务商设备能力未开通' : '请先登录服务商账号'}
-          description={isAuthenticated ? '无人机、保险、适航和 UOM 等关键资质审核通过后，才能上架正式服务。' : '登录后才能上架服务商供给。'}
+          title={isAuthenticated ? '接单资质未开通' : '请先登录服务商账号'}
+          description={isAuthenticated ? '设备资质和履约资质全部通过后，才能上架正式服务。' : '登录后才能上架服务商供给。'}
           actionText={isAuthenticated ? '查看服务商入驻' : undefined}
           onAction={isAuthenticated ? () => Taro.navigateTo({ url: '/pages/provider/onboarding/index' }) : undefined}
         />

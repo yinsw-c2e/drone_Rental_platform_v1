@@ -34,6 +34,13 @@ export const requestSubscribe = async (tmplIds: string[]) => {
   }
 };
 
+export const devTriggerWeChatSubscribe = (eventType: string, extras: Record<string, any> = {}) =>
+  apiV2.post<{ triggered: boolean; user_id: number; event_type: string; note: string }>(
+    '/push/wechat-subscribe/dev-trigger',
+    { event_type: eventType, extras },
+  );
+
 export const pushService = {
   requestSubscribe,
+  devTriggerWeChatSubscribe,
 };

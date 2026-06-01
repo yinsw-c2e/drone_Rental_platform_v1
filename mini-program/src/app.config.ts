@@ -47,6 +47,7 @@ export default defineAppConfig({
     'pages/settlement/wallet/index',
     'pages/settlement/withdrawal/index',
     'pages/settlement/withdrawal-list/index',
+    'pages/dev/subscribe-test/index',
   ],
   window: { backgroundTextStyle: 'light', navigationBarBackgroundColor: '#fff', navigationBarTitleText: '重载吊运', navigationBarTextStyle: 'black' },
   permission: {

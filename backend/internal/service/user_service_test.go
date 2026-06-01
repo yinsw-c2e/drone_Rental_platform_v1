@@ -99,12 +99,13 @@ func TestGetRoleSummaryBuildsPendingProviderSummaryForNewOnboarding(t *testing.T
 	}
 }
 
-func TestGetRoleSummaryApprovesAssetProviderFromEligibleDrone(t *testing.T) {
-	db := newServiceTestDB(t, &model.User{}, &model.ClientProfile{}, &model.OwnerProfile{}, &model.PilotProfile{}, &model.Drone{})
+func TestGetRoleSummaryRequiresAssetAndExecutorForProviderAccess(t *testing.T) {
+	db := newServiceTestDB(t, &model.User{}, &model.ClientProfile{}, &model.OwnerProfile{}, &model.PilotProfile{}, &model.Pilot{}, &model.Drone{})
 	userRepo := repository.NewUserRepo(db)
 	roleProfileRepo := repository.NewRoleProfileRepo(db)
 	droneRepo := repository.NewDroneRepo(db)
-	userService := NewUserService(userRepo, nil, roleProfileRepo, droneRepo, nil)
+	pilotRepo := repository.NewPilotRepo(db)
+	userService := NewUserService(userRepo, nil, roleProfileRepo, droneRepo, pilotRepo)
 	user := &model.User{
 		Phone:    "13900004444",
 		Nickname: "设备服务商",
@@ -134,15 +135,33 @@ func TestGetRoleSummaryApprovesAssetProviderFromEligibleDrone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get role summary: %v", err)
 	}
-	if summary.Provider.Status != providerStatusApproved || summary.Provider.AssetStatus != providerStatusApproved {
+	if summary.Provider.Status != providerStatusPendingReview || summary.Provider.AssetStatus != providerStatusApproved {
 		t.Fatalf("expected approved asset provider, got %#v", summary.Provider)
 	}
-	if !summary.Provider.CanUseWorkbench || !summary.Provider.CanQuote || !summary.Provider.CanArrangeDispatch || !summary.CanPublishSupply {
-		t.Fatalf("eligible drone must unlock asset provider operations, got %#v", summary.Provider)
+	if summary.Provider.CanUseWorkbench || summary.Provider.CanQuote || summary.Provider.CanArrangeDispatch || summary.CanPublishSupply {
+		t.Fatalf("asset-only provider must not unlock formal operations, got %#v", summary.Provider)
+	}
+
+	if err := pilotRepo.Create(&model.Pilot{
+		UserID:             user.ID,
+		VerificationStatus: "verified",
+		AvailabilityStatus: "offline",
+	}); err != nil {
+		t.Fatalf("create pilot: %v", err)
+	}
+	summary, err = userService.GetRoleSummary(user.ID)
+	if err != nil {
+		t.Fatalf("get role summary after executor approval: %v", err)
+	}
+	if !summary.Provider.CanUseWorkbench || !summary.Provider.CanQuote || !summary.Provider.CanArrangeDispatch || !summary.Provider.CanSelfExecute || !summary.CanPublishSupply || !summary.CanSelfExecute {
+		t.Fatalf("asset and executor approval must unlock unified provider operations, got %#v", summary.Provider)
+	}
+	if summary.Provider.CanAcceptDispatch || summary.CanAcceptDispatch {
+		t.Fatalf("offline executor must not accept dispatch, got %#v", summary.Provider)
 	}
 }
 
-func TestGetRoleSummaryExecutorApprovalDoesNotRequireOnlineForWorkbench(t *testing.T) {
+func TestGetRoleSummaryExecutorOnlyDoesNotUnlockWorkbench(t *testing.T) {
 	db := newServiceTestDB(t, &model.User{}, &model.Pilot{})
 	userRepo := repository.NewUserRepo(db)
 	pilotRepo := repository.NewPilotRepo(db)
@@ -168,11 +187,11 @@ func TestGetRoleSummaryExecutorApprovalDoesNotRequireOnlineForWorkbench(t *testi
 	if err != nil {
 		t.Fatalf("get role summary: %v", err)
 	}
-	if summary.Provider.Status != providerStatusApproved || summary.Provider.ExecutorStatus != providerStatusApproved {
+	if summary.Provider.Status != providerStatusPendingReview || summary.Provider.ExecutorStatus != providerStatusApproved {
 		t.Fatalf("expected approved executor provider, got %#v", summary.Provider)
 	}
-	if !summary.Provider.CanUseWorkbench {
-		t.Fatalf("verified executor should enter workbench even while offline, got %#v", summary.Provider)
+	if summary.Provider.CanUseWorkbench || summary.Provider.CanQuote || summary.Provider.CanSelfExecute {
+		t.Fatalf("executor-only provider must not unlock formal workbench, got %#v", summary.Provider)
 	}
 	if summary.Provider.CanAcceptDispatch || summary.CanAcceptDispatch {
 		t.Fatalf("offline executor must not accept dispatch, got %#v", summary.Provider)

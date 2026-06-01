@@ -683,7 +683,13 @@ export default function CustomerHaulHome() {
         </View>
 
         <View className='secondary-actions'>
-          <View className='secondary-action' onClick={openComplexService}>复杂服务 / 议价单</View>
+          <View className='secondary-action secondary-action-primary' onClick={openComplexService}>
+            <Text className='secondary-action-emoji'>📋</Text>
+            <View className='secondary-action-body'>
+              <Text className='secondary-action-title'>发布吊运任务</Text>
+              <Text className='secondary-action-sub'>不确定价格 / 要现场看 / 想多家比价</Text>
+            </View>
+          </View>
           <View className='secondary-action' onClick={() => Taro.switchTab({ url: '/pages/orders/index' })}>查看订单</View>
         </View>
 

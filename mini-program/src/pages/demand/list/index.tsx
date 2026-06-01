@@ -85,22 +85,16 @@ const formatPrice = (min?: number | null, max?: number | null) => {
 };
 
 const providerCapabilityCopyOf = (canQuote: boolean, canSelfExecute: boolean): ProviderCapabilityCopy | null => {
-  if (!canQuote && !canSelfExecute) {
-    return {
-      title: '设备和履约资质都未开通',
-      desc: '议价报价需先通过设备资质审核，即时抢单还需要补充履约资质。',
-    };
-  }
   if (!canQuote) {
     return {
-      title: '议价报价需先通过设备资质审核',
-      desc: '设备资质通过后才能查看可报价需求。',
+      title: '接单资质未开通',
+      desc: '设备资质和履约资质全部通过后，才能查看需求并提交报价。',
     };
   }
   if (!canSelfExecute) {
     return {
-      title: '可议价报价；即时抢单需补履约资质',
-      desc: '当前可查看需求并报价，即时抢单还需要补充履约资质。',
+      title: '接单资质未完整开通',
+      desc: '设备资质和履约资质全部通过后，才能正式接单。',
     };
   }
   return null;
@@ -372,7 +366,7 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
     if (!isAuthenticated || !canQuoteAsProvider) {
       setDemands([]);
       setHasMore(false);
-      setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '议价报价需先通过设备资质审核') : '请先登录服务商账号后查看可接需求。');
+      setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '接单资质通过后才能查看可接需求') : '请先登录服务商账号后查看可接需求。');
       setLoading(false);
       return;
     }
@@ -400,7 +394,7 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
     if (!isAuthenticated || !canQuoteAsProvider) {
       setDemands([]);
       setHasMore(false);
-      setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '议价报价需先通过设备资质审核') : '请先登录服务商账号后查看可接需求。');
+      setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '接单资质通过后才能查看可接需求') : '请先登录服务商账号后查看可接需求。');
       setLoading(false);
       return;
     }
