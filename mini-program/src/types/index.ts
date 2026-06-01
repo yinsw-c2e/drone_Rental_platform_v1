@@ -18,12 +18,18 @@ export interface User {
 }
 
 export type ProviderReviewStatus = "none" | "pending_review" | "approved" | "rejected" | "suspended";
+export type ProviderReviewState = "none" | "pending" | "approved" | "rejected";
 export type ProviderNextAction = "start_onboarding" | "wait_review" | "fix_rejected" | "open_workbench";
 
 export interface ProviderRoleSummary {
   status: ProviderReviewStatus;
   asset_status: ProviderReviewStatus;
   executor_status: ProviderReviewStatus;
+  reject_reason?: string;
+  asset_review_state?: ProviderReviewState;
+  asset_reject_reason?: string;
+  executor_review_state?: ProviderReviewState;
+  executor_reject_reason?: string;
   can_use_workbench: boolean;
   can_quote: boolean;
   can_arrange_dispatch: boolean;

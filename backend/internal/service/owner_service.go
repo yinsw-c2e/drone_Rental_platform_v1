@@ -242,7 +242,7 @@ func (s *OwnerService) providerRoleSummary(userID int64) (ProviderRoleSummary, e
 		}
 	}
 
-	return buildProviderRoleSummary(assetStatus, executorStatus, executorOnline), nil
+	return buildProviderRoleSummary(assetStatus, executorStatus, executorOnline, "", ""), nil
 }
 
 func isOptionalProviderLookupError(err error) bool {

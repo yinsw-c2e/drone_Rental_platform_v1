@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"wurenji-backend/internal/model"
@@ -158,6 +159,71 @@ func TestGetRoleSummaryRequiresAssetAndExecutorForProviderAccess(t *testing.T) {
 	}
 	if summary.Provider.CanAcceptDispatch || summary.CanAcceptDispatch {
 		t.Fatalf("offline executor must not accept dispatch, got %#v", summary.Provider)
+	}
+}
+
+func TestGetRoleSummaryIncludesProviderReviewReasons(t *testing.T) {
+	db := newServiceTestDB(t, &model.User{}, &model.ClientProfile{}, &model.OwnerProfile{}, &model.PilotProfile{}, &model.Pilot{}, &model.Drone{})
+	userRepo := repository.NewUserRepo(db)
+	roleProfileRepo := repository.NewRoleProfileRepo(db)
+	droneRepo := repository.NewDroneRepo(db)
+	pilotRepo := repository.NewPilotRepo(db)
+	userService := NewUserService(userRepo, nil, roleProfileRepo, droneRepo, pilotRepo)
+	user := &model.User{
+		Phone:    "13900006666",
+		Nickname: "待修复服务商",
+		UserType: "renter",
+		Status:   "active",
+	}
+	if err := userRepo.Create(user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := roleProfileRepo.EnsureOwnerProfile(&model.OwnerProfile{
+		UserID:             user.ID,
+		VerificationStatus: "pending",
+		Status:             "active",
+	}); err != nil {
+		t.Fatalf("create owner profile: %v", err)
+	}
+	if err := droneRepo.Create(&model.Drone{
+		OwnerID:               user.ID,
+		Brand:                 "DJI",
+		Model:                 "Heavy",
+		SerialNumber:          "DR-PROVIDER-ROLE-REJECTED-001",
+		MTOWKG:                model.HeavyLiftMinMTOWKG,
+		MaxPayloadKG:          model.HeavyLiftMinPayloadKG,
+		AvailabilityStatus:    "available",
+		CertificationStatus:   "approved",
+		UOMVerified:           "verified",
+		InsuranceVerified:     "rejected",
+		InsuranceRejectReason: "保单截图不清晰",
+		AirworthinessVerified: "verified",
+	}); err != nil {
+		t.Fatalf("create rejected drone: %v", err)
+	}
+	if err := pilotRepo.Create(&model.Pilot{
+		UserID:             user.ID,
+		VerificationStatus: "rejected",
+		VerificationNote:   "保险有效期不足 60 天",
+	}); err != nil {
+		t.Fatalf("create rejected pilot: %v", err)
+	}
+
+	summary, err := userService.GetRoleSummary(user.ID)
+	if err != nil {
+		t.Fatalf("get role summary: %v", err)
+	}
+	if summary.Provider.Status != providerStatusRejected {
+		t.Fatalf("expected rejected provider summary, got %#v", summary.Provider)
+	}
+	if summary.Provider.AssetReviewState != "rejected" || !strings.Contains(summary.Provider.AssetRejectReason, "保单截图不清晰") {
+		t.Fatalf("expected asset rejection details, got %#v", summary.Provider)
+	}
+	if summary.Provider.ExecutorReviewState != "rejected" || !strings.Contains(summary.Provider.ExecutorRejectReason, "保险有效期不足 60 天") {
+		t.Fatalf("expected executor rejection details, got %#v", summary.Provider)
+	}
+	if summary.Provider.RejectReason == "" {
+		t.Fatalf("expected overall reject reason, got %#v", summary.Provider)
 	}
 }
 

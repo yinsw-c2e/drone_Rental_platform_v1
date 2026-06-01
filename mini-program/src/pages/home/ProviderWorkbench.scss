@@ -827,6 +827,61 @@ page {
   line-height: 40rpx;
 }
 
+.pw-review-fix-card {
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #fed7aa;
+}
+
+.pw-review-fix-title {
+  display: block;
+  color: #9a3412;
+  font-size: 28rpx;
+  line-height: 38rpx;
+  font-weight: 900;
+}
+
+.pw-review-fix-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 22rpx 0;
+  border-top: 1rpx solid rgba(251, 146, 60, 0.28);
+}
+
+.pw-review-fix-title + .pw-review-fix-row {
+  margin-top: 14rpx;
+}
+
+.pw-review-fix-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pw-review-fix-name {
+  display: block;
+  color: #7c2d12;
+  font-size: 26rpx;
+  line-height: 36rpx;
+  font-weight: 800;
+}
+
+.pw-review-fix-reason {
+  display: block;
+  margin-top: 6rpx;
+  color: #9a3412;
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.pw-review-fix-action {
+  flex: none;
+  color: #2563eb;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  font-weight: 800;
+}
+
 .pw-gate-primary,
 .pw-gate-secondary {
   display: flex;

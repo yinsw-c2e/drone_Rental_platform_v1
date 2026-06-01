@@ -14,6 +14,7 @@ import { RootState, useAppDispatch } from '../../store/store';
 import { presenceConfigUpdated } from '../../store/slices/providerPresenceSlice';
 import { PROVIDER_WORKBENCH_SUBSCRIBE_TEMPLATES } from '../../constants/subscribeTemplates';
 import { requestSubscribe } from '../../services/push';
+import ProviderOnboardingOverlay from '../../components/haul/ProviderOnboardingOverlay';
 import {
   HomeDashboard,
   OwnerWorkbenchOrderItem,
@@ -24,6 +25,8 @@ import {
   V2ProviderStats,
   V2ServiceClass,
 } from '../../types';
+import { PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY } from '../../utils/providerOnboarding';
+import { buildProviderReviewFixItems } from '../../utils/providerReview';
 import logoProvider from '../../assets/haul/provider-workbench/logo_provider_anyi_round_drone.png';
 import metricPendingIcon from '../../assets/haul/provider-workbench/icon_metric_pending_today_blue.png';
 import metricQuoteIcon from '../../assets/haul/provider-workbench/icon_metric_quote_orange.png';
@@ -314,8 +317,10 @@ export default function ProviderWorkbench() {
   const [providerStats, setProviderStats] = useState<V2ProviderStats | null>(null);
   const [serviceClasses, setServiceClasses] = useState<V2ServiceClass[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showProviderOnboarding, setShowProviderOnboarding] = useState(false);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary), [roleSummary]);
   const providerCapabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
+  const providerReviewFixItems = useMemo(() => buildProviderReviewFixItems(providerCapabilities), [providerCapabilities]);
   const canUseProvider = canUseProviderWorkbench(effectiveRoleSummary);
   const providerBrandName = useMemo(() => {
     const nickname = String(user?.nickname || '').trim();
@@ -344,9 +349,12 @@ export default function ProviderWorkbench() {
       };
     }
     if (providerCapabilities.nextAction === 'fix_rejected') {
+      const fixDesc = providerReviewFixItems.length
+        ? `请按下方待修复项补充资料：${providerReviewFixItems.map(item => item.title).join('、')}。`
+        : '当前服务商资质未通过或已暂停，请补充资料后重新提交审核。';
       return {
         title: '服务商资质需补充',
-        desc: '当前服务商资质未通过或已暂停，请补充资料后重新提交审核。',
+        desc: fixDesc,
         primary: '补充服务商资质',
       };
     }
@@ -355,7 +363,13 @@ export default function ProviderWorkbench() {
       desc: '先完善服务商资料、设备资质和履约资质，审核通过后才能接单和管理履约。',
       primary: '开始服务商入驻',
     };
-  }, [isAuthenticated, providerCapabilities.assetStatus, providerCapabilities.executorStatus, providerCapabilities.nextAction]);
+  }, [
+    isAuthenticated,
+    providerCapabilities.assetStatus,
+    providerCapabilities.executorStatus,
+    providerCapabilities.nextAction,
+    providerReviewFixItems,
+  ]);
 
   const promptLogin = useCallback(() => {
     Taro.showModal({
@@ -463,6 +477,15 @@ export default function ProviderWorkbench() {
     refreshProviderStats,
   ]);
 
+  const closeProviderOnboarding = useCallback(() => {
+    setShowProviderOnboarding(false);
+    try {
+      Taro.setStorageSync(PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY, true);
+    } catch (error) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '引导状态保存失败'), icon: 'none' });
+    }
+  }, []);
+
   useDidShow(() => {
     // 仅同步 TabBar 选中态，不强制改写全局角色身份。
     syncCustomTabBar(0);
@@ -470,6 +493,17 @@ export default function ProviderWorkbench() {
       setOpenedOnboardingOnce(true);
       safeNavigateTo('/pages/provider/onboarding/index?from=workbench');
       return;
+    }
+    if (isAuthenticated && canUseProvider) {
+      try {
+        const seen = Boolean(Taro.getStorageSync(PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY));
+        setShowProviderOnboarding(!seen);
+      } catch (error) {
+        setShowProviderOnboarding(false);
+        Taro.showToast({ title: friendlyErrorMessage(error, '新手引导加载失败'), icon: 'none' });
+      }
+    } else {
+      setShowProviderOnboarding(false);
     }
     refreshDashboard();
     refreshServiceClasses();
@@ -699,6 +733,20 @@ export default function ProviderWorkbench() {
           <View className='pw-card pw-gate-card'>
             <Text className='pw-gate-title'>{providerGateCopy.title}</Text>
             <Text className='pw-gate-desc'>{providerGateCopy.desc}</Text>
+            {providerReviewFixItems.length ? (
+              <View className='pw-review-fix-card'>
+                <Text className='pw-review-fix-title'>服务商资质待修复</Text>
+                {providerReviewFixItems.map((item) => (
+                  <View key={`${item.key}-${item.url}`} className='pw-review-fix-row' onClick={() => safeNavigateTo(item.url)}>
+                    <View className='pw-review-fix-main'>
+                      <Text className='pw-review-fix-name'>{item.title}</Text>
+                      <Text className='pw-review-fix-reason'>{item.reason}</Text>
+                    </View>
+                    <Text className='pw-review-fix-action'>去修改 →</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             <View className='pw-gate-primary' onClick={openProviderOnboarding}>
               <Text>{providerGateCopy.primary}</Text>
             </View>
@@ -915,6 +963,7 @@ export default function ProviderWorkbench() {
 
         <View className='pw-scroll-spacer' />
       </ScrollView>
+      <ProviderOnboardingOverlay visible={showProviderOnboarding} onClose={closeProviderOnboarding} />
     </View>
   );
 }

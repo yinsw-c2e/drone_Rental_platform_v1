@@ -5,9 +5,12 @@ import { ScrollView, Switch, Text, View } from '@tarojs/components';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { logout } from '../../store/slices/authSlice';
+import { setHaulRoleMode } from '../../store/slices/roleSlice';
 import { RootState } from '../../store/store';
 import { COMMON_PLATFORM_SUBSCRIBE_TEMPLATES } from '../../constants/subscribeTemplates';
 import { requestSubscribe } from '../../services/push';
+import { PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY } from '../../utils/providerOnboarding';
+import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
 
 const PUSH_STORAGE_KEY = 'profile_push_enabled';
@@ -108,6 +111,21 @@ export default function SettingsPage() {
     });
   };
 
+  const handleResetProviderOnboarding = () => {
+    try {
+      Taro.removeStorageSync(PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY);
+      dispatch(setHaulRoleMode('provider'));
+      Taro.showToast({ title: '已重置新手引导', icon: 'success' });
+      setTimeout(() => {
+        Taro.switchTab({ url: '/pages/home/index' }).catch(() => {
+          Taro.showToast({ title: '首页暂不可用', icon: 'none' });
+        });
+      }, 350);
+    } catch (error) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '重置失败'), icon: 'none' });
+    }
+  };
+
   const notificationStatusText = useMemo(() => {
     if (loadingSettings) {
       return '读取中...';
@@ -198,6 +216,22 @@ export default function SettingsPage() {
               <View className='settings-row-main'>
                 <Text className='settings-row-label'>打开授权设置</Text>
                 <Text className='settings-row-hint'>检查通知、订阅消息与微信授权状态</Text>
+              </View>
+              <Text className='settings-row-arrow'>›</Text>
+            </View>
+          </View>
+
+          <View className='settings-section-header'>
+            <Text className='settings-section-title'>服务商设置</Text>
+          </View>
+          <View className='settings-section'>
+            <View
+              className='settings-row settings-row-clickable settings-row-last'
+              onClick={handleResetProviderOnboarding}
+            >
+              <View className='settings-row-main'>
+                <Text className='settings-row-label'>重看新手引导</Text>
+                <Text className='settings-row-hint'>回到服务商工作台后重新显示三步引导</Text>
               </View>
               <Text className='settings-row-arrow'>›</Text>
             </View>

@@ -1,0 +1,2 @@
+export const PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY = 'provider_workbench_onboarding_seen_v1';
+

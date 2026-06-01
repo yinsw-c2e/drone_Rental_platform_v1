@@ -9,6 +9,7 @@ import {
   resolveProviderCapabilities,
   type ProviderCapabilities,
 } from '../../../utils/roleSummary';
+import { buildProviderReviewFixItems } from '../../../utils/providerReview';
 import { syncCustomTabBar } from '../../../utils/tabBar';
 import type { ProviderReviewStatus, User } from '../../../types';
 import './index.scss';
@@ -163,6 +164,7 @@ export default function ProviderOnboardingPage() {
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary, user), [roleSummary, user]);
   const capabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
+  const reviewFixItems = useMemo(() => buildProviderReviewFixItems(capabilities), [capabilities]);
   const timelineState = useMemo(
     () => deriveTimelineState(capabilities, user, isAuthenticated),
     [capabilities, isAuthenticated, user],
@@ -239,6 +241,26 @@ export default function ProviderOnboardingPage() {
               )}
             </View>
           </View>
+
+          {reviewFixItems.length ? (
+            <View className="provider-onboarding-card provider-onboarding-fix-card">
+              <Text className="provider-onboarding-fix-title">服务商资质待修复</Text>
+              <Text className="provider-onboarding-fix-desc">按下列项目修改后，重新提交审核即可继续入驻。</Text>
+              {reviewFixItems.map((item) => (
+                <View
+                  key={`${item.key}-${item.url}`}
+                  className="provider-onboarding-fix-row"
+                  onClick={() => safeNavigateTo(item.url)}
+                >
+                  <View className="provider-onboarding-fix-main">
+                    <Text className="provider-onboarding-fix-name">{item.title}</Text>
+                    <Text className="provider-onboarding-fix-reason">{item.reason}</Text>
+                  </View>
+                  <Text className="provider-onboarding-fix-action">去修改 →</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <View className="provider-onboarding-card provider-onboarding-timeline">
             {steps.map((step, index) => (

@@ -29,15 +29,20 @@ const (
 )
 
 type ProviderRoleSummary struct {
-	Status             string `json:"status"`
-	AssetStatus        string `json:"asset_status"`
-	ExecutorStatus     string `json:"executor_status"`
-	CanUseWorkbench    bool   `json:"can_use_workbench"`
-	CanQuote           bool   `json:"can_quote"`
-	CanArrangeDispatch bool   `json:"can_arrange_dispatch"`
-	CanAcceptDispatch  bool   `json:"can_accept_dispatch"`
-	CanSelfExecute     bool   `json:"can_self_execute"`
-	NextAction         string `json:"next_action"`
+	Status               string `json:"status"`
+	AssetStatus          string `json:"asset_status"`
+	ExecutorStatus       string `json:"executor_status"`
+	RejectReason         string `json:"reject_reason,omitempty"`
+	AssetReviewState     string `json:"asset_review_state"`
+	AssetRejectReason    string `json:"asset_reject_reason,omitempty"`
+	ExecutorReviewState  string `json:"executor_review_state"`
+	ExecutorRejectReason string `json:"executor_reject_reason,omitempty"`
+	CanUseWorkbench      bool   `json:"can_use_workbench"`
+	CanQuote             bool   `json:"can_quote"`
+	CanArrangeDispatch   bool   `json:"can_arrange_dispatch"`
+	CanAcceptDispatch    bool   `json:"can_accept_dispatch"`
+	CanSelfExecute       bool   `json:"can_self_execute"`
+	NextAction           string `json:"next_action"`
 }
 
 type RoleSummary struct {
@@ -227,6 +232,8 @@ func (s *UserService) GetRoleSummary(userID int64) (*RoleSummary, error) {
 	summary := &RoleSummary{}
 	assetStatus := providerStatusNone
 	executorStatus := providerStatusNone
+	assetRejectReason := ""
+	executorRejectReason := ""
 	executorOnline := false
 
 	user, err := s.userRepo.GetByID(userID)
@@ -252,14 +259,22 @@ func (s *UserService) GetRoleSummary(userID int64) (*RoleSummary, error) {
 
 		if ownerProfile, err := s.roleProfileRepo.GetOwnerProfileByUserID(userID); err == nil {
 			summary.HasOwnerRole = true
-			assetStatus = combineProviderCapabilityStatus(assetStatus, ownerProfileStatus(ownerProfile))
+			ownerStatus := ownerProfileStatus(ownerProfile)
+			assetStatus = combineProviderCapabilityStatus(assetStatus, ownerStatus)
+			if ownerStatus == providerStatusRejected || ownerStatus == providerStatusSuspended {
+				assetRejectReason = firstNonEmpty(assetRejectReason, ownerProfileRejectReason(ownerProfile))
+			}
 		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
 
 		if pilotProfile, err := s.roleProfileRepo.GetPilotProfileByUserID(userID); err == nil {
 			summary.HasPilotRole = true
-			executorStatus = combineProviderCapabilityStatus(executorStatus, statusFromVerification(pilotProfile.VerificationStatus))
+			profileStatus := statusFromVerification(pilotProfile.VerificationStatus)
+			executorStatus = combineProviderCapabilityStatus(executorStatus, profileStatus)
+			if profileStatus == providerStatusRejected || profileStatus == providerStatusSuspended {
+				executorRejectReason = firstNonEmpty(executorRejectReason, executorProfileRejectReason())
+			}
 		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
@@ -279,20 +294,31 @@ func (s *UserService) GetRoleSummary(userID int64) (*RoleSummary, error) {
 			summary.HasOwnerRole = true
 			assetStatus = providerStatusApproved
 		}
+		if reason, err := s.rejectedAssetReason(userID); err != nil {
+			return nil, err
+		} else if reason != "" {
+			summary.HasOwnerRole = true
+			assetStatus = providerStatusRejected
+			assetRejectReason = firstNonEmpty(assetRejectReason, reason)
+		}
 	}
 
 	if s.pilotRepo != nil {
 		pilot, err := s.pilotRepo.GetByUserID(userID)
 		if err == nil && pilot != nil {
 			summary.HasPilotRole = true
-			executorStatus = combineProviderCapabilityStatus(executorStatus, statusFromVerification(pilot.VerificationStatus))
+			pilotStatus := statusFromVerification(pilot.VerificationStatus)
+			executorStatus = combineProviderCapabilityStatus(executorStatus, pilotStatus)
+			if pilotStatus == providerStatusRejected || pilotStatus == providerStatusSuspended {
+				executorRejectReason = firstNonEmpty(executorRejectReason, pilotRejectReason(pilot))
+			}
 			executorOnline = strings.EqualFold(strings.TrimSpace(pilot.AvailabilityStatus), "online")
 		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
 	}
 
-	summary.Provider = buildProviderRoleSummary(assetStatus, executorStatus, executorOnline)
+	summary.Provider = buildProviderRoleSummary(assetStatus, executorStatus, executorOnline, assetRejectReason, executorRejectReason)
 	summary.CanPublishSupply = summary.Provider.CanQuote
 	summary.CanAcceptDispatch = summary.Provider.CanAcceptDispatch
 	summary.CanSelfExecute = summary.Provider.CanSelfExecute
@@ -310,6 +336,19 @@ func ownerProfileStatus(profile *model.OwnerProfile) string {
 		return providerStatusRejected
 	}
 	return providerStatusPendingReview
+}
+
+func ownerProfileRejectReason(profile *model.OwnerProfile) string {
+	if profile == nil {
+		return ""
+	}
+	if strings.EqualFold(strings.TrimSpace(profile.Status), providerStatusSuspended) {
+		return "服务商资料已暂停，请联系平台客服"
+	}
+	if strings.EqualFold(strings.TrimSpace(profile.VerificationStatus), providerStatusRejected) {
+		return "服务商资料未通过，请修改服务商资料后重新提交"
+	}
+	return ""
 }
 
 func statusFromVerification(status string) string {
@@ -363,7 +402,66 @@ func normalizeProviderCapabilityStatus(status string) string {
 	}
 }
 
-func buildProviderRoleSummary(assetStatus, executorStatus string, executorOnline bool) ProviderRoleSummary {
+func (s *UserService) rejectedAssetReason(userID int64) (string, error) {
+	if s == nil || s.droneRepo == nil || userID <= 0 {
+		return "", nil
+	}
+	drones, _, err := s.droneRepo.ListByOwner(userID, 1, 50)
+	if err != nil {
+		return "", err
+	}
+	for i := range drones {
+		if reason := droneRejectReason(&drones[i]); reason != "" {
+			return reason, nil
+		}
+	}
+	return "", nil
+}
+
+func droneRejectReason(drone *model.Drone) string {
+	if drone == nil {
+		return ""
+	}
+	if strings.EqualFold(strings.TrimSpace(drone.InsuranceVerified), providerStatusRejected) {
+		return firstNonEmpty(strings.TrimSpace(drone.InsuranceRejectReason), "保险资料未通过，请重新上传保险材料")
+	}
+	if strings.EqualFold(strings.TrimSpace(drone.CertificationStatus), providerStatusRejected) {
+		return "设备认证未通过，请重新上传设备资料"
+	}
+	if strings.EqualFold(strings.TrimSpace(drone.UOMVerified), providerStatusRejected) {
+		return "实名登记资料未通过，请重新上传登记材料"
+	}
+	if strings.EqualFold(strings.TrimSpace(drone.AirworthinessVerified), providerStatusRejected) {
+		return "适航资料未通过，请重新上传适航材料"
+	}
+	return ""
+}
+
+func executorProfileRejectReason() string {
+	return "履约资质未通过，请重新提交履约资料"
+}
+
+func pilotRejectReason(pilot *model.Pilot) string {
+	if pilot == nil {
+		return ""
+	}
+	return firstNonEmpty(strings.TrimSpace(pilot.VerificationNote), executorProfileRejectReason())
+}
+
+func providerReviewState(status string) string {
+	switch normalizeProviderCapabilityStatus(status) {
+	case providerStatusApproved:
+		return "approved"
+	case providerStatusRejected, providerStatusSuspended:
+		return "rejected"
+	case providerStatusPendingReview:
+		return "pending"
+	default:
+		return "none"
+	}
+}
+
+func buildProviderRoleSummary(assetStatus, executorStatus string, executorOnline bool, assetRejectReason, executorRejectReason string) ProviderRoleSummary {
 	assetStatus = normalizeProviderCapabilityStatus(assetStatus)
 	executorStatus = normalizeProviderCapabilityStatus(executorStatus)
 	status := combinedProviderStatus(assetStatus, executorStatus)
@@ -373,16 +471,29 @@ func buildProviderRoleSummary(assetStatus, executorStatus string, executorOnline
 	canAcceptDispatch := qualificationApproved && executorOnline
 
 	return ProviderRoleSummary{
-		Status:             status,
-		AssetStatus:        assetStatus,
-		ExecutorStatus:     executorStatus,
-		CanUseWorkbench:    qualificationApproved,
-		CanQuote:           qualificationApproved,
-		CanArrangeDispatch: qualificationApproved,
-		CanAcceptDispatch:  canAcceptDispatch,
-		CanSelfExecute:     qualificationApproved,
-		NextAction:         providerNextActionForStatus(status),
+		Status:               status,
+		AssetStatus:          assetStatus,
+		ExecutorStatus:       executorStatus,
+		RejectReason:         firstNonEmpty(assetRejectReason, executorRejectReason),
+		AssetReviewState:     providerReviewState(assetStatus),
+		AssetRejectReason:    rejectReasonForState(assetStatus, assetRejectReason),
+		ExecutorReviewState:  providerReviewState(executorStatus),
+		ExecutorRejectReason: rejectReasonForState(executorStatus, executorRejectReason),
+		CanUseWorkbench:      qualificationApproved,
+		CanQuote:             qualificationApproved,
+		CanArrangeDispatch:   qualificationApproved,
+		CanAcceptDispatch:    canAcceptDispatch,
+		CanSelfExecute:       qualificationApproved,
+		NextAction:           providerNextActionForStatus(status),
 	}
+}
+
+func rejectReasonForState(status, reason string) string {
+	normalized := normalizeProviderCapabilityStatus(status)
+	if normalized != providerStatusRejected && normalized != providerStatusSuspended {
+		return ""
+	}
+	return strings.TrimSpace(reason)
 }
 
 func combinedProviderStatus(assetStatus, executorStatus string) string {

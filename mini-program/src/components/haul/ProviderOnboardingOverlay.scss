@@ -1,0 +1,131 @@
+.provider-onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: auto;
+}
+
+.provider-onboarding-spotlight {
+  position: absolute;
+  left: 28rpx;
+  right: 28rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.02);
+  border: 4rpx solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 2200rpx rgba(15, 23, 42, 0.68), 0 18rpx 44rpx rgba(15, 23, 42, 0.22);
+  box-sizing: border-box;
+}
+
+.provider-onboarding-overlay-preferences .provider-onboarding-spotlight {
+  top: 600rpx;
+  height: 220rpx;
+}
+
+.provider-onboarding-overlay-presence .provider-onboarding-spotlight {
+  top: 830rpx;
+  height: 120rpx;
+}
+
+.provider-onboarding-overlay-orders .provider-onboarding-spotlight {
+  left: 170rpx;
+  right: 170rpx;
+  bottom: 20rpx;
+  height: 116rpx;
+  border-radius: 999rpx;
+}
+
+.provider-onboarding-bubble {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  padding: 30rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 24rpx 60rpx rgba(15, 23, 42, 0.24);
+  box-sizing: border-box;
+}
+
+.provider-onboarding-overlay-preferences .provider-onboarding-bubble {
+  top: 850rpx;
+}
+
+.provider-onboarding-overlay-presence .provider-onboarding-bubble {
+  top: 980rpx;
+}
+
+.provider-onboarding-overlay-orders .provider-onboarding-bubble {
+  bottom: 174rpx;
+}
+
+.provider-onboarding-count {
+  display: block;
+  color: #2563eb;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  font-weight: 800;
+}
+
+.provider-onboarding-overlay-title {
+  display: block;
+  margin-top: 8rpx;
+  color: #0f172a;
+  font-size: 34rpx;
+  line-height: 44rpx;
+  font-weight: 900;
+}
+
+.provider-onboarding-overlay-desc {
+  display: block;
+  margin-top: 14rpx;
+  color: #334155;
+  font-size: 27rpx;
+  line-height: 42rpx;
+  font-weight: 600;
+}
+
+.provider-onboarding-overlay-hint {
+  display: block;
+  margin-top: 14rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 14rpx;
+  color: #0f766e;
+  background: #ecfdf5;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  font-weight: 700;
+}
+
+.provider-onboarding-bottom {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  bottom: 54rpx;
+  display: flex;
+  gap: 18rpx;
+}
+
+.provider-onboarding-skip,
+.provider-onboarding-next {
+  height: 84rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  line-height: 84rpx;
+  font-weight: 800;
+}
+
+.provider-onboarding-skip {
+  flex: 0 0 190rpx;
+  color: #ffffff;
+  border: 2rpx solid rgba(255, 255, 255, 0.78);
+}
+
+.provider-onboarding-next {
+  flex: 1;
+  color: #ffffff;
+  background: #2563eb;
+  box-shadow: 0 12rpx 28rpx rgba(37, 99, 235, 0.28);
+}
+

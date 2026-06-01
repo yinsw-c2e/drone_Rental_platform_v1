@@ -1,4 +1,4 @@
-import type { ProviderNextAction, ProviderReviewStatus, ProviderRoleSummary, RoleSummary, User } from '../types';
+import type { ProviderNextAction, ProviderReviewState, ProviderReviewStatus, ProviderRoleSummary, RoleSummary, User } from '../types';
 import type { HaulRoleMode } from '../store/slices/roleSlice';
 
 export interface ProviderCapabilities {
@@ -9,6 +9,11 @@ export interface ProviderCapabilities {
   providerStatus: ProviderReviewStatus;
   assetStatus: ProviderReviewStatus;
   executorStatus: ProviderReviewStatus;
+  rejectReason: string;
+  assetReviewState: ProviderReviewState;
+  assetRejectReason: string;
+  executorReviewState: ProviderReviewState;
+  executorRejectReason: string;
   canPublishSupply: boolean;
   canAcceptDispatch: boolean;
   canSelfExecute: boolean;
@@ -23,6 +28,11 @@ const EMPTY_PROVIDER_SUMMARY: ProviderRoleSummary = {
   status: 'none',
   asset_status: 'none',
   executor_status: 'none',
+  reject_reason: '',
+  asset_review_state: 'none',
+  asset_reject_reason: '',
+  executor_review_state: 'none',
+  executor_reject_reason: '',
   can_use_workbench: false,
   can_quote: false,
   can_arrange_dispatch: false,
@@ -59,6 +69,13 @@ const nextActionOf = (status: ProviderReviewStatus): ProviderNextAction => {
   return 'start_onboarding';
 };
 
+const reviewStateOf = (status?: ProviderReviewStatus): ProviderReviewState => {
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected' || status === 'suspended') return 'rejected';
+  if (status === 'pending_review') return 'pending';
+  return 'none';
+};
+
 const deriveProviderSummary = (summary: RoleSummary): ProviderRoleSummary => {
   const assetStatus: ProviderReviewStatus = summary.can_publish_supply
     ? 'approved'
@@ -77,6 +94,11 @@ const deriveProviderSummary = (summary: RoleSummary): ProviderRoleSummary => {
     status,
     asset_status: assetStatus,
     executor_status: executorStatus,
+    reject_reason: '',
+    asset_review_state: reviewStateOf(assetStatus),
+    asset_reject_reason: '',
+    executor_review_state: reviewStateOf(executorStatus),
+    executor_reject_reason: '',
     can_use_workbench: unifiedReady,
     can_quote: unifiedReady,
     can_arrange_dispatch: unifiedReady,
@@ -113,6 +135,11 @@ export const resolveProviderCapabilities = (roleSummary?: RoleSummary | null): P
     providerStatus: provider.status,
     assetStatus: provider.asset_status,
     executorStatus: provider.executor_status,
+    rejectReason: provider.reject_reason || '',
+    assetReviewState: provider.asset_review_state || reviewStateOf(provider.asset_status),
+    assetRejectReason: provider.asset_reject_reason || '',
+    executorReviewState: provider.executor_review_state || reviewStateOf(provider.executor_status),
+    executorRejectReason: provider.executor_reject_reason || '',
     canPublishSupply,
     canAcceptDispatch,
     canSelfExecute,
