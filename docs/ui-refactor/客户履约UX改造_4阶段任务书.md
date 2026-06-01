@@ -124,9 +124,9 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 批次 1b — 立即下单等待 + 服务商履约
+#### ✓ 批次 1b — 立即下单等待 + 服务商履约（已完成，commit `bf153ad`）
 
-##### 1.4 客户立即单下单后跳"派单进行中"等待页
+##### ✓ 1.4 客户立即单下单后跳"派单进行中"等待页
 
 **用户痛点**：客户下立即单后直接进 orders/detail 静态页，看到状态字符串 `等待服务商` 之后不知道在等什么、要等多久、要不要再操作。
 
@@ -174,7 +174,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-##### 1.6 服务商履约 3 步按钮加 helper text
+##### ✓ 1.6 服务商履约 3 步按钮加 helper text
 
 **用户痛点**：服务商在"我的订单"看到"开始准备 / 开始飞行 / 确认送达"，不知道每步对应什么物理动作、误操作能不能撤销。
 
@@ -699,6 +699,9 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 6. order 状态见 [mini-program/src/utils/index.ts](mini-program/src/utils/index.ts) orderLabels（约 90 行起）
 7. 后端 buildOrderSummary 已返回字段（截至 commit `949b6c2` + 工作区 P1 修复）见 [backend/internal/api/v2/order/handler.go:1114](backend/internal/api/v2/order/handler.go)，**任何前端依赖字段在此函数中存在才算 OK**
 8. 自定义 tabbar 已实现 role-aware 切换（customer/provider 两套列表），代码在 [mini-program/src/custom-tab-bar/index.js](mini-program/src/custom-tab-bar/index.js)
+9. 批次 1b 新增 `GET /api/v2/orders/:order_id/dispatch-state`，由 `BroadcastService.GetDispatchState` 返回 `online_providers_count / elapsed_seconds / estimated_wait_seconds / tried_providers_count`
+10. 立即单创建成功进入 [mini-program/src/pages/dispatch/waiting/index.tsx](mini-program/src/pages/dispatch/waiting/index.tsx)，预约单仍进入 [mini-program/src/pages/orders/live/index.tsx](mini-program/src/pages/orders/live/index.tsx)
+11. `cd backend && go test ./...` 截至 commit `bf153ad` 仍有预存失败：`internal/service` 在 clean HEAD `946d849` 同样因 `finance_anomaly_records` 表缺失失败；本批次直接覆盖的 `go build ./... && go test ./internal/api/v2/order/...` 通过
 
 ---
 
