@@ -9,6 +9,7 @@ import {
   resolveProviderCapabilities,
   type ProviderCapabilities,
 } from '../../../utils/roleSummary';
+import StepBar, { type StepBarState, type StepBarStep } from '../../../components/business/StepBar';
 import { buildProviderReviewFixItems } from '../../../utils/providerReview';
 import { syncCustomTabBar } from '../../../utils/tabBar';
 import type { ProviderReviewStatus, User } from '../../../types';
@@ -36,10 +37,16 @@ type TimelineStep = {
   interactive: boolean;
 };
 
+type ProviderProgressStep = Omit<StepBarStep, 'onClick'> & {
+  action: ActionKey;
+};
+
 type TimelineState = {
   steps: TimelineStep[];
   currentIndex: number | null;
   completedCount: number;
+  progressSteps: ProviderProgressStep[];
+  progressCompletedCount: number;
   hero: HeroCopy;
 };
 
@@ -86,6 +93,16 @@ const buildStep = (
   };
 };
 
+const progressStateFromReview = (
+  status: ProviderReviewStatus,
+  current: boolean,
+): StepBarState => {
+  if (status === 'approved') return 'done';
+  if (status === 'rejected' || status === 'suspended') return 'fix';
+  if (status === 'pending_review') return 'review';
+  return current ? 'current' : 'pending';
+};
+
 const deriveTimelineState = (
   capabilities: ProviderCapabilities,
   user: User | null | undefined,
@@ -126,6 +143,35 @@ const deriveTimelineState = (
     buildStep('接单资质', '提交设备资质与履约资质', doneFlags[2], 2, currentIndex, step3Override),
   ];
 
+  const identityDone = doneFlags[0];
+  const profileDone = identityDone && (capabilities.hasProviderApplication || qualificationStarted || capabilities.canUseWorkbench);
+  const profileState: StepBarState = !isAuthenticated
+    ? 'current'
+    : profileDone
+      ? 'done'
+      : idStatus === 'pending'
+        ? 'review'
+        : idStatus === 'rejected'
+          ? 'fix'
+          : 'current';
+  const reviewState: StepBarState = capabilities.canUseWorkbench
+    ? 'done'
+    : hasQualificationFix
+      ? 'fix'
+      : hasQualificationReview
+        ? 'review'
+        : assetApproved || executorApproved || qualificationStarted
+          ? 'current'
+          : 'pending';
+  const progressSteps: ProviderProgressStep[] = [
+    { key: 'profile', label: '资料', state: profileState, action: identityDone ? 'owner' : 'verification' },
+    { key: 'asset', label: '设备', state: progressStateFromReview(assetStatus, profileDone), action: 'drones' },
+    { key: 'executor', label: '履约', state: progressStateFromReview(executorStatus, assetApproved), action: 'executor' },
+    { key: 'review', label: '审核中', state: reviewState, action: qualificationAction },
+    { key: 'approved', label: '已通过', state: capabilities.canUseWorkbench ? 'done' : 'pending', action: 'workbench' },
+  ];
+  const progressCompletedCount = progressSteps.filter((step) => step.state === 'done').length;
+
   let hero = makeHero('未开通', 'gray', '开始服务商入驻', '完善服务商资料和接单资质即可进入审核。', '完善服务商资料', 'owner');
   if (!isAuthenticated) {
     hero = makeHero('待登录', 'blue', '登录后开始服务商入驻', '登录后即可提交服务商资料和接单资质。', '去登录', 'login');
@@ -154,7 +200,7 @@ const deriveTimelineState = (
     hero = makeHero('未完成', 'gray', '完善接单资质', '需要设备资质和履约资质全部通过后，才能正式接单。', assetApproved ? '补充履约资质' : '补充设备资质', qualificationAction);
   }
 
-  return { steps, currentIndex, completedCount, hero };
+  return { steps, currentIndex, completedCount, progressSteps, progressCompletedCount, hero };
 };
 
 export default function ProviderOnboardingPage() {
@@ -207,26 +253,27 @@ export default function ProviderOnboardingPage() {
       .catch(() => null);
   };
   const openExecutorRegister = () => safeNavigateTo('/pages/pilot/register/index');
-  const { hero, steps, completedCount } = timelineState;
+  const { hero, steps, progressSteps, progressCompletedCount } = timelineState;
+  const clickableProgressSteps: StepBarStep[] = progressSteps.map((step) => ({
+    key: step.key,
+    label: step.label,
+    state: step.state,
+    onClick: () => runAction(step.action),
+  }));
 
   return (
     <View className="provider-onboarding-page">
       <View className="provider-onboarding-scroll">
         <View className="provider-onboarding-content">
-          <View className="provider-onboarding-hero">
-            <View className="provider-onboarding-hero-top">
-              <Text className="provider-onboarding-progress-label">入驻进度 {completedCount} / 3</Text>
+            <View className="provider-onboarding-hero">
+              <View className="provider-onboarding-hero-top">
+              <Text className="provider-onboarding-progress-label">入驻进度 {progressCompletedCount} / {progressSteps.length}</Text>
               <View className={`provider-onboarding-status provider-onboarding-status-${hero.tone}`}>
                 <Text className="provider-onboarding-status-text">{hero.label}</Text>
               </View>
             </View>
-            <View className="provider-onboarding-progressbar">
-              {[0, 1, 2].map((index) => (
-                <View
-                  key={index}
-                  className={`provider-onboarding-progress-segment${index < completedCount ? ' provider-onboarding-progress-segment-active' : ''}`}
-                />
-              ))}
+            <View className="provider-onboarding-stepbar">
+              <StepBar steps={clickableProgressSteps} />
             </View>
             <Text className="provider-onboarding-title">{hero.title}</Text>
             <Text className="provider-onboarding-desc">{hero.desc}</Text>

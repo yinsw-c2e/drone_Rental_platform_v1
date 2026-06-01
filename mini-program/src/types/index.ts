@@ -577,6 +577,11 @@ export interface DemandOwnerSummary {
   id: number;
   nickname: string;
   avatar_url?: string;
+  recent_30d_completed_orders?: number;
+  avg_response_seconds?: number;
+  preferred_scenes?: string[];
+  rating?: number | null;
+  rating_count?: number;
 }
 
 export interface DemandQuoteDemandSummary {
@@ -847,6 +852,10 @@ export interface V2ServiceClass {
   per_km_price_cents?: number;
   per_minute_price_cents?: number;
   min_charge_cents?: number;
+  night_surcharge_rate?: number;
+  plateau_surcharge_rate?: number;
+  emergency_surcharge_rate?: number;
+  island_surcharge_rate?: number;
   status?: string;
   sort_order?: number;
 }

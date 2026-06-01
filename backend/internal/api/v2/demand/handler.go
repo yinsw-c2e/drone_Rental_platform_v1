@@ -223,10 +223,15 @@ func (h *Handler) ListQuotes(c *gin.Context) {
 		v2common.HandleServiceError(c, err)
 		return
 	}
+	providerStats, err := h.clientService.ListDemandQuoteProviderStats(quotes)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
 
 	items := make([]gin.H, 0, len(quotes))
 	for i := range quotes {
-		items = append(items, buildQuoteSummary(&quotes[i]))
+		items = append(items, buildQuoteSummaryWithProviderStats(&quotes[i], providerStats))
 	}
 
 	response.V2Success(c, gin.H{"items": items})
@@ -395,6 +400,10 @@ func buildDemandDetail(demand *model.Demand, stats service.DemandStats, viewerSt
 }
 
 func buildQuoteSummary(quote *model.DemandQuote) gin.H {
+	return buildQuoteSummaryWithProviderStats(quote, nil)
+}
+
+func buildQuoteSummaryWithProviderStats(quote *model.DemandQuote, providerStats map[int64]service.DemandQuoteProviderStats) gin.H {
 	if quote == nil {
 		return gin.H{}
 	}
@@ -410,11 +419,23 @@ func buildQuoteSummary(quote *model.DemandQuote) gin.H {
 		"execution_plan": quote.ExecutionPlan,
 	}
 	if quote.Owner != nil {
-		data["owner"] = gin.H{
+		owner := gin.H{
 			"id":         quote.Owner.ID,
 			"nickname":   quote.Owner.Nickname,
 			"avatar_url": quote.Owner.AvatarURL,
 		}
+		if stats, ok := providerStats[quote.OwnerUserID]; ok {
+			owner["recent_30d_completed_orders"] = stats.Recent30DCompletedOrders
+			owner["avg_response_seconds"] = stats.AvgResponseSeconds
+			owner["preferred_scenes"] = stats.PreferredScenes
+			owner["rating_count"] = stats.RatingCount
+			if stats.Rating != nil {
+				owner["rating"] = *stats.Rating
+			} else {
+				owner["rating"] = nil
+			}
+		}
+		data["owner"] = owner
 	}
 	if quote.Drone != nil {
 		data["drone"] = gin.H{

@@ -152,7 +152,7 @@ page {
 }
 
 .qo3-plan-card {
-  height: 395.2rpx;
+  height: 466rpx;
   box-shadow: 0 8rpx 24rpx rgba(6, 30, 86, 0.07);
 }
 
@@ -209,6 +209,29 @@ page {
   font-size: 24rpx;
   line-height: 1.55;
   color: #5d6b85;
+}
+
+.qo3-branch-examples-toggle {
+  display: block;
+  margin-top: 12rpx;
+  color: #005bea;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 700;
+}
+
+.qo3-branch-examples {
+  margin-top: 12rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+}
+
+.qo3-branch-example {
+  display: block;
+  color: #44546f;
+  font-size: 23rpx;
+  line-height: 34rpx;
 }
 
 .qo3-scene-card {
@@ -765,9 +788,24 @@ page {
   white-space: nowrap;
 }
 
+.qo3-plan-info-button {
+  position: absolute;
+  left: 204rpx;
+  top: 20rpx;
+  width: 32rpx;
+  height: 32rpx;
+  z-index: 4;
+}
+
+.qo3-plan-info-icon {
+  width: 32rpx;
+  height: 32rpx;
+  display: block;
+}
+
 .qo3-recommend-badge {
   position: absolute;
-  left: 220.9rpx;
+  left: 250rpx;
   top: 16.7rpx;
   width: 58.1rpx;
   height: 32.6rpx;
@@ -830,6 +868,21 @@ page {
   margin-left: 4rpx;
 }
 
+.qo3-plan-hint {
+  position: absolute;
+  left: 30rpx;
+  right: 30rpx;
+  top: 386rpx;
+  min-height: 42rpx;
+  padding: 10rpx 14rpx;
+  border-radius: 10rpx;
+  box-sizing: border-box;
+  color: #37506f;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  background: #eef5ff;
+}
+
 .qo3-bottom-bar {
   position: fixed;
   left: 0;
@@ -886,4 +939,68 @@ page {
   line-height: 33.5rpx;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.qo3-plan-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 18, 43, 0.46);
+}
+
+.qo3-plan-modal {
+  position: absolute;
+  left: 38rpx;
+  right: 38rpx;
+  bottom: 228rpx;
+  padding: 30rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 -14rpx 36rpx rgba(6, 30, 86, 0.18);
+}
+
+.qo3-plan-modal-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
+.qo3-plan-modal-title {
+  color: #061e5b;
+  font-size: 34rpx;
+  line-height: 44rpx;
+  font-weight: 800;
+}
+
+.qo3-plan-modal-close {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  color: #64748b;
+  font-size: 40rpx;
+  line-height: 48rpx;
+  text-align: center;
+  background: #f1f5f9;
+}
+
+.qo3-plan-modal-desc {
+  display: block;
+  margin-top: 22rpx;
+  color: #354762;
+  font-size: 26rpx;
+  line-height: 40rpx;
+}
+
+.qo3-plan-modal-note {
+  display: block;
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 14rpx;
+  color: #0052d9;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  font-weight: 700;
+  background: #eef5ff;
 }

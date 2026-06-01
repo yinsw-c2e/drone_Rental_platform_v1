@@ -62,6 +62,7 @@ const servicePlans: Array<{
   title: string;
   subtitle: string;
   price: string;
+  detail: string;
   prefix?: string;
   suffix?: string;
   recommended?: boolean;
@@ -71,6 +72,7 @@ const servicePlans: Array<{
     title: '标准吊运',
     subtitle: '服务商确认后生效',
     price: '服务商报价',
+    detail: '适合作业条件清楚、时间不紧的常规吊运。服务商会按作业点、载重、距离和现场条件报价。',
     recommended: true,
   },
   {
@@ -78,14 +80,35 @@ const servicePlans: Array<{
     title: '加急吊运',
     subtitle: '优先匹配服务商',
     price: '服务商报价',
+    detail: '适合当天或短时间内必须处理的任务。预算区间会按加急场景估算，平台优先推给在线服务商。',
   },
   {
     key: 'survey',
     title: '现场勘查',
     subtitle: '勘查费用可抵扣服务费',
     price: '提交后确认',
+    detail: '适合路线、停机点或货物状态不确定的复杂工况。先约服务商看现场，后续成单时勘查费用可抵扣。',
   },
 ];
+
+const planHints: Record<ServicePlanKey, string> = {
+  standard: '标准吊运按平台估价区间报价，适合正常匹配。',
+  urgent: '加急吊运按约 25% 加急溢价估算，平台会优先推给在线服务商。',
+  survey: '现场勘查适合复杂工况，勘查费用可抵扣后续服务费。',
+};
+
+const branchExamples: Record<'quote' | 'pick', string[]> = {
+  quote: [
+    '家里盖房子要吊建材，不确定行情价。',
+    '农田要吊喷洒物资，想多家服务商比比。',
+    '山路点位不确定，希望服务商先判断路线。',
+  ],
+  pick: [
+    '之前合作过某个服务商，想继续找对方。',
+    '需要特定机型，已经问过服务商有空。',
+    '工期很紧，只想找熟悉现场的人议价。',
+  ],
+};
 
 const cargoWeightOptions = [
   { label: '50kg以下', value: '50' },
@@ -364,6 +387,8 @@ export default function QuickOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [taskDescription, setTaskDescription] = useState('');
   const [selectedBranch, setSelectedBranch] = useState<'quote' | 'pick'>('quote');
+  const [expandedBranchExample, setExpandedBranchExample] = useState<'quote' | 'pick' | null>(null);
+  const [planInfo, setPlanInfo] = useState<typeof servicePlans[number] | null>(null);
   const pendingAddressTargetRef = useRef<AddressTarget | null>(null);
 
   const clearAddressSelection = useCallback(() => {
@@ -528,6 +553,7 @@ export default function QuickOrderPage() {
     : 45;
   const distanceLabel = routeDistance > 0 ? `${routeDistance.toFixed(1)} km` : '--';
   const durationLabel = `约 ${durationMinutes} 分钟`;
+  const selectedPlanHint = planHints[selectedPlan];
 
   const handleChooseLocation = (type: AddressTarget) => {
     pendingAddressTargetRef.current = type;
@@ -723,6 +749,15 @@ export default function QuickOrderPage() {
       >
         <Image className='qo3-plan-radio' src={active ? radioSelectedIcon : radioUnselectedIcon} mode='aspectFit' />
         <Text className='qo3-plan-title'>{plan.title}</Text>
+        <View
+          className='qo3-plan-info-button'
+          onClick={(event) => {
+            event.stopPropagation?.();
+            setPlanInfo(plan);
+          }}
+        >
+          <Image className='qo3-plan-info-icon' src={infoCircleIcon} mode='aspectFit' />
+        </View>
         {plan.recommended ? (
           <View className='qo3-recommend-badge'>
             <Text className='qo3-recommend-text'>推荐</Text>
@@ -775,6 +810,22 @@ export default function QuickOrderPage() {
                   {selectedBranch === 'quote' ? <Text className='qo3-branch-tag'>已选</Text> : null}
                 </View>
                 <Text className='qo3-branch-desc'>发布需求，等几家服务商上门报价，再挑一家。适合想比价或不确定价格的任务。</Text>
+                <Text
+                  className='qo3-branch-examples-toggle'
+                  onClick={(event) => {
+                    event.stopPropagation?.();
+                    setExpandedBranchExample(expandedBranchExample === 'quote' ? null : 'quote');
+                  }}
+                >
+                  {expandedBranchExample === 'quote' ? '收起例子' : '看几个例子'}
+                </Text>
+                {expandedBranchExample === 'quote' ? (
+                  <View className='qo3-branch-examples'>
+                    {branchExamples.quote.map((item) => (
+                      <Text key={item} className='qo3-branch-example'>• {item}</Text>
+                    ))}
+                  </View>
+                ) : null}
               </View>
               <View
                 className={`qo3-branch-option ${selectedBranch === 'pick' ? 'is-active' : ''}`}
@@ -786,6 +837,22 @@ export default function QuickOrderPage() {
                   {selectedBranch === 'pick' ? <Text className='qo3-branch-tag'>已选</Text> : null}
                 </View>
                 <Text className='qo3-branch-desc'>从服务商列表里挑一家直接下单议价。适合已经有合作对象或想要特定机型的任务。</Text>
+                <Text
+                  className='qo3-branch-examples-toggle'
+                  onClick={(event) => {
+                    event.stopPropagation?.();
+                    setExpandedBranchExample(expandedBranchExample === 'pick' ? null : 'pick');
+                  }}
+                >
+                  {expandedBranchExample === 'pick' ? '收起例子' : '看几个例子'}
+                </Text>
+                {expandedBranchExample === 'pick' ? (
+                  <View className='qo3-branch-examples'>
+                    {branchExamples.pick.map((item) => (
+                      <Text key={item} className='qo3-branch-example'>• {item}</Text>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             </View>
           )}
@@ -908,14 +975,15 @@ export default function QuickOrderPage() {
               <Image className='qo3-section-plan-icon' src={sectionPlanClipboardIcon} mode='aspectFit' />
               <Text className='qo3-section-title'>选择服务方案</Text>
             </View>
-            <View className='qo3-plan-list'>
-              <View className='qo3-plan-line qo3-plan-line-1' />
-              <View className='qo3-plan-line qo3-plan-line-2' />
-              {servicePlans.map(renderPlan)}
+              <View className='qo3-plan-list'>
+                <View className='qo3-plan-line qo3-plan-line-1' />
+                <View className='qo3-plan-line qo3-plan-line-2' />
+                {servicePlans.map(renderPlan)}
+              </View>
+              <Text className='qo3-plan-hint'>{selectedPlanHint}</Text>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
       <View className='qo3-bottom-bar'>
         <View className='qo3-back-button' onClick={handleBack}>
@@ -933,6 +1001,19 @@ export default function QuickOrderPage() {
           </Text>
         </View>
       </View>
+
+      {planInfo ? (
+        <View className='qo3-plan-modal-mask' onClick={() => setPlanInfo(null)}>
+          <View className='qo3-plan-modal' onClick={(event) => event.stopPropagation?.()}>
+            <View className='qo3-plan-modal-head'>
+              <Text className='qo3-plan-modal-title'>{planInfo.title}</Text>
+              <Text className='qo3-plan-modal-close' onClick={() => setPlanInfo(null)}>×</Text>
+            </View>
+            <Text className='qo3-plan-modal-desc'>{planInfo.detail}</Text>
+            <Text className='qo3-plan-modal-note'>{planHints[planInfo.key]}</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

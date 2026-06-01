@@ -259,10 +259,19 @@
   border: 2rpx dashed #cbd5e1;
 }
 
+.quote-empty-warning {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
 .quote-empty-text {
   color: #94a3b8;
   font-size: 26rpx;
   font-weight: 600;
+}
+
+.quote-empty-warning .quote-empty-text {
+  color: #9a3412;
 }
 
 .quote-card {
@@ -271,7 +280,8 @@
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 18rpx;
 }
 
 .quote-card:last-child {
@@ -285,19 +295,56 @@
 
 .quote-main {
   flex: 1;
+  min-width: 0;
   padding-right: 24rpx;
+}
+
+.quote-provider-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 10rpx;
 }
 
 .quote-title {
   display: block;
+  flex: 1;
+  min-width: 0;
   color: #0f172a;
   font-size: 30rpx;
+  line-height: 40rpx;
   font-weight: 800;
-  margin-bottom: 12rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quote-rating {
+  flex: none;
+  color: #f97316;
+  font-size: 23rpx;
+  line-height: 32rpx;
+  font-weight: 800;
+}
+
+.quote-provider-stats,
+.quote-scenes {
+  display: block;
+  color: #475569;
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.quote-scenes {
+  color: #2563eb;
+  margin-top: 4rpx;
 }
 
 .quote-desc {
   display: block;
+  margin-top: 8rpx;
   color: #64748b;
   font-size: 24rpx;
   line-height: 36rpx;

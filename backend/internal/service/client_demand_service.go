@@ -64,6 +64,14 @@ type DemandViewerState struct {
 	MyCandidate *model.DemandCandidatePilot `json:"my_candidate,omitempty"`
 }
 
+type DemandQuoteProviderStats struct {
+	Recent30DCompletedOrders int      `json:"recent_30d_completed_orders"`
+	AvgResponseSeconds       int      `json:"avg_response_seconds"`
+	PreferredScenes          []string `json:"preferred_scenes"`
+	Rating                   *float64 `json:"rating,omitempty"`
+	RatingCount              int      `json:"rating_count"`
+}
+
 type addressSnapshotPayload struct {
 	Text      string   `json:"text"`
 	Latitude  *float64 `json:"latitude,omitempty"`
@@ -382,6 +390,147 @@ func (s *ClientService) ListDemandQuotes(userID, demandID int64) ([]model.Demand
 		return []model.DemandQuote{}, nil
 	}
 	return s.demandDomainRepo.ListDemandQuotes(demandID)
+}
+
+func (s *ClientService) ListDemandQuoteProviderStats(quotes []model.DemandQuote) (map[int64]DemandQuoteProviderStats, error) {
+	result := make(map[int64]DemandQuoteProviderStats)
+	if s == nil || s.demandDomainRepo == nil || s.demandDomainRepo.DB() == nil || len(quotes) == 0 {
+		return result, nil
+	}
+	seen := make(map[int64]struct{})
+	for _, quote := range quotes {
+		if quote.OwnerUserID <= 0 {
+			continue
+		}
+		if _, ok := seen[quote.OwnerUserID]; ok {
+			continue
+		}
+		seen[quote.OwnerUserID] = struct{}{}
+		stats, err := s.demandQuoteProviderStats(quote.OwnerUserID)
+		if err != nil {
+			return nil, err
+		}
+		result[quote.OwnerUserID] = stats
+	}
+	return result, nil
+}
+
+func (s *ClientService) demandQuoteProviderStats(ownerUserID int64) (DemandQuoteProviderStats, error) {
+	db := s.demandDomainRepo.DB()
+	stats := DemandQuoteProviderStats{PreferredScenes: []string{}}
+
+	var recentCompleted int64
+	if err := db.Model(&model.Order{}).
+		Where("(provider_user_id = ? OR owner_id = ?) AND status = ?", ownerUserID, ownerUserID, "completed").
+		Where("completed_at IS NOT NULL AND completed_at >= ?", time.Now().AddDate(0, 0, -30)).
+		Count(&recentCompleted).Error; err != nil {
+		return stats, err
+	}
+	stats.Recent30DCompletedOrders = int(recentCompleted)
+
+	avgSeconds, err := s.averageQuoteResponseSeconds(ownerUserID)
+	if err != nil {
+		return stats, err
+	}
+	stats.AvgResponseSeconds = avgSeconds
+
+	scenes, err := s.preferredOwnerScenes(ownerUserID)
+	if err != nil {
+		return stats, err
+	}
+	stats.PreferredScenes = scenes
+
+	rating, ratingCount, err := s.providerRating(ownerUserID)
+	if err != nil {
+		return stats, err
+	}
+	stats.Rating = rating
+	stats.RatingCount = ratingCount
+	return stats, nil
+}
+
+func (s *ClientService) averageQuoteResponseSeconds(ownerUserID int64) (int, error) {
+	db := s.demandDomainRepo.DB()
+	var quotes []model.DemandQuote
+	if err := db.Preload("Demand").
+		Where("owner_user_id = ?", ownerUserID).
+		Order("created_at DESC").
+		Limit(50).
+		Find(&quotes).Error; err != nil {
+		return 0, err
+	}
+	var total int64
+	var count int64
+	for i := range quotes {
+		quote := &quotes[i]
+		if quote.Demand == nil || quote.CreatedAt.IsZero() || quote.Demand.CreatedAt.IsZero() {
+			continue
+		}
+		seconds := int64(quote.CreatedAt.Sub(quote.Demand.CreatedAt).Seconds())
+		if seconds < 0 {
+			continue
+		}
+		total += seconds
+		count++
+	}
+	if count == 0 {
+		return 0, nil
+	}
+	return int(math.Round(float64(total) / float64(count))), nil
+}
+
+func (s *ClientService) preferredOwnerScenes(ownerUserID int64) ([]string, error) {
+	db := s.demandDomainRepo.DB()
+	var supplies []model.OwnerSupply
+	if err := db.Where("owner_user_id = ? AND status IN ?", ownerUserID, []string{"active", "published"}).
+		Order("updated_at DESC").
+		Limit(20).
+		Find(&supplies).Error; err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{})
+	scenes := make([]string, 0, 4)
+	for i := range supplies {
+		var values []string
+		if err := json.Unmarshal(supplies[i].CargoScenes, &values); err != nil {
+			continue
+		}
+		for _, value := range values {
+			scene := strings.TrimSpace(value)
+			if scene == "" {
+				continue
+			}
+			if _, ok := seen[scene]; ok {
+				continue
+			}
+			seen[scene] = struct{}{}
+			scenes = append(scenes, scene)
+			if len(scenes) >= 4 {
+				return scenes, nil
+			}
+		}
+	}
+	return scenes, nil
+}
+
+func (s *ClientService) providerRating(ownerUserID int64) (*float64, int, error) {
+	db := s.demandDomainRepo.DB()
+	var row struct {
+		Average float64
+		Count   int64
+	}
+	if err := db.Model(&model.Review{}).
+		Select("COALESCE(AVG(rating), 0) AS average, COUNT(*) AS count").
+		Where("reviewee_id = ?", ownerUserID).
+		Where("(target_type = '' OR target_type IN ? OR target_type IS NULL)", []string{"user", "owner", "pilot", "provider"}).
+		Scan(&row).Error; err != nil {
+		return nil, 0, err
+	}
+	if row.Count <= 0 {
+		return nil, 0, nil
+	}
+	rating := row.Average
+	return &rating, int(row.Count), nil
 }
 
 func (s *ClientService) GetDemandViewerState(userID, demandID int64) (*DemandViewerState, error) {

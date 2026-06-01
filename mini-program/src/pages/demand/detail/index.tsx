@@ -82,6 +82,33 @@ const formatScheduledRange = (startISO?: string, endISO?: string): string => {
   return start || end || '-';
 };
 
+const formatProviderResponse = (seconds?: number) => {
+  const safeSeconds = Number(seconds || 0);
+  if (!safeSeconds || safeSeconds <= 0) return '响应时间暂无';
+  if (safeSeconds < 60) return `平均 ${Math.round(safeSeconds)} 秒响应`;
+  if (safeSeconds < 3600) return `平均 ${Math.round(safeSeconds / 60)} 分钟响应`;
+  return `平均 ${(safeSeconds / 3600).toFixed(1)} 小时响应`;
+};
+
+const formatProviderRating = (rating?: number | null, count?: number) => {
+  const safeRating = Number(rating || 0);
+  const safeCount = Number(count || 0);
+  if (!safeRating || safeCount <= 0) return '暂无评分';
+  return `★ ${safeRating.toFixed(1)}（${safeCount} 评）`;
+};
+
+const formatProviderScenes = (scenes?: string[]) => {
+  const labels = (scenes || [])
+    .map(item => getDemandSceneLabel(item))
+    .filter(Boolean);
+  return labels.length ? `擅长：${labels.slice(0, 3).join('、')}` : '擅长：暂无';
+};
+
+const formatQuoteDrone = (quote: DemandQuoteSummary) => {
+  if (!quote.drone) return '机型信息待补充';
+  return [quote.drone.brand, quote.drone.model].filter(Boolean).join(' ') || '机型信息待补充';
+};
+
 export default function DemandDetailPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
@@ -91,6 +118,7 @@ export default function DemandDetailPage() {
 
   const [demand, setDemand] = useState<DemandDetail | null>(null);
   const [quotes, setQuotes] = useState<DemandQuoteSummary[]>([]);
+  const [quoteError, setQuoteError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,14 +130,23 @@ export default function DemandDetailPage() {
       const detail = res as any;
       setDemand(detail);
       if (Number(detail?.client_user_id || 0) === Number(user?.id || 0)) {
-        const quoteRes: any = await demandV2Service.listQuotes(demandId).catch(() => null);
-        setQuotes(quoteRes?.data?.items || quoteRes?.items || []);
+        try {
+          const quoteRes: any = await demandV2Service.listQuotes(demandId);
+          setQuotes(quoteRes?.data?.items || quoteRes?.items || []);
+          setQuoteError('');
+        } catch (error: any) {
+          setQuotes([]);
+          setQuoteError(friendlyErrorMessage(error, '报价加载失败'));
+        }
       } else {
         setQuotes([]);
+        setQuoteError('');
       }
-    } catch {
+    } catch (error: any) {
       setDemand(null);
       setQuotes([]);
+      setQuoteError('');
+      Taro.showToast({ title: friendlyErrorMessage(error, '任务加载失败'), icon: 'none' });
     } finally {
       setLoading(false);
     }
@@ -276,7 +313,11 @@ export default function DemandDetailPage() {
       {isOwnDemand ? (
         <View className="info-card">
           <Text className="section-title">服务商报价</Text>
-          {quotes.length === 0 ? (
+          {quoteError ? (
+            <View className="quote-empty quote-empty-warning">
+              <Text className="quote-empty-text">{quoteError}</Text>
+            </View>
+          ) : quotes.length === 0 ? (
             <View className="quote-empty">
               <Text className="quote-empty-text">暂无服务商提交报价</Text>
             </View>
@@ -284,9 +325,16 @@ export default function DemandDetailPage() {
             quotes.map((quote) => (
               <View key={quote.id} className="quote-card">
                 <View className="quote-main">
-                  <Text className="quote-title">{quote.owner?.nickname || quote.drone?.brand || `服务商 #${quote.owner_user_id}`}</Text>
+                  <View className="quote-provider-head">
+                    <Text className="quote-title">{quote.owner?.nickname || `服务商 #${quote.owner_user_id}`}</Text>
+                    <Text className="quote-rating">{formatProviderRating(quote.owner?.rating, quote.owner?.rating_count)}</Text>
+                  </View>
+                  <Text className="quote-provider-stats">
+                    近 30 天 {Number(quote.owner?.recent_30d_completed_orders || 0)} 单 · {formatProviderResponse(quote.owner?.avg_response_seconds)}
+                  </Text>
+                  <Text className="quote-scenes">{formatProviderScenes(quote.owner?.preferred_scenes)}</Text>
                   <Text className="quote-desc">
-                    {quote.drone ? `${quote.drone.brand} ${quote.drone.model}` : '无人机信息待补'}
+                    {formatQuoteDrone(quote)}
                     {quote.execution_plan ? ` · ${quote.execution_plan}` : ''}
                   </Text>
                 </View>

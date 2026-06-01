@@ -95,6 +95,12 @@
   background: rgba(255, 255, 255, 0.95);
 }
 
+.provider-onboarding-stepbar {
+  position: relative;
+  z-index: 1;
+  margin-top: 26rpx;
+}
+
 .provider-onboarding-title {
   position: relative;
   z-index: 1;

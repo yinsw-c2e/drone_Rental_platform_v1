@@ -1,0 +1,106 @@
+.business-stepbar {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.business-stepbar-node {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.business-stepbar-dot {
+  position: relative;
+  z-index: 2;
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.28);
+  border: 2rpx solid rgba(255, 255, 255, 0.52);
+}
+
+.business-stepbar-dot-done {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+.business-stepbar-dot-current {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+.business-stepbar-dot-review {
+  background: #ffcf88;
+  border-color: #ffcf88;
+}
+
+.business-stepbar-dot-fix {
+  background: #ffb4ad;
+  border-color: #ffb4ad;
+}
+
+.business-stepbar-dot-pending {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.business-stepbar-dot-text {
+  color: #0b63d8;
+  font-size: 22rpx;
+  line-height: 38rpx;
+  font-weight: 900;
+}
+
+.business-stepbar-dot-pending .business-stepbar-dot-text {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.business-stepbar-dot-review .business-stepbar-dot-text {
+  color: #9a4b00;
+}
+
+.business-stepbar-dot-fix .business-stepbar-dot-text {
+  color: #9f1d17;
+}
+
+.business-stepbar-label {
+  display: block;
+  max-width: 118rpx;
+  margin-top: 10rpx;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 21rpx;
+  line-height: 28rpx;
+  text-align: center;
+  font-weight: 700;
+}
+
+.business-stepbar-label-done,
+.business-stepbar-label-current,
+.business-stepbar-label-review,
+.business-stepbar-label-fix {
+  color: #ffffff;
+}
+
+.business-stepbar-line {
+  position: absolute;
+  left: 50%;
+  right: -50%;
+  top: 18rpx;
+  height: 2rpx;
+  background: rgba(255, 255, 255, 0.28);
+  z-index: 1;
+}
+
+.business-stepbar-line-done {
+  background: rgba(255, 255, 255, 0.92);
+}

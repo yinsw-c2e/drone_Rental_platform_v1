@@ -33,6 +33,12 @@ const formatMoney = (cents?: number | null) => {
   return `¥${Math.round(cents / 100).toLocaleString('zh-CN')}`;
 };
 
+const formatMoneyWithZero = (cents?: number | null) =>
+  `¥${Math.round(Number(cents || 0) / 100).toLocaleString('zh-CN')}`;
+
+const formatSurchargeRate = (rate?: number | null) =>
+  `${Math.round(Number(rate || 0) * 100)}%`;
+
 const generateClientRequestId = () =>
   `mini_${Date.now()}_${Math.random().toString(16).slice(2, 10)}_${Math.random().toString(16).slice(2, 10)}`;
 
@@ -164,6 +170,23 @@ const buildServiceClassPayloadRange = (item: V2ServiceClass) => {
   return `${min}kg以上`;
 };
 
+const buildServiceClassMtowRange = (item: V2ServiceClass) => {
+  const min = Math.round(item.mtow_min_kg || 0);
+  const max = Math.round(item.mtow_max_kg || 0);
+  if (min > 0 && max > 0) return `${min}-${max}kg`;
+  if (max > 0) return `${max}kg以内`;
+  if (min > 0) return `${min}kg以上`;
+  return '按平台机型档';
+};
+
+const matchesServiceClassWeight = (item: V2ServiceClass, weight: number) => {
+  const min = Number(item.payload_min_kg || 0);
+  const max = Number(item.payload_max_kg || 0);
+  if (!Number.isFinite(weight) || weight <= 0) return false;
+  if (max > 0) return weight >= min && weight <= max;
+  return weight >= min;
+};
+
 const getDefaultWeight = (item?: V2ServiceClass | null) => {
   if (!item) return '50';
   const min = Number(item.payload_min_kg || 50);
@@ -220,6 +243,8 @@ export default function CustomerHaulHome() {
   const [scheduledLabel, setScheduledLabel] = useState('');
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [showCitySheet, setShowCitySheet] = useState(false);
+  const [serviceClassDetail, setServiceClassDetail] = useState<V2ServiceClass | null>(null);
+  const [estimateExpanded, setEstimateExpanded] = useState(false);
   const [pendingScheduleDate, setPendingScheduleDate] = useState(initialSchedule.date);
   const [pendingScheduleTime, setPendingScheduleTime] = useState(initialSchedule.time);
   const [estimate, setEstimate] = useState<V2PricingEstimate | null>(null);
@@ -245,6 +270,11 @@ export default function CustomerHaulHome() {
   const selectedClass = useMemo(
     () => serviceClasses.find(item => item.code === selectedClassCode) || serviceClasses[0] || null,
     [selectedClassCode, serviceClasses],
+  );
+  const cargoWeightValue = useMemo(() => Number(cargoWeight || 0), [cargoWeight]);
+  const autoMatchedClass = useMemo(
+    () => serviceClasses.find(item => matchesServiceClassWeight(item, cargoWeightValue)) || null,
+    [cargoWeightValue, serviceClasses],
   );
 
   // 去重后保留全部候选城市；弹层用 ScrollView 滚动展示，不再 slice 截断
@@ -392,9 +422,18 @@ export default function CustomerHaulHome() {
   };
 
   const selectServiceClass = (item: V2ServiceClass) => {
+    if (item.code !== selectedClassCode) {
+      Taro.showToast({ title: `已为你切换到 ${item.display_name}`, icon: 'none' });
+    }
     setSelectedClassCode(item.code);
     setCargoWeight(getDefaultWeight(item));
   };
+
+  useEffect(() => {
+    if (!selectedClassCode || !autoMatchedClass || autoMatchedClass.code === selectedClassCode) return;
+    setSelectedClassCode(autoMatchedClass.code);
+    Taro.showToast({ title: `已为你切换到 ${autoMatchedClass.display_name}`, icon: 'none' });
+  }, [autoMatchedClass, selectedClassCode]);
 
   const buildOrderPayload = useCallback((): V2EstimateOrderPayload | null => {
     if (!pickup || !dropoff || !selectedClass) return null;
@@ -628,7 +667,21 @@ export default function CustomerHaulHome() {
                 className={`service-class-card ${selectedClass?.code === item.code ? 'is-active' : ''}`}
                 onClick={() => selectServiceClass(item)}
               >
-                <Text className='service-class-name'>{item.display_name}</Text>
+                {autoMatchedClass?.code === item.code && cargoWeightValue > 0 ? (
+                  <Text className='service-class-auto'>按你的 {Math.round(cargoWeightValue)}kg 自动推荐</Text>
+                ) : null}
+                <View className='service-class-head'>
+                  <Text className='service-class-name'>{item.display_name}</Text>
+                  <Text
+                    className='service-class-info'
+                    onClick={(event) => {
+                      event.stopPropagation?.();
+                      setServiceClassDetail(item);
+                    }}
+                  >
+                    ⓘ
+                  </Text>
+                </View>
                 <Text className='service-class-range'>载重 {buildServiceClassPayloadRange(item)}</Text>
                 <Text className='service-class-min'>{item.min_charge_cents ? `${formatMoney(item.min_charge_cents)}起` : '平台估价'}</Text>
               </View>
@@ -671,16 +724,53 @@ export default function CustomerHaulHome() {
               <Text className='estimate-label'>预估价</Text>
               <Text className='estimate-hint'>服务商接单后按平台规则履约</Text>
             </View>
+            {estimate ? (
+              <Text className='estimate-detail-link' onClick={() => setEstimateExpanded(value => !value)}>
+                {estimateExpanded ? '收起' : '明细'} ›
+              </Text>
+            ) : null}
             <Text className='estimate-price'>
               {estimating ? '计算中' : formatMoney(estimate?.total_estimated_cents)}
             </Text>
           </View>
           {estimate ? (
-            <View className='estimate-meta'>
-              <Text>{estimate.distance_km.toFixed(1)} km</Text>
-              <Text>约 {estimate.estimated_duration_min} 分钟</Text>
-              <Text>{estimate.service_class_name}</Text>
-            </View>
+            <>
+              <View className='estimate-meta'>
+                <Text>{estimate.distance_km.toFixed(1)} km</Text>
+                <Text>约 {estimate.estimated_duration_min} 分钟</Text>
+                <Text>{estimate.service_class_name}</Text>
+              </View>
+              {estimateExpanded ? (
+                <View className='estimate-breakdown'>
+                  <View className='estimate-breakdown-row'>
+                    <Text>基础费</Text>
+                    <Text>{formatMoneyWithZero(estimate.base_price_cents)}</Text>
+                  </View>
+                  <View className='estimate-breakdown-row'>
+                    <Text>距离费</Text>
+                    <Text>{formatMoneyWithZero(estimate.distance_fee_cents)}（{estimate.distance_km.toFixed(1)} km × {formatMoneyWithZero(selectedClass?.per_km_price_cents)}/km）</Text>
+                  </View>
+                  <View className='estimate-breakdown-row'>
+                    <Text>时长费</Text>
+                    <Text>{formatMoneyWithZero(estimate.duration_fee_cents)}（{estimate.estimated_duration_min} 分钟 × {formatMoneyWithZero(selectedClass?.per_minute_price_cents)}/分钟）</Text>
+                  </View>
+                  {(estimate.surcharges || []).map(item => (
+                    <View key={item.code} className='estimate-breakdown-row'>
+                      <Text>{item.name}</Text>
+                      <Text>{formatMoneyWithZero(item.amount_cents)}（+{formatSurchargeRate(item.rate)}）</Text>
+                    </View>
+                  ))}
+                  <View className='estimate-breakdown-row'>
+                    <Text>最低消费调整</Text>
+                    <Text>+{formatMoneyWithZero(estimate.min_charge_adjustment_cents)}</Text>
+                  </View>
+                  <View className='estimate-breakdown-total'>
+                    <Text>预估总价</Text>
+                    <Text>{formatMoneyWithZero(estimate.total_estimated_cents)}</Text>
+                  </View>
+                </View>
+              ) : null}
+            </>
           ) : (
             <Text className='estimate-error'>{estimateError || '选择起点和终点后自动估价'}</Text>
           )}
@@ -732,9 +822,58 @@ export default function CustomerHaulHome() {
         </View>
       </View>
 
+      {serviceClassDetail ? (
+        <View className='service-class-modal-mask' onClick={() => setServiceClassDetail(null)}>
+          <View className='service-class-modal' onClick={(event) => event.stopPropagation?.()}>
+            <View className='service-class-modal-head'>
+              <View>
+                <Text className='service-class-modal-kicker'>机型档说明</Text>
+                <Text className='service-class-modal-title'>{serviceClassDetail.display_name}</Text>
+              </View>
+              <Text className='service-class-modal-close' onClick={() => setServiceClassDetail(null)}>×</Text>
+            </View>
+            <View className='service-class-modal-grid'>
+              <View className='service-class-modal-row'>
+                <Text className='service-class-modal-label'>最大起飞重量</Text>
+                <Text className='service-class-modal-value'>{buildServiceClassMtowRange(serviceClassDetail)}</Text>
+              </View>
+              <View className='service-class-modal-row'>
+                <Text className='service-class-modal-label'>有效载重</Text>
+                <Text className='service-class-modal-value'>{buildServiceClassPayloadRange(serviceClassDetail)}</Text>
+              </View>
+              <View className='service-class-modal-row'>
+                <Text className='service-class-modal-label'>起步价</Text>
+                <Text className='service-class-modal-value'>{formatMoney(serviceClassDetail.base_price_cents)}</Text>
+              </View>
+              <View className='service-class-modal-row'>
+                <Text className='service-class-modal-label'>距离单价</Text>
+                <Text className='service-class-modal-value'>{formatMoney(serviceClassDetail.per_km_price_cents)}/km</Text>
+              </View>
+              <View className='service-class-modal-row'>
+                <Text className='service-class-modal-label'>时长单价</Text>
+                <Text className='service-class-modal-value'>{formatMoney(serviceClassDetail.per_minute_price_cents)}/分钟</Text>
+              </View>
+              <View className='service-class-modal-row'>
+                <Text className='service-class-modal-label'>最低消费</Text>
+                <Text className='service-class-modal-value'>{formatMoney(serviceClassDetail.min_charge_cents)}</Text>
+              </View>
+            </View>
+            <View className='service-class-modal-surcharges'>
+              <Text className='service-class-modal-section'>场景附加</Text>
+              <View className='service-class-modal-chips'>
+                <Text>夜间 +{formatSurchargeRate(serviceClassDetail.night_surcharge_rate)}</Text>
+                <Text>高原 +{formatSurchargeRate(serviceClassDetail.plateau_surcharge_rate)}</Text>
+                <Text>加急 +{formatSurchargeRate(serviceClassDetail.emergency_surcharge_rate)}</Text>
+                <Text>海岛 +{formatSurchargeRate(serviceClassDetail.island_surcharge_rate)}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {showCitySheet ? (
         <View className='city-sheet-mask' onClick={() => setShowCitySheet(false)}>
-          <View className='city-sheet-panel' onClick={event => event.stopPropagation()}>
+          <View className='city-sheet-panel' onClick={event => event.stopPropagation?.()}>
             <Text className='city-sheet-title'>选择服务城市</Text>
             <ScrollView scrollY className='city-sheet-scroll'>
               <View className='city-sheet-grid'>

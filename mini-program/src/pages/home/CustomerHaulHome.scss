@@ -241,12 +241,46 @@ page {
   background: #eef5ff;
 }
 
+.service-class-auto {
+  display: block;
+  margin-bottom: 8rpx;
+  color: #005bea;
+  font-size: 20rpx;
+  line-height: 28rpx;
+  font-weight: 800;
+}
+
+.service-class-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+}
+
 .service-class-name {
   display: block;
+  flex: 1;
+  min-width: 0;
   color: #071d49;
   font-size: 28rpx;
   line-height: 36rpx;
   font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-class-info {
+  flex: none;
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 50%;
+  color: #005bea;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  text-align: center;
+  font-weight: 800;
+  background: #dceaff;
 }
 
 .service-class-range,
@@ -380,6 +414,17 @@ page {
   white-space: nowrap;
 }
 
+.estimate-detail-link {
+  flex: none;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  color: #005bea;
+  font-size: 24rpx;
+  line-height: 30rpx;
+  font-weight: 800;
+  background: #ffffff;
+}
+
 .estimate-meta {
   display: flex;
   flex-wrap: wrap;
@@ -394,6 +439,51 @@ page {
   font-size: 22rpx;
   line-height: 28rpx;
   background: #ffffff;
+}
+
+.estimate-breakdown {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #d9e7ff;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.estimate-breakdown-row,
+.estimate-breakdown-total {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 10rpx 0;
+}
+
+.estimate-breakdown-row text:first-child,
+.estimate-breakdown-total text:first-child {
+  flex: none;
+  color: #5f6f87;
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.estimate-breakdown-row text:last-child,
+.estimate-breakdown-total text:last-child {
+  flex: 1;
+  min-width: 0;
+  color: #172b4d;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  text-align: right;
+}
+
+.estimate-breakdown-total {
+  margin-top: 8rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #dbe8fb;
+}
+
+.estimate-breakdown-total text {
+  font-weight: 900;
 }
 
 .secondary-actions {
@@ -542,6 +632,122 @@ page {
 
 .customer-home-scroll-spacer {
   height: 276rpx;
+}
+
+.service-class-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  background: rgba(5, 16, 35, 0.44);
+}
+
+.service-class-modal {
+  position: absolute;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 164rpx;
+  padding: 30rpx;
+  border-radius: 22rpx;
+  background: #ffffff;
+  box-shadow: 0 -16rpx 40rpx rgba(8, 30, 70, 0.18);
+}
+
+.service-class-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
+.service-class-modal-kicker {
+  display: block;
+  color: #005bea;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  font-weight: 800;
+}
+
+.service-class-modal-title {
+  display: block;
+  margin-top: 6rpx;
+  color: #071d49;
+  font-size: 34rpx;
+  line-height: 44rpx;
+  font-weight: 900;
+}
+
+.service-class-modal-close {
+  flex: none;
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 50%;
+  color: #66758a;
+  font-size: 42rpx;
+  line-height: 50rpx;
+  text-align: center;
+  background: #f2f5f9;
+}
+
+.service-class-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 26rpx;
+}
+
+.service-class-modal-row {
+  min-height: 104rpx;
+  padding: 18rpx;
+  border-radius: 14rpx;
+  background: #f7faff;
+  box-sizing: border-box;
+}
+
+.service-class-modal-label,
+.service-class-modal-value,
+.service-class-modal-section {
+  display: block;
+}
+
+.service-class-modal-label {
+  color: #718096;
+  font-size: 22rpx;
+  line-height: 30rpx;
+}
+
+.service-class-modal-value {
+  margin-top: 8rpx;
+  color: #111827;
+  font-size: 27rpx;
+  line-height: 36rpx;
+  font-weight: 800;
+}
+
+.service-class-modal-surcharges {
+  margin-top: 22rpx;
+}
+
+.service-class-modal-section {
+  color: #111827;
+  font-size: 26rpx;
+  line-height: 36rpx;
+  font-weight: 800;
+}
+
+.service-class-modal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.service-class-modal-chips text {
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  color: #37506f;
+  font-size: 23rpx;
+  line-height: 30rpx;
+  background: #eef4ff;
 }
 
 .city-sheet-mask {
