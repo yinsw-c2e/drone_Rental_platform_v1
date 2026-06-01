@@ -276,11 +276,18 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-### Phase 2 — 决策辅助
+### ✓ Phase 2 — 决策辅助（已完成，commit `63ba576`）
 
 > 目标：用户每个选择点都有依据，不再盲选。
 
-#### 2.1 机型档卡片加 helper text + 价目展开
+完成记录：
+- 客户首页已补机型档自动推荐、档位说明弹层、重量变化自动切档 toast、预估价明细展开。
+- quick-order 已补三种方案说明、选中方案价格提示、两种发布分叉的具体例子折叠区。
+- 需求详情报价卡已改为真实服务商统计：近 30 天完单、平均响应、擅长场景、真实评分/暂无评分。
+- 服务商入驻页已抽出 `mini-program/src/components/business/StepBar.tsx` 并接入 5 步进度条。
+- 后端 `buildQuoteSummaryWithProviderStats` 返回报价服务商统计字段，新增单测 `TestBuildQuoteSummaryIncludesProviderDecisionStats`。
+
+#### ✓ 2.1 机型档卡片加 helper text + 价目展开
 
 **用户痛点**：客户看机型档卡片"轻型重载 50-80kg"不知道这是按重量自动推荐的，也看不到这档具体怎么定价。
 
@@ -302,7 +309,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 2.2 预估价加 breakdown 展开
+#### ✓ 2.2 预估价加 breakdown 展开
 
 **用户痛点**：CustomerHaulHome 显示一个绝对预估价数字，客户不知道怎么算的、贵不贵。
 
@@ -329,7 +336,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 2.3 服务方案三选一加说明（标准 / 加急 / 现场勘查）
+#### ✓ 2.3 服务方案三选一加说明（标准 / 加急 / 现场勘查）
 
 **用户痛点**：quick-order 显示"加急吊运 - 优先匹配服务商 - 服务商报价"，客户不知道加急多贵、勘查怎么算钱。
 
@@ -346,7 +353,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 2.4 服务商报价卡片信息加强
+#### ✓ 2.4 服务商报价卡片信息加强
 
 **用户痛点**：demand/detail 报价列表只显示价格 + 服务商名 + "评分 5.0"（假数据），客户挑报价没依据。
 
@@ -388,7 +395,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 2.5 议价单分叉卡片展开例子
+#### ✓ 2.5 议价单分叉卡片展开例子
 
 **目标**：quick-order 两张分叉卡片（让多家报价 vs 指定服务商）已经在 1a 完成基础形态。Phase 2 时给每张卡片加"适合举例"折叠区，进一步降低决策门槛。
 
@@ -402,7 +409,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 2.6 服务商入驻进度条
+#### ✓ 2.6 服务商入驻进度条
 
 **用户痛点**：入驻有多个子流程（服务商资料 / 设备资质 / 履约资质 / 审核），新服务商不知道一共几步、卡在哪步。
 
@@ -705,6 +712,8 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 12. 批次 1c 的服务商审核失败字段不在 `buildOwnerSummary/buildRoleSummary` builder 中；本仓库运行时契约来自 `UserService.GetRoleSummary()` 的 `role_summary.provider`，新增 `reject_reason / asset_review_state / asset_reject_reason / executor_review_state / executor_reject_reason`
 13. 服务商工作台首启浮层在 [mini-program/src/components/haul/ProviderOnboardingOverlay.tsx](mini-program/src/components/haul/ProviderOnboardingOverlay.tsx)，由 [mini-program/src/pages/home/ProviderWorkbench.tsx](mini-program/src/pages/home/ProviderWorkbench.tsx) 读取/写入 `provider_workbench_onboarding_seen_v1`
 14. Settings 的“重看新手引导”会清除 `provider_workbench_onboarding_seen_v1` 并切到服务商首页；审核失败可执行卡片复用 [mini-program/src/utils/providerReview.ts](mini-program/src/utils/providerReview.ts)
+15. Phase 2 数据契约已确认：`service_classes` API 直接序列化 [backend/internal/model/service_class.go](backend/internal/model/service_class.go) 的价目字段；预估价接口返回 `base_price_cents / distance_fee_cents / duration_fee_cents / surcharges / min_charge_adjustment_cents / total_estimated_cents`；报价列表由 [backend/internal/api/v2/demand/handler.go](backend/internal/api/v2/demand/handler.go) 的 `buildQuoteSummaryWithProviderStats` 补充服务商决策统计。
+16. Phase 2 验证通过：`cd mini-program && npx tsc --noEmit`、`cd mini-program && npm run build:weapp:e2e`、`cd backend && go build ./...`、`cd backend && go test ./internal/api/v2/demand -count=1`、`cd backend && go test ./internal/api/v2/order/...`、`cd backend && go test ./internal/service -run TestGetRoleSummaryIncludesProviderReviewReasons -count=1`。`go test ./...` 仍受第 11 条的 `finance_anomaly_records` 测试表缺失影响。
 
 ---
 
