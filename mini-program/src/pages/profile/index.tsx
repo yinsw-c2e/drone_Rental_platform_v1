@@ -74,6 +74,8 @@ const getMenuIcon = (key: string) => {
       return identityDroneIcon;
     case 'wallet':
       return cellArchiveIcon;
+    case 'customer-service':
+      return cellSettingIcon;
     case 'edit-profile':
       return cellEditIcon;
     case 'settings':
@@ -101,6 +103,8 @@ const getMenuTone = (key: string) => {
       return 'teal';
     case 'wallet':
       return 'green';
+    case 'customer-service':
+      return 'blue';
     case 'edit-profile':
       return 'purple';
     case 'settings':
@@ -411,6 +415,13 @@ export default function ProfilePage() {
     }
 
     const settingItems = [
+      {
+        key: 'customer-service',
+        title: '平台客服',
+        desc: '订单、退款和履约问题协助',
+        screen: '/pages/customer-service/index?from=profile',
+        rightText: '09:00-21:00',
+      },
       {
         key: 'edit-profile',
         title: '编辑资料',

@@ -424,7 +424,7 @@ export default function OrderProgressPage() {
     else Taro.switchTab({ url: '/pages/orders/index' });
   };
 
-  const openService = () => Taro.switchTab({ url: '/pages/messages/index' });
+  const openService = () => Taro.navigateTo({ url: `/pages/customer-service/index?from=order&orderId=${orderId || ''}` });
 
   const viewPlan = () => {
     if (sourceSupplyId) {
@@ -458,8 +458,8 @@ export default function OrderProgressPage() {
     }
     Taro.showModal({
       title: `联系${contactTargetLabel}`,
-      content: `当前${contactTargetLabel}暂无可直拨电话，可先通过消息联系客服。`,
-      confirmText: '去消息',
+      content: `当前${contactTargetLabel}暂无可直拨电话，可找平台客服协助联系。`,
+      confirmText: '找平台客服',
       success: (res) => {
         if (res.confirm) openService();
       },

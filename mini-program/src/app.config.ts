@@ -8,6 +8,7 @@ export default defineAppConfig({
     'pages/home/index',
     'pages/provider/onboarding/index',
     'pages/messages/index','pages/chat/index',
+    'pages/customer-service/index',
     'pages/profile/index',
     'pages/profile/my-demands/index','pages/profile/my-offers/index','pages/profile/my-quotes/index',
     'pages/profile/owner/index','pages/profile/pilot/index','pages/profile/drones/index',

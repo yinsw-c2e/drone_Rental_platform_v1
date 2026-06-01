@@ -521,3 +521,29 @@
   line-height: 1.55;
   color: #475569;
 }
+
+.step-share-button {
+  margin: 18rpx 0 0;
+  padding: 0 24rpx;
+  height: 64rpx;
+  min-height: 64rpx;
+  border-radius: 14rpx;
+  background: #2563eb;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  line-height: 64rpx;
+}
+
+.step-share-button::after {
+  border: 0;
+}
+
+.step-share-text {
+  color: #ffffff;
+  font-size: 25rpx;
+  line-height: 34rpx;
+  font-weight: 800;
+}

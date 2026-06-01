@@ -627,7 +627,7 @@ export default function CustomerHaulHome() {
           <View
             className='customer-home-help'
             style={{ top: `${topInsetRpx}rpx` }}
-            onClick={() => Taro.switchTab({ url: '/pages/messages/index' })}
+            onClick={() => Taro.navigateTo({ url: '/pages/customer-service/index?from=home' })}
           >客服</View>
         </View>
 

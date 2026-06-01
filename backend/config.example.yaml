@@ -346,7 +346,63 @@ wechat:
           character_string2: order_no
           phrase3: status
           thing4: content
+      demand_quote_submitted:
+        template_id: ""
+        page: "pages/demand/detail/index?id={demand_id}"
+        data:
+          thing1: title
+          character_string2: demand_no
+          amount3: amount:price_amount
+          thing4: content
+      demand_selected:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          character_string3: quote_no
+          thing4: content
+      demand_cancelled:
+        template_id: ""
+        page: "pages/demand/detail/index?id={demand_id}"
+        data:
+          thing1: title
+          character_string2: demand_no
+          phrase3: status
+          thing4: content
       order_paid:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      order_cancelled:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      order_in_transit:
+        template_id: ""
+        page: "pages/orders/live/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      order_delivered:
+        template_id: ""
+        page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      order_completed:
         template_id: ""
         page: "pages/orders/detail/index?orderId={order_id}"
         data:
@@ -365,6 +421,14 @@ wechat:
       broadcast_auto_assigned:
         template_id: ""
         page: "pages/orders/detail/index?orderId={order_id}"
+        data:
+          thing1: title
+          character_string2: order_no
+          phrase3: status
+          thing4: content
+      broadcast_auto_assign_exhausted:
+        template_id: ""
+        page: "pages/dispatch/waiting/index?orderId={order_id}"
         data:
           thing1: title
           character_string2: order_no

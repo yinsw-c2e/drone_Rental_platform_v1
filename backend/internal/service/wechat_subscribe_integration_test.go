@@ -99,6 +99,15 @@ func setupSubscribeIntegrationFixture(t *testing.T) *subscribeFixture {
 					"character_string3": "pilot_user_id",
 				},
 			},
+			"demand_quote_submitted": {
+				TemplateID: "tmpl_demand_quote",
+				Page:       "pages/demand/detail/index?id={demand_id}",
+				Data: map[string]string{
+					"thing1":            "title",
+					"character_string2": "demand_no",
+					"thing3":            "content",
+				},
+			},
 		},
 	}
 
@@ -158,12 +167,31 @@ func TestEventService_WeChatSubscribe_Integration(t *testing.T) {
 		}
 	})
 
+	t.Run("new demand quote event is in wechat subscribe allowlist", func(t *testing.T) {
+		fx := setupSubscribeIntegrationFixture(t)
+		if err := fx.repo.Grant(context.Background(), fx.user.ID, "tmpl_demand_quote", 1); err != nil {
+			t.Fatalf("grant: %v", err)
+		}
+		fx.evt.notifyUsers([]int64{fx.user.ID}, "demand_quote_submitted", "收到新报价", "需求收到新的服务商报价。", map[string]interface{}{
+			"demand_id": 12,
+			"demand_no": "DMD202606020001",
+		})
+		sent := fx.sender.sent()
+		if len(sent) != 1 {
+			t.Fatalf("expected 1 message for demand_quote_submitted, got %d", len(sent))
+		}
+		if sent[0].TemplateID != "tmpl_demand_quote" {
+			t.Errorf("TemplateID = %q", sent[0].TemplateID)
+		}
+		if sent[0].Page != "pages/demand/detail/index?id=12" {
+			t.Errorf("Page = %q", sent[0].Page)
+		}
+	})
+
 	t.Run("event not in wechat subscribe allowlist: sender not called", func(t *testing.T) {
 		fx := setupSubscribeIntegrationFixture(t)
-		_ = fx.repo.Grant(context.Background(), fx.user.ID, "tmpl_pilot_verify", 5)
-		// EventService 通用入口，但 demand_quote_submitted 不在 wechat 白名单
-		// 直接走 notifyUsers 路径模拟
-		fx.evt.notifyUsers([]int64{fx.user.ID}, "demand_quote_submitted", "收到新报价", "...", map[string]interface{}{})
+		_ = fx.repo.Grant(context.Background(), fx.user.ID, "tmpl_demand_quote", 5)
+		fx.evt.notifyUsers([]int64{fx.user.ID}, "demand_expired", "需求已过期", "...", map[string]interface{}{})
 		if got := len(fx.sender.sent()); got != 0 {
 			t.Errorf("expected 0 messages for non-allowlist event, got %d", got)
 		}

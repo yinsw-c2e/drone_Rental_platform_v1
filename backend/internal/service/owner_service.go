@@ -980,6 +980,7 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 	}
 
 	var result *model.DemandQuote
+	shouldNotifyFirstQuote := false
 	err = db.Transaction(func(tx *gorm.DB) error {
 		demandRepo := repository.NewDemandDomainRepo(tx)
 		demand, err := demandRepo.LockDemandByID(demandID)
@@ -999,6 +1000,9 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 				return errors.New("该报价已被客户选中，不能重复修改")
 			}
 			if existing.Status == "submitted" {
+				if demand.Status == "published" {
+					shouldNotifyFirstQuote = true
+				}
 				if err := demandRepo.UpdateDemandQuoteFields(existing.ID, map[string]interface{}{
 					"drone_id":         input.DroneID,
 					"price_amount":     input.PriceAmount,
@@ -1042,6 +1046,7 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 			return err
 		}
 		if demand.Status == "published" {
+			shouldNotifyFirstQuote = true
 			if err := demandRepo.UpdateDemandFields(demand.ID, map[string]interface{}{
 				"status":     "quoting",
 				"updated_at": time.Now(),
@@ -1059,7 +1064,7 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 	if s.matchingService != nil && result != nil {
 		_ = s.matchingService.SyncDemandQuoteRanking(demandID, "owner", ownerUserID)
 	}
-	if s.eventService != nil && result != nil {
+	if s.eventService != nil && result != nil && shouldNotifyFirstQuote {
 		demand, err := s.demandDomainRepo.GetDemandByID(demandID)
 		if err == nil {
 			s.eventService.NotifyDemandQuoteSubmitted(demand, result)

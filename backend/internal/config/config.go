@@ -473,13 +473,21 @@ func applyWeChatSubscribeEnv(cfg *Config) {
 		cfg.WeChat.Subscribe.Templates = make(map[string]WeChatSubscribeTemplateConfig)
 	}
 	events := map[string]struct{}{
-		"direct_order_created":      {},
-		"direct_order_confirmed":    {},
-		"order_paid":                {},
-		"settlement_settled":        {},
-		"broadcast_auto_assigned":   {},
-		"dispatch_created":          {},
-		"pilot_verification_result": {},
+		"direct_order_created":            {},
+		"direct_order_confirmed":          {},
+		"demand_quote_submitted":          {},
+		"demand_selected":                 {},
+		"demand_cancelled":                {},
+		"order_paid":                      {},
+		"order_cancelled":                 {},
+		"order_in_transit":                {},
+		"order_delivered":                 {},
+		"order_completed":                 {},
+		"settlement_settled":              {},
+		"broadcast_auto_assigned":         {},
+		"broadcast_auto_assign_exhausted": {},
+		"dispatch_created":                {},
+		"pilot_verification_result":       {},
 	}
 	for event := range cfg.WeChat.Subscribe.Templates {
 		events[event] = struct{}{}

@@ -1,6 +1,6 @@
-import Taro, { useDidShow } from '@tarojs/taro';
+import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView } from '@tarojs/components';
+import { Button, View, Text, ScrollView } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store/store';
 import { demandV2Service } from '../../../services/demandV2';
@@ -121,6 +121,20 @@ export default function DemandDetailPage() {
   const [quoteError, setQuoteError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useShareAppMessage(() => {
+    const nickname = String(user?.nickname || '客户').trim() || '客户';
+    if (demand && (isDemandTerminal(demand) || isDemandDraft(demand))) {
+      return { title: '重载吊运任务', path: '/pages/home/index' };
+    }
+    if (!demandId) {
+      return { title: '重载吊运任务', path: '/pages/home/index' };
+    }
+    return {
+      title: `${nickname}发布了一个吊运任务`,
+      path: `/pages/demand/detail/index?id=${demandId}`,
+    };
+  });
 
   const loadData = useCallback(async () => {
     if (!demandId) { setLoading(false); return; }
@@ -248,6 +262,11 @@ export default function DemandDetailPage() {
                 {tip.lines.map((line, i) => (
                   <Text key={i} className="step-tip-line">{line}</Text>
                 ))}
+                {(demand.quote_count || 0) === 0 ? (
+                  <Button className="step-share-button" openType="share">
+                    <Text className="step-share-text">分享给认识的服务商</Text>
+                  </Button>
+                ) : null}
               </View>
             );
           })()}

@@ -1,8 +1,10 @@
 import Taro from '@tarojs/taro';
 import React, { useMemo, useState } from 'react';
 import { Image, Input, Picker, ScrollView, Text, Textarea, View } from '@tarojs/components';
+import { CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES } from '../../../constants/subscribeTemplates';
 import { getClientEligibility } from '../../../services/client';
 import { demandV2Service } from '../../../services/demandV2';
+import { requestSubscribe } from '../../../services/push';
 import { AddressData } from '../../../types';
 import backIcon from '../../../assets/publish-task/icons/back.png';
 import calendarIcon from '../../../assets/publish-task/icons/calendar.png';
@@ -256,6 +258,7 @@ export default function PublishDemandPage() {
       const eligible = await checkEligibility();
       if (!eligible) return;
 
+      await requestSubscribe(CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES);
       const created = await demandV2Service.create(getPayload());
       const demandId = (created as any).id || (created as any).data?.id;
       await demandV2Service.publish(demandId);
