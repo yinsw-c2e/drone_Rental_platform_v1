@@ -97,7 +97,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 | `customer_orders_default_segment` | quick-order.publishDemand | orders/index CustomerOrdersShell.useDidShow | 客户订单 tab 默认 segment hint | — |
 | `customer_order_redispatch_hint_v1` | orders/detail.switchToNegotiated | quick-order useEffect | 标记本次进 quick-order 是 redispatch，决定 toast 文案 | v1 |
 | `provider_orders_default_segment` | — | orders/index ProviderOrdersShell.useDidShow | 服务商订单 tab segment hint | — |
-| `provider_workbench_onboarding_seen_v1` | ProviderWorkbench 首启浮层关闭 | ProviderWorkbench 启动 | 首启引导是否已显示 | v1（任务 1.5）|
+| `provider_workbench_onboarding_seen_v1` | ProviderWorkbench 首启浮层关闭、Settings 重看新手引导清除 | ProviderWorkbench useDidShow | 首启引导是否已显示 | v1（任务 1.5）|
 | `customer_haul_home_onboarding_seen_v1` | CustomerHaulHome 首启提示关闭 | CustomerHaulHome 启动 | 客户首启引导是否已显示 | v1（如果加）|
 
 ---
@@ -203,9 +203,9 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-#### 批次 1c — 服务商首启 + 错误页
+#### ✓ 批次 1c — 服务商首启 + 错误页（已完成，commit `c482dce`）
 
-##### 1.5 服务商工作台首次进入加 onboarding 浮层
+##### ✓ 1.5 服务商工作台首次进入加 onboarding 浮层
 
 **用户痛点**：新服务商进 ProviderWorkbench 面对一堆配置（服务半径、可接机型、上线按钮、metric grid、接单需求 tab、快捷入口、待处理事项），不知道**第一步该做什么**。
 
@@ -235,7 +235,7 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 
 ---
 
-##### 1.7p 入驻审核失败页改成可执行
+##### ✓ 1.7p 入驻审核失败页改成可执行
 
 **用户痛点**：现在审核失败仅显示"服务商资质未通过或已暂停，请补充资料后重新提交审核"，没说**哪项不通过、改哪个字段**。
 
@@ -701,7 +701,10 @@ exit=0 才算完。只允许既有的 Sass `@import` deprecation 警告（在 `c
 8. 自定义 tabbar 已实现 role-aware 切换（customer/provider 两套列表），代码在 [mini-program/src/custom-tab-bar/index.js](mini-program/src/custom-tab-bar/index.js)
 9. 批次 1b 新增 `GET /api/v2/orders/:order_id/dispatch-state`，由 `BroadcastService.GetDispatchState` 返回 `online_providers_count / elapsed_seconds / estimated_wait_seconds / tried_providers_count`
 10. 立即单创建成功进入 [mini-program/src/pages/dispatch/waiting/index.tsx](mini-program/src/pages/dispatch/waiting/index.tsx)，预约单仍进入 [mini-program/src/pages/orders/live/index.tsx](mini-program/src/pages/orders/live/index.tsx)
-11. `cd backend && go test ./...` 截至 commit `bf153ad` 仍有预存失败：`internal/service` 在 clean HEAD `946d849` 同样因 `finance_anomaly_records` 表缺失失败；本批次直接覆盖的 `go build ./... && go test ./internal/api/v2/order/...` 通过
+11. `cd backend && go test ./...` 截至 commit `c482dce` 仍有预存失败：`internal/service` 在 clean HEAD `946d849` 同样因 `finance_anomaly_records` 表缺失失败；批次 1c 直接覆盖的 `go build ./...`、`go test ./internal/service -run TestGetRoleSummaryIncludesProviderReviewReasons -count=1`、`go test ./internal/api/v2/order/...` 通过
+12. 批次 1c 的服务商审核失败字段不在 `buildOwnerSummary/buildRoleSummary` builder 中；本仓库运行时契约来自 `UserService.GetRoleSummary()` 的 `role_summary.provider`，新增 `reject_reason / asset_review_state / asset_reject_reason / executor_review_state / executor_reject_reason`
+13. 服务商工作台首启浮层在 [mini-program/src/components/haul/ProviderOnboardingOverlay.tsx](mini-program/src/components/haul/ProviderOnboardingOverlay.tsx)，由 [mini-program/src/pages/home/ProviderWorkbench.tsx](mini-program/src/pages/home/ProviderWorkbench.tsx) 读取/写入 `provider_workbench_onboarding_seen_v1`
+14. Settings 的“重看新手引导”会清除 `provider_workbench_onboarding_seen_v1` 并切到服务商首页；审核失败可执行卡片复用 [mini-program/src/utils/providerReview.ts](mini-program/src/utils/providerReview.ts)
 
 ---
 
