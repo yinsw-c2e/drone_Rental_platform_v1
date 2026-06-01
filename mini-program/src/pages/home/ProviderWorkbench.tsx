@@ -297,7 +297,7 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
       ) : (
         <View className='pw-broadcast-empty'>
           <Image className='pw-broadcast-empty-image' src={todoAirspaceIcon} mode='aspectFit' />
-          <Text>暂无附近订单，保持在线等待</Text>
+          <Text>附近还没有可抢单订单，保持在线后有新订单会提醒</Text>
         </View>
       )}
     </View>
@@ -696,8 +696,8 @@ export default function ProviderWorkbench() {
     if (items.length === 0) {
       return [{
         key: 'empty',
-        title: '暂无待处理事项',
-        subtitle: '暂无待处理事项',
+        title: '当前没有待处理事项',
+        subtitle: '新订单、资质补充和履约提醒会在这里出现',
         status: '已同步',
         tone: 'blue',
         icon: todoInsuranceIcon,

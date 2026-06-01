@@ -59,7 +59,7 @@ const (
 )
 
 var (
-	ErrBroadcastConflict            = errors.New("广播单已被抢或已失效")
+	ErrBroadcastConflict            = errors.New("该派单已被其他服务商抢单或已失效")
 	ErrBroadcastLockedByAssign      = errors.New("broadcast_locked_by_assign")
 	ErrBroadcastTakenByOther        = errors.New("broadcast_taken")
 	ErrBroadcastStatusInvalid       = errors.New("broadcast_status_invalid")
@@ -461,7 +461,7 @@ func (s *BroadcastService) GetPresence(userID int64) (*model.ProviderPresence, e
 
 func (s *BroadcastService) ListOpenForProvider(userID int64, limit int) ([]ProviderBroadcastView, error) {
 	if s == nil || s.presenceRepo == nil || s.broadcastRepo == nil {
-		return nil, errors.New("抢单广播依赖未初始化")
+		return nil, errors.New("抢单服务暂不可用")
 	}
 
 	now := time.Now()
@@ -534,10 +534,10 @@ func (s *BroadcastService) Grab(broadcastID, providerUserID int64) (*model.Order
 
 func (s *BroadcastService) grabOnce(broadcastID, providerUserID int64) (*model.Order, error) {
 	if s == nil || s.orderRepo == nil || s.broadcastRepo == nil || s.presenceRepo == nil {
-		return nil, errors.New("抢单广播依赖未初始化")
+		return nil, errors.New("抢单服务暂不可用")
 	}
 	if broadcastID <= 0 {
-		return nil, errors.New("广播单ID无效")
+		return nil, errors.New("派单记录无效")
 	}
 	if providerUserID <= 0 {
 		return nil, errors.New("服务商账号无效")
@@ -584,7 +584,7 @@ func (s *BroadcastService) CreateForOrder(order *model.Order) (*model.OrderBroad
 
 func (s *BroadcastService) RedispatchOrder(orderID int64, opts RedispatchOrderOptions) (*RedispatchOrderResult, error) {
 	if s == nil || s.orderRepo == nil || s.broadcastRepo == nil {
-		return nil, errors.New("抢单广播依赖未初始化")
+		return nil, errors.New("抢单服务暂不可用")
 	}
 	if orderID <= 0 {
 		return nil, errors.New("订单ID无效")
@@ -660,7 +660,7 @@ func (s *BroadcastService) EnqueueDueReservations(now time.Time, limit int) (int
 
 func (s *BroadcastService) ExpireOpenBroadcasts(now time.Time, limit int) (int64, error) {
 	if s == nil || s.broadcastRepo == nil {
-		return 0, errors.New("抢单广播依赖未初始化")
+		return 0, errors.New("抢单服务暂不可用")
 	}
 	if now.IsZero() {
 		now = time.Now()
@@ -676,7 +676,7 @@ func (s *BroadcastService) AttemptAutoAssign(broadcastID int64) error {
 		return errors.New("自动指派依赖未初始化")
 	}
 	if broadcastID <= 0 {
-		return errors.New("广播单ID无效")
+		return errors.New("派单记录无效")
 	}
 
 	now := time.Now()
@@ -945,7 +945,7 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 	broadcast, err := broadcastRepo.LockByID(broadcastID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return outcome, errors.New("广播单不存在")
+			return outcome, errors.New("派单记录不存在")
 		}
 		return outcome, err
 	}
@@ -1069,7 +1069,7 @@ func (s *BroadcastService) acceptAssignmentWithRepos(
 			"responded_at": now,
 			"updated_at":   now,
 		})
-		return nil, fmt.Errorf("%w: 自动指派已超时", ErrBroadcastConflict)
+		return nil, fmt.Errorf("%w: 接单确认已超时", ErrBroadcastConflict)
 	}
 
 	if err := assignmentRepo.UpdateFields(assignment.ID, map[string]interface{}{
@@ -1186,7 +1186,7 @@ func (s *BroadcastService) redispatchOrderWithRepos(
 	artifactRepo *repository.OrderArtifactRepo,
 ) (*RedispatchOrderResult, error) {
 	if orderRepo == nil || broadcastRepo == nil {
-		return nil, errors.New("抢单广播依赖未初始化")
+		return nil, errors.New("抢单服务暂不可用")
 	}
 	order, err := orderRepo.LockByID(orderID)
 	if err != nil {
@@ -1700,10 +1700,10 @@ func (s *BroadcastService) createForOrderWithRepos(
 		return nil, errors.New("订单不存在")
 	}
 	if broadcastRepo == nil || orderRepo == nil {
-		return nil, errors.New("抢单广播依赖未初始化")
+		return nil, errors.New("抢单服务暂不可用")
 	}
 	if !canBroadcastOrderBeCreated(order) {
-		return nil, errors.New("当前订单状态不允许创建广播")
+		return nil, errors.New("当前订单状态不支持发起派单")
 	}
 
 	existing, err := broadcastRepo.GetByOrderID(order.ID)
@@ -1754,19 +1754,19 @@ func (s *BroadcastService) grabWithRepos(
 	broadcast, err := broadcastRepo.LockByID(broadcastID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("广播单不存在")
+			return nil, errors.New("派单记录不存在")
 		}
 		return nil, err
 	}
 	acceptableStatus := broadcast.Status == broadcastStatusOpen || (skipPresenceCheck && broadcast.Status == broadcastStatusAutoAssigning)
 	if !skipPresenceCheck && broadcast.Status == broadcastStatusAutoAssigning {
-		return nil, newBroadcastConflictError(ErrBroadcastLockedByAssign, "广播单正在自动指派")
+		return nil, newBroadcastConflictError(ErrBroadcastLockedByAssign, "该订单正在匹配服务商")
 	}
 	if broadcast.GrabbedByUserID != 0 || broadcast.Status == broadcastStatusGrabbed {
-		return nil, newBroadcastConflictError(ErrBroadcastTakenByOther, "广播单已被抢")
+		return nil, newBroadcastConflictError(ErrBroadcastTakenByOther, "该订单已被其他服务商抢单")
 	}
 	if !acceptableStatus || (!skipPresenceCheck && !broadcast.ExpiresAt.After(now)) {
-		return nil, newBroadcastConflictError(ErrBroadcastStatusInvalid, "广播单已过期或状态已变化")
+		return nil, newBroadcastConflictError(ErrBroadcastStatusInvalid, "派单已过期或状态已变化")
 	}
 
 	order, err := orderRepo.LockByID(broadcast.OrderID)

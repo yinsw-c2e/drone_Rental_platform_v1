@@ -157,8 +157,8 @@ func (s *EventService) NotifyBroadcastAutoAssigned(order *model.Order, providerU
 	if order == nil || providerUserID <= 0 {
 		return
 	}
-	s.notifyUsers([]int64{providerUserID}, "broadcast_auto_assigned", "收到自动指派订单",
-		fmt.Sprintf("订单“%s”已自动指派给您，请在时窗内确认是否承接。", fallbackTitle(order.Title, order.OrderNo, "订单")),
+	s.notifyUsers([]int64{providerUserID}, "broadcast_auto_assigned", "收到派单订单",
+		fmt.Sprintf("订单“%s”已派给您，请在时窗内确认是否承接。", fallbackTitle(order.Title, order.OrderNo, "订单")),
 		map[string]interface{}{
 			"order_id":           order.ID,
 			"order_no":           order.OrderNo,
@@ -175,8 +175,8 @@ func (s *EventService) NotifyBroadcastAutoAssignTimeoutForProvider(providerUserI
 	if providerUserID <= 0 || orderID <= 0 {
 		return
 	}
-	s.notifyUsers([]int64{providerUserID}, "broadcast_auto_assign_timeout", "自动指派已超时",
-		"您未在时窗内确认自动指派订单，系统已继续匹配其他服务商。",
+	s.notifyUsers([]int64{providerUserID}, "broadcast_auto_assign_timeout", "接单确认已超时",
+		"您未在时窗内确认订单，平台已继续匹配其他服务商。",
 		map[string]interface{}{
 			"order_id":      orderID,
 			"business_type": "broadcast_assignment",

@@ -198,7 +198,7 @@ export default function MessagesPage() {
 
       <ScrollView scrollY className="msg-scroll">
         {activeTab === 'notifications' ? (
-          sections.length === 0 ? <View className="empty-box"><Text className="empty-text">暂无系统通知</Text></View> :
+          sections.length === 0 ? <View className="empty-box"><Text className="empty-text">还没有系统通知，新报价和订单进度会在这里提醒</Text></View> :
             sections.map(sec => (
               <View key={sec.key} className="sec-wrap">
                 <View className="sec-header">
@@ -226,7 +226,7 @@ export default function MessagesPage() {
               </View>
             ))
         ) : (
-          conversations.length === 0 ? <View className="empty-box"><Text className="empty-text">暂无会话消息</Text></View> :
+          conversations.length === 0 ? <View className="empty-box"><Text className="empty-text">还没有会话消息，可从订单详情联系对方或找平台客服</Text></View> :
             conversations.map(c => {
               const swipeX = getSwipeX(c.conversation_id);
               return (
@@ -252,7 +252,7 @@ export default function MessagesPage() {
                           <Text className="c-time">{fmtTime(c.last_time)}</Text>
                         </View>
                         <View className="c-row-bottom">
-                          <Text className="c-desc" numberOfLines={1}>{c.last_type === 'image' ? '[图片]' : c.last_message || '暂无消息'}</Text>
+                          <Text className="c-desc" numberOfLines={1}>{c.last_type === 'image' ? '[图片]' : c.last_message || '还没有消息'}</Text>
                           {c.unread_count > 0 && <View className="msg-badge"><Text className="msg-badge-text">{c.unread_count > 99 ? '99+' : c.unread_count}</Text></View>}
                         </View>
                       </View>

@@ -104,3 +104,69 @@
 .business-stepbar-line-done {
   background: rgba(255, 255, 255, 0.92);
 }
+
+.business-stepbar-light .business-stepbar-dot {
+  width: 48rpx;
+  height: 48rpx;
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+.business-stepbar-light .business-stepbar-dot-done {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+
+.business-stepbar-light .business-stepbar-dot-current {
+  background: #2563eb;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 6rpx rgba(37, 99, 235, 0.16);
+}
+
+.business-stepbar-light .business-stepbar-dot-review {
+  background: #f97316;
+  border-color: #f97316;
+}
+
+.business-stepbar-light .business-stepbar-dot-fix {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.business-stepbar-light .business-stepbar-dot-text {
+  color: #ffffff;
+}
+
+.business-stepbar-light .business-stepbar-dot-pending .business-stepbar-dot-text {
+  color: #94a3b8;
+}
+
+.business-stepbar-light .business-stepbar-label {
+  color: #94a3b8;
+}
+
+.business-stepbar-light .business-stepbar-label-done {
+  color: #16a34a;
+}
+
+.business-stepbar-light .business-stepbar-label-current {
+  color: #2563eb;
+}
+
+.business-stepbar-light .business-stepbar-label-review {
+  color: #c2410c;
+}
+
+.business-stepbar-light .business-stepbar-label-fix {
+  color: #dc2626;
+}
+
+.business-stepbar-light .business-stepbar-line {
+  top: 23rpx;
+  height: 4rpx;
+  background: #e2e8f0;
+}
+
+.business-stepbar-light .business-stepbar-line-done {
+  background: #22c55e;
+}

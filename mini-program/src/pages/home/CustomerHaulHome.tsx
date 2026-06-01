@@ -801,7 +801,7 @@ export default function CustomerHaulHome() {
               </View>
             </View>
           )) : (
-            <View className='empty-line'>暂无常用地址</View>
+            <View className='empty-line'>还没有常用地址，选择起吊点后会自动记录</View>
           )}
         </View>
 

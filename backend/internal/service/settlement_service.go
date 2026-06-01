@@ -747,7 +747,7 @@ func (s *SettlementService) AddOrderTip(orderID, payerUserID int64, amount int64
 	return result, nil
 }
 
-// IncreaseOrderPrice 记录客户加价并刷新广播池展示金额，不修改 orders 金额快照。
+// IncreaseOrderPrice 记录客户加价并刷新派单展示金额，不修改 orders 金额快照。
 func (s *SettlementService) IncreaseOrderPrice(orderID, payerUserID int64, amount int64, reason string, method string) (*OrderPriceIncreaseResult, error) {
 	if amount <= 0 {
 		return nil, errors.New("加价金额必须大于0")
@@ -794,10 +794,10 @@ func (s *SettlementService) IncreaseOrderPrice(orderID, payerUserID int64, amoun
 
 		broadcast, err := broadcastRepo.LockByOrderID(order.ID)
 		if err != nil {
-			return errors.New("订单广播池不存在")
+			return errors.New("当前订单暂无可加价的派单信息")
 		}
 		if broadcast.Status != broadcastStatusOpen && broadcast.Status != broadcastStatusExpired {
-			return errors.New("当前广播状态不允许加价")
+			return errors.New("当前匹配状态不支持加价")
 		}
 
 		settlement, err := s.ensureMutableSettlementForOrder(order, settlementRepo)
@@ -835,7 +835,7 @@ func (s *SettlementService) IncreaseOrderPrice(orderID, payerUserID int64, amoun
 		if err := orderRepo.AddTimeline(&model.OrderTimeline{
 			OrderID:      order.ID,
 			Status:       "price_increased",
-			Note:         fmt.Sprintf("客户追加运费%s，广播池金额已刷新", formatAmountFen(amount)),
+			Note:         fmt.Sprintf("客户追加运费%s，派单金额已刷新", formatAmountFen(amount)),
 			OperatorID:   payerUserID,
 			OperatorType: "client",
 		}); err != nil {

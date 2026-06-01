@@ -5,10 +5,13 @@ import { ScrollView, Switch, Text, View } from '@tarojs/components';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { logout } from '../../store/slices/authSlice';
-import { setHaulRoleMode } from '../../store/slices/roleSlice';
+import { setHaulRoleMode, type HaulRoleMode } from '../../store/slices/roleSlice';
 import { RootState } from '../../store/store';
+import RoleModeCard from '../../components/business/RoleModeCard';
 import { COMMON_PLATFORM_SUBSCRIBE_TEMPLATES } from '../../constants/subscribeTemplates';
 import { requestSubscribe } from '../../services/push';
+import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
+import { syncPreferredModeWithBackend } from '../../utils/preferredMode';
 import { PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY } from '../../utils/providerOnboarding';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
 import './index.scss';
@@ -24,6 +27,16 @@ const getVerifyText = (status?: string) => {
 export default function SettingsPage() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
+  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
+  const providerCapabilities = resolveProviderCapabilities(effectiveRoleSummary);
+  const hasProviderMode = Boolean(
+    providerCapabilities.hasProviderApplication ||
+    providerCapabilities.canUseWorkbench ||
+    effectiveRoleSummary.has_owner_role ||
+    effectiveRoleSummary.has_pilot_role,
+  );
 
   const [pushEnabled, setPushEnabled] = useState(true);
   const [subscriptionsMainSwitch, setSubscriptionsMainSwitch] = useState<boolean | null>(null);
@@ -126,6 +139,16 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSelectRoleMode = (mode: HaulRoleMode) => {
+    if (mode === selectedMode) return;
+    dispatch(setHaulRoleMode(mode));
+    syncPreferredModeWithBackend(mode);
+    Taro.showToast({ title: `已切换到${mode === 'provider' ? '服务商' : '客户'}身份`, icon: 'none' });
+    setTimeout(() => {
+      Taro.switchTab({ url: '/pages/home/index' }).catch(() => null);
+    }, 250);
+  };
+
   const notificationStatusText = useMemo(() => {
     if (loadingSettings) {
       return '读取中...';
@@ -182,6 +205,15 @@ export default function SettingsPage() {
               </View>
             </View>
           </View>
+
+          <RoleModeCard
+            selectedMode={selectedMode}
+            hasClientMode={Boolean(effectiveRoleSummary.has_client_role)}
+            hasProviderMode={hasProviderMode}
+            onSelectMode={handleSelectRoleMode}
+            onOpenClientProfile={() => Taro.navigateTo({ url: '/pages/client/profile/index' })}
+            onOpenProviderOnboarding={() => Taro.navigateTo({ url: '/pages/provider/onboarding/index' })}
+          />
 
           <View className='settings-section-header'>
             <Text className='settings-section-title'>通知设置</Text>

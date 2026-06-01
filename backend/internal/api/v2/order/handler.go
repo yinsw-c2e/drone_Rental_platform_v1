@@ -543,7 +543,7 @@ func (h *Handler) Redispatch(c *gin.Context) {
 		return
 	}
 	if h.broadcastService == nil {
-		response.V2InternalError(c, "重发广播服务未初始化")
+		response.V2InternalError(c, "重新匹配服务暂不可用")
 		return
 	}
 

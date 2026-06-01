@@ -796,7 +796,7 @@ export default function OrderProgressPage() {
                   <Text className="dispatch-fail-reason">可能原因：附近在线服务商不足、机型未覆盖、当前时段紧张。</Text>
                   <Text className="dispatch-fail-suggest">你可以：</Text>
                   <Text className="dispatch-fail-line">• 加价或扩大半径再发一次（下方按钮）</Text>
-                  <Text className="dispatch-fail-line">• 改成「发布吊运任务」让服务商上门报价，常用于复杂或不急的活</Text>
+                  <Text className="dispatch-fail-line">• 改成「发布吊运任务」让服务商上门报价，适合路线或时间还需要商量的活</Text>
                 </View>
               ) : null}
 

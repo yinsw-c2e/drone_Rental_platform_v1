@@ -87,14 +87,14 @@ const servicePlans: Array<{
     title: '现场勘查',
     subtitle: '勘查费用可抵扣服务费',
     price: '提交后确认',
-    detail: '适合路线、停机点或货物状态不确定的复杂工况。先约服务商看现场，后续成单时勘查费用可抵扣。',
+    detail: '适合路线、停机点或货物状态还需要确认的场景。先约服务商看现场，后续成单时勘查费用可抵扣。',
   },
 ];
 
 const planHints: Record<ServicePlanKey, string> = {
   standard: '标准吊运按平台估价区间报价，适合正常匹配。',
   urgent: '加急吊运按约 25% 加急溢价估算，平台会优先推给在线服务商。',
-  survey: '现场勘查适合复杂工况，勘查费用可抵扣后续服务费。',
+  survey: '现场勘查适合需要先看现场的场景，勘查费用可抵扣后续服务费。',
 };
 
 const branchExamples: Record<'quote' | 'pick', string[]> = {

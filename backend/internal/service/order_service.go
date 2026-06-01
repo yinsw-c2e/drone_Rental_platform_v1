@@ -1809,7 +1809,7 @@ func (s *OrderService) reassignOrderAfterProviderCancel(
 		return cancelOrderOutcome{}, errors.New("当前订单状态不允许服务商取消")
 	}
 	if broadcastRepo == nil {
-		return cancelOrderOutcome{}, errors.New("广播池依赖未初始化")
+		return cancelOrderOutcome{}, errors.New("派单服务暂不可用")
 	}
 
 	now := time.Now()

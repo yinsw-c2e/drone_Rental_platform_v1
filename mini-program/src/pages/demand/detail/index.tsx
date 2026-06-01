@@ -9,6 +9,8 @@ import { CARGO_TYPES } from '../../../constants';
 import { getDemandSceneLabel, getObjectStatusMeta } from '../../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
+import StatusBadge from '../../../components/business/StatusBadge';
+import StepBar from '../../../components/business/StepBar';
 import './index.scss';
 
 type DemandStep = '已发布' | '收到报价' | '已选定服务商' | '已成单';
@@ -221,13 +223,17 @@ export default function DemandDetailPage() {
 
   if (loading) return <View className="page-wrap"><Text className="empty-text">加载中...</Text></View>;
   if (!demand) return <View className="page-wrap"><Text className="empty-text">任务不存在</Text></View>;
+  const demandStepIndex = resolveDemandStepIndex(demand);
 
   return (
     <ScrollView scrollY className="page-wrap">
       <View className="hero">
         <View className="hero-top">
           <Text className="demand-no">{demand.demand_no}</Text>
-          <View className="status-badge"><Text className="status-text">{getObjectStatusMeta('demand', demand.status).label}</Text></View>
+          <StatusBadge
+            label={getObjectStatusMeta('demand', demand.status).label}
+            tone={getObjectStatusMeta('demand', demand.status).tone}
+          />
         </View>
         <Text className="hero-title">{demand.title}</Text>
         <Text className="hero-budget">预算: ¥{((demand.budget_min || 0) / 100).toFixed(2)} - ¥{((demand.budget_max || 0) / 100).toFixed(2)}</Text>
@@ -236,23 +242,7 @@ export default function DemandDetailPage() {
       {isOwnDemand && !isDemandTerminal(demand) && !isDemandDraft(demand) ? (
         <View className="info-card">
           <Text className="section-title">任务进度</Text>
-          <View className="step-bar">
-            {DEMAND_STEPS.map((label, idx) => {
-              const currentStep = resolveDemandStepIndex(demand);
-              const tone = idx < currentStep ? 'done' : idx === currentStep ? 'active' : 'pending';
-              return (
-                <View key={label} className="step-node">
-                  <View className={`step-dot step-dot-${tone}`}>
-                    <Text className="step-dot-text">{idx < currentStep ? '✓' : String(idx + 1)}</Text>
-                  </View>
-                  <Text className={`step-label step-label-${tone}`}>{label}</Text>
-                  {idx < DEMAND_STEPS.length - 1 ? (
-                    <View className={`step-line step-line-${idx < currentStep ? 'done' : 'pending'}`} />
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+          <StepBar steps={DEMAND_STEPS.map(label => ({ key: label, label }))} currentIndex={demandStepIndex} theme="light" />
           {(() => {
             const tip = buildExpectationTip(demand);
             if (!tip.title) return null;
@@ -338,7 +328,7 @@ export default function DemandDetailPage() {
             </View>
           ) : quotes.length === 0 ? (
             <View className="quote-empty">
-              <Text className="quote-empty-text">暂无服务商提交报价</Text>
+              <Text className="quote-empty-text">还没有服务商报价，你可以分享给认识的服务商</Text>
             </View>
           ) : (
             quotes.map((quote) => (

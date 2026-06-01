@@ -687,8 +687,8 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
 
         {!loading && !fetchError && visualDemands.length === 0 ? (
           <View className='pd-empty-card'>
-            <Text className='pd-empty-title'>{demands.length ? '暂无符合筛选的需求' : '暂无可接需求'}</Text>
-            <Text className='pd-empty-desc'>{demands.length ? '当前筛选条件下没有匹配项，请调整区域、重量、时间或场景。' : '暂无可报价需求'}</Text>
+            <Text className='pd-empty-title'>{demands.length ? '当前筛选下没有接单需求' : '附近还没有可报价需求'}</Text>
+            <Text className='pd-empty-desc'>{demands.length ? '请调整区域、重量、时间或场景后再刷新。' : '保持接单状态，稍后刷新会看到新任务。'}</Text>
           </View>
         ) : null}
 

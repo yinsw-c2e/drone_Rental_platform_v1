@@ -91,7 +91,7 @@ export default function MyDemandsPage() {
         <View className="md-list">
           {filtered.length === 0 ? (
             <View className="md-empty-state">
-              <Text className="md-empty-state-text">暂无需求</Text>
+              <Text className="md-empty-state-text">还没有发布吊运任务，可回首页立即下单或发布任务</Text>
             </View>
           ) : filtered.map(d => {
             const meta = getObjectStatusMeta('demand', d.status);

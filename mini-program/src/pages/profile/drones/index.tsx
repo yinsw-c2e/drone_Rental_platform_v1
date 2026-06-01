@@ -80,7 +80,7 @@ export default function MyDronesPage() {
           <View className='card'>
             <View className='empty-state'>
               <Text className='empty-state-icon'>🛩️</Text>
-              <Text className='empty-state-text'>还没有添加无人机</Text>
+              <Text className='empty-state-text'>还没有添加无人机，添加设备后可用于接单资质审核</Text>
             </View>
           </View>
         ) : (

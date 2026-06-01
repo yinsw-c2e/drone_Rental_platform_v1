@@ -13,8 +13,11 @@ import { pilotV2Service } from '../../services/pilotV2';
 import { sessionService } from '../../services/session';
 import { userService } from '../../services/user';
 import { logout, setMeSummary, updateUser } from '../../store/slices/authSlice';
+import { setHaulRoleMode, type HaulRoleMode } from '../../store/slices/roleSlice';
 import { RootState } from '../../store/store';
+import RoleModeCard from '../../components/business/RoleModeCard';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
+import { syncPreferredModeWithBackend } from '../../utils/preferredMode';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import profileBgImage from '../../assets/mine/images/mine_profile_drone_bg_750x330.jpg';
 import defaultAvatarImage from '../../assets/mine/images/default_avatar_circle.png';
@@ -238,6 +241,23 @@ export default function ProfilePage() {
       return;
     }
     Taro.navigateTo({ url }).catch(() => null);
+  };
+
+  const hasProviderMode = Boolean(
+    providerCapabilities.hasProviderApplication ||
+    providerCapabilities.canUseWorkbench ||
+    effectiveRoleSummary.has_owner_role ||
+    effectiveRoleSummary.has_pilot_role,
+  );
+
+  const handleSelectRoleMode = (mode: HaulRoleMode) => {
+    if (mode === selectedMode) return;
+    dispatch(setHaulRoleMode(mode));
+    syncPreferredModeWithBackend(mode);
+    Taro.showToast({ title: `已切换到${mode === 'provider' ? '服务商' : '客户'}身份`, icon: 'none' });
+    setTimeout(() => {
+      Taro.switchTab({ url: '/pages/home/index' }).catch(() => null);
+    }, 250);
   };
 
   const handleAvatarPress = async () => {
@@ -592,6 +612,15 @@ export default function ProfilePage() {
               ))}
             </View>
           </View>
+
+          <RoleModeCard
+            selectedMode={selectedMode}
+            hasClientMode={Boolean(effectiveRoleSummary.has_client_role)}
+            hasProviderMode={hasProviderMode}
+            onSelectMode={handleSelectRoleMode}
+            onOpenClientProfile={() => handleNavigate('/pages/client/profile/index')}
+            onOpenProviderOnboarding={() => handleNavigate('/pages/provider/onboarding/index')}
+          />
 
           {menuGroups.map((group) => (
             <View key={group.key} className='group-block'>

@@ -7,18 +7,35 @@ export type StepBarState = 'done' | 'current' | 'pending' | 'review' | 'fix';
 export type StepBarStep = {
   key?: string;
   label: string;
-  state: StepBarState;
+  state?: StepBarState;
   onClick?: () => void;
 };
 
 type Props = {
   steps: StepBarStep[];
+  currentIndex?: number;
+  theme?: 'hero' | 'light';
 };
 
-export default function StepBar({ steps }: Props) {
+const stateFromIndex = (index: number, currentIndex: number): StepBarState => {
+  if (index < currentIndex) return 'done';
+  if (index === currentIndex) return 'current';
+  return 'pending';
+};
+
+const shouldCompleteLine = (current: StepBarState, next?: StepBarState) => (
+  current === 'done' && next !== undefined && next !== 'pending'
+);
+
+export default function StepBar({ steps, currentIndex = 0, theme = 'hero' }: Props) {
+  const normalizedSteps = steps.map((step, index) => ({
+    ...step,
+    state: step.state || stateFromIndex(index, currentIndex),
+  }));
+
   return (
-    <View className="business-stepbar">
-      {steps.map((step, index) => (
+    <View className={`business-stepbar business-stepbar-${theme}`}>
+      {normalizedSteps.map((step, index) => (
         <View
           key={step.key || step.label}
           className={`business-stepbar-node business-stepbar-node-${step.state}`}
@@ -29,7 +46,7 @@ export default function StepBar({ steps }: Props) {
           </View>
           <Text className={`business-stepbar-label business-stepbar-label-${step.state}`}>{step.label}</Text>
           {index < steps.length - 1 ? (
-            <View className={`business-stepbar-line ${steps[index + 1]?.state === 'done' ? 'business-stepbar-line-done' : ''}`} />
+            <View className={`business-stepbar-line ${shouldCompleteLine(step.state, normalizedSteps[index + 1]?.state) ? 'business-stepbar-line-done' : ''}`} />
           ) : null}
         </View>
       ))}

@@ -68,7 +68,7 @@ export default function MyOffersPage() {
             <View key={g} className={`filter-chip ${activeGroup === g ? 'filter-chip-active filter-chip-active-offers' : ''}`} onClick={() => setActiveGroup(g)}>{LABELS[g]}</View>
           ))}
         </View>
-        {filtered.length === 0 ? <View className="empty-state"><Text className="empty-state-text">暂无服务</Text></View> :
+        {filtered.length === 0 ? <View className="empty-state"><Text className="empty-state-text">还没有上架服务，可先补齐服务范围和设备资质</Text></View> :
           filtered.map(o => (
             <View key={o.id} className="list-item-card">
               <View className="list-item-card-header">

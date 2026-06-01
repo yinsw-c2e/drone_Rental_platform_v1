@@ -59,7 +59,7 @@ export default function MyQuotesPage() {
             <View key={g} className={`filter-chip ${activeGroup === g ? 'filter-chip-active filter-chip-active-quotes' : ''}`} onClick={() => setActiveGroup(g)}>{LABELS[g]}</View>
           ))}
         </View>
-        {filtered.length === 0 ? <View className="empty-state"><Text className="empty-state-text">暂无报价记录</Text></View> :
+        {filtered.length === 0 ? <View className="empty-state"><Text className="empty-state-text">还没有报价记录，可到接单需求里提交报价</Text></View> :
           filtered.map(q => (
             <View key={q.id} className="list-item-card" onClick={() => q.demand?.id && Taro.navigateTo({ url: `/pages/demand/detail/index?id=${q.demand.id}` })}>
               <View className="list-item-card-header">

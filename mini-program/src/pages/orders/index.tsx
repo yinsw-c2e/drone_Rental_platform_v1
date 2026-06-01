@@ -575,7 +575,7 @@ function ProviderOrdersPage({ segmentBar }: { segmentBar: React.ReactNode }) {
           </View>
         ) : filteredItems.length === 0 ? (
           <View className="empty-state">
-            <Text className="empty-state-text">当前没有待服务订单</Text>
+            <Text className="empty-state-text">当前没有待服务订单，可保持上线接单或去接单需求报价</Text>
           </View>
         ) : (
           filteredItems.map(order => {
@@ -838,7 +838,7 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
           </View>
         ) : filteredItems.length === 0 ? (
           <View className="empty-state">
-            <Text className="empty-state-text">当前没有订单</Text>
+            <Text className="empty-state-text">还没有订单，回首页可立即下单或发布吊运任务</Text>
           </View>
         ) : (
           filteredItems.map(order => {
