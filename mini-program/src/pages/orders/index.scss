@@ -63,6 +63,62 @@ page {
   background: #edf5ff;
 }
 
+.customer-order-segment {
+  display: flex;
+  flex-direction: row;
+  padding: 8rpx;
+  margin-bottom: 22rpx;
+  border: 1rpx solid #dbe6f5;
+  border-radius: 18rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(15, 35, 65, 0.04);
+}
+
+.customer-order-segment-item {
+  flex: 1;
+  height: 64rpx;
+  border-radius: 14rpx;
+  color: #5f6d82;
+  font-size: 27rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.customer-order-segment-item.is-active {
+  color: #005bea;
+  background: #edf5ff;
+}
+
+.customer-order-segment-count {
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 99rpx;
+  background: #ff4b05;
+  color: #ffffff;
+  font-size: 22rpx;
+  line-height: 36rpx;
+  font-weight: 700;
+}
+
+.empty-state-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18rpx;
+  padding: 14rpx 36rpx;
+  border-radius: 14rpx;
+  background: linear-gradient(135deg, #005bea 0%, #00c6fb 100%);
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
 .orders-filter-chip {
   min-width: 128rpx;
   height: 62rpx;

@@ -423,6 +423,21 @@ export default function QuickOrderPage() {
     } catch {
       Taro.removeStorageSync(QUICK_ORDER_PREFILL_STORAGE_KEY);
     }
+    try {
+      const hint = String(Taro.getStorageSync('customer_order_redispatch_hint_v1') || '');
+      if (hint) {
+        Taro.removeStorageSync('customer_order_redispatch_hint_v1');
+        Taro.showToast({
+          title: hint === 'full'
+            ? '已带入原订单的地点、重量和时间，可继续完善作业说明'
+            : '已带入原订单的重量和时间，请补全起吊/落放点',
+          icon: 'none',
+          duration: 3000,
+        });
+      }
+    } catch {
+      // 忽略
+    }
   }, []);
 
   useEffect(() => {
@@ -606,6 +621,7 @@ export default function QuickOrderPage() {
       await demandV2Service.publish(demandId);
       Taro.hideLoading();
       Taro.showToast({ title: '需求已发布', icon: 'success' });
+      try { Taro.setStorageSync('customer_orders_default_segment', 'demands'); } catch {}
       setTimeout(() => {
         Taro.redirectTo({ url: `/pages/demand/detail/index?id=${demandId}` });
       }, 500);

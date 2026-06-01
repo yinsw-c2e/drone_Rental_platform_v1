@@ -1,3 +1,6 @@
+const isProductionBuild = process.env.NODE_ENV === 'production';
+const devOnlyPages = isProductionBuild ? [] : ['pages/dev/subscribe-test/index'];
+
 export default defineAppConfig({
   pages: [
     'pages/auth/mode-selection/index',
@@ -47,7 +50,7 @@ export default defineAppConfig({
     'pages/settlement/wallet/index',
     'pages/settlement/withdrawal/index',
     'pages/settlement/withdrawal-list/index',
-    'pages/dev/subscribe-test/index',
+    ...devOnlyPages,
   ],
   window: { backgroundTextStyle: 'light', navigationBarBackgroundColor: '#fff', navigationBarTitleText: '重载吊运', navigationBarTextStyle: 'black' },
   permission: {

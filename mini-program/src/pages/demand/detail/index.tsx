@@ -11,6 +11,60 @@ import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../u
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import './index.scss';
 
+type DemandStep = '已发布' | '收到报价' | '已选定服务商' | '已成单';
+const DEMAND_STEPS: DemandStep[] = ['已发布', '收到报价', '已选定服务商', '已成单'];
+
+const resolveDemandStepIndex = (demand: DemandDetail | null): number => {
+  if (!demand) return 0;
+  const status = String(demand.status || '').toLowerCase();
+  if (status === 'converted_to_order') return 3;
+  if (status === 'selected' || demand.selected_quote_id) return 2;
+  if ((demand.quote_count || 0) > 0) return 1;
+  return 0;
+};
+
+const isDemandTerminal = (demand: DemandDetail | null): boolean => {
+  if (!demand) return false;
+  const status = String(demand.status || '').toLowerCase();
+  return status === 'cancelled' || status === 'expired' || status === 'closed';
+};
+
+const isDemandDraft = (demand: DemandDetail | null): boolean => {
+  if (!demand) return false;
+  return String(demand.status || '').toLowerCase() === 'draft';
+};
+
+const buildExpectationTip = (demand: DemandDetail | null): { title: string; lines: string[]; tone: 'info' | 'success' | 'muted' } => {
+  if (!demand) return { title: '', lines: [], tone: 'info' };
+  if (isDemandTerminal(demand)) {
+    return { title: '任务已结束', lines: ['如果想再发起一次，可回首页发布新的吊运任务。'], tone: 'muted' };
+  }
+  const status = String(demand.status || '').toLowerCase();
+  if (status === 'converted_to_order') {
+    return { title: '订单已生成', lines: ['服务商正在按约定推进履约，进度可在订单中跟踪。'], tone: 'success' };
+  }
+  const quoteCount = demand.quote_count || 0;
+  if (status === 'selected' || demand.selected_quote_id) {
+    return { title: '已选定服务商', lines: ['等服务商确认后即可生成订单，记得关注消息通知。'], tone: 'success' };
+  }
+  if (quoteCount > 0) {
+    return {
+      title: `已收到 ${quoteCount} 家服务商报价`,
+      lines: ['对比价格、机型和服务商资料，挑一家点"选定"即可生成订单。'],
+      tone: 'success',
+    };
+  }
+  return {
+    title: '通常 30 分钟内会有 1-3 家服务商报价',
+    lines: [
+      '没人报价时，可以试试：',
+      '• 检查作业说明是否清晰具体（建材吊几楼、要不要现场看）',
+      '• 适当放宽时间或预算，覆盖更多服务商',
+    ],
+    tone: 'info',
+  };
+};
+
 const formatScheduledRange = (startISO?: string, endISO?: string): string => {
   const fmt = (iso?: string): string => {
     if (!iso) return '';
@@ -127,6 +181,41 @@ export default function DemandDetailPage() {
         <Text className="hero-title">{demand.title}</Text>
         <Text className="hero-budget">预算: ¥{((demand.budget_min || 0) / 100).toFixed(2)} - ¥{((demand.budget_max || 0) / 100).toFixed(2)}</Text>
       </View>
+
+      {isOwnDemand && !isDemandTerminal(demand) && !isDemandDraft(demand) ? (
+        <View className="info-card">
+          <Text className="section-title">任务进度</Text>
+          <View className="step-bar">
+            {DEMAND_STEPS.map((label, idx) => {
+              const currentStep = resolveDemandStepIndex(demand);
+              const tone = idx < currentStep ? 'done' : idx === currentStep ? 'active' : 'pending';
+              return (
+                <View key={label} className="step-node">
+                  <View className={`step-dot step-dot-${tone}`}>
+                    <Text className="step-dot-text">{idx < currentStep ? '✓' : String(idx + 1)}</Text>
+                  </View>
+                  <Text className={`step-label step-label-${tone}`}>{label}</Text>
+                  {idx < DEMAND_STEPS.length - 1 ? (
+                    <View className={`step-line step-line-${idx < currentStep ? 'done' : 'pending'}`} />
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+          {(() => {
+            const tip = buildExpectationTip(demand);
+            if (!tip.title) return null;
+            return (
+              <View className={`step-tip step-tip-${tip.tone}`}>
+                <Text className="step-tip-title">{tip.title}</Text>
+                {tip.lines.map((line, i) => (
+                  <Text key={i} className="step-tip-line">{line}</Text>
+                ))}
+              </View>
+            );
+          })()}
+        </View>
+      ) : null}
 
       <View className="info-card">
         <Text className="section-title">操作</Text>

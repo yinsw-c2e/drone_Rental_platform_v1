@@ -512,6 +512,40 @@ export default function OrderProgressPage() {
     }
   };
 
+  const switchToNegotiated = () => {
+    if (!detail) {
+      Taro.showToast({ title: '订单数据未加载', icon: 'none' });
+      return;
+    }
+    const weight = Number(detail.cargo_weight_kg || (detail as any)?.cargo_weight || 0);
+    const scheduledStartAt = String((detail as any)?.start_time || (detail as any)?.scheduled_start_at || '');
+    const pickupLat = Number(detail.service_latitude || 0);
+    const pickupLng = Number(detail.service_longitude || 0);
+    const pickupText = String(detail.service_address || '').trim();
+    const dropoffLat = Number(detail.dest_latitude || 0);
+    const dropoffLng = Number(detail.dest_longitude || 0);
+    const dropoffText = String(detail.dest_address || '').trim();
+    const hasPickup = pickupLat !== 0 && pickupLng !== 0 && pickupText.length > 0;
+    const hasDropoff = dropoffLat !== 0 && dropoffLng !== 0 && dropoffText.length > 0;
+    try {
+      Taro.setStorageSync('customer_home_quick_order_prefill_v1', {
+        pickupAddress: hasPickup
+          ? { address: pickupText, name: pickupText, latitude: pickupLat, longitude: pickupLng }
+          : undefined,
+        deliveryAddress: hasDropoff
+          ? { address: dropoffText, name: dropoffText, latitude: dropoffLat, longitude: dropoffLng }
+          : undefined,
+        cargoWeight: weight > 0 ? String(weight) : '',
+        scheduledStartAt: scheduledStartAt || undefined,
+        timeOption: scheduledStartAt ? '预约' : '尽快',
+      });
+      Taro.setStorageSync('customer_order_redispatch_hint_v1', hasPickup && hasDropoff ? 'full' : 'partial');
+    } catch {
+      // 存储失败也不挡跳转，用户重新填即可
+    }
+    Taro.navigateTo({ url: '/pages/publish/quick-order/index?fromOrder=1' });
+  };
+
   const redispatchOrder = async (mode: 'price' | 'radius') => {
     if (!detail || !orderId || actionLoading) return;
     const isPriceMode = mode === 'price';
@@ -757,6 +791,16 @@ export default function OrderProgressPage() {
                 <Text className="op-meta-amount">{formatMoney(detail?.total_amount)}</Text>
               </View>
 
+              {showRedispatchActions ? (
+                <View className="dispatch-fail-card">
+                  <Text className="dispatch-fail-title">暂时没有匹配到合适的服务商</Text>
+                  <Text className="dispatch-fail-reason">可能原因：附近在线服务商不足、机型未覆盖、当前时段紧张。</Text>
+                  <Text className="dispatch-fail-suggest">你可以：</Text>
+                  <Text className="dispatch-fail-line">• 加价或扩大半径再发一次（下方按钮）</Text>
+                  <Text className="dispatch-fail-line">• 改成「发布吊运任务」让服务商上门报价，常用于复杂或不急的活</Text>
+                </View>
+              ) : null}
+
               <View className="op-actions">
                 {showTerminalOnlyAction ? (
                   <View className="op-button op-button-muted" onClick={() => Taro.switchTab({ url: '/pages/home/index' })}>
@@ -771,6 +815,9 @@ export default function OrderProgressPage() {
                         </View>
                         <View className="op-button op-button-primary" onClick={() => redispatchOrder('radius')}>
                           <Text>{actionLoading ? '重发中…' : `扩大 ${REDISPATCH_RADIUS_BUMP_KM}km 重发`}</Text>
+                        </View>
+                        <View className="op-button op-button-ghost" onClick={switchToNegotiated}>
+                          <Text>改成议价单（找服务商上门报价）</Text>
                         </View>
                       </>
                     ) : null}

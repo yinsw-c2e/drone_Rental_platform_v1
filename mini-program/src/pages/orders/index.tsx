@@ -4,8 +4,10 @@ import { ScrollView, Text, View } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 import { orderV2Service } from '../../services/orderV2';
-import { V2OrderSummary } from '../../types';
+import { demandV2Service } from '../../services/demandV2';
+import { DemandSummary, V2OrderSummary } from '../../types';
 import { syncCustomTabBar } from '../../utils/tabBar';
+import { getDemandSceneLabel, getObjectStatusMeta } from '../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
 import DemandListPage from '../demand/list';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
@@ -13,8 +15,10 @@ import './index.scss';
 
 type StatusFilter = 'all' | 'active' | 'done';
 type ProviderOrderSegment = 'demand' | 'mine';
+type CustomerOrderSegment = 'demands' | 'orders';
 
 const PROVIDER_ORDERS_SEGMENT_KEY = 'provider_orders_default_segment';
+export const CUSTOMER_ORDERS_SEGMENT_KEY = 'customer_orders_default_segment';
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: '全部' },
@@ -191,7 +195,207 @@ export default function RoleOrdersPage() {
     return <ProviderOrdersShell />;
   }
 
-  return <CustomerOrdersPage />;
+  return <CustomerOrdersShell />;
+}
+
+function CustomerOrderSegmentBar({
+  active,
+  onChange,
+  demandCount,
+}: {
+  active: CustomerOrderSegment;
+  onChange: (next: CustomerOrderSegment) => void;
+  demandCount: number;
+}) {
+  return (
+    <View className="customer-order-segment">
+      <View
+        className={`customer-order-segment-item ${active === 'demands' ? 'is-active' : ''}`}
+        onClick={() => onChange('demands')}
+      >
+        <Text>我的任务</Text>
+        {demandCount > 0 ? <Text className="customer-order-segment-count">{demandCount > 99 ? '99+' : demandCount}</Text> : null}
+      </View>
+      <View
+        className={`customer-order-segment-item ${active === 'orders' ? 'is-active' : ''}`}
+        onClick={() => onChange('orders')}
+      >
+        <Text>我的订单</Text>
+      </View>
+    </View>
+  );
+}
+
+function CustomerOrdersShell() {
+  const [activeSegment, setActiveSegment] = useState<CustomerOrderSegment>('orders');
+  const [demands, setDemands] = useState<DemandSummary[]>([]);
+  const [demandsLoading, setDemandsLoading] = useState(false);
+  const [demandsRefreshing, setDemandsRefreshing] = useState(false);
+  const [demandsError, setDemandsError] = useState('');
+
+  const fetchDemands = useCallback(async () => {
+    try {
+      const res = await demandV2Service.listMyDemands({ page: 1, page_size: 50 });
+      const list = (res as any)?.list || (res as any)?.data?.list || [];
+      setDemands(Array.isArray(list) ? list : []);
+      setDemandsError('');
+    } catch (error: any) {
+      setDemands([]);
+      setDemandsError(friendlyErrorMessage(error, '任务列表加载失败，请下拉刷新或检查网络'));
+    } finally {
+      setDemandsLoading(false);
+      setDemandsRefreshing(false);
+    }
+  }, []);
+
+  useDidShow(() => {
+    syncCustomTabBar(1);
+    const hint = Taro.getStorageSync(CUSTOMER_ORDERS_SEGMENT_KEY);
+    if (hint === 'demands' || hint === 'orders') {
+      setActiveSegment(hint);
+      Taro.removeStorageSync(CUSTOMER_ORDERS_SEGMENT_KEY);
+    }
+    setDemandsLoading(true);
+    fetchDemands();
+  });
+
+  const handleSegmentChange = useCallback((next: CustomerOrderSegment) => {
+    setActiveSegment(next);
+  }, []);
+
+  const activeDemandCount = useMemo(
+    () => demands.filter(d => !['cancelled', 'expired', 'closed', 'converted_to_order'].includes(String(d.status || '').toLowerCase())).length,
+    [demands],
+  );
+
+  const segmentBar = (
+    <CustomerOrderSegmentBar active={activeSegment} onChange={handleSegmentChange} demandCount={activeDemandCount} />
+  );
+
+  if (activeSegment === 'demands') {
+    return (
+      <CustomerDemandsPage
+        segmentBar={segmentBar}
+        demands={demands}
+        loading={demandsLoading}
+        refreshing={demandsRefreshing}
+        error={demandsError}
+        onRefresh={() => {
+          setDemandsRefreshing(true);
+          fetchDemands();
+        }}
+        onRetry={() => {
+          setDemandsLoading(true);
+          setDemandsError('');
+          fetchDemands();
+        }}
+      />
+    );
+  }
+
+  return <CustomerOrdersPage segmentBar={segmentBar} />;
+}
+
+function CustomerDemandsPage({
+  segmentBar,
+  demands,
+  loading,
+  refreshing,
+  error,
+  onRefresh,
+  onRetry,
+}: {
+  segmentBar: React.ReactNode;
+  demands: DemandSummary[];
+  loading: boolean;
+  refreshing: boolean;
+  error: string;
+  onRefresh: () => void;
+  onRetry: () => void;
+}) {
+  const [topInsetRpx, setTopInsetRpx] = useState(0);
+
+  useEffect(() => {
+    try {
+      const sys = Taro.getSystemInfoSync();
+      const ratio = 750 / (sys.windowWidth || 375);
+      const statusBarRpx = Math.round(((sys.statusBarHeight || 20) + 12) * ratio);
+      setTopInsetRpx(statusBarRpx);
+    } catch {
+      // 忽略
+    }
+  }, []);
+
+  const openDetail = (demand: DemandSummary) => {
+    Taro.navigateTo({ url: `/pages/demand/detail/index?id=${demand.id}` });
+  };
+
+  const goPublish = () => {
+    Taro.switchTab({ url: '/pages/home/index' });
+  };
+
+  return (
+    <ScrollView
+      scrollY
+      className="orders-page"
+      refresherEnabled
+      refresherTriggered={refreshing}
+      onRefresherRefresh={onRefresh}
+    >
+      <View className="orders-page-content" style={{ paddingTop: `${topInsetRpx}rpx` }}>
+        <Text className="orders-page-title">我的任务</Text>
+        {segmentBar}
+
+        {loading ? (
+          <View className="empty-state">
+            <Text className="empty-state-text">加载中...</Text>
+          </View>
+        ) : error ? (
+          <View className="empty-state">
+            <Text className="empty-state-text">{error}</Text>
+            <View className="empty-state-cta" onClick={onRetry}>
+              <Text>重新加载</Text>
+            </View>
+          </View>
+        ) : demands.length === 0 ? (
+          <View className="empty-state">
+            <Text className="empty-state-text">还没有发布过吊运任务</Text>
+            <View className="empty-state-cta" onClick={goPublish}>
+              <Text>回首页发布任务</Text>
+            </View>
+          </View>
+        ) : (
+          demands.map(demand => {
+            const meta = getObjectStatusMeta('demand', demand.status);
+            const route = String(demand.title || '未命名任务');
+            const quoteCount = demand.quote_count || 0;
+            const budgetMin = Math.round(Number(demand.budget_min || 0) / 100);
+            const budgetMax = Math.round(Number(demand.budget_max || 0) / 100);
+            const budgetText = budgetMin > 0 || budgetMax > 0
+              ? `预算 ¥${budgetMin}-${budgetMax}`
+              : '预算待估';
+            return (
+              <View key={demand.id} className="order-card" onClick={() => openDetail(demand)}>
+                <View className="order-card-head">
+                  <View className={`order-status-badge order-status-${meta.tone || 'gray'}`}>
+                    <Text>{meta.label}</Text>
+                  </View>
+                  <Text className="order-card-no">{demand.demand_no}</Text>
+                </View>
+                <View className="order-route">
+                  <Text className="order-route-text">{route}</Text>
+                </View>
+                <View className="order-card-foot">
+                  <Text className="order-mode-text">{getDemandSceneLabel(demand.cargo_scene)} · {quoteCount > 0 ? `${quoteCount} 家报价` : '等待报价'}</Text>
+                  <Text className="order-amount">{budgetText}</Text>
+                </View>
+              </View>
+            );
+          })
+        )}
+      </View>
+    </ScrollView>
+  );
 }
 
 function ProviderOrderSegmentBar({
@@ -399,7 +603,7 @@ function ProviderOrdersPage({ segmentBar }: { segmentBar: React.ReactNode }) {
   );
 }
 
-function CustomerOrdersPage() {
+function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
   const [activeStatus, setActiveStatus] = useState<StatusFilter>('all');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -599,6 +803,7 @@ function CustomerOrdersPage() {
     >
       <View className="orders-page-content" style={{ paddingTop: `${topInsetRpx}rpx` }}>
         <Text className="orders-page-title">我的订单</Text>
+        {segmentBar}
         <View className="orders-filter-row">
           {STATUS_TABS.map(tab => (
             <View

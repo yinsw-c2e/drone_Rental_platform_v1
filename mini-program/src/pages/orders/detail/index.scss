@@ -332,6 +332,45 @@ page {
   white-space: nowrap;
 }
 
+.dispatch-fail-card {
+  margin: 16rpx 0 4rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  background: #fff7ed;
+  border: 1rpx solid #fed7aa;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.dispatch-fail-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #c2410c;
+  line-height: 1.4;
+}
+
+.dispatch-fail-reason {
+  font-size: 24rpx;
+  color: #7c2d12;
+  line-height: 1.55;
+  margin-bottom: 4rpx;
+}
+
+.dispatch-fail-suggest {
+  font-size: 24rpx;
+  color: #7c2d12;
+  line-height: 1.55;
+  font-weight: 600;
+  margin-top: 4rpx;
+}
+
+.dispatch-fail-line {
+  font-size: 24rpx;
+  color: #7c2d12;
+  line-height: 1.6;
+}
+
 /* actions */
 .op-actions {
   display: flex;
