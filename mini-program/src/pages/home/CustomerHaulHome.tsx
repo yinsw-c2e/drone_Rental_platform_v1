@@ -671,9 +671,6 @@ export default function CustomerHaulHome() {
                 className={`service-class-card ${selectedClass?.code === item.code ? 'is-active' : ''}`}
                 onClick={() => selectServiceClass(item)}
               >
-                {autoMatchedClass?.code === item.code && cargoWeightValue > 0 ? (
-                  <Text className='service-class-auto'>按你的 {Math.round(cargoWeightValue)}kg 自动推荐</Text>
-                ) : null}
                 <View className='service-class-head'>
                   <Text className='service-class-name'>{item.display_name}</Text>
                   <Text
