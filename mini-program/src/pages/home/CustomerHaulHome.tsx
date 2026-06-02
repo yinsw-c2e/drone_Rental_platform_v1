@@ -187,6 +187,10 @@ const matchesServiceClassWeight = (item: V2ServiceClass, weight: number) => {
   return weight >= min;
 };
 
+const findRecommendedServiceClass = (items: V2ServiceClass[], weight: number) => (
+  [...items].reverse().find(item => matchesServiceClassWeight(item, weight)) || null
+);
+
 const getDefaultWeight = (item?: V2ServiceClass | null) => {
   if (!item) return '50';
   const min = Number(item.payload_min_kg || 50);
@@ -273,7 +277,7 @@ export default function CustomerHaulHome() {
   );
   const cargoWeightValue = useMemo(() => Number(cargoWeight || 0), [cargoWeight]);
   const autoMatchedClass = useMemo(
-    () => serviceClasses.find(item => matchesServiceClassWeight(item, cargoWeightValue)) || null,
+    () => findRecommendedServiceClass(serviceClasses, cargoWeightValue),
     [cargoWeightValue, serviceClasses],
   );
 
