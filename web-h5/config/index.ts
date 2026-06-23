@@ -8,7 +8,7 @@ const isProductionBuild =
 const isH5 = process.env.TARO_ENV === 'h5';
 const apiBase =
   process.env.MINI_PROGRAM_API_BASE ||
-  (isProductionBuild ? 'https://swvictory.top/api/v2' : 'http://127.0.0.1:8080/api/v2');
+  (isProductionBuild ? 'https://v1.swvictory.com/api/v2' : 'http://127.0.0.1:8080/api/v2');
 
 // 高德地图 Web 端 JS API 凭证（仅 H5 使用，通过环境变量注入，不写死在源码）。
 const amapKey = process.env.H5_AMAP_KEY || '';

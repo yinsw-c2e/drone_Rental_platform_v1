@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:cloud": "VITE_API_BASE_URL=${VITE_CLOUD_API_BASE_URL:-https://swvictory.top} VITE_API_PREFIX=/api/v2 VITE_APP_ENV=staging npm run build",
+    "build:cloud": "VITE_API_BASE_URL=${VITE_CLOUD_API_BASE_URL:-https://v1.swvictory.com} VITE_API_PREFIX=/api/v2 VITE_APP_ENV=staging npm run build",
     "preview": "vite preview"
   },
   "keywords": [],

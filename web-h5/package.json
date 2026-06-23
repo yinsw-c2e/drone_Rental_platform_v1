@@ -6,7 +6,7 @@
   "scripts": {
     "dev:h5": "node scripts/dev-h5.mjs",
     "build:h5": "node scripts/build-h5.mjs",
-    "build:h5:cloud": "MINI_PROGRAM_API_BASE=${H5_CLOUD_API_BASE:-https://swvictory.top/api/v2} node scripts/build-h5.mjs",
+    "build:h5:cloud": "MINI_PROGRAM_API_BASE=${H5_CLOUD_API_BASE:-https://v1.swvictory.com/api/v2} node scripts/build-h5.mjs",
     "lint": "eslint src/"
   },
   "dependencies": {

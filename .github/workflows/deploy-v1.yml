@@ -20,7 +20,7 @@ jobs:
       DEPLOY_USER: ${{ secrets.TENCENT_CLOUD_USER }}
       DEPLOY_KEY: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
       DEPLOY_DIR: /opt/drone_v1
-      V1_PUBLIC_ORIGIN: https://swvictory.top
+      V1_PUBLIC_ORIGIN: https://v1.swvictory.com
       DEPLOY_READY: ${{ secrets.TENCENT_CLOUD_HOST != '' && secrets.TENCENT_CLOUD_USER != '' && secrets.TENCENT_CLOUD_SSH_KEY != '' }}
 
     steps:

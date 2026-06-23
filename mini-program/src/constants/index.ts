@@ -2,7 +2,7 @@
 
 // __API_BASE__ 由 Taro defineConstants 注入（config/dev.ts / config/prod.ts）
 const BASE = (typeof __API_BASE__ !== 'undefined' ? __API_BASE__ : '') as string;
-const DEFAULT_API_BASE = 'https://swvictory.top/api/v2';
+const DEFAULT_API_BASE = 'https://v1.swvictory.com/api/v2';
 
 export const API_BASE_URL = BASE || DEFAULT_API_BASE;
 export const API_ROOT_URL = API_BASE_URL.replace(/\/api\/v[12]$/, '');
