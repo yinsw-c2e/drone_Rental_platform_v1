@@ -13,12 +13,11 @@ import { pilotV2Service } from '../../services/pilotV2';
 import { sessionService } from '../../services/session';
 import { userService } from '../../services/user';
 import { logout, setMeSummary, updateUser } from '../../store/slices/authSlice';
-import { setHaulRoleMode, type HaulRoleMode } from '../../store/slices/roleSlice';
+import { HaulRoleMode, readStoredRoleMode, setHaulRoleMode } from '../../store/slices/roleSlice';
 import { RootState } from '../../store/store';
-import RoleModeCard from '../../components/business/RoleModeCard';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
-import { syncPreferredModeWithBackend } from '../../utils/preferredMode';
 import { syncCustomTabBar } from '../../utils/tabBar';
+import { switchToOrdersTab } from '../../utils/ordersEntry';
 import profileBgImage from '../../assets/mine/images/mine_profile_drone_bg_750x330.jpg';
 import defaultAvatarImage from '../../assets/mine/images/default_avatar_circle.png';
 import cellOrderIcon from '../../assets/mine/icons/cell_order.png';
@@ -69,7 +68,6 @@ const getMenuIcon = (key: string) => {
     case 'owner-profile':
       return identityOwnerIcon;
     case 'pilot-profile':
-    case 'pilot-register':
       return cellFlyerIcon;
     case 'my-offers':
       return cellTaskIcon;
@@ -99,7 +97,6 @@ const getMenuTone = (key: string) => {
     case 'owner-profile':
       return 'green';
     case 'pilot-profile':
-    case 'pilot-register':
     case 'my-drones':
       return 'blue';
     case 'my-offers':
@@ -136,9 +133,15 @@ export default function ProfilePage() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
-  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
   const effectiveRoleSummary = getEffectiveRoleSummary(roleSummary, user);
   const providerCapabilities = resolveProviderCapabilities(effectiveRoleSummary);
+  const storedMode = readStoredRoleMode();
+  const effectiveMode: HaulRoleMode = storedMode === 'provider' && providerCapabilities.hasProviderApplication
+    ? 'provider'
+    : 'customer';
+  const ordersEntryScreen = effectiveMode === 'provider' && providerCapabilities.canUseWorkbench
+    ? '/pages/orders/provider/index'
+    : '/pages/orders/index';
 
   const [stats, setStats] = useState({
     orders: 0,
@@ -146,7 +149,6 @@ export default function ProfilePage() {
     supplies: 0,
     quotes: 0,
     drones: 0,
-    bindings: 0,
     pendingDispatches: 0,
     flightRecords: 0,
   });
@@ -168,7 +170,6 @@ export default function ProfilePage() {
         supplyRes,
         quoteRes,
         droneRes,
-        bindingRes,
         dispatchRes,
         flightRes,
       ] = await Promise.all([
@@ -184,11 +185,8 @@ export default function ProfilePage() {
         capabilities.canUseWorkbench
           ? ownerService.listMyQuotes({ page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
-        selectedMode === 'provider' || capabilities.hasProviderApplication || capabilities.canUseWorkbench
+        capabilities.hasProviderApplication || capabilities.canUseWorkbench
           ? droneService.myDrones({ page: 1, page_size: 50 }).catch(() => null)
-          : Promise.resolve(null),
-        capabilities.canUseWorkbench
-          ? ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 1 }).catch(() => null)
           : Promise.resolve(null),
         summary.has_pilot_role
           ? dispatchV2Service.list({ role: 'pilot', status: 'pending_response', page: 1, page_size: 1 }).catch(() => null)
@@ -211,17 +209,19 @@ export default function ProfilePage() {
         supplies: readTotal(supplyRes),
         quotes: readTotal(quoteRes),
         drones: Number(droneRes?.list?.length || droneRes?.total || 0),
-        bindings: readTotal(bindingRes),
         pendingDispatches: readTotal(dispatchRes),
         flightRecords: readTotal(flightRes),
       });
     } finally {
       setLoading(false);
     }
-  }, [dispatch, roleSummary, selectedMode, user]);
+  }, [dispatch, roleSummary, user]);
 
   useDidShow(() => {
-    syncCustomTabBar(3);
+    if (effectiveMode !== storedMode) {
+      dispatch(setHaulRoleMode(effectiveMode));
+    }
+    syncCustomTabBar(3, effectiveMode);
     loadData();
   });
 
@@ -237,27 +237,14 @@ export default function ProfilePage() {
     const pathOnly = url.split('?')[0];
     // TabBar 页面必须用 switchTab，否则报 "can not navigateTo a tabbar page"
     if (TAB_BAR_PATHS.includes(pathOnly)) {
+      if (pathOnly === '/pages/orders/index') {
+        switchToOrdersTab('customer').catch(() => null);
+        return;
+      }
       Taro.switchTab({ url: pathOnly }).catch(() => null);
       return;
     }
     Taro.navigateTo({ url }).catch(() => null);
-  };
-
-  const hasProviderMode = Boolean(
-    providerCapabilities.hasProviderApplication ||
-    providerCapabilities.canUseWorkbench ||
-    effectiveRoleSummary.has_owner_role ||
-    effectiveRoleSummary.has_pilot_role,
-  );
-
-  const handleSelectRoleMode = (mode: HaulRoleMode) => {
-    if (mode === selectedMode) return;
-    dispatch(setHaulRoleMode(mode));
-    syncPreferredModeWithBackend(mode);
-    Taro.showToast({ title: `已切换到${mode === 'provider' ? '服务商' : '客户'}身份`, icon: 'none' });
-    setTimeout(() => {
-      Taro.switchTab({ url: '/pages/home/index' }).catch(() => null);
-    }, 250);
   };
 
   const handleAvatarPress = async () => {
@@ -312,14 +299,18 @@ export default function ProfilePage() {
 
   const verifyInfo = getVerifyMeta(user?.id_verified);
 
-  const accountHighlights = useMemo(
-    () => [
-      { label: '订单', value: stats.orders, screen: '/pages/orders/index' },
+  const accountHighlights = useMemo(() => {
+    const items = [
+      { label: '订单', value: stats.orders, screen: ordersEntryScreen },
       { label: '任务', value: stats.demands, screen: '/pages/profile/my-demands/index' },
-      { label: '服务', value: stats.supplies, screen: '/pages/profile/my-offers/index' },
-    ],
-    [stats],
-  );
+    ];
+    if (providerCapabilities.canUseWorkbench) {
+      items.push({ label: '服务', value: stats.supplies, screen: '/pages/profile/my-offers/index' });
+    } else {
+      items.push({ label: '信用', value: Number(user?.credit_score ?? 100), screen: '/pages/verification/index' });
+    }
+    return items;
+  }, [ordersEntryScreen, providerCapabilities.canUseWorkbench, stats, user?.credit_score]);
 
   const menuGroups = useMemo(() => {
     const orderItems = [
@@ -327,7 +318,7 @@ export default function ProfilePage() {
         key: 'my-orders',
         title: '我的订单',
         desc: '查看下单、履约和结算进度',
-        screen: '/pages/orders/index',
+        screen: ordersEntryScreen,
         rightText: `${stats.orders} 单`,
       },
     ];
@@ -379,7 +370,7 @@ export default function ProfilePage() {
       },
     ];
 
-    if (selectedMode === 'provider' || providerCapabilities.hasProviderApplication) {
+    if (providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench) {
       const serviceStatusText =
         providerCapabilities.canUseWorkbench
           ? '已通过'
@@ -399,15 +390,15 @@ export default function ProfilePage() {
       });
     }
 
-    identityItems.push({
-      key: effectiveRoleSummary.has_pilot_role ? 'pilot-profile' : 'pilot-register',
-      title: effectiveRoleSummary.has_pilot_role ? '履约资质' : '履约资质认证',
-      desc: effectiveRoleSummary.has_pilot_role ? '履约状态、统计与服务范围' : '完善后用于服务商履约推进',
-      screen: effectiveRoleSummary.has_pilot_role
-        ? '/pages/profile/pilot/index'
-        : '/pages/pilot/register/index',
-      rightText: effectiveRoleSummary.has_pilot_role ? '已完善' : '去完善',
-    });
+    if (effectiveRoleSummary.has_pilot_role) {
+      identityItems.push({
+        key: 'pilot-profile',
+        title: '履约资质',
+        desc: '履约状态、统计与服务范围',
+        screen: '/pages/profile/pilot/index',
+        rightText: '已完善',
+      });
+    }
 
     const assetItems = [];
     if (providerCapabilities.canUseWorkbench) {
@@ -422,7 +413,7 @@ export default function ProfilePage() {
       );
     }
 
-    if (selectedMode === 'provider' || providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench) {
+    if (providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench) {
       assetItems.push(
         {
           key: 'my-drones',
@@ -462,36 +453,36 @@ export default function ProfilePage() {
       { key: 'assets', title: '资产与服务', items: assetItems },
       { key: 'settings', title: '账户设置', items: settingItems },
     ].filter((group) => group.items.length > 0);
-  }, [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities, selectedMode, stats, verifyInfo.label]);
+  }, [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, ordersEntryScreen, providerCapabilities, stats, verifyInfo.label]);
 
-  const roleBadges = useMemo(
-    () => [
+  const roleBadges = useMemo(() => {
+    const badges = [
       {
         label: effectiveRoleSummary.has_client_role ? '客户已持有' : '客户待补齐',
         tone: getRoleTone(effectiveRoleSummary.has_client_role, 'orange'),
       },
-      {
+    ];
+    if (providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench) {
+      badges.push({
         label: providerCapabilities.canUseWorkbench
           ? '服务商已通过'
-          : providerCapabilities.hasProviderApplication
-            ? '服务商审核中'
-            : '服务商未开通',
+          : '服务商审核中',
         tone: providerCapabilities.canUseWorkbench
           ? 'green'
-          : providerCapabilities.hasProviderApplication
-            ? 'orange'
-            : 'gray',
-      },
-      {
-        label: effectiveRoleSummary.has_pilot_role ? '履约资质已完善' : '履约资质待完善',
-        tone: getRoleTone(effectiveRoleSummary.has_pilot_role),
-      },
-    ],
-    [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities.canUseWorkbench, providerCapabilities.hasProviderApplication],
-  );
+          : 'orange',
+      });
+    }
+    if (effectiveRoleSummary.has_pilot_role) {
+      badges.push({
+        label: '履约资质已完善',
+        tone: getRoleTone(true),
+      });
+    }
+    return badges;
+  }, [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities.canUseWorkbench, providerCapabilities.hasProviderApplication]);
 
-  const identityCards = useMemo(
-    () => [
+  const identityCards = useMemo(() => {
+    const cards = [
       {
         key: 'client',
         label: '客户身份',
@@ -506,7 +497,9 @@ export default function ProfilePage() {
             : '完善客户档案后，可更顺畅地发布任务。',
         ],
       },
-      {
+    ];
+    if (providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench) {
+      cards.push({
         key: 'owner',
         label: providerCapabilities.canUseWorkbench ? '服务商身份' : '服务商入驻',
         screen: providerCapabilities.canUseWorkbench
@@ -514,39 +507,33 @@ export default function ProfilePage() {
           : '/pages/provider/onboarding/index',
         statusLabel: providerCapabilities.canUseWorkbench
           ? '已通过'
-          : providerCapabilities.hasProviderApplication
-            ? '审核中'
-            : '未开通',
+          : '审核中',
         statusTone: providerCapabilities.canUseWorkbench
           ? 'green'
-          : providerCapabilities.hasProviderApplication
-            ? 'orange'
-            : 'gray',
+          : 'orange',
         lines: [
           `可用无人机 ${stats.drones}`,
           `在线服务 ${stats.supplies}`,
           `待开始履约 ${stats.pendingDispatches}`,
         ],
-      },
-      {
+      });
+    }
+    if (effectiveRoleSummary.has_pilot_role) {
+      cards.push({
         key: 'pilot',
         label: '履约资质',
-        screen: effectiveRoleSummary.has_pilot_role
-          ? '/pages/profile/pilot/index'
-          : '/pages/pilot/register/index',
-        statusLabel: effectiveRoleSummary.has_pilot_role ? '已完善' : '待完善',
-        statusTone: effectiveRoleSummary.has_pilot_role ? 'green' : 'gray',
+        screen: '/pages/profile/pilot/index',
+        statusLabel: '已完善',
+        statusTone: 'green',
         lines: [
           `待履约订单 ${stats.pendingDispatches}`,
           `履约记录 ${stats.flightRecords}`,
-          effectiveRoleSummary.has_pilot_role
-            ? '履约资质已建立，可继续维护服务范围。'
-            : '完善后用于服务商履约推进。',
+          '履约资质已建立，可继续维护服务范围。',
         ],
-      },
-    ],
-    [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities.canUseWorkbench, providerCapabilities.hasProviderApplication, stats],
-  );
+      });
+    }
+    return cards;
+  }, [effectiveRoleSummary.has_client_role, effectiveRoleSummary.has_pilot_role, providerCapabilities.canUseWorkbench, providerCapabilities.hasProviderApplication, stats]);
 
   const capabilityItems = useMemo(
     () => [
@@ -557,6 +544,7 @@ export default function ProfilePage() {
     [providerCapabilities.assetStatus, providerCapabilities.canUseWorkbench, providerCapabilities.executorStatus],
   );
 
+  const showProviderCapabilityDetails = providerCapabilities.hasProviderApplication || providerCapabilities.canUseWorkbench;
   const canApplySelfExecute = providerCapabilities.canUseWorkbench;
 
   return (
@@ -612,15 +600,6 @@ export default function ProfilePage() {
               ))}
             </View>
           </View>
-
-          <RoleModeCard
-            selectedMode={selectedMode}
-            hasClientMode={Boolean(effectiveRoleSummary.has_client_role)}
-            hasProviderMode={hasProviderMode}
-            onSelectMode={handleSelectRoleMode}
-            onOpenClientProfile={() => handleNavigate('/pages/client/profile/index')}
-            onOpenProviderOnboarding={() => handleNavigate('/pages/provider/onboarding/index')}
-          />
 
           {menuGroups.map((group) => (
             <View key={group.key} className='group-block'>
@@ -699,32 +678,34 @@ export default function ProfilePage() {
                 </View>
               </View>
 
-              <View className='advanced-section advanced-section-compact'>
-                <Text className='advanced-title'>能力状态</Text>
-                <View className='advanced-card'>
-                  {capabilityItems.map((item, index) => (
-                    <View
-                      key={item.key}
-                      className={`advanced-row ${index === capabilityItems.length - 1 ? 'advanced-row-last' : ''}`}
-                    >
-                      <View className={`advanced-icon-wrap capability-icon-wrap ${item.enabled ? 'capability-icon-wrap-ready' : ''}`}>
-                        <Text className={`capability-dot ${item.enabled ? 'capability-dot-ready' : ''}`}>
-                          {item.enabled ? '✓' : '•'}
-                        </Text>
+              {showProviderCapabilityDetails ? (
+                <View className='advanced-section advanced-section-compact'>
+                  <Text className='advanced-title'>能力状态</Text>
+                  <View className='advanced-card'>
+                    {capabilityItems.map((item, index) => (
+                      <View
+                        key={item.key}
+                        className={`advanced-row ${index === capabilityItems.length - 1 ? 'advanced-row-last' : ''}`}
+                      >
+                        <View className={`advanced-icon-wrap capability-icon-wrap ${item.enabled ? 'capability-icon-wrap-ready' : ''}`}>
+                          <Text className={`capability-dot ${item.enabled ? 'capability-dot-ready' : ''}`}>
+                            {item.enabled ? '✓' : '•'}
+                          </Text>
+                        </View>
+                        <Text className='advanced-row-title'>{item.label}</Text>
+                        <View className={`advanced-status ${item.enabled ? 'advanced-status-green' : 'advanced-status-gray'}`}>
+                          <Text className='advanced-status-text'>{item.enabled ? '已就绪' : '未就绪'}</Text>
+                        </View>
                       </View>
-                      <Text className='advanced-row-title'>{item.label}</Text>
-                      <View className={`advanced-status ${item.enabled ? 'advanced-status-green' : 'advanced-status-gray'}`}>
-                        <Text className='advanced-status-text'>{item.enabled ? '已就绪' : '未就绪'}</Text>
-                      </View>
-                    </View>
-                  ))}
+                    ))}
+                  </View>
+                  <Text className='capability-note'>
+                    {canApplySelfExecute
+                      ? '你已经具备接单资质，可由服务商主体承接并履约。'
+                      : '正式接单需要同时完善设备资质和履约资质。'}
+                  </Text>
                 </View>
-                <Text className='capability-note'>
-                  {canApplySelfExecute
-                    ? '你已经具备接单资质，可由服务商主体承接并履约。'
-                    : '正式接单需要同时完善设备资质和履约资质。'}
-                </Text>
-              </View>
+              ) : null}
             </>
           ) : null}
 

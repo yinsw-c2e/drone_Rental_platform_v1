@@ -157,7 +157,7 @@ export default function PublishDemandPage() {
       estimated_trip_count: Math.max(Number(tripCount) || 1, 1),
       budget_min: budgetMin ? Math.round(Number(budgetMin) * 100) : undefined,
       budget_max: budgetMax ? Math.round(Number(budgetMax) * 100) : undefined,
-      allows_pilot_candidate: true,
+      allows_pilot_candidate: false,
       scheduled_start_at: parseDateInput(startTime)?.toISOString(),
       scheduled_end_at: parseDateInput(endTime)?.toISOString(),
     };

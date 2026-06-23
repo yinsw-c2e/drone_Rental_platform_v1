@@ -10,8 +10,7 @@ import { CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES } from '../../../constants/subscribe
 import { getClientEligibility } from '../../../services/client';
 import { demandV2Service, DemandUpsertPayload } from '../../../services/demandV2';
 import { requestSubscribe } from '../../../services/push';
-import { supplyService } from '../../../services/supply';
-import { AddressData, AddressSnapshot, DirectOrderInput, QuickOrderDraft } from '../../../types';
+import { AddressData, AddressSnapshot, QuickOrderDraft } from '../../../types';
 import { isAirspaceHardBlocked } from '../../../utils/airspaceRisk';
 import addWorkPointPlusIcon from '../../../assets/haul/quick-order-confirm/icon_add_work_point_plus.png';
 import chevronRightIcon from '../../../assets/haul/quick-order-confirm/icon_chevron_right.png';
@@ -30,6 +29,7 @@ import sectionDetectionShieldIcon from '../../../assets/haul/quick-order-confirm
 import sectionLocationPinIcon from '../../../assets/haul/quick-order-confirm/icon_section_location_pin.png';
 import sectionPlanClipboardIcon from '../../../assets/haul/quick-order-confirm/icon_section_plan_clipboard.png';
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
+import { saveQuickOrderOfferDraft } from '../../../utils/quickOrderOfferDraft';
 import './index.scss';
 
 const SCENE_OPTIONS = [
@@ -41,7 +41,6 @@ const SCENE_OPTIONS = [
 ];
 
 const QUICK_ORDER_PREFILL_STORAGE_KEY = 'customer_home_quick_order_prefill_v1';
-const QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY = 'quick_order_offer_draft_v1';
 
 type ServicePlanKey = 'standard' | 'urgent' | 'survey';
 type AddressTarget = 'pickup' | 'delivery' | 'extra';
@@ -230,38 +229,6 @@ const resolveDraftEndDate = (draft: QuickOrderDraft, startDate: Date) => {
   return fallback;
 };
 
-const buildDirectOrderPayload = (draft: QuickOrderDraft): DirectOrderInput => {
-  if (!draft.departure_address || !draft.destination_address) {
-    throw new Error('请先补充起吊点和落放点');
-  }
-  const startDate = parseIsoDate(draft.scheduled_start_at);
-  if (!startDate) {
-    throw new Error('请先填写作业时间');
-  }
-  const weight = Number(draft.cargo_weight_kg || 0);
-  if (!Number.isFinite(weight) || weight <= 0) {
-    throw new Error('请填写有效货物重量');
-  }
-
-  return {
-    service_type: 'heavy_cargo_lift_transport',
-    cargo_scene: draft.cargo_scene || 'power_grid',
-    departure_address: toAddressSnapshot(draft.departure_address),
-    destination_address: toAddressSnapshot(draft.destination_address),
-    service_address: null,
-    scheduled_start_at: startDate.toISOString(),
-    scheduled_end_at: resolveDraftEndDate(draft, startDate).toISOString(),
-    cargo_weight_kg: weight,
-    cargo_volume_m3: draft.cargo_volume_m3,
-    cargo_length_cm: draft.cargo_length_cm,
-    cargo_width_cm: draft.cargo_width_cm,
-    cargo_height_cm: draft.cargo_height_cm,
-    cargo_type: draft.cargo_type || '重载物资',
-    cargo_special_requirements: draft.special_requirements,
-    description: draft.description,
-  };
-};
-
 const buildDemandPayload = (
   draft: QuickOrderDraft,
   selectedPlan: ServicePlanKey,
@@ -302,7 +269,7 @@ const buildDemandPayload = (
     estimated_trip_count: 1,
     budget_min: budget.min,
     budget_max: budget.max,
-    allows_pilot_candidate: true,
+    allows_pilot_candidate: false,
   };
 };
 
@@ -367,8 +334,6 @@ const resolveMatchRegion = (pickup?: AddressData | null, delivery?: AddressData 
   '';
 
 export default function QuickOrderPage() {
-  const params = Taro.getCurrentInstance().router?.params || {};
-  const directSupplyId = Number(params.supplyId || params.id || 0);
   const [cargoScene, setCargoScene] = useState(SCENE_OPTIONS[0].key);
   const [cargoWeight, setCargoWeight] = useState('');
   const [cargoType, setCargoType] = useState('重载物资');
@@ -594,11 +559,9 @@ export default function QuickOrderPage() {
     Taro.showToast({ title: fallbackMessage || '当前暂不可提交', icon: 'none' });
   };
 
-  const ensureClientEligible = async (action: 'publish' | 'direct') => {
+  const ensureClientEligible = async () => {
     const eligibility = await getClientEligibility();
-    const allowed = action === 'publish'
-      ? eligibility.can_publish_demand
-      : eligibility.can_create_direct_order;
+    const allowed = eligibility.can_publish_demand;
     if (allowed) return true;
 
     const blocker = eligibility.blockers?.[0];
@@ -606,37 +569,8 @@ export default function QuickOrderPage() {
     return false;
   };
 
-  const createDirectOrder = async (draft: QuickOrderDraft, supplyId: number) => {
-    const eligible = await ensureClientEligible('direct');
-    if (!eligible) return;
-
-    const confirm = await Taro.showModal({
-      title: '确认下单',
-      content: '将按当前吊运信息向该服务商创建订单。',
-      confirmText: '确认下单',
-      cancelText: '再修改',
-    }).catch(() => null);
-    if (!confirm?.confirm) return;
-
-    Taro.showLoading({ title: '正在创建订单...' });
-    try {
-      const result = await supplyService.createDirectOrder(supplyId, buildDirectOrderPayload(draft));
-      const orderId = Number((result as any)?.order_id || (result as any)?.order?.id || (result as any)?.id || 0);
-      if (!orderId) throw new Error('订单已创建，请稍后在订单列表查看');
-      Taro.removeStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY);
-      Taro.hideLoading();
-      Taro.showToast({ title: '订单已创建', icon: 'success' });
-      setTimeout(() => {
-        Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
-      }, 500);
-    } catch (error: any) {
-      Taro.hideLoading();
-      Taro.showToast({ title: friendlyErrorMessage(error, '创建订单失败'), icon: 'none' });
-    }
-  };
-
   const publishDemand = async (draft: QuickOrderDraft) => {
-    const eligible = await ensureClientEligible('publish');
+    const eligible = await ensureClientEligible();
     if (!eligible) return;
 
     Taro.showLoading({ title: '正在发布需求...' });
@@ -647,7 +581,6 @@ export default function QuickOrderPage() {
       await demandV2Service.publish(demandId);
       Taro.hideLoading();
       Taro.showToast({ title: '需求已发布', icon: 'success' });
-      try { Taro.setStorageSync('customer_orders_default_segment', 'demands'); } catch {}
       setTimeout(() => {
         Taro.redirectTo({ url: `/pages/demand/detail/index?id=${demandId}` });
       }, 500);
@@ -658,7 +591,7 @@ export default function QuickOrderPage() {
   };
 
   const continueToSupplyList = (draft: QuickOrderDraft) => {
-    Taro.setStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY, draft);
+    saveQuickOrderOfferDraft(draft);
     Taro.navigateTo({ url: '/pages/supply/list/index?quickOrder=1' });
   };
 
@@ -722,18 +655,13 @@ export default function QuickOrderPage() {
         match_region: resolveMatchRegion(pickupAddress, deliveryAddress),
       };
 
-      if (directSupplyId > 0) {
-        await createDirectOrder(draft, directSupplyId);
-        return;
-      }
-
       if (selectedBranch === 'pick') {
         continueToSupplyList(draft);
         return;
       }
       await publishDemand(draft);
     } catch (e: any) {
-      Taro.showToast({ title: friendlyErrorMessage(e, '进入方案列表失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(e, '进入服务商列表失败'), icon: 'none' });
     } finally {
       setSubmitting(false);
     }
@@ -789,54 +717,51 @@ export default function QuickOrderPage() {
 
       <ScrollView scrollY className='qo3-scroll'>
         <View className='qo3-canvas'>
-          {directSupplyId > 0 ? null : (
-            <View className='qo3-hero-tip'>
-              <Text className='qo3-hero-tip-title'>发布吊运任务</Text>
-              <Text className='qo3-hero-tip-desc'>
-                价格没把握、要先看现场、想多家比价的任务都在这里发。先选一种方式：
-              </Text>
-            </View>
-          )}
+          <View className='qo3-hero-tip'>
+            <Text className='qo3-hero-tip-title'>发布吊运任务</Text>
+            <Text className='qo3-hero-tip-desc'>
+              价格没把握、要先看现场、想多家比价的任务都在这里发。先选一种方式：
+            </Text>
+          </View>
 
-          {directSupplyId > 0 ? null : (
-            <View className='qo3-card qo3-branch-card'>
-              <View
-                className={`qo3-branch-option ${selectedBranch === 'quote' ? 'is-active' : ''}`}
-                onClick={() => setSelectedBranch('quote')}
-              >
-                <View className='qo3-branch-header'>
-                  <Text className='qo3-branch-emoji'>📣</Text>
-                  <Text className='qo3-branch-title'>让多家服务商报价</Text>
-                  {selectedBranch === 'quote' ? <Text className='qo3-branch-tag'>已选</Text> : null}
-                </View>
-                <Text className='qo3-branch-desc'>发布需求，等几家服务商上门报价，再挑一家。适合想比价或不确定价格的任务。</Text>
-                <Text
-                  className='qo3-branch-examples-toggle'
-                  onClick={(event) => {
-                    event.stopPropagation?.();
-                    setExpandedBranchExample(expandedBranchExample === 'quote' ? null : 'quote');
-                  }}
-                >
-                  {expandedBranchExample === 'quote' ? '收起例子' : '看几个例子'}
-                </Text>
-                {expandedBranchExample === 'quote' ? (
-                  <View className='qo3-branch-examples'>
-                    {branchExamples.quote.map((item) => (
-                      <Text key={item} className='qo3-branch-example'>• {item}</Text>
-                    ))}
-                  </View>
-                ) : null}
+          <View className='qo3-card qo3-branch-card'>
+            <View
+              className={`qo3-branch-option ${selectedBranch === 'quote' ? 'is-active' : ''}`}
+              onClick={() => setSelectedBranch('quote')}
+            >
+              <View className='qo3-branch-header'>
+                <Text className='qo3-branch-emoji'>📣</Text>
+                <Text className='qo3-branch-title'>让多家服务商报价</Text>
+                {selectedBranch === 'quote' ? <Text className='qo3-branch-tag'>已选</Text> : null}
               </View>
+              <Text className='qo3-branch-desc'>发布需求，等几家服务商上门报价，再挑一家。适合想比价或不确定价格的任务。</Text>
+              <Text
+                className='qo3-branch-examples-toggle'
+                onClick={(event) => {
+                  event.stopPropagation?.();
+                  setExpandedBranchExample(expandedBranchExample === 'quote' ? null : 'quote');
+                }}
+              >
+                {expandedBranchExample === 'quote' ? '收起例子' : '看几个例子'}
+              </Text>
+              {expandedBranchExample === 'quote' ? (
+                <View className='qo3-branch-examples'>
+                  {branchExamples.quote.map((item) => (
+                    <Text key={item} className='qo3-branch-example'>• {item}</Text>
+                  ))}
+                </View>
+              ) : null}
+            </View>
               <View
                 className={`qo3-branch-option ${selectedBranch === 'pick' ? 'is-active' : ''}`}
                 onClick={() => setSelectedBranch('pick')}
               >
                 <View className='qo3-branch-header'>
                   <Text className='qo3-branch-emoji'>🎯</Text>
-                  <Text className='qo3-branch-title'>指定一家服务商议价</Text>
+                  <Text className='qo3-branch-title'>挑选服务商邀请报价</Text>
                   {selectedBranch === 'pick' ? <Text className='qo3-branch-tag'>已选</Text> : null}
                 </View>
-                <Text className='qo3-branch-desc'>从服务商列表里挑一家直接下单议价。适合已经有合作对象或想要特定机型的任务。</Text>
+                <Text className='qo3-branch-desc'>先查看候选服务商，再邀请对方按这张任务报价。适合已有合作对象或想要特定机型的任务。</Text>
                 <Text
                   className='qo3-branch-examples-toggle'
                   onClick={(event) => {
@@ -854,8 +779,7 @@ export default function QuickOrderPage() {
                   </View>
                 ) : null}
               </View>
-            </View>
-          )}
+          </View>
 
           <View className='qo3-card qo3-location-card'>
             <View className='qo3-section-head qo3-location-head'>
@@ -926,7 +850,7 @@ export default function QuickOrderPage() {
             </View>
             <View className='qo3-cost-note'>
               <Image className='qo3-info-icon' src={infoCircleIcon} mode='aspectFit' />
-              <Text className='qo3-cost-text'>最终费用以服务商确认方案为准</Text>
+              <Text className='qo3-cost-text'>最终费用以服务商针对本单报价为准</Text>
             </View>
           </View>
 
@@ -993,11 +917,9 @@ export default function QuickOrderPage() {
           <Text className='qo3-submit-button-text'>
             {submitting
               ? '提交中...'
-              : directSupplyId > 0
-                ? '确认下单'
-                : selectedBranch === 'pick'
-                  ? '去挑选服务商'
-                  : '发布需求等报价'}
+              : selectedBranch === 'pick'
+                ? '去挑选服务商'
+                : '发布需求等报价'}
           </Text>
         </View>
       </View>

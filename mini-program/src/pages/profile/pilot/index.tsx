@@ -444,7 +444,7 @@ export default function PilotProfilePage() {
               <View
                 className="pilot-quick-card"
                 onClick={() =>
-                  Taro.switchTab({ url: "/pages/orders/index" })
+                  Taro.navigateTo({ url: "/pages/orders/provider/index" })
                 }
               >
                 <View className="pilot-quick-icon pilot-quick-icon-orders" />

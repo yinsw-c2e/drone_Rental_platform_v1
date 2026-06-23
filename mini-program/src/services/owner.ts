@@ -1,6 +1,5 @@
 import {
   OwnerProfile,
-  OwnerPilotBindingSummary,
   OwnerWorkbenchView,
   SupplyDetail,
   DemandQuoteSummary,
@@ -55,19 +54,4 @@ export const ownerService = {
 
   listMyQuotes: (params?: OwnerListParams) =>
     apiV2.get<V2ListData<DemandQuoteSummary> & { meta: V2PageMeta }>('/owner/quotes', params),
-
-  listPilotBindings: (params?: OwnerListParams) =>
-    apiV2.get<V2ListData<OwnerPilotBindingSummary> & { meta: V2PageMeta }>('/owner/pilot-bindings', params),
-
-  invitePilotBinding: (payload: { pilot_user_id: number; is_priority?: boolean; note?: string }) =>
-    apiV2.post<OwnerPilotBindingSummary>('/owner/pilot-bindings', payload),
-
-  confirmPilotBinding: (bindingId: number) =>
-    apiV2.post<OwnerPilotBindingSummary>(`/owner/pilot-bindings/${bindingId}/confirm`),
-
-  rejectPilotBinding: (bindingId: number) =>
-    apiV2.post<OwnerPilotBindingSummary>(`/owner/pilot-bindings/${bindingId}/reject`),
-
-  updatePilotBindingStatus: (bindingId: number, status: string) =>
-    apiV2.patch<OwnerPilotBindingSummary>(`/owner/pilot-bindings/${bindingId}/status`, { status }),
 };

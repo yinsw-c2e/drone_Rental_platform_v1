@@ -1,8 +1,9 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input, ScrollView, Text, View } from '@tarojs/components';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
+import { setHaulRoleMode } from '../../store/slices/roleSlice';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { addressHistoryService } from '../../services/addressHistory';
 import { addressService } from '../../services/address';
@@ -17,6 +18,7 @@ import {
 } from '../../types';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
 import { QUICK_ORDER_PREFILL_STORAGE_KEY } from '../../utils/orderPrefill';
+import { switchToOrdersTab } from '../../utils/ordersEntry';
 import './CustomerHaulHome.scss';
 
 type AddressTarget = 'pickup' | 'dropoff';
@@ -232,6 +234,7 @@ const getOrderListItems = (response: unknown): V2OrderSummary[] => {
 };
 
 export default function CustomerHaulHome() {
+  const dispatch = useDispatch();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const initialSchedule = useMemo(() => buildDefaultScheduleParts(), []);
   const [pickup, setPickup] = useState<AddressData | null>(null);
@@ -371,7 +374,8 @@ export default function CustomerHaulHome() {
   }, [consumeStoredAddress, refreshCommonAddresses, refreshRecentOrder, refreshServiceClasses]);
 
   useDidShow(() => {
-    syncCustomTabBar(0);
+    dispatch(setHaulRoleMode('customer'));
+    syncCustomTabBar(0, 'customer');
     refreshHomeData();
   });
 
@@ -597,7 +601,7 @@ export default function CustomerHaulHome() {
       Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${recentOrder.id}` });
       return;
     }
-    Taro.switchTab({ url: '/pages/orders/index' });
+    switchToOrdersTab('customer');
   };
 
   const scheduleDateOptions = getScheduleDateOptions();
@@ -785,7 +789,7 @@ export default function CustomerHaulHome() {
               <Text className='secondary-action-sub'>不确定价格 / 要现场看 / 想多家比价</Text>
             </View>
           </View>
-          <View className='secondary-action' onClick={() => Taro.switchTab({ url: '/pages/orders/index' })}>查看订单</View>
+          <View className='secondary-action' onClick={() => switchToOrdersTab('customer')}>查看订单</View>
         </View>
 
         <View className='customer-home-section customer-home-common-card'>

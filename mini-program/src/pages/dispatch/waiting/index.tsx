@@ -40,17 +40,23 @@ export default function DispatchWaitingPage() {
   const [errorText, setErrorText] = useState('');
   const [longWait, setLongWait] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [clockTick, setClockTick] = useState(0);
+  const [dispatchStateReceivedAtMs, setDispatchStateReceivedAtMs] = useState(0);
   const redirectingRef = useRef(false);
 
   const elapsedSeconds = useMemo(() => {
+    void clockTick;
     if (dispatchState?.elapsed_seconds !== undefined) {
-      return dispatchState.elapsed_seconds;
+      const receivedAt = Number(dispatchStateReceivedAtMs || Date.now());
+      const elapsedSinceState = Math.max(0, Math.floor((Date.now() - receivedAt) / 1000));
+      return Math.max(0, Number(dispatchState.elapsed_seconds || 0) + elapsedSinceState);
     }
-    if (!detail?.created_at) return 0;
-    const createdAt = new Date(detail.created_at).getTime();
-    if (Number.isNaN(createdAt)) return 0;
-    return Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
-  }, [detail?.created_at, dispatchState?.elapsed_seconds]);
+    const createdAt = detail?.created_at ? new Date(detail.created_at).getTime() : NaN;
+    if (Number.isFinite(createdAt)) {
+      return Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
+    }
+    return 0;
+  }, [clockTick, detail?.created_at, dispatchState?.elapsed_seconds, dispatchStateReceivedAtMs]);
 
   const loadState = useCallback(async (showLoading = false) => {
     if (!orderId) {
@@ -59,13 +65,10 @@ export default function DispatchWaitingPage() {
       return;
     }
     if (showLoading) setLoading(true);
+    let orderDetail: V2OrderDetail | null = null;
     try {
-      const [orderDetail, state] = await Promise.all([
-        orderV2Service.get(orderId),
-        orderV2Service.getDispatchState(orderId),
-      ]);
+      orderDetail = await orderV2Service.get(orderId);
       setDetail(orderDetail);
-      setDispatchState(state);
       setErrorText('');
       const status = normalizedStatus(orderDetail);
       if (['assigned', 'preparing', 'in_transit', 'delivered', 'completed'].includes(status) && !redirectingRef.current) {
@@ -75,13 +78,37 @@ export default function DispatchWaitingPage() {
           Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
         }, 500);
       }
-      if (status !== 'dispatch_failed' && Number(state?.elapsed_seconds || 0) >= LONG_WAIT_SECONDS) {
-        setLongWait(true);
-      }
     } catch (error: any) {
-      setErrorText(friendlyErrorMessage(error, '匹配进度加载失败，请稍后重试'));
+      setErrorText(friendlyErrorMessage(error, '订单信息加载失败，请稍后重试'));
+      return;
     } finally {
       setLoading(false);
+    }
+
+    const status = normalizedStatus(orderDetail);
+    const createdAt = orderDetail?.created_at ? new Date(orderDetail.created_at).getTime() : NaN;
+    const derivedElapsedSeconds = Number.isFinite(createdAt)
+      ? Math.max(0, Math.floor((Date.now() - createdAt) / 1000))
+      : 0;
+    if (status === 'dispatch_failed') {
+      setLongWait(false);
+    }
+    try {
+      const state = await orderV2Service.getDispatchState(orderId);
+      setDispatchState(state);
+      setDispatchStateReceivedAtMs(Date.now());
+      setErrorText('');
+      if (status !== 'dispatch_failed' && Number(state?.elapsed_seconds || derivedElapsedSeconds || 0) >= LONG_WAIT_SECONDS) {
+        setLongWait(true);
+      } else {
+        setLongWait(false);
+      }
+    } catch (error: any) {
+      if (status === 'dispatch_failed') {
+        setErrorText('');
+        return;
+      }
+      setErrorText(friendlyErrorMessage(error, '匹配进度加载失败，请稍后重试'));
     }
   }, [orderId]);
 
@@ -90,6 +117,11 @@ export default function DispatchWaitingPage() {
     const timer = setInterval(() => loadState(false), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [loadState]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick(value => value + 1), 1_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const switchToNegotiated = () => {
     if (!detail) {
@@ -121,11 +153,22 @@ export default function DispatchWaitingPage() {
     if (!res.confirm) return;
     setActionLoading(true);
     try {
-      await orderV2Service.redispatch(
+      const result = await orderV2Service.redispatch(
         detail.id,
-        isPriceMode ? { price_bump_percent: 0 } : { radius_bump_km: 0 },
+        isPriceMode
+          ? { price_bump_percent: REDISPATCH_PRICE_BUMP_PERCENT }
+          : { radius_bump_km: REDISPATCH_RADIUS_BUMP_KM },
       );
       setLongWait(false);
+      setErrorText('');
+      setDispatchState(null);
+      setDispatchStateReceivedAtMs(0);
+      if (result?.order) {
+        setDetail(previous => ({
+          ...(previous || detail),
+          ...(result.order as any),
+        } as V2OrderDetail));
+      }
       Taro.showToast({ title: '已重新发起匹配', icon: 'success' });
       await loadState(false);
     } catch (error: any) {
@@ -153,19 +196,44 @@ export default function DispatchWaitingPage() {
     Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
   };
 
+  const cancelOrder = async () => {
+    if (!detail || !orderId || actionLoading) return;
+    const res = await Taro.showModal({
+      title: '确认取消订单？',
+      content: '取消后订单将停止继续匹配或服务。',
+      cancelText: '再想想',
+      confirmText: '确认取消',
+    });
+    if (!res.confirm) return;
+    setActionLoading(true);
+    try {
+      await orderV2Service.cancel(orderId, '客户在等待页取消');
+      Taro.showToast({ title: '已取消', icon: 'success' });
+      setTimeout(() => {
+        Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
+      }, 500);
+    } catch (error: any) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '取消失败'), icon: 'none' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const status = normalizedStatus(detail);
   const failed = status === 'dispatch_failed';
   const onlineCount = Number(dispatchState?.online_providers_count || 0);
   const triedCount = Number(dispatchState?.tried_providers_count || 0);
   const waitSeconds = Number(dispatchState?.estimated_wait_seconds || 0);
-  const showMainWaiting = !failed && !longWait && !errorText;
+  const showProgressError = Boolean(errorText && !failed);
+  const showMainWaiting = !failed && !longWait && !showProgressError;
+  const cancellable = ['pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled'].includes(status);
 
   return (
     <ScrollView scrollY className="dispatch-waiting-page">
       <View className="dispatch-waiting-content">
         <View className="dispatch-waiting-hero">
-          <View className="dispatch-spinner" />
-          <Text className="dispatch-title">正在为你匹配服务商</Text>
+          {failed ? <View className="dispatch-status-icon dispatch-status-icon-failed" /> : <View className="dispatch-spinner" />}
+          <Text className="dispatch-title">{failed ? '暂未匹配到服务商' : '正在为你匹配服务商'}</Text>
           <Text className="dispatch-subtitle">
             {detail?.order_no ? `订单 ${detail.order_no}` : '订单已创建'}
           </Text>
@@ -174,7 +242,7 @@ export default function DispatchWaitingPage() {
         <View className="dispatch-stats">
           <View className="dispatch-stat">
             <Text className="dispatch-stat-value">{formatSeconds(elapsedSeconds)}</Text>
-            <Text className="dispatch-stat-label">已通知</Text>
+            <Text className="dispatch-stat-label">已等待</Text>
           </View>
           <View className="dispatch-stat">
             <Text className="dispatch-stat-value">{triedCount}</Text>
@@ -193,7 +261,7 @@ export default function DispatchWaitingPage() {
           </View>
         ) : null}
 
-        {errorText ? (
+        {showProgressError ? (
           <View className="dispatch-panel dispatch-panel-warning">
             <Text className="dispatch-panel-title">进度暂时不可用</Text>
             <Text className="dispatch-panel-copy">{errorText}</Text>
@@ -225,10 +293,18 @@ export default function DispatchWaitingPage() {
             <View className="dispatch-button dispatch-button-ghost dispatch-button-wide" onClick={switchToNegotiated}>
               <Text>改成议价单</Text>
             </View>
+            {cancellable ? (
+              <View
+                className={`dispatch-button dispatch-button-ghost dispatch-button-wide ${actionLoading ? 'is-disabled' : ''}`}
+                onClick={cancelOrder}
+              >
+                <Text>{actionLoading ? '取消中…' : '取消订单'}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
-        {longWait && !failed && !errorText ? (
+        {longWait && !failed && !showProgressError ? (
           <View className="dispatch-panel dispatch-panel-warning">
             <Text className="dispatch-panel-title">匹配耗时较长</Text>
             <Text className="dispatch-panel-copy">建议改成议价单，让服务商根据现场情况主动报价。</Text>
@@ -240,6 +316,14 @@ export default function DispatchWaitingPage() {
                 <Text>查看订单</Text>
               </View>
             </View>
+            {cancellable ? (
+              <View
+                className={`dispatch-button dispatch-button-ghost dispatch-button-wide ${actionLoading ? 'is-disabled' : ''}`}
+                onClick={cancelOrder}
+              >
+                <Text>{actionLoading ? '取消中…' : '取消订单'}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -280,11 +364,19 @@ export default function DispatchWaitingPage() {
           </View>
         ) : null}
 
-        {!failed && !errorText ? (
+        {!failed && !showProgressError ? (
           <View className="dispatch-bottom-actions">
             <View className="dispatch-button dispatch-button-ghost dispatch-button-wide" onClick={switchToNegotiated}>
               <Text>改成议价单</Text>
             </View>
+            {cancellable ? (
+              <View
+                className={`dispatch-button dispatch-button-ghost dispatch-button-wide ${actionLoading ? 'is-disabled' : ''}`}
+                onClick={cancelOrder}
+              >
+                <Text>{actionLoading ? '取消中…' : '取消订单'}</Text>
+              </View>
+            ) : null}
             <View className="dispatch-link" onClick={viewDetail}>
               <Text>查看订单详情</Text>
             </View>

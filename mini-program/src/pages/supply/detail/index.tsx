@@ -33,7 +33,7 @@ export default function SupplyDetailPage() {
   if (!supply) return <View style={{ padding: '60px', textAlign: 'center' }}><Text>服务不存在</Text></View>;
 
   const isMySupply = (supply as any).owner_user_id === user?.id;
-  const canOrder = !isMySupply && roleSummary?.has_client_role && supply.status === 'active' && supply.accepts_direct_order;
+  const canPublishDemand = !isMySupply && roleSummary?.has_client_role && supply.status === 'active';
   const ownerUserId = Number((supply as any).owner_user_id || supply.owner?.id || 0);
   const canContactOwner = ownerUserId > 0 && ownerUserId !== user?.id;
   const ownerLabel = supply.owner?.nickname || `服务商 #${(supply as any).owner_user_id}`;
@@ -70,7 +70,7 @@ export default function SupplyDetailPage() {
           <Text className="supply-hero-title">{supply.title}</Text>
           <View className="supply-hero-price-row">
             <Text className="supply-hero-price">{formatMoney(supply.base_price_amount)}{PRICING_UNITS[supply.pricing_unit] || ''}</Text>
-            {supply.accepts_direct_order && <Text className="supply-hero-direct-tag">支持直达下单</Text>}
+            <Text className="supply-hero-direct-tag">服务参考价</Text>
           </View>
         </View>
 
@@ -127,9 +127,9 @@ export default function SupplyDetailPage() {
             >
               <Text className="supply-footer-btn-secondary-text">联系服务商</Text>
             </View>
-            <View className={`supply-footer-btn supply-footer-btn-primary ${!canOrder ? 'supply-footer-btn-disabled' : ''}`}
-              onClick={() => canOrder && Taro.navigateTo({ url: `/pages/publish/quick-order/index?supplyId=${supplyId}` })}>
-              <Text className="supply-footer-btn-primary-text">立即下单</Text>
+            <View className={`supply-footer-btn supply-footer-btn-primary ${!canPublishDemand ? 'supply-footer-btn-disabled' : ''}`}
+              onClick={() => canPublishDemand && Taro.navigateTo({ url: '/pages/publish/quick-order/index' })}>
+              <Text className="supply-footer-btn-primary-text">发布需求</Text>
             </View>
           </>
         )}

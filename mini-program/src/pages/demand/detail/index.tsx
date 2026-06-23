@@ -1,14 +1,16 @@
 import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button, View, Text, ScrollView } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store/store';
 import { demandV2Service } from '../../../services/demandV2';
+import { orderV2Service } from '../../../services/orderV2';
 import { DemandDetail, DemandQuoteSummary } from '../../../types';
 import { CARGO_TYPES } from '../../../constants';
 import { getDemandSceneLabel, getObjectStatusMeta } from '../../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
+import { clearQuickOrderOfferDraftForDemand } from '../../../utils/quickOrderOfferDraft';
 import StatusBadge from '../../../components/business/StatusBadge';
 import StepBar from '../../../components/business/StepBar';
 import './index.scss';
@@ -111,10 +113,45 @@ const formatQuoteDrone = (quote: DemandQuoteSummary) => {
   return [quote.drone.brand, quote.drone.model].filter(Boolean).join(' ') || '机型信息待补充';
 };
 
+const centsToYuanText = (amount?: number | null): string => {
+  const cents = Number(amount || 0);
+  if (!Number.isFinite(cents) || cents <= 0) return '';
+  const yuan = cents / 100;
+  return Number.isInteger(yuan) ? String(yuan) : yuan.toFixed(2);
+};
+
+const formatBudgetRange = (min?: number | null, max?: number | null) => {
+  const minText = centsToYuanText(min);
+  const maxText = centsToYuanText(max);
+  if (minText && maxText) return `预算: ¥${minText} - ¥${maxText}`;
+  if (maxText) return `预算: ¥${maxText} 以内`;
+  if (minText) return `预算: ¥${minText} 起`;
+  return '预算待确认';
+};
+
+const orderItemsOf = (response: unknown): any[] => {
+  const data = response as any;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  return [];
+};
+
+const orderIdOfSelectResult = (result: unknown) => {
+  const data = result as any;
+  return Number(
+    data?.order_id ||
+    data?.data?.order_id ||
+    data?.order?.id ||
+    data?.data?.order?.id ||
+    0,
+  );
+};
+
 export default function DemandDetailPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const providerCapabilities = resolveProviderCapabilities(getEffectiveRoleSummary(roleSummary));
+  const canRequestSuggestedPrice = providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply;
   const params = Taro.getCurrentInstance().router?.params || {};
   const demandId = Number(params.id || params.demandId || 0);
 
@@ -123,6 +160,8 @@ export default function DemandDetailPage() {
   const [quoteError, setQuoteError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selectingQuoteId, setSelectingQuoteId] = useState<number | null>(null);
+  const [suggestedPriceText, setSuggestedPriceText] = useState('');
 
   useShareAppMessage(() => {
     const nickname = String(user?.nickname || '客户').trim() || '客户';
@@ -138,14 +177,28 @@ export default function DemandDetailPage() {
     };
   });
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options?: { silent?: boolean }) => {
     if (!demandId) { setLoading(false); return; }
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     try {
       const res = await demandV2Service.getById(demandId);
       const detail = res as any;
       setDemand(detail);
-      if (Number(detail?.client_user_id || 0) === Number(user?.id || 0)) {
+      const isViewerOwner = Number(detail?.client_user_id || 0) === Number(user?.id || 0);
+      if (!isViewerOwner && canRequestSuggestedPrice) {
+        try {
+          const suggestedRes: any = await demandV2Service.getSuggestedPrice(demandId);
+          const yuan = Number(suggestedRes?.data?.yuan ?? suggestedRes?.yuan ?? 0);
+          setSuggestedPriceText(Number.isFinite(yuan) && yuan > 0
+            ? (Number.isInteger(yuan) ? String(yuan) : yuan.toFixed(2))
+            : '');
+        } catch {
+          setSuggestedPriceText('');
+        }
+      } else {
+        setSuggestedPriceText('');
+      }
+      if (isViewerOwner) {
         try {
           const quoteRes: any = await demandV2Service.listQuotes(demandId);
           setQuotes(quoteRes?.data?.items || quoteRes?.items || []);
@@ -162,19 +215,66 @@ export default function DemandDetailPage() {
       setDemand(null);
       setQuotes([]);
       setQuoteError('');
+      setSuggestedPriceText('');
       Taro.showToast({ title: friendlyErrorMessage(error, '任务加载失败'), icon: 'none' });
     } finally {
       setLoading(false);
     }
-  }, [demandId, user?.id]);
+  }, [canRequestSuggestedPrice, demandId, user?.id]);
 
   useDidShow(() => { loadData(); });
+  const shouldAutoRefreshDemand = Boolean(demandId && demand && !isDemandTerminal(demand) && !isDemandDraft(demand));
+
+  useEffect(() => {
+    if (!shouldAutoRefreshDemand) return undefined;
+    const timer = setInterval(() => {
+      loadData({ silent: true });
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [loadData, shouldAutoRefreshDemand]);
 
   const isOwnDemand = demand?.client_user_id === user?.id;
   const canEdit = isOwnDemand && ['draft', 'published', 'quoting'].includes(demand?.status || '');
   const canQuote = !isOwnDemand && providerCapabilities.canUseWorkbench && providerCapabilities.canPublishSupply;
-  const canCandidate = !isOwnDemand && roleSummary?.has_pilot_role && demand?.allows_pilot_candidate;
-  const hasOwnQuote = Boolean((demand as any)?.my_quote);
+  const myQuote = ((demand as any)?.my_quote || null) as DemandQuoteSummary | null;
+  const hasOwnQuote = Boolean(myQuote?.id);
+  const quoteCount = demand?.quote_count || 0;
+  const demandStatus = String(demand?.status || '').toLowerCase();
+  const customerHeroText = demandStatus === 'converted_to_order'
+    ? '订单已生成'
+    : demandStatus === 'selected' || demand?.selected_quote_id
+      ? '已选定服务商'
+      : quoteCount > 0
+        ? `已收到 ${quoteCount} 家报价`
+        : isDemandDraft(demand)
+          ? '任务草稿'
+          : '等待服务商报价';
+  const heroMetaText = canQuote && suggestedPriceText
+    ? `建议报价: ¥${suggestedPriceText}`
+    : isOwnDemand
+      ? customerHeroText
+      : formatBudgetRange(demand?.budget_min, demand?.budget_max);
+  const quotePriceParam = canQuote && suggestedPriceText ? `&priceYuan=${suggestedPriceText}` : '';
+  const quoteEditorUrl = demand
+    ? `/pages/demand/quote/index?demandId=${demandId}&demandTitle=${encodeURIComponent(demand.title || '需求')}${quotePriceParam}`
+    : '';
+  const openQuoteEditor = () => {
+    if (!quoteEditorUrl) return;
+    Taro.navigateTo({ url: quoteEditorUrl });
+  };
+
+  const resolveGeneratedOrderId = useCallback(async () => {
+    try {
+      const orders = await orderV2Service.list({ role: 'client', page: 1, page_size: 50 });
+      const matched = orderItemsOf(orders).find(order =>
+        Number(order?.demand_id || 0) === demandId &&
+        String(order?.order_source || '').toLowerCase() === 'demand_market',
+      );
+      return Number(matched?.id || 0);
+    } catch {
+      return 0;
+    }
+  }, [demandId]);
 
   const handleCancel = async () => {
     const res = await Taro.showModal({ title: '确认撤销', content: '撤销后不可恢复' });
@@ -185,20 +285,8 @@ export default function DemandDetailPage() {
     finally { setSubmitting(false); }
   };
 
-  const handleCandidateToggle = async () => {
-    setSubmitting(true);
-    try {
-      if ((demand as any)?.my_candidate?.status === 'active') {
-        await demandV2Service.withdrawCandidate(demandId);
-      } else {
-        await demandV2Service.applyCandidate(demandId);
-      }
-      loadData();
-    } catch (e: any) { Taro.showToast({ title: friendlyErrorMessage(e, '操作失败'), icon: 'none' }); }
-    finally { setSubmitting(false); }
-  };
-
   const handleSelectQuote = async (quote: DemandQuoteSummary) => {
+    if (submitting || selectingQuoteId) return;
     const res = await Taro.showModal({
       title: '选择报价',
       content: `确认选择该服务商报价 ¥${((quote.price_amount || 0) / 100).toFixed(2)} 并生成订单？`,
@@ -206,16 +294,31 @@ export default function DemandDetailPage() {
     });
     if (!res.confirm) return;
     setSubmitting(true);
+    setSelectingQuoteId(quote.id);
     try {
       const result = await demandV2Service.selectProvider(demandId, quote.id);
+      const orderId = orderIdOfSelectResult(result) || await resolveGeneratedOrderId();
+      clearQuickOrderOfferDraftForDemand(demandId);
       Taro.showToast({ title: '订单已生成', icon: 'success' });
-      const orderId = Number((result as any)?.order_id || 0);
       setTimeout(() => {
         if (orderId) Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
-        else loadData();
+        else {
+          loadData({ silent: true });
+          setSelectingQuoteId(null);
+        }
       }, 800);
     } catch (e: any) {
+      const orderId = await resolveGeneratedOrderId();
+      if (orderId) {
+        clearQuickOrderOfferDraftForDemand(demandId);
+        Taro.showToast({ title: '订单已生成', icon: 'success' });
+        setTimeout(() => {
+          Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
+        }, 800);
+        return;
+      }
       Taro.showToast({ title: friendlyErrorMessage(e, '选择失败'), icon: 'none' });
+      setSelectingQuoteId(null);
     } finally {
       setSubmitting(false);
     }
@@ -236,7 +339,7 @@ export default function DemandDetailPage() {
           />
         </View>
         <Text className="hero-title">{demand.title}</Text>
-        <Text className="hero-budget">预算: ¥{((demand.budget_min || 0) / 100).toFixed(2)} - ¥{((demand.budget_max || 0) / 100).toFixed(2)}</Text>
+        <Text className="hero-budget">{heroMetaText}</Text>
       </View>
 
       {isOwnDemand && !isDemandTerminal(demand) && !isDemandDraft(demand) ? (
@@ -273,15 +376,34 @@ export default function DemandDetailPage() {
             <View className="btn btn-outline" onClick={handleCancel}><Text className="btn-text-outline">撤销</Text></View>
           )}
           {canQuote && (
-            <View className="btn btn-primary" onClick={() => Taro.navigateTo({ url: `/pages/demand/quote/index?demandId=${demandId}&demandTitle=${encodeURIComponent(demand.title)}` })}><Text className="btn-text">{hasOwnQuote ? '更新报价' : '提交报价'}</Text></View>
-          )}
-          {canCandidate && (
-            <View className={`btn ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-outline' : 'btn-warning'}`} onClick={handleCandidateToggle}>
-              <Text className={`btn-text ${(demand as any)?.my_candidate?.status === 'active' ? 'btn-text-outline' : ''}`}>{(demand as any)?.my_candidate?.status === 'active' ? '撤回报名' : '报名承接'}</Text>
-            </View>
+            <View className="btn btn-primary" onClick={openQuoteEditor}><Text className="btn-text">{hasOwnQuote ? '修改报价' : '填写报价'}</Text></View>
           )}
         </View>
       </View>
+
+      {canQuote && myQuote ? (
+        <View className="info-card">
+          <Text className="section-title">我的报价</Text>
+          <View className="quote-card quote-card-own">
+            <View className="quote-main">
+              <View className="quote-provider-head">
+                <Text className="quote-title">已提交给客户</Text>
+                <Text className="quote-rating">{getObjectStatusMeta('quote', myQuote.status).label || myQuote.status}</Text>
+              </View>
+              <Text className="quote-provider-stats">{formatQuoteDrone(myQuote)}</Text>
+              <Text className={`quote-desc ${(myQuote.execution_plan || '').trim() ? '' : 'is-empty'}`}>
+                {(myQuote.execution_plan || '').trim() || '未填写执行说明'}
+              </Text>
+            </View>
+            <View className="quote-side">
+              <Text className="quote-price">¥{((myQuote.price_amount || 0) / 100).toFixed(2)}</Text>
+              <View className="quote-select" onClick={openQuoteEditor}>
+                <Text className="quote-select-text">修改</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : null}
 
       <View className="info-card">
         <Text className="section-title">任务概况</Text>
@@ -310,11 +432,7 @@ export default function DemandDetailPage() {
         <View className="stats-row">
           <View className="stat-box">
             <Text className="stat-num">{demand.quote_count || 0}</Text>
-            <Text className="stat-label">已收报价</Text>
-          </View>
-          <View className="stat-box">
-            <Text className="stat-num stat-orange">{demand.candidate_pilot_count || 0}</Text>
-            <Text className="stat-label">已报名服务商</Text>
+            <Text className="stat-label">服务商报价</Text>
           </View>
         </View>
       </View>
@@ -331,34 +449,38 @@ export default function DemandDetailPage() {
               <Text className="quote-empty-text">还没有服务商报价，你可以分享给认识的服务商</Text>
             </View>
           ) : (
-            quotes.map((quote) => (
-              <View key={quote.id} className="quote-card">
-                <View className="quote-main">
-                  <View className="quote-provider-head">
-                    <Text className="quote-title">{quote.owner?.nickname || `服务商 #${quote.owner_user_id}`}</Text>
-                    <Text className="quote-rating">{formatProviderRating(quote.owner?.rating, quote.owner?.rating_count)}</Text>
-                  </View>
-                  <Text className="quote-provider-stats">
-                    近 30 天 {Number(quote.owner?.recent_30d_completed_orders || 0)} 单 · {formatProviderResponse(quote.owner?.avg_response_seconds)}
-                  </Text>
-                  <Text className="quote-scenes">{formatProviderScenes(quote.owner?.preferred_scenes)}</Text>
-                  <Text className="quote-desc">
-                    {formatQuoteDrone(quote)}
-                    {quote.execution_plan ? ` · ${quote.execution_plan}` : ''}
-                  </Text>
-                </View>
-                <View className="quote-side">
-                  <Text className="quote-price">¥{((quote.price_amount || 0) / 100).toFixed(2)}</Text>
-                  {quote.status === 'submitted' ? (
-                    <View className={`quote-select ${submitting ? 'disabled' : ''}`} onClick={() => handleSelectQuote(quote)}>
-                      <Text className="quote-select-text">{submitting ? '处理中' : '选定'}</Text>
+            quotes.map((quote) => {
+              const isSelectingThisQuote = selectingQuoteId === quote.id;
+              const selectDisabled = submitting || selectingQuoteId !== null;
+              return (
+                <View key={quote.id} className="quote-card">
+                  <View className="quote-main">
+                    <View className="quote-provider-head">
+                      <Text className="quote-title">{quote.owner?.nickname || `服务商 #${quote.owner_user_id}`}</Text>
+                      <Text className="quote-rating">{formatProviderRating(quote.owner?.rating, quote.owner?.rating_count)}</Text>
                     </View>
-                  ) : (
-                    <Text className="quote-status">{getObjectStatusMeta('quote', quote.status).label || quote.status}</Text>
-                  )}
+                    <Text className="quote-provider-stats">
+                      近 30 天 {Number(quote.owner?.recent_30d_completed_orders || 0)} 单 · {formatProviderResponse(quote.owner?.avg_response_seconds)}
+                    </Text>
+                    <Text className="quote-scenes">{formatProviderScenes(quote.owner?.preferred_scenes)}</Text>
+                    <Text className="quote-desc">
+                      {formatQuoteDrone(quote)}
+                      {quote.execution_plan ? ` · ${quote.execution_plan}` : ''}
+                    </Text>
+                  </View>
+                  <View className="quote-side">
+                    <Text className="quote-price">¥{((quote.price_amount || 0) / 100).toFixed(2)}</Text>
+                    {quote.status === 'submitted' ? (
+                      <View className={`quote-select ${selectDisabled ? 'disabled' : ''}`} onClick={selectDisabled ? undefined : () => handleSelectQuote(quote)}>
+                        <Text className="quote-select-text">{isSelectingThisQuote ? '处理中' : '选定'}</Text>
+                      </View>
+                    ) : (
+                      <Text className="quote-status">{getObjectStatusMeta('quote', quote.status).label || quote.status}</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       ) : null}

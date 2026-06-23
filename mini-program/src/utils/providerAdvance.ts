@@ -1,5 +1,11 @@
 export const getProviderAdvanceConfirmCopy = (label?: string | null) => {
   switch (label) {
+    case '确认接单':
+      return {
+        title: '确认接单',
+        content: '确认承接这笔订单？确认后客户会看到服务商已接单，并继续后续支付或履约流程。',
+        confirmText: '确认接单',
+      };
     case '开始准备':
       return {
         title: '开始准备',

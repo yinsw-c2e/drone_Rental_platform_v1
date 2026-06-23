@@ -8,6 +8,7 @@ import type {
   V2ProviderBroadcastView,
 } from '../../types';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
+import { remainingSeconds } from '../../utils/countdown';
 import './index.scss';
 
 const SELF_EXECUTABLE_REQUIRED_TOAST = '需要先完善设备和履约资质';
@@ -19,13 +20,7 @@ const normalizeProviderItems = <T,>(res: unknown): T[] => {
   return [];
 };
 
-const getRemainingSeconds = (deadline?: string | null, fallback?: number | null) => {
-  const deadlineMs = deadline ? Date.parse(deadline) : NaN;
-  if (Number.isFinite(deadlineMs)) {
-    return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
-  }
-  return Math.max(0, Math.ceil(Number(fallback || 0)));
-};
+type TimedAssignmentView = V2ProviderAssignmentView & { received_at_ms?: number };
 
 const getBroadcastAmount = (item: V2ProviderBroadcastView | V2ProviderAssignmentView) => {
   const broadcastAmount = 'estimated_total_cents' in item ? item.estimated_total_cents : item.broadcast?.estimated_total_cents;
@@ -67,7 +62,7 @@ function isProviderNotSelfExecutableError(error: any) {
 }
 
 export default function AssignmentModal({ onAccepted }: { onAccepted?: (orderId: number) => void }) {
-  const [assignment, setAssignment] = useState<V2ProviderAssignmentView | null>(null);
+  const [assignment, setAssignment] = useState<TimedAssignmentView | null>(null);
   const [responding, setResponding] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -76,7 +71,9 @@ export default function AssignmentModal({ onAccepted }: { onAccepted?: (orderId:
     const pull = async () => {
       try {
         const res = await providerService.listAssignments(5);
+        const receivedAtMs = Date.now();
         const items = normalizeProviderItems<V2ProviderAssignmentView>(res)
+          .map(item => ({ ...item, received_at_ms: receivedAtMs }))
           .filter(item => item.status === 'pending_accept')
           .sort((a, b) => b.attempt_seq - a.attempt_seq);
         if (!cancelled) {
@@ -100,7 +97,7 @@ export default function AssignmentModal({ onAccepted }: { onAccepted?: (orderId:
   }, []);
 
   const remaining = assignment
-    ? getRemainingSeconds(assignment.accept_deadline_at, assignment.remaining_seconds)
+    ? remainingSeconds(assignment.accept_deadline_at, assignment)
     : 0;
 
   useEffect(() => {

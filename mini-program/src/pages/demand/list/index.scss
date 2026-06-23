@@ -151,6 +151,63 @@ page {
   font-weight: 700;
 }
 
+.pd-selected-order-card {
+  margin: 20rpx 24rpx 0;
+  padding: 24rpx;
+  border-radius: 18rpx;
+  background: #fff7ed;
+  border: 2rpx solid #fed7aa;
+  box-shadow: 0 12rpx 28rpx rgba(249, 115, 22, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.pd-selected-order-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pd-selected-order-kicker {
+  display: block;
+  color: #ea580c;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  font-weight: 900;
+}
+
+.pd-selected-order-title {
+  display: block;
+  margin-top: 4rpx;
+  color: #0f172a;
+  font-size: 30rpx;
+  line-height: 42rpx;
+  font-weight: 900;
+}
+
+.pd-selected-order-desc {
+  display: block;
+  margin-top: 6rpx;
+  color: #9a3412;
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.pd-selected-order-action {
+  flex-shrink: 0;
+  min-width: 132rpx;
+  height: 60rpx;
+  padding: 0 18rpx;
+  border-radius: 12rpx;
+  background: #f97316;
+  color: #ffffff;
+  font-size: 24rpx;
+  line-height: 60rpx;
+  font-weight: 900;
+  text-align: center;
+}
+
 .pd-filter-row {
   display: flex;
   flex-direction: row;
@@ -216,6 +273,25 @@ page {
   background: #ffffff;
   box-shadow: 0 2rpx 12rpx rgba(15, 23, 42, 0.04);
   box-sizing: border-box;
+}
+
+.pd-source-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18rpx;
+}
+
+.pd-source-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 40rpx;
+  padding: 0 14rpx;
+  border-radius: 8rpx;
+  color: #c2410c;
+  background: #ffedd5;
+  font-size: 22rpx;
+  line-height: 40rpx;
+  font-weight: 700;
 }
 
 /* route line */

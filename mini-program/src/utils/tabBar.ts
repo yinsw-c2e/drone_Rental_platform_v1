@@ -4,7 +4,7 @@ import { messageService } from '../services/message';
 import { notificationV2Service } from '../services/notificationV2';
 import { orderV2Service } from '../services/orderV2';
 import { store } from '../store/store';
-import type { HaulRoleMode } from '../store/slices/roleSlice';
+import { readStoredRoleMode, type HaulRoleMode } from '../store/slices/roleSlice';
 
 const ORDERS_TAB_INDEX = 1;
 const MESSAGE_TAB_INDEX = 2;
@@ -13,6 +13,11 @@ const CLIENT_ACTION_ORDER_STATUSES = new Set(['pending_payment', 'dispatch_faile
 const TAB_LABELS = {
   customer: ['首页', '订单', '消息', '我的'],
   provider: ['工作台', '接单需求', '消息', '我的'],
+};
+
+const TAB_PATHS = {
+  customer: ['/pages/home/index', '/pages/orders/index', '/pages/messages/index', '/pages/profile/index'],
+  provider: ['/pages/home/index', '/pages/provider-demand/index', '/pages/messages/index', '/pages/profile/index'],
 };
 
 const PROVIDER_TAB_ICONS = [
@@ -127,7 +132,7 @@ function patchTabBadges(tabBar: any, badges: Record<number, number>) {
 }
 
 function getRoleTabLabels(modeOverride?: HaulRoleMode) {
-  const selectedMode = modeOverride || store.getState().role.selectedMode;
+  const selectedMode = modeOverride || readStoredRoleMode();
   return selectedMode === 'provider' ? TAB_LABELS.provider : TAB_LABELS.customer;
 }
 
@@ -135,13 +140,15 @@ function patchRoleTabLabels(tabBar: any, selected?: number, modeOverride?: HaulR
   const list = Array.isArray(tabBar?.data?.list) ? tabBar.data.list : [];
   if (!list.length) return;
 
-  const selectedMode = modeOverride || store.getState().role.selectedMode;
+  const selectedMode = modeOverride || readStoredRoleMode();
   const labels = getRoleTabLabels(selectedMode);
+  const paths = selectedMode === 'provider' ? TAB_PATHS.provider : TAB_PATHS.customer;
   const icons = selectedMode === 'provider' ? PROVIDER_TAB_ICONS : CUSTOMER_TAB_ICONS;
   tabBar.setData({
     ...(typeof selected === 'number' ? { selected } : {}),
     list: list.map((item: any, index: number) => ({
       ...item,
+      pagePath: paths[index] || item.pagePath,
       text: labels[index] || item.text,
       ...(icons[index] || {}),
       badgeDot: false,
@@ -203,7 +210,7 @@ async function fetchProviderDemandTabBadge() {
   return countItems(result);
 }
 
-export async function refreshCustomTabBarBadges() {
+export async function refreshCustomTabBarBadges(modeOverride?: HaulRoleMode) {
   const tabBar = getCurrentTabBar();
   if (!store.getState().auth.isAuthenticated) {
     if (tabBar?.setData) {
@@ -216,7 +223,7 @@ export async function refreshCustomTabBarBadges() {
   }
 
   try {
-    const mode = store.getState().role.selectedMode;
+    const mode = modeOverride || readStoredRoleMode();
     const [messageResult, workResult] = await Promise.allSettled([
       fetchMessageTabUnread(),
       mode === 'provider' ? fetchProviderDemandTabBadge() : fetchCustomerOrderTabBadge(),
@@ -246,6 +253,6 @@ export function syncCustomTabBar(selected: number, modeOverride?: HaulRoleMode) 
 
   if (tabBar?.setData) {
     patchRoleTabLabels(tabBar, selected, modeOverride);
-    refreshCustomTabBarBadges();
+    refreshCustomTabBarBadges(modeOverride);
   }
 }

@@ -1,13 +1,18 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Image, ScrollView, Text, View } from '@tarojs/components';
+import { Image, Input, ScrollView, Text, View } from '@tarojs/components';
 
-import { CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES } from '../../../constants/subscribeTemplates';
-import { requestSubscribe } from '../../../services/push';
-import { supplyService } from '../../../services/supply';
+import { demandV2Service, DemandUpsertPayload } from '../../../services/demandV2';
+import { providerRecommendationService } from '../../../services/providerRecommendation';
 import { store } from '../../../store/store';
-import { AddressData, AddressSnapshot, DirectOrderInput, QuickOrderDraft, SupplySummary } from '../../../types';
+import {
+  AddressData,
+  AddressSnapshot,
+  ProviderRecommendationSummary,
+  QuickOrderDraft,
+} from '../../../types';
 import { getSupplySceneLabel } from '../../../utils';
+import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import navBackIcon from '../../../assets/haul/offer-list/icon_nav_back.png';
 import navChatIcon from '../../../assets/haul/offer-list/icon_nav_chat.png';
 import clockIcon from '../../../assets/haul/offer-list/icon_clock.png';
@@ -18,24 +23,25 @@ import tabMessageInactiveIcon from '../../../assets/haul/offer-list/tab_message_
 import tabOrderActiveIcon from '../../../assets/haul/offer-list/tab_order_active.png';
 import tabProfileInactiveIcon from '../../../assets/haul/offer-list/tab_profile_inactive.png';
 import weightIcon from '../../../assets/haul/offer-list/icon_weight_m.png';
-import { friendlyErrorMessage } from '../../../utils/errorMessage';
+import {
+  readQuickOrderOfferDraft,
+  saveQuickOrderOfferDraft,
+} from '../../../utils/quickOrderOfferDraft';
+import { switchToOrdersTab } from '../../../utils/ordersEntry';
 import './index.scss';
 
-const QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY = 'quick_order_offer_draft_v1';
-
-type OfferPlan = {
+type ProviderPlan = {
   key: string;
   title: string;
   logoUrl?: string;
   logoInitial: string;
-  statusLabel: string;
+  ratingLabel: string;
+  orderLabel: string;
+  trustLabels: string[];
+  distanceLabel: string;
   capacityLabel: string;
-  ownerName: string;
-  etaTitle: string;
-  etaLabel: string;
-  priceYuan: number | null;
   tags: string[];
-  supply: SupplySummary;
+  item: ProviderRecommendationSummary;
 };
 
 const emptyDraft: QuickOrderDraft = {
@@ -43,21 +49,29 @@ const emptyDraft: QuickOrderDraft = {
   cargo_type: '重载物资',
 };
 
-const parseStoredDraft = (value: unknown): QuickOrderDraft | null => {
-  try {
-    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as QuickOrderDraft;
-  } catch {
-    return null;
-  }
-};
+const PROVIDER_CARD_TOP_RPX = 584;
+const PROVIDER_CARD_STEP_RPX = 456;
 
 const getStoredQuickOrderDraft = () =>
-  parseStoredDraft(Taro.getStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY)) || emptyDraft;
+  readQuickOrderOfferDraft() || emptyDraft;
 
-const normalizeSupplies = (res: any): SupplySummary[] =>
-  (res?.data?.items || res?.items || []) as SupplySummary[];
+const normalizeRecommendations = (res: any): ProviderRecommendationSummary[] =>
+  (res?.data?.items || res?.items || []) as ProviderRecommendationSummary[];
+
+const formatAddress = (addr?: AddressData | null) =>
+  addr?.address || addr?.name || '';
+
+const shortAddress = (addr?: AddressData | null, placeholder = '作业点') =>
+  addr?.name || addr?.district || addr?.address || placeholder;
+
+const toAddressSnapshot = (addr: AddressData): AddressSnapshot => ({
+  text: formatAddress(addr),
+  province: addr.province,
+  city: addr.city,
+  district: addr.district,
+  latitude: addr.latitude,
+  longitude: addr.longitude,
+});
 
 const formatAddressName = (addr?: AddressData | null, fallback = '-') =>
   addr?.name || addr?.address || fallback;
@@ -68,6 +82,20 @@ const formatAddressSub = (addr?: AddressData | null, fallback = '-') => {
   const text = addr.address || '';
   if (mainName && text.includes(mainName)) return text.replace(mainName, '') || text;
   return text || fallback;
+};
+
+const parseIsoDate = (value?: string) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const resolveDraftEndDate = (draft: QuickOrderDraft, startDate: Date) => {
+  const endDate = parseIsoDate(draft.scheduled_end_at);
+  if (endDate && endDate > startDate) return endDate;
+  const fallback = new Date(startDate);
+  fallback.setHours(startDate.getHours() + 2, startDate.getMinutes(), 0, 0);
+  return fallback;
 };
 
 const formatWorkTime = (value?: string) => {
@@ -87,18 +115,12 @@ const formatWorkTime = (value?: string) => {
   return `${prefix} ${hour}:${minute} 前`;
 };
 
-const supplyPriceYuan = (item: SupplySummary) => {
-  const amount = Number(item.base_price_amount || 0);
-  if (amount > 0) return Math.round(amount / 100);
-  return null;
-};
-
 const firstChar = (value: string) => Array.from(value.trim())[0] || '服';
 
-const compactKg = (value?: number | null) => {
+const compactNumber = (value?: number | null, digits = 0) => {
   const amount = Number(value || 0);
   if (!Number.isFinite(amount) || amount <= 0) return '';
-  return Number.isInteger(amount) ? `${amount}` : amount.toFixed(1);
+  return Number.isInteger(amount) ? `${amount}` : amount.toFixed(digits);
 };
 
 const validCoordinate = (lat?: number | null, lng?: number | null) => {
@@ -110,72 +132,96 @@ const validCoordinate = (lat?: number | null, lng?: number | null) => {
     nextLng >= -180 && nextLng <= 180;
 };
 
-const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-  const radiusKm = 6371;
-  const toRad = (value: number) => (value * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * radiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+const roundToHundred = (value: number) => Math.round(value / 100) * 100;
+
+const estimateBudgetCents = (weightKg: number) => {
+  const safeWeight = Math.max(Number(weightKg || 0), 1);
+  const estimated = 36000 + safeWeight * 420;
+  const min = Math.max(30000, roundToHundred(estimated * 0.85));
+  const max = Math.max(min + 10000, roundToHundred(estimated * 1.2));
+  return { min, max };
 };
 
-const supplyDistanceFromDraft = (draft: QuickOrderDraft, item: SupplySummary) => {
-  const start = draft.departure_address || draft.destination_address;
-  const drone = item.drone;
-  if (!start || !drone || !validCoordinate(start.latitude, start.longitude) || !validCoordinate(drone.latitude, drone.longitude)) {
-    return null;
+const buildDemandPayload = (draft: QuickOrderDraft): DemandUpsertPayload => {
+  if (!draft.departure_address || !draft.destination_address) {
+    throw new Error('请先补充起吊点和落放点');
   }
-  return haversineKm(Number(start.latitude), Number(start.longitude), Number(drone.latitude), Number(drone.longitude));
+  const startDate = parseIsoDate(draft.scheduled_start_at);
+  if (!startDate) {
+    throw new Error('请先填写作业时间');
+  }
+  const weight = Number(draft.cargo_weight_kg || 0);
+  if (!Number.isFinite(weight) || weight <= 0) {
+    throw new Error('请填写有效货物重量');
+  }
+  const budget = estimateBudgetCents(weight);
+  return {
+    title: `${shortAddress(draft.departure_address, '起吊点')} → ${shortAddress(draft.destination_address, '落放点')}`,
+    service_type: 'heavy_cargo_lift_transport',
+    cargo_scene: draft.cargo_scene || 'power_grid',
+    description: draft.description || undefined,
+    departure_address: toAddressSnapshot(draft.departure_address),
+    destination_address: toAddressSnapshot(draft.destination_address),
+    service_address: toAddressSnapshot(draft.departure_address),
+    scheduled_start_at: startDate.toISOString(),
+    scheduled_end_at: resolveDraftEndDate(draft, startDate).toISOString(),
+    cargo_weight_kg: weight,
+    cargo_volume_m3: draft.cargo_volume_m3,
+    cargo_length_cm: draft.cargo_length_cm,
+    cargo_width_cm: draft.cargo_width_cm,
+    cargo_height_cm: draft.cargo_height_cm,
+    cargo_type: draft.cargo_type || '重载物资',
+    cargo_special_requirements: draft.special_requirements,
+    estimated_trip_count: 1,
+    budget_min: budget.min,
+    budget_max: budget.max,
+    allows_pilot_candidate: false,
+  };
 };
 
-const supplyCoverageTag = (distanceKm: number | null, rangeKm: number) => {
-  if (!distanceKm || !Number.isFinite(rangeKm) || rangeKm <= 0) return '';
-  return distanceKm <= rangeKm ? '可覆盖' : '超半径';
+const formatRating = (item: ProviderRecommendationSummary) => {
+  const rating = Number(item.rating || 0);
+  const count = Number(item.rating_count || 0);
+  if (!Number.isFinite(rating) || rating <= 0 || !Number.isFinite(count) || count <= 0) {
+    return '暂无评分';
+  }
+  return `${rating.toFixed(1)} · ${count}评`;
 };
 
-const formatAverageResponse = (seconds?: number | null, samples?: number | null) => {
+const formatTrustRating = (item: ProviderRecommendationSummary) => {
+  const label = formatRating(item);
+  return label === '暂无评分' ? label : `评分 ${label}`;
+};
+
+const formatCompletedOrders = (item: ProviderRecommendationSummary) => {
+  const count = Number(item.completed_orders_30d || 0);
+  if (!Number.isFinite(count) || count <= 0) return '0单';
+  return `${count}单`;
+};
+
+const formatTrustCompletedOrders = (item: ProviderRecommendationSummary) =>
+  `30天 ${formatCompletedOrders(item)}`;
+
+const formatStatusLabel = (invited: boolean) =>
+  invited ? '已邀请' : '可报价';
+
+const formatStatusClass = (invited: boolean) =>
+  invited ? 'is-invited' : '';
+
+const formatDistance = (value?: number | null) => {
+  const distance = Number(value);
+  if (!Number.isFinite(distance) || distance < 0) return '距离待算';
+  if (distance < 0.1) return '起吊点附近';
+  return `${distance.toFixed(1)}km`;
+};
+
+const formatResponse = (seconds?: number | null) => {
   const value = Number(seconds || 0);
-  const sampleCount = Number(samples || 0);
-  if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(sampleCount) || sampleCount <= 0) return '';
+  if (!Number.isFinite(value) || value <= 0) return '响应待参考';
   const minutes = Math.max(1, Math.round(value / 60));
-  if (minutes < 60) return `平均接单 ${minutes}分`;
+  if (minutes < 60) return `响应 ${minutes}分`;
   const hours = Math.max(1, Math.round(minutes / 60));
-  if (hours < 24) return `平均接单 ${hours}小时`;
-  return `平均接单 ${Math.round(hours / 24)}天`;
-};
-
-const ratingLabel = (item: SupplySummary) => {
-  const rating = Number(item.stats?.rating || 0);
-  const count = Number(item.stats?.rating_count || 0);
-  if (!Number.isFinite(rating) || rating <= 0 || !Number.isFinite(count) || count <= 0) return '';
-  return `评分 ${rating.toFixed(1)}`;
-};
-
-const completedOrderLabel = (item: SupplySummary) => {
-  const count = Number(item.stats?.completed_order_count || 0);
-  if (!Number.isFinite(count) || count <= 0) return '';
-  return `完成 ${count}单`;
-};
-
-const supplyRangeKm = (item: SupplySummary) => {
-  const values = [item.max_range_km, item.drone?.max_distance]
-    .map(value => Number(value || 0))
-    .filter(value => Number.isFinite(value) && value > 0);
-  if (!values.length) return 0;
-  return Math.min(...values);
-};
-
-const estimateArrivalMinutes = (distanceKm: number | null, item: SupplySummary, rangeKm: number) => {
-  const maxDistance = Number(item.drone?.max_distance || item.max_range_km || 0);
-  const maxFlightTime = Number(item.drone?.max_flight_time || 0);
-  if (!distanceKm || !Number.isFinite(maxDistance) || !Number.isFinite(maxFlightTime) || maxDistance <= 0 || maxFlightTime <= 0) {
-    return null;
-  }
-  if (Number.isFinite(rangeKm) && rangeKm > 0 && distanceKm > rangeKm) {
-    return null;
-  }
-  return Math.max(1, Math.ceil((distanceKm / maxDistance) * maxFlightTime));
+  return `响应 ${hours}小时`;
 };
 
 const uniqueTags = (tags: string[]) => {
@@ -188,134 +234,98 @@ const uniqueTags = (tags: string[]) => {
   });
 };
 
-const toOfferPlan = (item: SupplySummary, draft: QuickOrderDraft): OfferPlan => {
-  const ownerName = item.owner?.nickname || '认证服务商';
-  const title = item.title || item.supply_no || `${ownerName}方案`;
-  const droneLabel = [item.drone?.brand, item.drone?.model].filter(Boolean).join(' ') || '机型待补';
-  const payload = compactKg(item.drone?.max_payload_kg || item.max_payload_kg);
-  const sceneTags = (item.cargo_scenes || []).slice(0, 2).map(scene => getSupplySceneLabel(scene));
-  const rangeKm = supplyRangeKm(item);
-  const city = item.drone?.city || item.service_area_snapshot?.city || item.service_area_snapshot?.region || '';
-  const distanceKm = supplyDistanceFromDraft(draft, item);
-  const arrivalMinutes = estimateArrivalMinutes(distanceKm, item, rangeKm);
-  const ratingText = ratingLabel(item);
-  const completedText = completedOrderLabel(item);
+const ACTIVE_INVITATION_STATUSES = new Set(['pending_quote', 'quoted', 'selected']);
+
+const hasActiveInvitation = (status?: string) =>
+  ACTIVE_INVITATION_STATUSES.has(String(status || '').trim());
+
+const isProviderInvited = (plan: ProviderPlan, invitedProviderIds: Set<number>) => {
+  const providerUserId = Number(plan.item.provider_user_id || 0);
+  return invitedProviderIds.has(providerUserId) || hasActiveInvitation(plan.item.invitation_status);
+};
+
+const inviteButtonLabel = (plan: ProviderPlan, isInviting: boolean, isInvited: boolean) => {
+  if (isInviting) return '邀请中...';
+  if (plan.item.invitation_status === 'quoted') return '已报价';
+  if (plan.item.invitation_status === 'selected') return '已选定';
+  if (isInvited) return '已邀请报价';
+  return '邀请报价';
+};
+
+const toProviderPlan = (item: ProviderRecommendationSummary): ProviderPlan => {
+  const providerName = item.provider_name || `服务商 #${item.provider_user_id}`;
+  const payload = compactNumber(item.max_payload_kg, 1);
+  const radius = compactNumber(item.service_radius_km, 0);
+  const sceneTags = (item.matched_scenes || []).slice(0, 2).map(scene => getSupplySceneLabel(scene));
+  const capacityLabel = payload ? `载重 ${payload}kg` : '载重待确认';
+  const distanceLabel = formatDistance(item.distance_km);
+  const responseLabel = formatResponse(item.average_response_seconds);
 
   return {
-    key: `supply-${item.id}`,
-    title,
-    logoUrl: item.owner?.avatar_url,
-    logoInitial: firstChar(ownerName || title),
-    statusLabel: ratingText || (item.status === 'active' ? '可下单' : '待确认'),
-    capacityLabel: completedText || (payload ? `载重 ${payload}kg` : '载重待补'),
-    ownerName,
-    etaTitle: arrivalMinutes ? '预估到场' : '无人机',
-    etaLabel: arrivalMinutes ? `约${arrivalMinutes}分钟` : droneLabel,
-    priceYuan: supplyPriceYuan(item),
+    key: `provider-${item.provider_user_id}`,
+    title: providerName,
+    logoUrl: item.avatar_url,
+    logoInitial: firstChar(providerName),
+    ratingLabel: formatRating(item),
+    orderLabel: formatCompletedOrders(item),
+    trustLabels: [
+      formatTrustRating(item),
+      formatTrustCompletedOrders(item),
+      responseLabel,
+    ],
+    distanceLabel,
+    capacityLabel,
     tags: uniqueTags([
-      ...sceneTags.slice(0, 1),
-      arrivalMinutes ? droneLabel : '',
-      completedText ? (payload ? `载重 ${payload}kg` : '') : '',
-      formatAverageResponse(item.stats?.average_response_seconds, item.stats?.response_sample_count),
-      distanceKm ? `距起吊点 ${distanceKm.toFixed(1)}km` : '',
-      supplyCoverageTag(distanceKm, rangeKm),
-      city ? `${city}服务` : '',
-      rangeKm > 0 ? `半径 ${rangeKm.toFixed(0)}km` : '',
-      item.accepts_direct_order ? '支持直达下单' : '需先沟通',
+      ...sceneTags,
+      radius ? `半径 ${radius}km` : '',
+      item.drone_label || '',
+      responseLabel,
+      item.service_city ? `${item.service_city}服务` : '',
+      item.has_previous_cooperation ? '曾合作' : '',
     ]).slice(0, 5),
-    supply: item,
-  };
-};
-
-const toAddressSnapshot = (address: AddressData): AddressSnapshot => ({
-  text: address.address || address.name || '',
-  province: address.province,
-  city: address.city,
-  district: address.district,
-  latitude: address.latitude,
-  longitude: address.longitude,
-});
-
-const parseDraftDate = (value?: string) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const resolveEndDate = (draft: QuickOrderDraft, startDate: Date) => {
-  const explicitEnd = parseDraftDate(draft.scheduled_end_at);
-  if (explicitEnd && explicitEnd > startDate) return explicitEnd;
-  const fallbackEnd = new Date(startDate);
-  fallbackEnd.setHours(startDate.getHours() + 2, startDate.getMinutes(), 0, 0);
-  return fallbackEnd;
-};
-
-const buildDirectOrderPayload = (draft: QuickOrderDraft, supply: SupplySummary): DirectOrderInput => {
-  if (!draft.departure_address || !draft.destination_address) {
-    throw new Error('请先返回补充起吊点和落放点');
-  }
-  const weight = Number(draft.cargo_weight_kg || 0);
-  if (!Number.isFinite(weight) || weight <= 0) {
-    throw new Error('请先返回填写有效货物重量');
-  }
-  if (Number(supply.max_payload_kg || 0) > 0 && weight > Number(supply.max_payload_kg)) {
-    throw new Error('所选服务最大吊重不足，请选择其他方案');
-  }
-  const startDate = parseDraftDate(draft.scheduled_start_at);
-  if (!startDate) {
-    throw new Error('请先返回填写作业时间');
-  }
-  const endDate = resolveEndDate(draft, startDate);
-
-  return {
-    service_type: 'heavy_cargo_lift_transport',
-    cargo_scene: draft.cargo_scene || supply.cargo_scenes?.[0] || 'power_grid',
-    departure_address: toAddressSnapshot(draft.departure_address),
-    destination_address: toAddressSnapshot(draft.destination_address),
-    service_address: null,
-    scheduled_start_at: startDate.toISOString(),
-    scheduled_end_at: endDate.toISOString(),
-    cargo_weight_kg: weight,
-    cargo_volume_m3: draft.cargo_volume_m3,
-    cargo_length_cm: draft.cargo_length_cm,
-    cargo_width_cm: draft.cargo_width_cm,
-    cargo_height_cm: draft.cargo_height_cm,
-    cargo_type: draft.cargo_type || '重载物资',
-    cargo_special_requirements: draft.special_requirements,
-    description: draft.description,
+    item,
   };
 };
 
 export default function OfferListPage() {
   const [draft, setDraft] = useState<QuickOrderDraft>(emptyDraft);
-  const [supplies, setSupplies] = useState<SupplySummary[]>([]);
+  const [keyword, setKeyword] = useState('');
+  const [recommendations, setRecommendations] = useState<ProviderRecommendationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
-  const [submittingKey, setSubmittingKey] = useState('');
+  const [activeKeyword, setActiveKeyword] = useState('');
+  const [viewingPlan, setViewingPlan] = useState<ProviderPlan | null>(null);
+  const [invitingProviderId, setInvitingProviderId] = useState(0);
+  const [invitedProviderIds, setInvitedProviderIds] = useState<Set<number>>(() => new Set());
 
-  const fetchSupplies = useCallback(async (nextDraft: QuickOrderDraft) => {
+  const fetchRecommendations = useCallback(async (nextDraft: QuickOrderDraft, nextKeyword = '') => {
+    const normalizedKeyword = nextKeyword.trim();
     try {
       setLoading(true);
       setFetchError('');
+      setActiveKeyword(normalizedKeyword);
       if (!store.getState().auth.accessToken) {
-        setSupplies([]);
-        setFetchError('请先登录后查看可下单服务');
+        setRecommendations([]);
+        setFetchError('请先登录后查看候选服务商');
         return;
       }
-      const res = await supplyService.list({
+      const originAddress = nextDraft.departure_address || nextDraft.destination_address;
+      const hasOriginCoordinate = validCoordinate(originAddress?.latitude, originAddress?.longitude);
+      const res = await providerRecommendationService.list({
         page: 1,
         page_size: 10,
-        region: nextDraft.match_region || nextDraft.destination_address?.city || nextDraft.departure_address?.city,
+        demand_id: Number(nextDraft.demand_id || 0) || undefined,
         cargo_scene: nextDraft.cargo_scene || undefined,
-        min_payload_kg: nextDraft.cargo_weight_kg,
-        accepts_direct_order: true,
-        service_type: 'heavy_cargo_lift_transport',
+        cargo_weight_kg: nextDraft.cargo_weight_kg,
+        origin_latitude: hasOriginCoordinate ? Number(originAddress?.latitude) : undefined,
+        origin_longitude: hasOriginCoordinate ? Number(originAddress?.longitude) : undefined,
+        keyword: normalizedKeyword || undefined,
       });
-      setSupplies(normalizeSupplies(res));
+      setRecommendations(normalizeRecommendations(res));
     } catch (error) {
-      console.warn('服务商方案接口暂不可用', error);
-      setSupplies([]);
-      setFetchError('服务商方案加载失败，请稍后重试');
+      console.warn('候选服务商接口暂不可用', error);
+      setRecommendations([]);
+      setFetchError(friendlyErrorMessage(error, '候选服务商加载失败，请稍后重试'));
     } finally {
       setLoading(false);
     }
@@ -324,10 +334,15 @@ export default function OfferListPage() {
   useDidShow(() => {
     const nextDraft = getStoredQuickOrderDraft();
     setDraft(nextDraft);
-    fetchSupplies(nextDraft);
+    fetchRecommendations(nextDraft, keyword);
   });
 
-  const plans = useMemo(() => supplies.slice(0, 3).map(item => toOfferPlan(item, draft)), [supplies, draft]);
+  const plans = useMemo(
+    () => recommendations.map(item => toProviderPlan(item)),
+    [recommendations],
+  );
+
+  const canvasHeight = Math.max(1780, PROVIDER_CARD_TOP_RPX + plans.length * PROVIDER_CARD_STEP_RPX + 220);
 
   const handleBack = () => {
     const pages = Taro.getCurrentPages();
@@ -335,101 +350,223 @@ export default function OfferListPage() {
       Taro.navigateBack();
       return;
     }
-    Taro.switchTab({ url: '/pages/orders/index' });
+    switchToOrdersTab('customer');
   };
 
   const handleService = () => Taro.switchTab({ url: '/pages/messages/index' });
 
-  const handleSelectPlan = async (plan: OfferPlan) => {
-    if (submittingKey) return;
-    if (!store.getState().auth.accessToken) {
-      Taro.showToast({ title: '请先登录后下单', icon: 'none' });
-      return;
-    }
-    if (plan.supply.status !== 'active' || !plan.supply.accepts_direct_order) {
-      Taro.showToast({ title: '该服务当前不可直达下单', icon: 'none' });
-      return;
-    }
-    let payload: DirectOrderInput;
-    try {
-      payload = buildDirectOrderPayload(draft, plan.supply);
-    } catch (error: any) {
-      Taro.showToast({ title: friendlyErrorMessage(error, '下单信息不完整'), icon: 'none' });
-      return;
-    }
-    await requestSubscribe(CUSTOMER_ORDER_SUBSCRIBE_TEMPLATES);
+  const handleSearch = () => {
+    const normalizedKeyword = keyword.trim();
+    setKeyword(normalizedKeyword);
+    fetchRecommendations(draft, normalizedKeyword);
+  };
 
-    const confirm = await Taro.showModal({
-      title: '确认下单',
-      content: `确认选择「${plan.title}」并创建吊运订单？`,
-      confirmText: '确认下单',
-      cancelText: '再看看',
-    }).catch(() => null);
-    if (!confirm?.confirm) return;
+  const handleViewProvider = (plan: ProviderPlan) => {
+    setViewingPlan(plan);
+  };
 
-    setSubmittingKey(plan.key);
-    Taro.showLoading({ title: '正在创建订单...' });
+  const handleCloseProvider = () => setViewingPlan(null);
+
+  const ensureDemandId = async (currentDraft: QuickOrderDraft) => {
+    const existingDemandId = Number(currentDraft.demand_id || 0);
+    if (existingDemandId > 0) return existingDemandId;
+
+    const created = await demandV2Service.create(buildDemandPayload(currentDraft));
+    const demandId = Number((created as any)?.id || (created as any)?.data?.id || 0);
+    if (!demandId) throw new Error('需求已创建，请稍后在任务列表查看');
+    await demandV2Service.publish(demandId);
+
+    const nextDraft = { ...currentDraft, demand_id: demandId };
+    saveQuickOrderOfferDraft(nextDraft);
+    setDraft(nextDraft);
+    return demandId;
+  };
+
+  const handleInviteProvider = async (plan: ProviderPlan) => {
+    const providerUserId = Number(plan.item.provider_user_id || 0);
+    if (!providerUserId || invitingProviderId) return;
+    if (isProviderInvited(plan, invitedProviderIds)) {
+      Taro.showToast({ title: '已邀请该服务商', icon: 'none' });
+      return;
+    }
     try {
-      const res = await supplyService.createDirectOrder(plan.supply.id, payload);
-      const result = (res as any)?.data || res;
-      const orderId = Number(result?.order_id || result?.order?.id || result?.id || 0);
-      if (!orderId) throw new Error('订单已创建，请稍后在订单列表查看');
-      Taro.removeStorageSync(QUICK_ORDER_OFFER_DRAFT_STORAGE_KEY);
+      setInvitingProviderId(providerUserId);
+      Taro.showLoading({ title: draft.demand_id ? '正在发送邀请...' : '正在发布需求...' });
+      const demandId = await ensureDemandId(draft);
+      await providerRecommendationService.invite(demandId, {
+        provider_user_id: providerUserId,
+        message: '希望你看一下这单，合适的话请报价',
+      });
+      setInvitedProviderIds(prev => new Set(prev).add(providerUserId));
       Taro.hideLoading();
-      Taro.showToast({ title: '订单已创建', icon: 'success' });
-      setTimeout(() => {
-        Taro.redirectTo({ url: `/pages/orders/detail/index?orderId=${orderId}` });
-      }, 500);
-    } catch (error: any) {
+      Taro.showToast({ title: '已邀请报价', icon: 'success' });
+    } catch (error) {
       Taro.hideLoading();
-      Taro.showToast({ title: friendlyErrorMessage(error, '创建订单失败'), icon: 'none' });
+      Taro.showToast({ title: friendlyErrorMessage(error, '邀请失败，请稍后重试'), icon: 'none' });
     } finally {
-      setSubmittingKey('');
+      setInvitingProviderId(0);
     }
   };
 
-  const renderPlan = (plan: OfferPlan, index: number) => (
-    <View key={plan.key} className={`qo4-plan-card qo4-plan-card-${index + 1}`}>
-      {plan.logoUrl ? (
-        <Image className='qo4-provider-logo' src={plan.logoUrl} mode='aspectFill' />
-      ) : (
-        <View className='qo4-provider-logo qo4-provider-avatar'>
-          <Text className='qo4-provider-avatar-text'>{plan.logoInitial}</Text>
-        </View>
-      )}
-      <Text className='qo4-provider-title'>{plan.title}</Text>
-      <View className='qo4-rating-row'>
-        <View className='qo4-status-dot' />
-        <Text className='qo4-rating-text'>{plan.statusLabel}</Text>
-        <View className='qo4-rating-divider' />
-        <Text className='qo4-order-count'>{plan.capacityLabel}</Text>
-      </View>
-      <View className='qo4-plan-divider' />
-      <Image className='qo4-eta-icon' src={clockIcon} mode='aspectFit' />
-      <Text className='qo4-eta-label'>{plan.etaTitle}</Text>
-      <Text className='qo4-eta-value'>{plan.etaLabel}</Text>
-      <View className='qo4-vertical-divider' />
-      <Text className='qo4-price-label'>报价</Text>
-      {plan.priceYuan !== null ? (
-        <>
-          <Text className='qo4-price-unit'>￥</Text>
-          <Text className='qo4-price-value'>{plan.priceYuan}</Text>
-        </>
-      ) : (
-        <Text className='qo4-price-pending'>待确认</Text>
-      )}
-      <View className='qo4-tags-row'>
-        {plan.tags.map(tag => (
-          <View className='qo4-tag' key={tag}>
-            <Text className='qo4-tag-text'>{tag}</Text>
+  const renderProviderModal = () => {
+    if (!viewingPlan) return null;
+    const plan = viewingPlan;
+    const providerUserId = Number(plan.item.provider_user_id || 0);
+    const isInvited = isProviderInvited(plan, invitedProviderIds);
+    const isInviting = invitingProviderId === providerUserId;
+    const inviteDisabled = isInvited || isInviting;
+    const intro = plan.item.intro || '该服务商已完成平台资质审核，平台将根据实际报价与履约情况持续更新画像。';
+    const reasons = (plan.item.score_reasons || []).slice(0, 4);
+    return (
+      <View className='qo4-provider-modal'>
+        <View className='qo4-provider-mask' onClick={handleCloseProvider} />
+        <View className='qo4-provider-sheet'>
+          <View className='qo4-provider-sheet-header'>
+            {plan.logoUrl ? (
+              <Image className='qo4-provider-sheet-logo' src={plan.logoUrl} mode='aspectFill' />
+            ) : (
+              <View className='qo4-provider-sheet-logo qo4-provider-sheet-avatar'>
+                <Text className='qo4-provider-sheet-avatar-text'>{plan.logoInitial}</Text>
+              </View>
+            )}
+            <View className='qo4-provider-sheet-title-block'>
+              <Text className='qo4-provider-sheet-title' numberOfLines={1}>{plan.title}</Text>
+              <Text className='qo4-provider-sheet-sub' numberOfLines={1}>
+                {plan.item.service_city ? `${plan.item.service_city}服务商 · 已通过平台资质` : '已通过平台资质'}
+              </Text>
+            </View>
+            <View className='qo4-provider-sheet-close' onClick={handleCloseProvider}>
+              <Text className='qo4-provider-sheet-close-text'>关闭</Text>
+            </View>
           </View>
-        ))}
+
+          <ScrollView scrollY className='qo4-provider-sheet-body' enhanced showScrollbar={false}>
+            <View className='qo4-provider-stat-grid'>
+              <View className='qo4-provider-stat'>
+                <Text className='qo4-provider-stat-label'>评分</Text>
+                <Text className='qo4-provider-stat-value' numberOfLines={1}>{plan.ratingLabel}</Text>
+              </View>
+              <View className='qo4-provider-stat'>
+                <Text className='qo4-provider-stat-label'>近30天</Text>
+                <Text className='qo4-provider-stat-value' numberOfLines={1}>{plan.orderLabel}</Text>
+              </View>
+              <View className='qo4-provider-stat'>
+                <Text className='qo4-provider-stat-label'>距起吊点</Text>
+                <Text className='qo4-provider-stat-value' numberOfLines={1}>{plan.distanceLabel}</Text>
+              </View>
+              <View className='qo4-provider-stat'>
+                <Text className='qo4-provider-stat-label'>服务能力</Text>
+                <Text className='qo4-provider-stat-value' numberOfLines={1}>{plan.capacityLabel}</Text>
+              </View>
+            </View>
+
+            <View className='qo4-provider-detail-section'>
+              <Text className='qo4-provider-section-title'>服务标签</Text>
+              <View className='qo4-provider-detail-tags'>
+                {plan.tags.map(tag => (
+                  <View className='qo4-provider-detail-tag' key={tag}>
+                    <Text className='qo4-provider-detail-tag-text' numberOfLines={1}>{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View className='qo4-provider-detail-section'>
+              <Text className='qo4-provider-section-title'>服务商简介</Text>
+              <Text className='qo4-provider-intro'>{intro}</Text>
+            </View>
+
+            {reasons.length > 0 ? (
+              <View className='qo4-provider-detail-section'>
+                <Text className='qo4-provider-section-title'>推荐理由</Text>
+                {reasons.map(reason => (
+                  <View className='qo4-provider-reason' key={reason}>
+                    <View className='qo4-provider-reason-dot' />
+                    <Text className='qo4-provider-reason-text'>{reason}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <View className='qo4-provider-sheet-actions'>
+            <View className='qo4-provider-secondary-btn' onClick={handleCloseProvider}>
+              <Text className='qo4-provider-secondary-text'>稍后再看</Text>
+            </View>
+            <View
+              className={`qo4-provider-primary-btn ${isInvited ? 'is-invited' : ''} ${isInviting ? 'is-submitting' : ''} ${inviteDisabled ? 'is-disabled' : ''}`}
+              onClick={inviteDisabled ? undefined : () => handleInviteProvider(plan)}
+            >
+              <Text className='qo4-provider-primary-text'>{inviteButtonLabel(plan, isInviting, isInvited)}</Text>
+            </View>
+          </View>
+        </View>
       </View>
-      <View className={`qo4-select-btn ${submittingKey === plan.key ? 'is-submitting' : ''}`} onClick={() => handleSelectPlan(plan)}>
-        <Text className='qo4-select-btn-text'>{submittingKey === plan.key ? '创建订单中...' : '选择此方案'}</Text>
+    );
+  };
+
+  const renderPlan = (plan: ProviderPlan, index: number) => {
+    const providerUserId = Number(plan.item.provider_user_id || 0);
+    const isInvited = isProviderInvited(plan, invitedProviderIds);
+    const isInviting = invitingProviderId === providerUserId;
+    const inviteDisabled = isInvited || isInviting;
+    const statusClass = formatStatusClass(isInvited);
+    return (
+      <View
+        key={plan.key}
+        className='qo4-plan-card'
+        style={{ top: `${PROVIDER_CARD_TOP_RPX + index * PROVIDER_CARD_STEP_RPX}rpx` }}
+      >
+        {plan.logoUrl ? (
+          <Image className='qo4-provider-logo' src={plan.logoUrl} mode='aspectFill' />
+        ) : (
+          <View className='qo4-provider-logo qo4-provider-avatar'>
+            <Text className='qo4-provider-avatar-text'>{plan.logoInitial}</Text>
+          </View>
+        )}
+        <Text className='qo4-provider-title' numberOfLines={1}>{plan.title}</Text>
+        <View className={`qo4-status-row ${statusClass}`}>
+          <View className='qo4-status-dot' />
+          <Text className='qo4-status-text'>{formatStatusLabel(isInvited)}</Text>
+        </View>
+        <View className='qo4-trust-strip'>
+          {plan.trustLabels.map((label, trustIndex) => (
+            <Text
+              className={`qo4-trust-item qo4-trust-item-${trustIndex + 1}`}
+              key={label}
+            >
+              {label}
+            </Text>
+          ))}
+        </View>
+        <View className='qo4-plan-divider' />
+        <Image className='qo4-eta-icon' src={clockIcon} mode='aspectFit' />
+        <Text className='qo4-eta-label'>距起吊点</Text>
+        <Text className='qo4-eta-value' numberOfLines={1}>{plan.distanceLabel}</Text>
+        <View className='qo4-vertical-divider' />
+        <Text className='qo4-capability-label'>服务能力</Text>
+        <Text className='qo4-capability-value' numberOfLines={1}>{plan.capacityLabel}</Text>
+        <View className='qo4-tags-row'>
+          {plan.tags.map(tag => (
+            <View className='qo4-tag' key={tag}>
+              <Text className='qo4-tag-text' numberOfLines={1}>{tag}</Text>
+            </View>
+          ))}
+        </View>
+        <View className='qo4-action-row'>
+          <View className='qo4-detail-btn' onClick={() => handleViewProvider(plan)}>
+            <Text className='qo4-detail-btn-text'>查看服务商</Text>
+          </View>
+          <View
+            className={`qo4-select-btn ${isInvited ? 'is-invited' : ''} ${isInviting ? 'is-submitting' : ''} ${inviteDisabled ? 'is-disabled' : ''}`}
+            onClick={inviteDisabled ? undefined : () => handleInviteProvider(plan)}
+          >
+            <Text className='qo4-select-btn-text'>{inviteButtonLabel(plan, isInviting, isInvited)}</Text>
+          </View>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View className='qo4-page'>
@@ -438,7 +575,7 @@ export default function OfferListPage() {
         <View className='qo4-nav-back' onClick={handleBack}>
           <Image className='qo4-nav-back-icon' src={navBackIcon} mode='aspectFit' />
         </View>
-        <Text className='qo4-nav-title'>服务商方案</Text>
+        <Text className='qo4-nav-title'>挑选服务商</Text>
         <View className='qo4-nav-service' onClick={handleService}>
           <Image className='qo4-nav-chat' src={navChatIcon} mode='aspectFit' />
           <Text className='qo4-nav-service-text'>客服</Text>
@@ -446,18 +583,18 @@ export default function OfferListPage() {
       </View>
 
       <ScrollView scrollY className='qo4-scroll' enhanced showScrollbar={false}>
-        <View className='qo4-canvas'>
+        <View className='qo4-canvas' style={{ height: `${canvasHeight}rpx` }}>
           <View className='qo4-summary-card'>
             <View className='qo4-route-left'>
               <Image className='qo4-route-pin' src={locationPinIcon} mode='aspectFit' />
-              <Text className='qo4-route-title'>{formatAddressName(draft.departure_address, '待选择起吊点')}</Text>
-              <Text className='qo4-route-sub'>{formatAddressSub(draft.departure_address, '--')}</Text>
+              <Text className='qo4-route-title' numberOfLines={1}>{formatAddressName(draft.departure_address, '待选择起吊点')}</Text>
+              <Text className='qo4-route-sub' numberOfLines={1}>{formatAddressSub(draft.departure_address, '--')}</Text>
             </View>
             <Image className='qo4-route-arrow' src={routeArrowIcon} mode='aspectFit' />
             <View className='qo4-route-right'>
               <Image className='qo4-route-pin' src={locationPinIcon} mode='aspectFit' />
-              <Text className='qo4-route-title'>{formatAddressName(draft.destination_address, '待选择落放点')}</Text>
-              <Text className='qo4-route-sub'>{formatAddressSub(draft.destination_address, '--')}</Text>
+              <Text className='qo4-route-title' numberOfLines={1}>{formatAddressName(draft.destination_address, '待选择落放点')}</Text>
+              <Text className='qo4-route-sub' numberOfLines={1}>{formatAddressSub(draft.destination_address, '--')}</Text>
             </View>
             <View className='qo4-summary-divider' />
             <View className='qo4-weight-block'>
@@ -473,21 +610,37 @@ export default function OfferListPage() {
             </View>
           </View>
 
+          <View className='qo4-search-card'>
+            <Input
+              className='qo4-search-input'
+              value={keyword}
+              confirmType='search'
+              placeholder='搜索服务商名称'
+              onInput={event => setKeyword(event.detail.value)}
+              onConfirm={handleSearch}
+            />
+            <View className='qo4-search-btn' onClick={handleSearch}>
+              <Text className='qo4-search-btn-text'>搜索</Text>
+            </View>
+          </View>
+
           <View className='qo4-list-area'>
             {plans.map(renderPlan)}
-            {loading ? (
-              <View className='qo4-loading'><Text className='qo4-loading-text'>正在匹配服务商方案...</Text></View>
+            {loading && plans.length === 0 ? (
+              <View className='qo4-loading'><Text className='qo4-loading-text'>正在匹配候选服务商...</Text></View>
             ) : null}
             {!loading && fetchError ? (
               <View className='qo4-empty-card'>
-                <Text className='qo4-empty-title'>无法加载方案</Text>
+                <Text className='qo4-empty-title'>无法加载服务商</Text>
                 <Text className='qo4-empty-desc'>{fetchError}</Text>
               </View>
             ) : null}
             {!loading && !fetchError && plans.length === 0 ? (
               <View className='qo4-empty-card'>
-                <Text className='qo4-empty-title'>暂无匹配服务商</Text>
-                <Text className='qo4-empty-desc'>当前条件下暂无可下单服务，请调整地址、重量或时间后重试</Text>
+                <Text className='qo4-empty-title'>{activeKeyword ? `未找到“${activeKeyword}”` : '暂无匹配服务商'}</Text>
+                <Text className='qo4-empty-desc'>
+                  {activeKeyword ? '没有匹配到该服务商名称或手机号，请换个关键词再试' : '当前条件下暂无候选服务商，请调整地址、重量或搜索关键词后重试'}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -499,7 +652,7 @@ export default function OfferListPage() {
           <Image className='qo4-tab-icon qo4-tab-home-icon' src={tabHomeInactiveIcon} mode='aspectFit' />
           <Text className='qo4-tab-text'>首页</Text>
         </View>
-        <View className='qo4-tab-item qo4-tab-item-current' onClick={() => Taro.switchTab({ url: '/pages/orders/index' })}>
+        <View className='qo4-tab-item qo4-tab-item-current' onClick={() => switchToOrdersTab('customer')}>
           <Image className='qo4-tab-icon qo4-tab-order-icon' src={tabOrderActiveIcon} mode='aspectFit' />
           <Text className='qo4-tab-text qo4-tab-text-current'>订单</Text>
         </View>
@@ -512,6 +665,8 @@ export default function OfferListPage() {
           <Text className='qo4-tab-text'>我的</Text>
         </View>
       </View>
+
+      {renderProviderModal()}
     </View>
   );
 }

@@ -7,6 +7,7 @@ import { orderFinanceV2Service } from '../../../services/orderFinanceV2';
 import { ownerService } from '../../../services/owner';
 import { RootState } from '../../../store/store';
 import { syncCustomTabBar } from '../../../utils/tabBar';
+import { switchToOrdersTab } from '../../../utils/ordersEntry';
 import { canUseProviderWorkbench, getEffectiveRoleSummary } from '../../../utils/roleSummary';
 import { V2SettlementSummary } from '../../../types';
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
@@ -575,7 +576,7 @@ export default function FulfillmentHubPage() {
 
   const switchTab = (key: 'workbench' | 'orders' | 'messages' | 'profile') => {
     if (key === 'orders') {
-      Taro.navigateTo({ url: '/pages/demand/list/index' }).catch(() => null);
+      switchToOrdersTab('provider').catch(() => null);
       return;
     }
     const urlMap = {

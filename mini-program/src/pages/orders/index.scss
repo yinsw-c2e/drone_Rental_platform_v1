@@ -23,10 +23,10 @@ page {
 .orders-page-title {
   display: block;
   color: #111827;
-  font-size: 40rpx;
-  line-height: 52rpx;
+  font-size: 36rpx;
+  line-height: 46rpx;
   font-weight: 900;
-  margin-bottom: 22rpx;
+  margin-bottom: 18rpx;
 }
 
 .orders-filter-row {
@@ -66,21 +66,21 @@ page {
 .customer-order-segment {
   display: flex;
   flex-direction: row;
-  padding: 8rpx;
-  margin-bottom: 22rpx;
+  padding: 6rpx;
+  margin-bottom: 18rpx;
   border: 1rpx solid #dbe6f5;
-  border-radius: 18rpx;
+  border-radius: 16rpx;
   background: #ffffff;
   box-shadow: 0 6rpx 18rpx rgba(15, 35, 65, 0.04);
 }
 
 .customer-order-segment-item {
   flex: 1;
-  height: 64rpx;
-  border-radius: 14rpx;
+  height: 56rpx;
+  border-radius: 12rpx;
   color: #5f6d82;
-  font-size: 27rpx;
-  line-height: 64rpx;
+  font-size: 25rpx;
+  line-height: 56rpx;
   text-align: center;
   font-weight: 800;
   display: flex;
@@ -95,14 +95,14 @@ page {
 }
 
 .customer-order-segment-count {
-  min-width: 36rpx;
-  height: 36rpx;
-  padding: 0 10rpx;
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
   border-radius: 99rpx;
   background: #ff4b05;
   color: #ffffff;
-  font-size: 22rpx;
-  line-height: 36rpx;
+  font-size: 20rpx;
+  line-height: 30rpx;
   font-weight: 700;
 }
 
@@ -117,6 +117,91 @@ page {
   color: #ffffff;
   font-size: 26rpx;
   font-weight: 700;
+}
+
+.pending-offer-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid #dce7f5;
+  border-left: 6rpx solid #1677ff;
+  border-radius: 16rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 16rpx rgba(15, 35, 65, 0.04);
+}
+
+.pending-offer-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pending-offer-eyebrow,
+.pending-offer-title,
+.pending-offer-route,
+.pending-offer-meta {
+  display: block;
+}
+
+.pending-offer-eyebrow {
+  color: #005bea;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  font-weight: 800;
+}
+
+.pending-offer-title {
+  margin-top: 4rpx;
+  color: #111827;
+  font-size: 28rpx;
+  line-height: 36rpx;
+  font-weight: 900;
+}
+
+.pending-offer-route {
+  margin-top: 6rpx;
+  color: #233b63;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 700;
+}
+
+.pending-offer-meta {
+  margin-top: 4rpx;
+  color: #66758a;
+  font-size: 23rpx;
+  line-height: 32rpx;
+}
+
+.pending-offer-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.pending-offer-discard,
+.pending-offer-resume {
+  min-width: 104rpx;
+  height: 50rpx;
+  padding: 0 16rpx;
+  border-radius: 12rpx;
+  font-size: 23rpx;
+  line-height: 50rpx;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pending-offer-discard {
+  color: #66758a;
+  background: #eef2f7;
+}
+
+.pending-offer-resume {
+  color: #ffffff;
+  background: #005bea;
 }
 
 .orders-filter-chip {
@@ -146,6 +231,101 @@ page {
   border-radius: 18rpx;
   background: #ffffff;
   box-shadow: 0 8rpx 22rpx rgba(15, 35, 65, 0.05);
+}
+
+.order-card-demand {
+  padding: 22rpx;
+}
+
+.order-card-demand .order-card-head {
+  margin-bottom: 16rpx;
+}
+
+.demand-card-main {
+  min-width: 0;
+}
+
+.demand-card-title,
+.demand-card-meta,
+.demand-next-label,
+.demand-next-text,
+.demand-budget-label,
+.demand-budget-value {
+  display: block;
+}
+
+.demand-card-title {
+  color: #111827;
+  font-size: 30rpx;
+  line-height: 40rpx;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demand-card-meta {
+  margin-top: 8rpx;
+  color: #66758a;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demand-card-foot {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-top: 18rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #edf1f6;
+}
+
+.demand-next {
+  flex: 1;
+  min-width: 0;
+}
+
+.demand-next-label,
+.demand-budget-label {
+  color: #8a96a8;
+  font-size: 21rpx;
+  line-height: 28rpx;
+  font-weight: 700;
+}
+
+.demand-next-text {
+  margin-top: 3rpx;
+  color: #5f6d82;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demand-next.is-ready .demand-next-text {
+  color: #005bea;
+}
+
+.demand-budget {
+  flex: 0 0 auto;
+  max-width: 260rpx;
+  text-align: right;
+}
+
+.demand-budget-value {
+  margin-top: 2rpx;
+  color: #ff5a14;
+  font-size: 30rpx;
+  line-height: 36rpx;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .order-card-head,

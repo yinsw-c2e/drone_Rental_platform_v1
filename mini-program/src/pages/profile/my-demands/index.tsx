@@ -109,20 +109,15 @@ export default function MyDemandsPage() {
                 <View className="md-category-wrap">
                   <Text className="md-category">{getDemandSceneLabel(d.cargo_scene)}</Text>
                 </View>
-                <View className="md-stats-panel">
-                  <View className="md-stat-col">
-                    <Text className="md-stat-num md-stat-num-blue">{d.quote_count || 0}</Text>
-                    <Text className="md-stat-label">报价</Text>
-                  </View>
-                  <View className="md-stat-divider" />
-                  <View className="md-stat-col">
-                    <Text className="md-stat-num md-stat-num-orange">{d.candidate_pilot_count || 0}</Text>
-                    <Text className="md-stat-label">已报名服务商</Text>
-                  </View>
-                  <View className="md-stat-divider" />
-                  <View className="md-stat-col">
-                    <Text className="md-stat-num md-stat-num-red">{formatBudget(d.budget_max)}</Text>
-                    <Text className="md-stat-label">预算</Text>
+	                <View className="md-stats-panel">
+	                  <View className="md-stat-col">
+	                    <Text className="md-stat-num md-stat-num-blue">{d.quote_count || 0}</Text>
+	                    <Text className="md-stat-label">报价</Text>
+	                  </View>
+	                  <View className="md-stat-divider" />
+	                  <View className="md-stat-col">
+	                    <Text className="md-stat-num md-stat-num-red">{formatBudget(d.budget_max)}</Text>
+	                    <Text className="md-stat-label">预算</Text>
                   </View>
                 </View>
               </View>

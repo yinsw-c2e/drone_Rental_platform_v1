@@ -8,28 +8,60 @@ const distRoot = path.join(projectRoot, 'dist');
 const appWxssPath = path.join(distRoot, 'app.wxss');
 const appOriginWxssPath = path.join(distRoot, 'app-origin.wxss');
 const commonWxssPath = path.join(distRoot, 'common.wxss');
+const watchMode = process.argv.includes('--watch');
+const appOriginImportPattern = /@import\s+['"]\.\/app-origin\.wxss['"];?/;
+const commonImportPattern = /@import\s+['"]\.\/common\.wxss['"];?/;
 
 const readIfExists = (filePath) => {
   if (!fs.existsSync(filePath)) return '';
   return fs.readFileSync(filePath, 'utf8').trim();
 };
 
-if (!fs.existsSync(appWxssPath)) {
+if (watchMode) {
+  fs.mkdirSync(distRoot, { recursive: true });
+}
+
+const inlineWxssImports = () => {
+  if (!fs.existsSync(appWxssPath)) {
+    return false;
+  }
+
+  const appWxss = fs.readFileSync(appWxssPath, 'utf8');
+  const referencesAppOrigin = appOriginImportPattern.test(appWxss);
+  const referencesCommon = commonImportPattern.test(appWxss);
+
+  if (!referencesAppOrigin && !referencesCommon) {
+    return false;
+  }
+
+  const chunks = [
+    '/* generated: inlined by scripts/fix-weapp-wxss-imports.mjs to avoid DevTools app-origin.wxss import races */',
+    readIfExists(appOriginWxssPath),
+    readIfExists(commonWxssPath),
+  ].filter(Boolean);
+
+  fs.writeFileSync(appWxssPath, `${chunks.join('\n')}\n`);
+  return true;
+};
+
+inlineWxssImports();
+
+if (!watchMode) {
   process.exit(0);
 }
 
-const appWxss = fs.readFileSync(appWxssPath, 'utf8');
-const referencesAppOrigin = appWxss.includes('app-origin.wxss');
-const referencesCommon = appWxss.includes('common.wxss');
+let timer = null;
 
-if (!referencesAppOrigin && !referencesCommon) {
-  process.exit(0);
-}
+const scheduleInline = () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    inlineWxssImports();
+  }, 80);
+};
 
-const chunks = [
-  '/* generated: inlined by scripts/fix-weapp-wxss-imports.mjs to avoid DevTools app-origin.wxss import races */',
-  readIfExists(appOriginWxssPath),
-  readIfExists(commonWxssPath),
-].filter(Boolean);
-
-fs.writeFileSync(appWxssPath, `${chunks.join('\n')}\n`);
+fs.watch(distRoot, (_eventType, filename) => {
+  if (!filename) return;
+  if (['app.wxss', 'app-origin.wxss', 'common.wxss'].includes(filename.toString())) {
+    scheduleInline();
+  }
+});

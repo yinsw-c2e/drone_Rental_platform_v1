@@ -1,4 +1,7 @@
 const ROLE_MODE_STORAGE_KEY = 'haulRoleMode';
+const PROVIDER_ORDERS_SEGMENT_KEY = 'provider_orders_default_segment';
+const CUSTOMER_ORDERS_SEGMENT_KEY = 'customer_orders_default_segment';
+const ORDERS_ROLE_ENTRY_MODE_KEY = 'orders_role_entry_mode';
 
 const customerTabList = [
   {
@@ -61,7 +64,7 @@ const providerTabList = [
   },
   {
     key: 'orders',
-    pagePath: '/pages/orders/index',
+    pagePath: '/pages/provider-demand/index',
     text: '接单需求',
     iconPath: '/custom-tab-bar/assets/provider_tab_accept_order_inactive.png',
     selectedIconPath: '/custom-tab-bar/assets/provider_tab_accept_order_active.png',
@@ -116,6 +119,7 @@ function isSameList(a, b) {
     && a.every((item, index) => {
       const next = b[index];
       return item.text === next.text
+        && item.pagePath === next.pagePath
         && item.iconPath === next.iconPath
         && item.selectedIconPath === next.selectedIconPath
         && item.iconWidth === next.iconWidth
@@ -165,8 +169,24 @@ Component({
     switchTab(event) {
       const { index, path } = event.currentTarget.dataset;
       const selected = Number(index);
+      const targetPath = normalizeRoute(path);
 
-      if (selected === this.data.selected) return;
+      if (targetPath === '/pages/orders/index' || targetPath === '/pages/provider-demand/index') {
+        const visibleOrdersText = this.data.list?.[1]?.text || '';
+        const entryMode = targetPath === '/pages/provider-demand/index' || visibleOrdersText === '接单需求'
+          ? 'provider'
+          : 'customer';
+        wx.setStorageSync(ORDERS_ROLE_ENTRY_MODE_KEY, entryMode);
+        wx.setStorageSync(ROLE_MODE_STORAGE_KEY, entryMode);
+        wx.removeStorageSync(PROVIDER_ORDERS_SEGMENT_KEY);
+        wx.removeStorageSync(CUSTOMER_ORDERS_SEGMENT_KEY);
+      }
+
+      if (
+        selected === this.data.selected &&
+        targetPath !== '/pages/orders/index' &&
+        targetPath !== '/pages/provider-demand/index'
+      ) return;
 
       wx.switchTab({
         url: path,

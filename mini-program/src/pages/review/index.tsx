@@ -4,18 +4,10 @@ import { ScrollView, Text, Textarea, View } from '@tarojs/components';
 import { orderFinanceV2Service } from '../../services/orderFinanceV2';
 import { orderV2Service } from '../../services/orderV2';
 import { store } from '../../store/store';
-import type { OrderPartySummary, V2OrderDetail, V2ReviewSummary } from '../../types';
+import type { V2OrderDetail, V2ReviewSummary } from '../../types';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
+import { buildReviewPartySummary, buildReviewTargets, reviewTargetKeyOf } from '../../utils/reviewTargets';
 import './index.scss';
-
-type ReviewTargetRole = 'client' | 'owner' | 'pilot';
-
-type ReviewTarget = {
-  userId: number;
-  role: ReviewTargetRole;
-  label: string;
-  subtitle: string;
-};
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '-';
@@ -43,50 +35,6 @@ const roleLabelOf = (role?: string) => {
   if (role === 'owner') return '承接方';
   if (role === 'pilot') return '履约方';
   return role || '参与方';
-};
-
-const buildTargetSummary = (party?: OrderPartySummary | null, fallbackRole = '参与方') => {
-  if (!party) return fallbackRole;
-  return party.nickname || `${fallbackRole} #${party.user_id}`;
-};
-
-const fallbackParty = (
-  userId: number | null | undefined,
-  role: ReviewTargetRole,
-): OrderPartySummary | null => {
-  const id = Number(userId || 0);
-  return id > 0 ? { user_id: id, role } : null;
-};
-
-const buildReviewTargets = (detail: V2OrderDetail | null, currentUserId: number): ReviewTarget[] => {
-  if (!detail || !currentUserId) return [];
-  const participants = detail.participants || {};
-  const client = participants.client || detail.client || fallbackParty(detail.contract?.client_user_id, 'client');
-  const provider = participants.provider || detail.provider || fallbackParty(detail.provider_user_id, 'owner');
-  const executor = participants.executor || detail.executor || fallbackParty(detail.executor_pilot_user_id, 'pilot');
-  const targets: ReviewTarget[] = [];
-
-  const pushTarget = (
-    party: OrderPartySummary | null | undefined,
-    role: ReviewTargetRole,
-    label: string,
-  ) => {
-    if (!party?.user_id || party.user_id === currentUserId) return;
-    targets.push({
-      userId: party.user_id,
-      role,
-      label,
-      subtitle: buildTargetSummary(party, label),
-    });
-  };
-
-  pushTarget(client, 'client', '客户');
-  pushTarget(provider, 'owner', '承接方');
-  pushTarget(executor, 'pilot', '履约方');
-
-  const unique = new Map<string, ReviewTarget>();
-  targets.forEach((item) => unique.set(`${item.role}:${item.userId}`, item));
-  return Array.from(unique.values());
 };
 
 const normalizeReviewItems = (res: any): V2ReviewSummary[] => {
@@ -158,16 +106,16 @@ export default function ReviewPage() {
     [currentUserId, reviews],
   );
   const selectedTarget = useMemo(
-    () => targets.find((item) => `${item.role}:${item.userId}` === selectedTargetKey) || null,
+    () => targets.find((item) => reviewTargetKeyOf(item) === selectedTargetKey) || null,
     [selectedTargetKey, targets],
   );
   const canReview = !!detail && detail.status === 'completed' && !existingMyReview;
 
   useEffect(() => {
-    if (selectedTargetKey && targets.some((item) => `${item.role}:${item.userId}` === selectedTargetKey)) {
+    if (selectedTargetKey && targets.some((item) => reviewTargetKeyOf(item) === selectedTargetKey)) {
       return;
     }
-    setSelectedTargetKey(targets[0] ? `${targets[0].role}:${targets[0].userId}` : '');
+    setSelectedTargetKey(targets[0] ? reviewTargetKeyOf(targets[0]) : '');
   }, [selectedTargetKey, targets]);
 
   const refresh = () => {
@@ -262,19 +210,19 @@ export default function ReviewPage() {
           <View className="review-info-row">
             <Text className="review-info-label">客户</Text>
             <Text className="review-info-value" numberOfLines={1}>
-              {buildTargetSummary(detail.participants?.client || detail.client, '客户')}
+              {buildReviewPartySummary(detail.participants?.client || detail.client, '客户')}
             </Text>
           </View>
           <View className="review-info-row">
             <Text className="review-info-label">承接方</Text>
             <Text className="review-info-value" numberOfLines={1}>
-              {buildTargetSummary(detail.participants?.provider || detail.provider, '承接方')}
+              {buildReviewPartySummary(detail.participants?.provider || detail.provider, '承接方')}
             </Text>
           </View>
           <View className="review-info-row review-info-row-last">
             <Text className="review-info-label">履约方</Text>
             <Text className="review-info-value" numberOfLines={1}>
-              {buildTargetSummary(detail.participants?.executor || detail.executor, '未安排')}
+              {buildReviewPartySummary(detail.participants?.executor || detail.executor, '未安排')}
             </Text>
           </View>
         </View>
@@ -302,7 +250,7 @@ export default function ReviewPage() {
               <Text className="review-label">评价对象</Text>
               <View className="review-target-list">
                 {targets.map((target) => {
-                  const key = `${target.role}:${target.userId}`;
+                  const key = reviewTargetKeyOf(target);
                   const active = selectedTargetKey === key;
                   return (
                     <View

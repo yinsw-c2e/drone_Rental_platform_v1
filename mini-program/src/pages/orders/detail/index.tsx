@@ -8,6 +8,8 @@ import { store } from '../../../store/store';
 import { friendlyErrorMessage } from '../../../utils/errorMessage';
 import { writeQuickOrderPrefillFromOrder } from '../../../utils/orderPrefill';
 import { getProviderAdvanceConfirmCopy } from '../../../utils/providerAdvance';
+import { canOpenProgress, progressActionLabelOf, progressUrlOf } from '../../../utils/orderProgressNavigation';
+import { switchToOrdersTab } from '../../../utils/ordersEntry';
 import './index.scss';
 
 import iconBack from '../../../assets/haul/order-progress/icon_nav_back.png';
@@ -63,12 +65,16 @@ const providerNameOf = (detail: any) =>
   '服务商待确认';
 
 const providerPhoneOf = (detail: any) =>
+  detail?.participants?.provider?.call_phone ||
+  detail?.participants?.executor?.call_phone ||
   detail?.participants?.provider?.phone ||
+  detail?.participants?.executor?.phone ||
   detail?.provider?.phone ||
   detail?.provider_phone ||
   '';
 
 const customerPhoneOf = (detail: any) =>
+  detail?.participants?.client?.call_phone ||
   detail?.participants?.client?.phone ||
   detail?.client?.phone ||
   detail?.client_phone ||
@@ -199,7 +205,7 @@ const getStepState = (detail: any) => {
   if (status === 'delivered') return 5;                                    // step 5 active (等客户确认)
   if (status === 'in_transit') return 4;                                   // step 4 active (吊运中)
   if (['preparing', 'assigned'].includes(status)) return 3;                // step 3 active (开始履约)
-  if (['pending_dispatch', 'dispatch_failed', 'paid', 'pending_payment'].includes(status)) return 2; // step 2 active (服务商确认/等履约)
+  if (['pending_provider_confirmation', 'pending_dispatch', 'dispatch_failed', 'paid', 'pending_payment'].includes(status)) return 2; // step 2 active (服务商确认/等履约)
   return 1;                                                                // 默认 step 1 active (已下单)
 };
 
@@ -235,6 +241,7 @@ const formatEta = (seconds?: number | null) => {
 
 const orderStatusBadgeOf = (order: any) => {
   const status = normalizedStatus(order);
+  if (status === 'pending_provider_confirmation') return '待确认接单';
   if (status === 'pending_dispatch' || status === 'auto_assigning') return '等待服务商';
   if (status === 'dispatch_failed') return '暂无服务商';
   if (status === 'assigned') return '服务商已接单';
@@ -253,7 +260,7 @@ const orderStatusToneOf = (order: any) => {
   const status = normalizedStatus(order);
   if (['completed', 'delivered'].includes(status)) return 'success';
   if (['cancelled', 'provider_rejected'].includes(status)) return 'muted';
-  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled'].includes(status)) return 'warning';
+  if (['pending_provider_confirmation', 'pending_payment', 'pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled'].includes(status)) return 'warning';
   return 'primary';
 };
 
@@ -283,6 +290,9 @@ const isTerminalOnlyOrder = (order: any) => terminalOnlyStatuses.includes(normal
 
 const providerAdvanceActionOf = (order: any) => {
   const status = normalizedStatus(order);
+  if (status === 'pending_provider_confirmation') {
+    return { label: '确认接单', run: () => orderV2Service.providerConfirm(Number(order?.id || 0)) };
+  }
   if (status === 'pending_dispatch' || status === 'assigned') {
     return { label: '开始准备', run: () => orderV2Service.startPreparing(Number(order?.id || 0)) };
   }
@@ -403,11 +413,29 @@ export default function OrderProgressPage() {
   const canConfirm = !isProviderViewer && detail?.status === 'delivered';
   const canPay = !isProviderViewer && detail?.status === 'pending_payment';
   const canReview = !isProviderViewer && detail?.status === 'completed';
-  const canViewLive = ['instant', 'reservation'].includes(String(detail?.order_mode || ''))
-    && ['pending_dispatch', 'assigned', 'preparing', 'in_transit', 'delivered', 'completed'].includes(String(detail?.status || ''));
+  const canViewProgress = canOpenProgress(detail);
   const providerAdvanceAction = isProviderViewer ? providerAdvanceActionOf(detail) : null;
+  const heroStatusBadge = isProviderViewer && normalizedStatus(detail) === 'pending_payment'
+    ? '报价已选中'
+    : orderStatusBadgeOf(detail);
+  const providerCanOpenContract = Boolean(
+    isProviderViewer &&
+    detail?.contract?.id &&
+    ['pending_payment', 'accepted'].includes(normalizedStatus(detail)),
+  );
+  const providerNeedsContractSign = Boolean(
+    providerCanOpenContract &&
+    detail?.contract?.status !== 'fully_signed' &&
+    !detail?.contract?.provider_signed_at,
+  );
   const showRedispatchActions = Boolean(detail && !isProviderViewer && normalizedStatus(detail) === 'dispatch_failed');
-  const needsContractSign = canPay && !detail?.payment_ready;
+  const detailContract = detail?.contract;
+  const detailPaymentReady = detailContract
+    ? (typeof detailContract.payment_ready === 'boolean'
+        ? detailContract.payment_ready
+        : detailContract.status === 'fully_signed')
+    : (normalizedStatus(detail) === 'pending_payment' ? false : Boolean(detail?.payment_ready));
+  const needsContractSign = canPay && !detailPaymentReady;
   const contactTargetLabel = isProviderViewer ? '客户' : '服务商';
   const contactPhone = isProviderViewer ? customerPhone : providerPhone;
   const sourceSupplyId = detail ? sourceSupplyIdOf(detail) : 0;
@@ -421,7 +449,8 @@ export default function OrderProgressPage() {
 
   const goBack = () => {
     if (Taro.getCurrentPages().length > 1) Taro.navigateBack();
-    else Taro.switchTab({ url: '/pages/orders/index' });
+    else if (isProviderViewer) Taro.redirectTo({ url: '/pages/orders/provider/index' });
+    else switchToOrdersTab('customer');
   };
 
   const openService = () => Taro.navigateTo({ url: `/pages/customer-service/index?from=order&orderId=${orderId || ''}` });
@@ -438,12 +467,25 @@ export default function OrderProgressPage() {
     Taro.showToast({ title: '暂无方案详情', icon: 'none' });
   };
 
-  const viewLive = () => {
+  const viewProgress = () => {
     if (!orderId) {
       Taro.showToast({ title: '缺少订单信息，无法查看进度', icon: 'none' });
       return;
     }
-    Taro.navigateTo({ url: `/pages/orders/live/index?orderId=${orderId}` });
+    const url = progressUrlOf(orderId, detail);
+    if (!url) {
+      Taro.showToast({ title: '暂无可查看进度', icon: 'none' });
+      return;
+    }
+    Taro.navigateTo({ url });
+  };
+
+  const viewContract = () => {
+    if (!orderId) {
+      Taro.showToast({ title: '缺少订单信息，无法查看合同', icon: 'none' });
+      return;
+    }
+    Taro.navigateTo({ url: `/pages/orders/contract/index?orderId=${orderId}` });
   };
 
   const copyOrderNo = () => {
@@ -453,7 +495,9 @@ export default function OrderProgressPage() {
 
   const contactCounterparty = () => {
     if (isCallablePhone(contactPhone)) {
-      Taro.makePhoneCall({ phoneNumber: contactPhone });
+      Taro.makePhoneCall({ phoneNumber: contactPhone }).catch(() => {
+        Taro.showToast({ title: '无法唤起电话，请稍后再试', icon: 'none' });
+      });
       return;
     }
     Taro.showModal({
@@ -480,9 +524,8 @@ export default function OrderProgressPage() {
       await orderV2Service.cancel(orderId, providerCancel ? '服务商取消接单' : '客户主动取消');
       Taro.showToast({ title: providerCancel ? '已取消接单' : '已取消', icon: 'success' });
       if (providerCancel) {
-        Taro.setStorageSync('provider_orders_default_segment', 'mine');
         setTimeout(() => {
-          Taro.switchTab({ url: '/pages/orders/index' });
+          Taro.redirectTo({ url: '/pages/orders/provider/index' });
         }, 500);
       } else {
         await load();
@@ -742,7 +785,7 @@ export default function OrderProgressPage() {
             <View className="op-hero-card">
               <View className="op-hero-head">
                 <View className={`op-badge op-badge-${orderStatusToneOf(detail)}`}>
-                  <Text>{orderStatusBadgeOf(detail)}</Text>
+                  <Text>{heroStatusBadge}</Text>
                 </View>
                 <View className="op-copy" onClick={copyOrderNo}>
                   <Text>复制单号</Text>
@@ -835,9 +878,9 @@ export default function OrderProgressPage() {
                         <Text>给个小费</Text>
                       </View>
                     ) : null}
-                    {canViewLive ? (
-                      <View className="op-button op-button-ghost" onClick={viewLive}>
-                        <Text>查看路线进度</Text>
+                    {canViewProgress ? (
+                      <View className="op-button op-button-ghost" onClick={viewProgress}>
+                        <Text>{progressActionLabelOf(detail)}</Text>
                       </View>
                     ) : null}
 	                    {canContactOrderProvider(detail) ? (
@@ -846,11 +889,16 @@ export default function OrderProgressPage() {
 	                      </View>
 	                    ) : null}
 		                    {providerAdvanceAction ? (
-		                      <View className="op-button op-button-primary" onClick={advanceProviderOrder}>
-		                        <Text>{providerAdvanceLoading ? '推进中…' : providerAdvanceAction.label}</Text>
+			                      <View className="op-button op-button-primary" onClick={advanceProviderOrder}>
+			                        <Text>{providerAdvanceLoading ? '推进中…' : providerAdvanceAction.label}</Text>
+			                      </View>
+			                    ) : null}
+		                    {providerCanOpenContract ? (
+		                      <View className={`op-button ${providerNeedsContractSign ? 'op-button-primary' : 'op-button-ghost'}`} onClick={viewContract}>
+		                        <Text>{providerNeedsContractSign ? '签署合同' : '查看合同'}</Text>
 		                      </View>
 		                    ) : null}
-	                    {canPay ? (
+		                    {canPay ? (
                       <View className="op-button op-button-primary" onClick={submitConfirm}>
                         <Text>{needsContractSign ? '签署合同' : '去支付'}</Text>
                       </View>

@@ -557,6 +557,7 @@ export interface DirectOrderResult {
 }
 
 export interface QuickOrderDraft {
+  demand_id?: number;
   cargo_scene: string;
   cargo_type?: string;
   cargo_weight_kg?: number;
@@ -571,6 +572,41 @@ export interface QuickOrderDraft {
   description?: string;
   special_requirements?: string;
   match_region?: string;
+}
+
+export interface ProviderRecommendationSummary {
+  provider_user_id: number;
+  provider_name: string;
+  avatar_url?: string;
+  intro?: string;
+  service_city?: string;
+  distance_km?: number | null;
+  service_radius_km?: number;
+  matched_scenes?: string[];
+  max_payload_kg?: number;
+  drone_count?: number;
+  drone_id?: number;
+  drone_label?: string;
+  rating?: number | null;
+  rating_count?: number;
+  completed_orders_30d?: number;
+  average_response_seconds?: number;
+  has_previous_cooperation?: boolean;
+  score?: number;
+  score_reasons?: string[];
+  invitation_id?: number;
+  invitation_status?: 'pending_quote' | 'quoted' | 'declined' | 'expired' | 'selected' | string;
+}
+
+export interface ProviderInviteResult {
+  id: number;
+  demand_id: number;
+  client_user_id: number;
+  provider_user_id: number;
+  status: 'pending_quote' | 'quoted' | 'declined' | 'expired' | 'selected' | string;
+  message?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DemandOwnerSummary {
@@ -655,12 +691,16 @@ export interface DemandSummary {
   distance_km?: number;
   service_range_km?: number;
   service_coverage_status?: 'in_range' | 'out_of_range' | 'unknown' | string;
+  airspace_status?: string;
   estimated_arrival_minutes?: number;
   arrival_estimate_source?: string;
   quote_response_seconds?: number;
   matched_supply_id?: number;
   matched_drone_id?: number;
   matched_supply_title?: string;
+  source?: 'invitation' | 'recommendation' | string;
+  source_label?: string;
+  invitation_id?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -782,6 +822,7 @@ export interface V2PilotProfile {
 
 export interface OwnerWorkbenchSummary {
   recommended_demand_count: number;
+  pending_invitation_count?: number;
   pending_quote_count: number;
   pending_provider_confirmation_order_count: number;
   pending_dispatch_order_count: number;
@@ -800,6 +841,9 @@ export interface OwnerWorkbenchDemandItem {
   budget_max: number;
   quote_count: number;
   candidate_pilot_count: number;
+  source?: 'invitation' | 'recommendation' | string;
+  source_label?: string;
+  invitation_id?: number;
 }
 
 export interface OwnerWorkbenchOrderItem {

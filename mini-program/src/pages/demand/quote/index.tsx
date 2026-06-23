@@ -1,6 +1,6 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Input } from '@tarojs/components';
+import { View, Text, ScrollView, Input, Textarea } from '@tarojs/components';
 import { useSelector } from 'react-redux';
 import ProviderAccessNotice from '../../../components/business/ProviderAccessNotice';
 import { demandV2Service } from '../../../services/demandV2';
@@ -28,6 +28,13 @@ const formatScheduledAt = (iso?: string): string => {
   return `${mm}-${dd} ${hh}:${mi}`;
 };
 
+const centsToYuanText = (amount?: number | null): string => {
+  const cents = Number(amount || 0);
+  if (!Number.isFinite(cents) || cents <= 0) return '';
+  const yuan = cents / 100;
+  return Number.isInteger(yuan) ? String(yuan) : yuan.toFixed(2);
+};
+
 export default function DemandQuotePage() {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
@@ -48,11 +55,10 @@ export default function DemandQuotePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedDroneId, setSelectedDroneId] = useState<number>(0);
-  const [priceText, setPriceText] = useState(initialPriceYuan > 0 ? String(initialPriceYuan) : '');
-  const [executionPlan, setExecutionPlan] = useState(
-    isQuickQuote ? '根据需求时间、重量和现场条件安排可用无人机执行，作业前完成安全复核。' : '',
-  );
+  const [priceText, setPriceText] = useState('');
+  const [executionPlan, setExecutionPlan] = useState('');
   const [demandDetail, setDemandDetail] = useState<DemandDetail | null>(null);
+  const [suggestedPriceText, setSuggestedPriceText] = useState(initialPriceYuan > 0 ? String(initialPriceYuan) : '');
 
   useDidShow(() => {
     if (!canQuote) {
@@ -66,7 +72,7 @@ export default function DemandQuotePage() {
         (d: any) => d.certification_status === 'approved' && d.availability_status === 'available'
       );
       setDrones(list);
-      if (list.length > 0) setSelectedDroneId(list[0].id);
+      if (list.length > 0) setSelectedDroneId(prev => prev || list[0].id);
       setLoading(false);
     }).catch(() => setLoading(false));
 
@@ -74,12 +80,28 @@ export default function DemandQuotePage() {
       demandV2Service.getById(demandId)
         .then((detail: any) => {
           const data = (detail?.data ?? detail) as DemandDetail;
-          if (data && typeof data === 'object') setDemandDetail(data);
+          if (data && typeof data === 'object') {
+            setDemandDetail(data);
+            const myQuote = data.my_quote;
+            if (myQuote?.drone?.id) setSelectedDroneId(myQuote.drone.id);
+            if (myQuote?.price_amount) setPriceText(centsToYuanText(myQuote.price_amount));
+            if (myQuote?.execution_plan) setExecutionPlan(myQuote.execution_plan);
+          }
+        })
+        .catch(() => {});
+      demandV2Service.getSuggestedPrice(demandId)
+        .then((res: any) => {
+          const yuan = Number(res?.data?.yuan ?? res?.yuan ?? 0);
+          if (Number.isFinite(yuan) && yuan > 0) {
+            const next = Number.isInteger(yuan) ? String(yuan) : yuan.toFixed(2);
+            setSuggestedPriceText(next);
+          }
         })
         .catch(() => {});
     }
   });
 
+  const isUpdatingQuote = Boolean(demandDetail?.my_quote?.id);
   const demandPickup = formatAddressText(demandDetail?.departure_address as any);
   const demandDropoff = formatAddressText(demandDetail?.destination_address as any);
   const demandWeight = demandDetail?.cargo_weight_kg ? `${demandDetail.cargo_weight_kg} kg` : '';
@@ -94,16 +116,20 @@ export default function DemandQuotePage() {
     if (!selectedDroneId) return Taro.showToast({ title: '请选择无人机', icon: 'none' });
     const amountYuan = Number(priceText);
     if (!Number.isFinite(amountYuan) || amountYuan <= 0) return Taro.showToast({ title: '请输入有效报价', icon: 'none' });
+    const planText = executionPlan.trim();
 
     setSubmitting(true);
     try {
       await demandV2Service.createQuote(demandId, {
         drone_id: selectedDroneId,
         price_amount: Math.round(amountYuan * 100),
-        execution_plan: executionPlan.trim(),
+        execution_plan: planText,
       });
-      Taro.showToast({ title: '报价提交成功', icon: 'success' });
-      setTimeout(() => Taro.navigateBack(), 1500);
+      Taro.showToast({ title: isUpdatingQuote ? '报价已更新' : '报价提交成功', icon: 'success' });
+      setTimeout(() => {
+        Taro.redirectTo({ url: `/pages/demand/detail/index?id=${demandId}&quoted=1` })
+          .catch(() => Taro.navigateBack());
+      }, 900);
     } catch (e: any) {
       Taro.showToast({ title: friendlyErrorMessage(e, '提交失败'), icon: 'none' });
     } finally {
@@ -127,12 +153,51 @@ export default function DemandQuotePage() {
   return (
     <ScrollView scrollY className="page-wrap">
       <View className="hero">
+        <Text className="hero-kicker">{isUpdatingQuote ? '更新报价' : '提交报价'}</Text>
         <Text className="hero-title">{demandTitle}</Text>
         <Text className="hero-desc">
           {isQuickQuote
-            ? '已按平台推荐价预填，确认机型后一键提交即可。'
-            : '提交方案后，客户会对比所有报价并挑一家。被选中后才会正式建单。'}
+            ? '平台推荐价只是参考，你可以按现场条件调整金额和说明。'
+            : '填写报价金额和执行说明后提交，客户会对比所有报价并挑一家。'}
         </Text>
+      </View>
+
+      <View className="form-card quote-card">
+        <View className="section-head">
+          <Text className="section-title">报价金额</Text>
+          <Text className="section-sub">必填。客户最终按你提交的金额选择和成单</Text>
+        </View>
+        <View className="price-panel">
+          <Text className="input-prefix">¥</Text>
+          <Input
+            className="price-input"
+            type="digit"
+            placeholder="请输入报价"
+            value={priceText}
+            onInput={e => setPriceText(e.detail.value)}
+          />
+          <Text className="price-unit">元</Text>
+        </View>
+        {suggestedPriceText ? (
+          <View className="quote-reference">
+            <Text className="quote-reference-text">建议报价 ¥{suggestedPriceText}，仅供参考，可自行调整</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View className="form-card quote-card">
+        <View className="section-head">
+          <Text className="section-title">报价说明（选填）</Text>
+          <Text className="section-sub">写明报价原因、执行安排或服务优势，客户更容易判断你的方案</Text>
+        </View>
+        <Textarea
+          className="textarea-input"
+          maxlength={300}
+          placeholder="例如：可安排已认证重载无人机执行，熟悉电网吊运场景，报价已包含现场安全复核与基础保障。"
+          value={executionPlan}
+          onInput={e => setExecutionPlan(e.detail.value)}
+        />
+        <Text className="textarea-count">{executionPlan.trim().length}/300</Text>
       </View>
 
       <View className="form-card demand-card">
@@ -184,7 +249,10 @@ export default function DemandQuotePage() {
       </View>
 
       <View className="form-card">
-        <Text className="section-title">选择执行无人机</Text>
+        <View className="section-head">
+          <Text className="section-title">执行无人机</Text>
+          <Text className="section-sub">只显示资质通过且当前可用的设备</Text>
+        </View>
         {drones.length === 0 ? (
           <View className="empty-box"><Text className="empty-text">没有符合条件的无人机（需资质审核通过且可用）</Text></View>
         ) : (
@@ -201,22 +269,9 @@ export default function DemandQuotePage() {
         )}
       </View>
 
-      <View className="form-card">
-        <Text className="section-title">方案报价</Text>
-        <View className="input-row">
-          <Text className="input-prefix">¥</Text>
-          <Input className="price-input" type="digit" placeholder="0.00" value={priceText} onInput={e => setPriceText(e.detail.value)} />
-        </View>
-      </View>
-
-      <View className="form-card">
-        <Text className="section-title">执行方案描述 (选填)</Text>
-        <Input className="textarea-input" style={{ width: '100%', height: '100px' }} placeholder="简单描述您的服务优势或执行计划..." value={executionPlan} onInput={e => setExecutionPlan(e.detail.value)} />
-      </View>
-
-      <View style={{ padding: '20px 16px' }}>
+      <View className="submit-wrap">
         <View className={`btn-primary ${submitting ? 'disabled' : ''}`} onClick={handleSubmit}>
-          <Text className="btn-text">提交报价</Text>
+          <Text className="btn-text">{submitting ? '提交中...' : isUpdatingQuote ? '更新报价' : '提交报价'}</Text>
         </View>
       </View>
     </ScrollView>

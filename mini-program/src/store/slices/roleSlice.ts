@@ -8,7 +8,7 @@ interface RoleState {
   selectedMode: HaulRoleMode;
 }
 
-function readStoredRoleMode(): HaulRoleMode {
+export function readStoredRoleMode(): HaulRoleMode {
   try {
     const value = Taro.getStorageSync(HAUL_ROLE_MODE_STORAGE_KEY);
     return value === 'provider' || value === 'customer' ? value : 'customer';

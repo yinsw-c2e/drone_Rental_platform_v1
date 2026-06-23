@@ -359,8 +359,8 @@ export default function MarketPage() {
                 <Text className="market-price">{priceParts.price}</Text>
                 <Text className="market-price-unit"> {priceParts.unit}</Text>
               </View>
-              <View className="market-order-btn" onClick={(e: any) => { e.stopPropagation(); Taro.navigateTo({ url: `/pages/publish/quick-order/index?supplyId=${item.id}` }); }}>
-                <Text className="market-order-btn-text">去下单</Text>
+              <View className="market-order-btn" onClick={(e: any) => { e.stopPropagation(); Taro.navigateTo({ url: `/pages/supply/detail/index?id=${item.id}&from=market` }); }}>
+                <Text className="market-order-btn-text">查看服务</Text>
               </View>
             </View>
           </View>
@@ -477,7 +477,7 @@ export default function MarketPage() {
               <Image className="empty-state-icon" src={activeTab === 'demand' ? taskHallIcon : serviceHexIcon} mode="aspectFit" />
               <Text className="empty-state-text">
                 {isClientFocused
-                  ? activeTab === 'demand' ? '当前还没有公开任务' : '当前还没有可快速下单的服务'
+                  ? activeTab === 'demand' ? '当前还没有公开任务' : '当前还没有可浏览的服务'
                   : `暂无公开${activeTab === 'demand' ? '需求' : '服务'}`}
               </Text>
             </View>

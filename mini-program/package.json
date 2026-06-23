@@ -9,7 +9,7 @@
     "build:weapp:cloud": "MINI_PROGRAM_BUILD_ENV=production MINI_PROGRAM_API_BASE=${MINI_PROGRAM_CLOUD_API_BASE:-https://swvictory.top/api/v2} npm run build:weapp",
     "build:weapp:prod": "MINI_PROGRAM_BUILD_ENV=production MINI_PROGRAM_API_BASE=${MINI_PROGRAM_PROD_API_BASE:-https://swvictory.top/api/v2} npm run build:weapp",
     "check:p1-freeze": "../scripts/mini_program_p1_freeze_check.sh",
-    "dev:weapp": "taro build --type weapp --watch",
+    "dev:weapp": "node scripts/dev-weapp.mjs",
     "open:devtools": "../scripts/open_mini_program_devtools.sh",
     "lint": "eslint src/"
   },

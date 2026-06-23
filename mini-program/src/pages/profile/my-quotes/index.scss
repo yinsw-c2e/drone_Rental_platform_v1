@@ -37,3 +37,42 @@
     margin-bottom: 4px;
   }
 }
+
+.quote-card {
+  position: relative;
+}
+
+.quote-card-selected {
+  border-color: #fb923c;
+  background: #fffaf5;
+  box-shadow: 0 8px 22px rgba(249, 115, 22, 0.12);
+}
+
+.status-quotes-selected {
+  color: #ffffff;
+  background: #f97316;
+}
+
+.quote-selected-notice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.quote-selected-notice-title {
+  display: block;
+  color: #c2410c;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 800;
+}
+
+.quote-selected-notice-desc {
+  display: block;
+  margin-top: 3px;
+  color: #7c2d12;
+  font-size: 12px;
+  line-height: 17px;
+}

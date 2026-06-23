@@ -14,6 +14,8 @@ export type SupplyMarketParams = {
   cargo_scene?: string;
   service_type?: string;
   min_payload_kg?: number;
+  origin_latitude?: number;
+  origin_longitude?: number;
   accepts_direct_order?: boolean;
   page?: number;
   page_size?: number;

@@ -9,11 +9,11 @@ export default function DispatchDetailPage() {
   const openTarget = () => {
     if (orderId) {
       Taro.redirectTo({ url: `/pages/fulfillment/hub/index?orderId=${orderId}` }).catch(() => {
-        Taro.switchTab({ url: '/pages/orders/index' });
+        Taro.redirectTo({ url: '/pages/orders/provider/index' });
       });
       return;
     }
-    Taro.switchTab({ url: '/pages/orders/index' });
+    Taro.redirectTo({ url: '/pages/orders/provider/index' });
   };
 
   return (

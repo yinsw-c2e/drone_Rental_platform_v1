@@ -214,6 +214,64 @@ page {
   height: 20rpx;
 }
 
+.pw-selected-alert {
+  margin: 24rpx 32rpx 0;
+  padding: 28rpx 28rpx;
+  border-radius: 24rpx;
+  background: #fff7ed;
+  border: 2rpx solid #fed7aa;
+  box-shadow: 0 16rpx 36rpx rgba(249, 115, 22, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
+.pw-selected-alert-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pw-selected-alert-kicker {
+  display: block;
+  color: #ea580c;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  font-weight: 800;
+}
+
+.pw-selected-alert-title {
+  display: block;
+  margin-top: 6rpx;
+  color: #0f172a;
+  font-size: 34rpx;
+  line-height: 44rpx;
+  font-weight: 900;
+}
+
+.pw-selected-alert-desc {
+  display: block;
+  margin-top: 8rpx;
+  color: #9a3412;
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+
+.pw-selected-alert-cta {
+  flex-shrink: 0;
+  min-width: 144rpx;
+  height: 64rpx;
+  padding: 0 20rpx;
+  border-radius: 16rpx;
+  background: #f97316;
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 64rpx;
+  font-weight: 800;
+  text-align: center;
+  box-shadow: 0 8rpx 18rpx rgba(249, 115, 22, 0.22);
+}
+
 /* ── presence card ── */
 .pw-presence-card {
   margin-top: 20rpx;
@@ -498,6 +556,70 @@ page {
 /* ── broadcast card ── */
 .pw-broadcast-card {
   background: rgba(255, 255, 255, 0.95);
+}
+
+.pw-assignment-card {
+  background: #fffaf0;
+  border-color: #fed7aa;
+}
+
+.pw-assignment-list {
+  margin-top: 4rpx;
+}
+
+.pw-assignment-item {
+  padding: 24rpx;
+  margin-top: 16rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  border: 2rpx solid #fdba74;
+  box-shadow: 0 12rpx 28rpx rgba(249, 115, 22, 0.08);
+}
+
+.pw-assignment-tag {
+  color: #c2410c;
+  font-size: 24rpx;
+  font-weight: 800;
+  background: #ffedd5;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.pw-assignment-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.pw-assignment-decline,
+.pw-assignment-accept {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 108rpx;
+  height: 64rpx;
+  padding: 0 20rpx;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.pw-assignment-decline {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.pw-assignment-accept {
+  color: #ffffff;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 8rpx 16rpx rgba(249, 115, 22, 0.18);
+}
+
+.pw-assignment-decline.is-loading,
+.pw-assignment-accept.is-loading,
+.pw-broadcast-grab.is-loading {
+  opacity: 0.58;
 }
 
 .pw-broadcast-item {

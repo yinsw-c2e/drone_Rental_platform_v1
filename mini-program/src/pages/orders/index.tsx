@@ -1,25 +1,28 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from '@tarojs/components';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../store/store';
+import { useDispatch } from 'react-redux';
+import { readStoredRoleMode, setHaulRoleMode } from '../../store/slices/roleSlice';
 import { orderV2Service } from '../../services/orderV2';
 import { demandV2Service } from '../../services/demandV2';
-import { DemandSummary, V2OrderSummary } from '../../types';
+import { DemandSummary, QuickOrderDraft, V2OrderSummary } from '../../types';
 import { syncCustomTabBar } from '../../utils/tabBar';
 import { getDemandSceneLabel, getObjectStatusMeta } from '../../utils';
-import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
-import DemandListPage from '../demand/list';
 import { friendlyErrorMessage } from '../../utils/errorMessage';
-import { getProviderAdvanceConfirmCopy } from '../../utils/providerAdvance';
+import { canOpenProgress, progressActionLabelOf, progressUrlOf } from '../../utils/orderProgressNavigation';
+import {
+  clearQuickOrderOfferDraftForDemand,
+  clearQuickOrderOfferDraft,
+  quickOrderOfferDraftSummary,
+  readQuickOrderOfferDraft,
+} from '../../utils/quickOrderOfferDraft';
+import {
+  CUSTOMER_ORDERS_SEGMENT_KEY,
+} from '../../utils/ordersEntry';
 import './index.scss';
 
 type StatusFilter = 'all' | 'active' | 'done';
-type ProviderOrderSegment = 'demand' | 'mine';
 type CustomerOrderSegment = 'demands' | 'orders';
-
-const PROVIDER_ORDERS_SEGMENT_KEY = 'provider_orders_default_segment';
-export const CUSTOMER_ORDERS_SEGMENT_KEY = 'customer_orders_default_segment';
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: '全部' },
@@ -27,13 +30,28 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: 'done', label: '已结束' },
 ];
 
-const activeStatuses = ['pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled', 'assigned', 'preparing', 'in_transit', 'delivered', 'pending_payment'];
+const activeStatuses = [
+  'pending_payment',
+  'delivered',
+  'in_transit',
+  'in_progress',
+  'preparing',
+  'assigned',
+  'pending_provider_confirmation',
+  'pending_dispatch',
+  'auto_assigning',
+  'dispatch_failed',
+  'scheduled',
+  'created',
+  'paid',
+  'airspace_applying',
+  'airspace_approved',
+];
 const providerVisibleStatuses = ['assigned', 'preparing', 'in_transit', 'delivered', 'completed'];
 const contactVisibleStatuses = ['assigned', 'preparing', 'in_transit', 'delivered'];
-const liveStatuses = ['assigned', 'preparing', 'in_transit', 'delivered'];
 const cancelStatuses = ['pending_dispatch', 'dispatch_failed', 'scheduled', 'assigned', 'preparing'];
 const terminalOnlyStatuses = ['cancelled', 'provider_rejected'];
-const SELF_EXECUTABLE_REQUIRED_TOAST = '需要先完善设备和履约资质';
+const inactiveDemandStatuses = ['cancelled', 'expired', 'closed', 'converted_to_order'];
 
 const stopTap = (event?: any) => {
   event?.stopPropagation?.();
@@ -44,6 +62,12 @@ const normalizedStatus = (order?: Pick<V2OrderSummary, 'status'> | null) =>
 
 const normalizedMode = (order?: Pick<V2OrderSummary, 'order_mode'> | null) =>
   String(order?.order_mode || '').toLowerCase();
+
+const normalizedDemandStatus = (demand?: Pick<DemandSummary, 'status'> | null) =>
+  String(demand?.status || '').toLowerCase();
+
+const isCustomerActionableDemand = (demand: DemandSummary) =>
+  !inactiveDemandStatuses.includes(normalizedDemandStatus(demand));
 
 const formatAmount = (amount?: number | null) =>
   `¥${(Number(amount || 0) / 100).toFixed(2)}`;
@@ -85,6 +109,7 @@ const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   cancelled: '已取消',
   provider_rejected: '服务未确认',
   pending_payment: '待支付',
+  pending_provider_confirmation: '待服务商确认',
   paid: '已支付',
   refunded: '已退款',
   scheduled: '已预约',
@@ -97,8 +122,22 @@ const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   settlement_failed: '结算失败',
 };
 
+const isPaymentReady = (order: V2OrderSummary) => {
+  const contract = (order as any).contract;
+  if (contract) {
+    if (typeof contract.payment_ready === 'boolean') return contract.payment_ready;
+    return String(contract.status || '').toLowerCase() === 'fully_signed';
+  }
+  if (normalizedStatus(order) === 'pending_payment') return false;
+  return Boolean(order.payment_ready);
+};
+
+const needsContractSign = (order: V2OrderSummary) =>
+  normalizedStatus(order) === 'pending_payment' && !isPaymentReady(order);
+
 const statusLabelOf = (order: V2OrderSummary) => {
   const status = normalizedStatus(order);
+  if (status === 'pending_payment' && needsContractSign(order)) return '待签署合同';
   return ORDER_STATUS_LABEL_MAP[status] || '服务推进中';
 };
 
@@ -106,7 +145,7 @@ const statusToneOf = (order: V2OrderSummary) => {
   const status = normalizedStatus(order);
   if (['completed', 'delivered'].includes(status)) return 'success';
   if (['cancelled', 'provider_rejected'].includes(status)) return 'muted';
-  if (['pending_payment', 'pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled'].includes(status)) return 'warning';
+  if (['pending_payment', 'pending_provider_confirmation', 'pending_dispatch', 'auto_assigning', 'dispatch_failed', 'scheduled', 'created'].includes(status)) return 'warning';
   return 'primary';
 };
 
@@ -140,10 +179,6 @@ const canAddTip = (order: V2OrderSummary) => {
   return status === 'delivered' && within24Hours(order.updated_at || order.completed_at || order.created_at);
 };
 
-const canViewLive = (order: V2OrderSummary) =>
-  ['instant', 'reservation'].includes(normalizedMode(order)) &&
-  liveStatuses.includes(normalizedStatus(order));
-
 const canContactProvider = (order: V2OrderSummary) =>
   contactVisibleStatuses.includes(normalizedStatus(order));
 
@@ -156,26 +191,61 @@ const canReview = (order: V2OrderSummary) =>
 const isTerminalOnly = (order: V2OrderSummary) =>
   terminalOnlyStatuses.includes(normalizedStatus(order));
 
-const providerAdvanceLabelOf = (order: V2OrderSummary) => {
-  const status = normalizedStatus(order);
-  if (status === 'pending_dispatch' || status === 'assigned') return '开始准备';
-  if (status === 'preparing') return '开始飞行';
-  if (status === 'in_transit') return '确认送达';
-  return '';
-};
-
 const hasActionButtons = (order: V2OrderSummary) =>
   isTerminalOnly(order) ||
   canCancel(order) ||
   canIncreasePrice(order) ||
   canAddTip(order) ||
-  canViewLive(order) ||
+  canOpenProgress(order) ||
   canContactProvider(order) ||
   canPay(order) ||
   canReview(order);
 
 const statusBucketOf = (order: V2OrderSummary): StatusFilter =>
   activeStatuses.includes(normalizedStatus(order)) ? 'active' : 'done';
+
+const ORDER_STATUS_SORT_RANK: Record<string, number> = {
+  pending_payment: 0,
+  delivered: 1,
+  in_transit: 2,
+  in_progress: 3,
+  preparing: 4,
+  assigned: 5,
+  pending_provider_confirmation: 6,
+  pending_dispatch: 7,
+  auto_assigning: 8,
+  dispatch_failed: 9,
+  scheduled: 10,
+  created: 11,
+  paid: 12,
+  airspace_applying: 13,
+  airspace_approved: 14,
+  completed: 40,
+  settled: 41,
+  refunded: 50,
+  cancelled: 60,
+  provider_rejected: 60,
+  rejected: 60,
+  settlement_failed: 60,
+};
+
+const orderSortTime = (order: V2OrderSummary) => {
+  const value = order.updated_at || order.completed_at || order.created_at;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+};
+
+const customerOrderSortRank = (order: V2OrderSummary) => {
+  const status = normalizedStatus(order);
+  if (ORDER_STATUS_SORT_RANK[status] !== undefined) return ORDER_STATUS_SORT_RANK[status];
+  return statusBucketOf(order) === 'active' ? 20 : 70;
+};
+
+const compareCustomerOrders = (a: V2OrderSummary, b: V2OrderSummary) => {
+  const rankDiff = customerOrderSortRank(a) - customerOrderSortRank(b);
+  if (rankDiff !== 0) return rankDiff;
+  return orderSortTime(b) - orderSortTime(a);
+};
 
 const listItemsOf = (response: unknown): V2OrderSummary[] => {
   const data = response as any;
@@ -184,17 +254,24 @@ const listItemsOf = (response: unknown): V2OrderSummary[] => {
   return [];
 };
 
+const demandItemsOf = (response: unknown): DemandSummary[] => {
+  const data = response as any;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.list)) return data.list;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.data?.list)) return data.data.list;
+  return [];
+};
+
 export default function RoleOrdersPage() {
-  const selectedMode = useSelector((state: RootState) => state.role.selectedMode);
+  const dispatch = useDispatch();
 
   useDidShow(() => {
-    // 仅同步 TabBar 选中态，不强制改写全局角色身份。
-    syncCustomTabBar(1);
+    if (readStoredRoleMode() !== 'customer') {
+      dispatch(setHaulRoleMode('customer'));
+    }
+    syncCustomTabBar(1, 'customer');
   });
-
-  if (selectedMode === 'provider') {
-    return <ProviderOrdersShell />;
-  }
 
   return <CustomerOrdersShell />;
 }
@@ -227,18 +304,55 @@ function CustomerOrderSegmentBar({
   );
 }
 
+function PendingOfferDraftCard({
+  draft,
+  onResume,
+  onDiscard,
+}: {
+  draft: QuickOrderDraft;
+  onResume: () => void;
+  onDiscard: () => void;
+}) {
+  const summary = quickOrderOfferDraftSummary(draft);
+
+  return (
+    <View className="pending-offer-card">
+      <View className="pending-offer-main" onClick={onResume}>
+        <Text className="pending-offer-eyebrow">待完成下单</Text>
+        <Text className="pending-offer-title" numberOfLines={1}>继续挑选服务商</Text>
+        <Text className="pending-offer-route" numberOfLines={1}>{summary.route}</Text>
+        <Text className="pending-offer-meta" numberOfLines={1}>{summary.meta}</Text>
+      </View>
+      <View className="pending-offer-actions">
+        <View className="pending-offer-discard" onClick={onDiscard}>
+          <Text>放弃</Text>
+        </View>
+        <View className="pending-offer-resume" onClick={onResume}>
+          <Text>继续</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function CustomerOrdersShell() {
   const [activeSegment, setActiveSegment] = useState<CustomerOrderSegment>('orders');
   const [demands, setDemands] = useState<DemandSummary[]>([]);
   const [demandsLoading, setDemandsLoading] = useState(false);
   const [demandsRefreshing, setDemandsRefreshing] = useState(false);
   const [demandsError, setDemandsError] = useState('');
+  const [pendingOfferDraft, setPendingOfferDraft] = useState<QuickOrderDraft | null>(null);
 
   const fetchDemands = useCallback(async () => {
     try {
       const res = await demandV2Service.listMyDemands({ page: 1, page_size: 50 });
-      const list = (res as any)?.list || (res as any)?.data?.list || [];
-      setDemands(Array.isArray(list) ? list : []);
+      const list = demandItemsOf(res);
+      setDemands(list);
+      const draftDemandId = Number(readQuickOrderOfferDraft()?.demand_id || 0);
+      if (draftDemandId && list.some(demand => Number(demand.id || 0) === draftDemandId && !isCustomerActionableDemand(demand))) {
+        clearQuickOrderOfferDraftForDemand(draftDemandId);
+        setPendingOfferDraft(null);
+      }
       setDemandsError('');
     } catch (error: any) {
       setDemands([]);
@@ -250,7 +364,8 @@ function CustomerOrdersShell() {
   }, []);
 
   useDidShow(() => {
-    syncCustomTabBar(1);
+    syncCustomTabBar(1, 'customer');
+    setPendingOfferDraft(readQuickOrderOfferDraft());
     const hint = Taro.getStorageSync(CUSTOMER_ORDERS_SEGMENT_KEY);
     if (hint === 'demands' || hint === 'orders') {
       setActiveSegment(hint);
@@ -260,27 +375,64 @@ function CustomerOrdersShell() {
     fetchDemands();
   });
 
+  useEffect(() => {
+    if (activeSegment !== 'demands') return undefined;
+    const timer = setInterval(() => {
+      fetchDemands();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [activeSegment, fetchDemands]);
+
   const handleSegmentChange = useCallback((next: CustomerOrderSegment) => {
     setActiveSegment(next);
   }, []);
 
   const activeDemandCount = useMemo(
-    () => demands.filter(d => !['cancelled', 'expired', 'closed', 'converted_to_order'].includes(String(d.status || '').toLowerCase())).length,
+    () => demands.filter(isCustomerActionableDemand).length,
+    [demands],
+  );
+  const actionableDemands = useMemo(
+    () => demands.filter(isCustomerActionableDemand),
     [demands],
   );
 
   const segmentBar = (
     <CustomerOrderSegmentBar active={activeSegment} onChange={handleSegmentChange} demandCount={activeDemandCount} />
   );
+  const resumeOfferDraft = useCallback(() => {
+    Taro.navigateTo({ url: '/pages/supply/list/index?quickOrder=1' });
+  }, []);
+  const discardOfferDraft = useCallback(async () => {
+    const res = await Taro.showModal({
+      title: '放弃本次挑选？',
+      content: '放弃后需要重新填写吊运信息。',
+      confirmText: '放弃',
+      confirmColor: '#dc2626',
+      cancelText: '保留',
+    }).catch(() => null);
+    if (!res?.confirm) return;
+    clearQuickOrderOfferDraft();
+    setPendingOfferDraft(null);
+  }, []);
+  const offerDraftCard = pendingOfferDraft ? (
+    <PendingOfferDraftCard
+      draft={pendingOfferDraft}
+      onResume={resumeOfferDraft}
+      onDiscard={discardOfferDraft}
+    />
+  ) : null;
 
   if (activeSegment === 'demands') {
     return (
       <CustomerDemandsPage
         segmentBar={segmentBar}
-        demands={demands}
+        demands={actionableDemands}
         loading={demandsLoading}
         refreshing={demandsRefreshing}
         error={demandsError}
+        offerDraftCard={offerDraftCard}
+        hasHistoricalDemands={demands.length > 0}
+        onViewOrders={() => setActiveSegment('orders')}
         onRefresh={() => {
           setDemandsRefreshing(true);
           fetchDemands();
@@ -294,7 +446,7 @@ function CustomerOrdersShell() {
     );
   }
 
-  return <CustomerOrdersPage segmentBar={segmentBar} />;
+  return <CustomerOrdersPage segmentBar={segmentBar} offerDraftCard={offerDraftCard} />;
 }
 
 function CustomerDemandsPage({
@@ -303,6 +455,9 @@ function CustomerDemandsPage({
   loading,
   refreshing,
   error,
+  offerDraftCard,
+  hasHistoricalDemands,
+  onViewOrders,
   onRefresh,
   onRetry,
 }: {
@@ -311,6 +466,9 @@ function CustomerDemandsPage({
   loading: boolean;
   refreshing: boolean;
   error: string;
+  offerDraftCard?: React.ReactNode;
+  hasHistoricalDemands: boolean;
+  onViewOrders: () => void;
   onRefresh: () => void;
   onRetry: () => void;
 }) {
@@ -346,6 +504,7 @@ function CustomerDemandsPage({
       <View className="orders-page-content" style={{ paddingTop: `${topInsetRpx}rpx` }}>
         <Text className="orders-page-title">我的任务</Text>
         {segmentBar}
+        {offerDraftCard}
 
         {loading ? (
           <View className="empty-state">
@@ -360,9 +519,11 @@ function CustomerDemandsPage({
           </View>
         ) : demands.length === 0 ? (
           <View className="empty-state">
-            <Text className="empty-state-text">还没有发布过吊运任务</Text>
-            <View className="empty-state-cta" onClick={goPublish}>
-              <Text>回首页发布任务</Text>
+            <Text className="empty-state-text">
+              {hasHistoricalDemands ? '暂无待处理任务，已生成的订单可在我的订单查看' : '还没有发布过吊运任务'}
+            </Text>
+            <View className="empty-state-cta" onClick={hasHistoricalDemands ? onViewOrders : goPublish}>
+              <Text>{hasHistoricalDemands ? '查看我的订单' : '回首页发布任务'}</Text>
             </View>
           </View>
         ) : (
@@ -370,25 +531,44 @@ function CustomerDemandsPage({
             const meta = getObjectStatusMeta('demand', demand.status);
             const route = String(demand.title || '未命名任务');
             const quoteCount = demand.quote_count || 0;
+            const demandStatus = normalizedDemandStatus(demand);
+            const isSelectedDemand = demandStatus === 'selected' || Number((demand as any).selected_quote_id || 0) > 0;
             const budgetMin = Math.round(Number(demand.budget_min || 0) / 100);
             const budgetMax = Math.round(Number(demand.budget_max || 0) / 100);
             const budgetText = budgetMin > 0 || budgetMax > 0
-              ? `预算 ¥${budgetMin}-${budgetMax}`
-              : '预算待估';
+              ? `¥${budgetMin}-${budgetMax}`
+              : '待估';
+            const quoteStateText = isSelectedDemand
+              ? '已选定服务商'
+              : quoteCount > 0
+                ? `已收到 ${quoteCount} 家报价`
+                : '等待服务商报价';
+            const nextActionText = isSelectedDemand
+              ? '等待生成订单'
+              : quoteCount > 0
+                ? '点开选择服务商'
+                : '等待服务商报价';
             return (
-              <View key={demand.id} className="order-card" onClick={() => openDetail(demand)}>
+              <View key={demand.id} className="order-card order-card-demand" onClick={() => openDetail(demand)}>
                 <View className="order-card-head">
                   <View className={`order-status-badge order-status-${meta.tone || 'gray'}`}>
                     <Text>{meta.label}</Text>
                   </View>
                   <Text className="order-card-no">{demand.demand_no}</Text>
                 </View>
-                <View className="order-route">
-                  <Text className="order-route-text">{route}</Text>
+                <View className="demand-card-main">
+                  <Text className="demand-card-title" numberOfLines={1}>{route}</Text>
+                  <Text className="demand-card-meta" numberOfLines={1}>{getDemandSceneLabel(demand.cargo_scene)} · {quoteStateText}</Text>
                 </View>
-                <View className="order-card-foot">
-                  <Text className="order-mode-text">{getDemandSceneLabel(demand.cargo_scene)} · {quoteCount > 0 ? `${quoteCount} 家报价` : '等待报价'}</Text>
-                  <Text className="order-amount">{budgetText}</Text>
+                <View className="demand-card-foot">
+                  <View className={`demand-next ${quoteCount > 0 ? 'is-ready' : ''}`}>
+                    <Text className="demand-next-label">下一步</Text>
+                    <Text className="demand-next-text">{nextActionText}</Text>
+                  </View>
+                  <View className="demand-budget">
+                    <Text className="demand-budget-label">预算</Text>
+                    <Text className="demand-budget-value">{budgetText}</Text>
+                  </View>
                 </View>
               </View>
             );
@@ -399,227 +579,13 @@ function CustomerDemandsPage({
   );
 }
 
-function ProviderOrderSegmentBar({
-  active,
-  onChange,
+function CustomerOrdersPage({
+  segmentBar,
+  offerDraftCard,
 }: {
-  active: ProviderOrderSegment;
-  onChange: (next: ProviderOrderSegment) => void;
+  segmentBar?: React.ReactNode;
+  offerDraftCard?: React.ReactNode;
 }) {
-  return (
-    <View className="provider-order-segment">
-      <View
-        className={`provider-order-segment-item ${active === 'demand' ? 'is-active' : ''}`}
-        onClick={() => onChange('demand')}
-      >
-        <Text>接单需求</Text>
-      </View>
-      <View
-        className={`provider-order-segment-item ${active === 'mine' ? 'is-active' : ''}`}
-        onClick={() => onChange('mine')}
-      >
-        <Text>我的订单</Text>
-      </View>
-    </View>
-  );
-}
-
-function ProviderOrdersShell() {
-  const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
-  const [activeSegment, setActiveSegment] = useState<ProviderOrderSegment>('demand');
-  const effectiveRoleSummary = useMemo(() => getEffectiveRoleSummary(roleSummary), [roleSummary]);
-  const providerCapabilities = useMemo(() => resolveProviderCapabilities(effectiveRoleSummary), [effectiveRoleSummary]);
-
-  useDidShow(() => {
-    syncCustomTabBar(1);
-    const hint = Taro.getStorageSync(PROVIDER_ORDERS_SEGMENT_KEY);
-    if (hint === 'mine' || hint === 'demand') {
-      setActiveSegment(hint);
-      Taro.removeStorageSync(PROVIDER_ORDERS_SEGMENT_KEY);
-    }
-  });
-
-  const handleSegmentChange = useCallback((next: ProviderOrderSegment) => {
-    if (!providerCapabilities.canSelfExecute) {
-      Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
-    }
-    setActiveSegment(next);
-  }, [providerCapabilities.canSelfExecute]);
-
-  const segmentBar = (
-    <ProviderOrderSegmentBar active={activeSegment} onChange={handleSegmentChange} />
-  );
-
-  if (activeSegment === 'mine') {
-    return <ProviderOrdersPage segmentBar={segmentBar} />;
-  }
-
-  return <DemandListPage headerExtra={segmentBar} />;
-}
-
-function ProviderOrdersPage({ segmentBar }: { segmentBar: React.ReactNode }) {
-  const [activeStatus, setActiveStatus] = useState<StatusFilter>('all');
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [items, setItems] = useState<V2OrderSummary[]>([]);
-  const [topInsetRpx, setTopInsetRpx] = useState(132);
-  const [advancingId, setAdvancingId] = useState<number | null>(null);
-
-  useEffect(() => {
-    try {
-      const sys = Taro.getSystemInfoSync();
-      const ratio = 750 / (sys.windowWidth || 375);
-      const statusBarRpx = Math.round(((sys.statusBarHeight || 20) + 12) * ratio);
-      setTopInsetRpx(statusBarRpx);
-    } catch {
-      setTopInsetRpx(132);
-    }
-  }, []);
-
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await orderV2Service.list({ role: 'provider', page: 1, page_size: 50 });
-      const list = listItemsOf(response).sort(
-        (a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime(),
-      );
-      setItems(list);
-    } catch (error: any) {
-      Taro.showToast({ title: friendlyErrorMessage(error, '订单加载失败'), icon: 'none' });
-      setItems([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useDidShow(() => {
-    syncCustomTabBar(1);
-    fetchOrders();
-  });
-
-  const filteredItems = useMemo(
-    () => items.filter(item => activeStatus === 'all' || statusBucketOf(item) === activeStatus),
-    [activeStatus, items],
-  );
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchOrders();
-  };
-
-  const openDetail = (order: V2OrderSummary) => {
-    Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${order.id}` });
-  };
-
-  const advanceOrder = async (event: any, order: V2OrderSummary) => {
-    stopTap(event);
-    if (advancingId) return;
-    const label = providerAdvanceLabelOf(order);
-    if (!label) return;
-    try {
-      const copy = getProviderAdvanceConfirmCopy(label);
-      if (copy) {
-        const res = await Taro.showModal({
-          title: copy.title,
-          content: copy.content,
-          cancelText: '再想想',
-          confirmText: copy.confirmText,
-        });
-        if (!res.confirm) return;
-      }
-    } catch (error: any) {
-      Taro.showToast({ title: friendlyErrorMessage(error, '操作确认失败'), icon: 'none' });
-      return;
-    }
-    setAdvancingId(order.id);
-    try {
-      if (label === '开始准备') await orderV2Service.startPreparing(order.id);
-      if (label === '开始飞行') await orderV2Service.startFlight(order.id);
-      if (label === '确认送达') await orderV2Service.confirmDelivery(order.id);
-      Taro.showToast({ title: '已推进', icon: 'success' });
-      fetchOrders();
-    } catch (error: any) {
-      Taro.showToast({ title: friendlyErrorMessage(error, '推进失败'), icon: 'none' });
-    } finally {
-      setAdvancingId(null);
-    }
-  };
-
-  return (
-    <ScrollView
-      scrollY
-      className="orders-page"
-      refresherEnabled
-      refresherTriggered={refreshing}
-      onRefresherRefresh={onRefresh}
-    >
-      <View className="orders-page-content" style={{ paddingTop: `${topInsetRpx}rpx` }}>
-        <Text className="orders-page-title">服务商订单</Text>
-        {segmentBar}
-        <View className="orders-filter-row">
-          {STATUS_TABS.map(tab => (
-            <View
-              key={tab.key}
-              className={`orders-filter-chip ${activeStatus === tab.key ? 'orders-filter-chip-active' : ''}`}
-              onClick={() => setActiveStatus(tab.key)}
-            >
-              <Text>{tab.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {loading ? (
-          <View className="empty-state">
-            <Text className="empty-state-text">加载中...</Text>
-          </View>
-        ) : filteredItems.length === 0 ? (
-          <View className="empty-state">
-            <Text className="empty-state-text">当前没有待服务订单，可保持上线接单或去接单需求报价</Text>
-          </View>
-        ) : (
-          filteredItems.map(order => {
-            const status = normalizedStatus(order);
-            const label = providerAdvanceLabelOf(order);
-            return (
-              <View key={order.id} className="order-card" onClick={() => openDetail(order)}>
-                <View className="order-card-head">
-                  <View className={`order-status-badge order-status-${statusToneOf(order)}`}>
-                    <Text>{statusLabelOf(order)}</Text>
-                  </View>
-                  <Text className="order-card-no">{order.order_no}</Text>
-                </View>
-                <View className="order-route">
-                  <View className="order-route-line">
-                    <View className="order-route-dot order-route-dot-start" />
-                    <Text className="order-route-text">{order.service_address || '起点待确认'}</Text>
-                  </View>
-                  <View className="order-route-line">
-                    <View className="order-route-dot order-route-dot-end" />
-                    <Text className="order-route-text">{order.dest_address || '终点待确认'}</Text>
-                  </View>
-                </View>
-                <View className="order-card-foot">
-                  <Text className="order-mode-text">{normalizedMode(order) === 'negotiated' ? '议价单' : normalizedMode(order) === 'reservation' ? '预约单' : '即时单'}</Text>
-                  <Text className="order-amount">{formatAmount(order.total_amount)}</Text>
-                </View>
-                {label ? (
-                  <View className="order-card-actions">
-                    <View className="order-card-button order-card-button-primary" onClick={event => advanceOrder(event, order)}>
-                      <Text>{advancingId === order.id ? '推进中...' : label}</Text>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            );
-          })
-        )}
-      </View>
-    </ScrollView>
-  );
-}
-
-function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
   const [activeStatus, setActiveStatus] = useState<StatusFilter>('all');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -641,9 +607,7 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
     setLoading(true);
     try {
       const response = await orderV2Service.list({ role: 'client', page: 1, page_size: 50 });
-      const list = listItemsOf(response).sort(
-        (a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime(),
-      );
+      const list = listItemsOf(response).sort(compareCustomerOrders);
       setItems(list);
     } catch (error: any) {
       Taro.showToast({ title: friendlyErrorMessage(error, '订单加载失败'), icon: 'none' });
@@ -655,7 +619,7 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
   }, []);
 
   useDidShow(() => {
-    syncCustomTabBar(1);
+    syncCustomTabBar(1, 'customer');
     fetchOrders();
   });
 
@@ -739,7 +703,11 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
 
   const goPayment = (event: any, order: V2OrderSummary) => {
     stopTap(event);
-    Taro.navigateTo({ url: `/pages/payment/index?orderId=${order.id}` });
+    Taro.navigateTo({
+      url: needsContractSign(order)
+        ? `/pages/orders/contract/index?orderId=${order.id}`
+        : `/pages/payment/index?orderId=${order.id}`,
+    });
   };
 
   const goReview = (event: any, order: V2OrderSummary) => {
@@ -747,9 +715,14 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
     Taro.navigateTo({ url: `/pages/review/index?orderId=${order.id}` });
   };
 
-  const goLive = (event: any, order: V2OrderSummary) => {
+  const goProgress = (event: any, order: V2OrderSummary) => {
     stopTap(event);
-    Taro.showToast({ title: '实时位置功能即将开放', icon: 'none' });
+    const url = progressUrlOf(order.id, order);
+    if (!url) {
+      Taro.showToast({ title: '暂无可查看进度', icon: 'none' });
+      return;
+    }
+    Taro.navigateTo({ url });
   };
 
   const reorder = (event: any) => {
@@ -785,9 +758,9 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
             <Text>给个小费</Text>
           </View>
         ) : null}
-        {canViewLive(order) ? (
-          <View className="order-card-button order-card-button-ghost" onClick={event => goLive(event, order)}>
-            <Text>实时位置（暂未启用）</Text>
+        {canOpenProgress(order) ? (
+          <View className="order-card-button order-card-button-ghost" onClick={event => goProgress(event, order)}>
+            <Text>{progressActionLabelOf(order)}</Text>
           </View>
         ) : null}
         {canContactProvider(order) ? (
@@ -797,7 +770,7 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
         ) : null}
         {canPay(order) ? (
           <View className="order-card-button order-card-button-primary" onClick={event => goPayment(event, order)}>
-            <Text>去支付</Text>
+            <Text>{needsContractSign(order) ? '签署合同' : '去支付'}</Text>
           </View>
         ) : null}
         {canReview(order) ? (
@@ -820,6 +793,7 @@ function CustomerOrdersPage({ segmentBar }: { segmentBar?: React.ReactNode }) {
       <View className="orders-page-content" style={{ paddingTop: `${topInsetRpx}rpx` }}>
         <Text className="orders-page-title">我的订单</Text>
         {segmentBar}
+        {offerDraftCard}
         <View className="orders-filter-row">
           {STATUS_TABS.map(tab => (
             <View

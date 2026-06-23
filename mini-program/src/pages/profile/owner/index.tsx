@@ -26,7 +26,7 @@ export default function OwnerProfilePage() {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [draft, setDraft] = useState({ service_city: '', contact_phone: '', intro: '' });
-  const [stats, setStats] = useState({ drones: 0, activeSupplies: 0, quotes: 0, bindings: 0 });
+  const [stats, setStats] = useState({ drones: 0, activeSupplies: 0, quotes: 0 });
   const [workbench, setWorkbench] = useState<any>(null);
 
   const loadData = useCallback(async () => {
@@ -39,7 +39,6 @@ export default function OwnerProfilePage() {
         dronesRes,
         suppliesRes,
         quotesRes,
-        bindingsRes,
         workbenchRes,
       ] = await Promise.all([
         ownerService.getProfile().catch(() => null),
@@ -51,9 +50,6 @@ export default function OwnerProfilePage() {
           : Promise.resolve(null),
         canLoadWorkbench
           ? ownerService.listMyQuotes({ page: 1, page_size: 50 }).catch(() => null)
-          : Promise.resolve(null),
-        canLoadWorkbench
-          ? ownerService.listPilotBindings({ status: 'active', page: 1, page_size: 50 }).catch(() => null)
           : Promise.resolve(null),
         canLoadWorkbench ? ownerService.getWorkbench().catch(() => null) : Promise.resolve(null),
       ]);
@@ -71,7 +67,6 @@ export default function OwnerProfilePage() {
         drones: Number(dronesRes?.list?.length || 0),
         activeSupplies: supplyItems.filter((item: any) => item.status === 'active').length,
         quotes: Number(quotesRes?.meta?.total || quotesRes?.total || 0),
-        bindings: Number(bindingsRes?.meta?.total || bindingsRes?.total || 0),
       });
     } finally {
       setLoading(false);
@@ -156,7 +151,7 @@ export default function OwnerProfilePage() {
         desc: '设备资质与履约资质全部通过后才开通接单。',
         status: providerCapabilities.executorStatus === 'approved' ? '已通过' : providerCapabilities.executorStatus === 'pending_review' ? '审核中' : '去完善',
         ready: providerCapabilities.executorStatus === 'approved',
-        onClick: () => Taro.navigateTo({ url: '/pages/pilot/register/index' }),
+        onClick: () => Taro.navigateTo({ url: '/pages/provider/onboarding/index?from=owner-profile' }),
       },
       {
         title: '实名认证',
@@ -447,7 +442,7 @@ export default function OwnerProfilePage() {
               </View>
               <View
                 className='owner-quick-card'
-                onClick={() => Taro.navigateTo({ url: '/pages/pilot/register/index' })}
+                onClick={() => Taro.navigateTo({ url: '/pages/provider/onboarding/index?from=owner-profile' })}
               >
                 <Text className='owner-quick-icon'>✅</Text>
                 <Text className='owner-quick-title'>履约资质</Text>

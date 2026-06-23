@@ -7,13 +7,16 @@ import { ownerService } from '../../services/owner';
 import { orderV2Service } from '../../services/orderV2';
 import { providerService } from '../../services/provider';
 import { syncCustomTabBar } from '../../utils/tabBar';
+import { switchToOrdersTab } from '../../utils/ordersEntry';
 import { formatAmountYuan } from '../../utils';
 import { canUseProviderWorkbench, getEffectiveRoleSummary, resolveProviderCapabilities } from '../../utils/roleSummary';
 import { useProviderPresence } from '../../hooks/useProviderPresence';
 import { RootState, useAppDispatch } from '../../store/store';
 import { presenceConfigUpdated } from '../../store/slices/providerPresenceSlice';
+import { setHaulRoleMode } from '../../store/slices/roleSlice';
 import { PROVIDER_WORKBENCH_SUBSCRIBE_TEMPLATES } from '../../constants/subscribeTemplates';
 import { requestSubscribe } from '../../services/push';
+import AssignmentModal from '../../components/AssignmentModal';
 import ProviderOnboardingOverlay from '../../components/haul/ProviderOnboardingOverlay';
 import {
   HomeDashboard,
@@ -22,11 +25,13 @@ import {
   V2ProviderAssignmentView,
   V2ProviderBroadcastOrderSummary,
   V2ProviderBroadcastView,
+  V2OrderSummary,
   V2ProviderStats,
   V2ServiceClass,
 } from '../../types';
 import { PROVIDER_WORKBENCH_ONBOARDING_STORAGE_KEY } from '../../utils/providerOnboarding';
 import { buildProviderReviewFixItems } from '../../utils/providerReview';
+import { remainingSeconds } from '../../utils/countdown';
 import logoProvider from '../../assets/haul/provider-workbench/logo_provider_anyi_round_drone.png';
 import metricPendingIcon from '../../assets/haul/provider-workbench/icon_metric_pending_today_blue.png';
 import metricQuoteIcon from '../../assets/haul/provider-workbench/icon_metric_quote_orange.png';
@@ -71,6 +76,16 @@ type TodoItem = {
   icon: string;
   onClick: () => void;
 };
+
+type SelectedQuoteAlert = {
+  order: V2OrderSummary | OwnerWorkbenchOrderItem;
+  title: string;
+  desc: string;
+  cta: string;
+};
+
+type TimedProviderBroadcastView = V2ProviderBroadcastView & { received_at_ms?: number };
+type TimedProviderAssignmentView = V2ProviderAssignmentView & { received_at_ms?: number };
 
 const formatMoney = (amount: number) =>
   amount.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
@@ -124,14 +139,6 @@ const formatWeight = (kg?: number | null) => {
   return `${Math.round(value)}kg`;
 };
 
-const getRemainingSeconds = (deadline?: string | null, fallback?: number | null) => {
-  const deadlineMs = deadline ? Date.parse(deadline) : NaN;
-  if (Number.isFinite(deadlineMs)) {
-    return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
-  }
-  return Math.max(0, Math.ceil(Number(fallback || 0)));
-};
-
 const getBroadcastAmount = (item: V2ProviderBroadcastView | V2ProviderAssignmentView) => {
   const broadcastAmount = 'estimated_total_cents' in item ? item.estimated_total_cents : item.broadcast?.estimated_total_cents;
   return Number(broadcastAmount || item.order?.total_amount || 0);
@@ -146,6 +153,11 @@ const getOrderIdFromPayload = (payload: unknown, fallback: number) => {
 };
 
 const formatOrderTodoSubtitle = (item: OwnerWorkbenchOrderItem) => {
+  const route = [item.service_address, item.dest_address].filter(Boolean).join(' → ') || '待补地址';
+  return `${route} · ${formatMoney(Math.round(Number(item.total_amount || 0) / 100))}元`;
+};
+
+const formatProviderOrderSubtitle = (item: V2OrderSummary) => {
   const route = [item.service_address, item.dest_address].filter(Boolean).join(' → ') || '待补地址';
   return `${route} · ${formatMoney(Math.round(Number(item.total_amount || 0) / 100))}元`;
 };
@@ -175,15 +187,178 @@ function getGrabConflictToast(code?: unknown) {
   }
 }
 
+function PendingAssignments({ onAccepted }: { onAccepted?: (orderId: number) => void }) {
+  const [items, setItems] = useState<TimedProviderAssignmentView[]>([]);
+  const [tick, setTick] = useState(0);
+  const [respondingId, setRespondingId] = useState<number | null>(null);
+
+  const pullAssignments = useCallback(async () => {
+    try {
+      const res = await providerService.listAssignments(5);
+      const receivedAtMs = Date.now();
+      setItems(normalizeProviderItems<V2ProviderAssignmentView>(res).map(item => ({
+        ...item,
+        received_at_ms: receivedAtMs,
+      })));
+    } catch {
+      // 自动重试，不打断服务商当前操作。
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const res = await providerService.listAssignments(5);
+        if (!cancelled) {
+          const receivedAtMs = Date.now();
+          setItems(normalizeProviderItems<V2ProviderAssignmentView>(res).map(item => ({
+            ...item,
+            received_at_ms: receivedAtMs,
+          })));
+        }
+      } catch {
+        // 静默重试。
+      }
+    };
+    pull();
+    const timer = setInterval(pull, 3_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick(value => value + 1), 1_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const visibleItems = useMemo(() => {
+    void tick;
+    return items
+      .filter(item => item.status === 'pending_accept')
+      .filter(item => remainingSeconds(item.accept_deadline_at, item) > 0)
+      .slice(0, 2);
+  }, [items, tick]);
+
+  const accept = useCallback(async (assignment: TimedProviderAssignmentView) => {
+    if (respondingId) return;
+    setRespondingId(assignment.id);
+    try {
+      const res = await providerService.acceptAssignment(assignment.id);
+      const orderId = getOrderIdFromPayload(res, assignment.order_id);
+      Taro.showToast({ title: '已接受', icon: 'success' });
+      setItems(current => current.filter(item => item.id !== assignment.id));
+      if (orderId > 0) {
+        onAccepted?.(orderId);
+      }
+    } catch (error: any) {
+      if (error?.statusCode === 409 || error?.errno === 409) {
+        Taro.showToast({ title: '派单已失效', icon: 'none' });
+        setItems(current => current.filter(item => item.id !== assignment.id));
+      } else {
+        Taro.showToast({ title: friendlyErrorMessage(error, '接受失败'), icon: 'none' });
+      }
+      pullAssignments();
+    } finally {
+      setRespondingId(null);
+    }
+  }, [onAccepted, pullAssignments, respondingId]);
+
+  const decline = useCallback(async (assignment: TimedProviderAssignmentView) => {
+    if (respondingId) return;
+    const res = await Taro.showModal({
+      title: '拒绝派单？',
+      content: '拒绝后系统会继续匹配其他服务商。',
+      cancelText: '再想想',
+      confirmText: '确认拒绝',
+    });
+    if (!res.confirm) return;
+    setRespondingId(assignment.id);
+    try {
+      await providerService.declineAssignment(assignment.id, '服务商主动拒绝');
+      Taro.showToast({ title: '已拒绝', icon: 'none' });
+      setItems(current => current.filter(item => item.id !== assignment.id));
+    } catch (error: any) {
+      Taro.showToast({ title: friendlyErrorMessage(error, '拒绝失败'), icon: 'none' });
+      pullAssignments();
+    } finally {
+      setRespondingId(null);
+    }
+  }, [pullAssignments, respondingId]);
+
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <View className='pw-card pw-assignment-card'>
+      <View className='pw-card-head'>
+        <Text className='pw-card-title'>待确认派单</Text>
+        <Text className='pw-card-sub'>请在倒计时内确认</Text>
+      </View>
+      <View className='pw-assignment-list'>
+        {visibleItems.map((item) => {
+          const order = getOrderFromBroadcast(item);
+          const remaining = remainingSeconds(item.accept_deadline_at, item);
+          const isResponding = respondingId === item.id;
+          return (
+            <View className='pw-assignment-item' key={item.id}>
+              <View className='pw-broadcast-head'>
+                <Text className='pw-assignment-tag'>平台指派 · 第 {item.attempt_seq} 轮</Text>
+                <Text className='pw-broadcast-countdown'>剩 {remaining}s</Text>
+              </View>
+              <View className='pw-broadcast-route'>
+                <Text className='pw-broadcast-route-start'>{order?.service_address || '起点待确认'}</Text>
+                <Text className='pw-broadcast-route-arrow'>→</Text>
+                <Text className='pw-broadcast-route-end'>{order?.dest_address || '终点待确认'}</Text>
+              </View>
+              <View className='pw-broadcast-meta'>
+                <Text>{formatWeight(order?.cargo_weight_kg || item.broadcast?.weight_kg)}</Text>
+                <Text>{formatDuration(order?.estimated_duration_min)}</Text>
+                <Text>{formatBroadcastDistance(item.distance_km)}</Text>
+              </View>
+              <View className='pw-broadcast-foot'>
+                <Text className='pw-broadcast-price'>{formatAmountYuan(getBroadcastAmount(item))}</Text>
+                <View className='pw-assignment-actions'>
+                  <View
+                    className={`pw-assignment-decline ${isResponding ? 'is-loading' : ''}`}
+                    onClick={() => {
+                      if (!isResponding) decline(item);
+                    }}
+                  >
+                    <Text>拒绝</Text>
+                  </View>
+                  <View
+                    className={`pw-assignment-accept ${isResponding ? 'is-loading' : ''}`}
+                    onClick={() => {
+                      if (!isResponding) accept(item);
+                    }}
+                  >
+                    <Text>{isResponding ? '处理中' : '接受'}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boolean; onGrabbed?: (orderId: number) => void }) {
-  const [items, setItems] = useState<V2ProviderBroadcastView[]>([]);
+  const [items, setItems] = useState<TimedProviderBroadcastView[]>([]);
   const [tick, setTick] = useState(0);
   const [grabbingId, setGrabbingId] = useState<number | null>(null);
 
   const pullBroadcasts = useCallback(async () => {
     try {
       const res = await providerService.listBroadcasts(20);
-      setItems(normalizeProviderItems<V2ProviderBroadcastView>(res));
+      const receivedAtMs = Date.now();
+      setItems(normalizeProviderItems<V2ProviderBroadcastView>(res).map(item => ({
+        ...item,
+        received_at_ms: receivedAtMs,
+      })));
     } catch {
       // 网络抖动不打扰服务商，下一轮轮询自动恢复。
     }
@@ -195,7 +370,11 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
       try {
         const res = await providerService.listBroadcasts(20);
         if (!cancelled) {
-          setItems(normalizeProviderItems<V2ProviderBroadcastView>(res));
+          const receivedAtMs = Date.now();
+          setItems(normalizeProviderItems<V2ProviderBroadcastView>(res).map(item => ({
+            ...item,
+            received_at_ms: receivedAtMs,
+          })));
         }
       } catch {
         // 静默重试。
@@ -217,11 +396,11 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
   const visibleItems = useMemo(() => {
     void tick;
     return items
-      .filter(item => getRemainingSeconds(item.expires_at, item.remaining_seconds) > 0)
+      .filter(item => remainingSeconds(item.expires_at, item) > 0)
       .slice(0, 3);
   }, [items, tick]);
 
-  const grab = useCallback(async (broadcast: V2ProviderBroadcastView) => {
+  const grab = useCallback(async (broadcast: TimedProviderBroadcastView) => {
     if (grabbingId) return;
     if (!canSelfExecute) {
       Taro.showToast({ title: SELF_EXECUTABLE_REQUIRED_TOAST, icon: 'none' });
@@ -259,7 +438,7 @@ function NearbyBroadcasts({ canSelfExecute, onGrabbed }: { canSelfExecute: boole
         <View className='pw-broadcast-list'>
           {visibleItems.map((item) => {
             const order = getOrderFromBroadcast(item);
-            const remaining = getRemainingSeconds(item.expires_at, item.remaining_seconds);
+            const remaining = remainingSeconds(item.expires_at, item);
             const isGrabbing = grabbingId === item.id;
             return (
               <View className='pw-broadcast-item' key={item.id}>
@@ -313,6 +492,7 @@ export default function ProviderWorkbench() {
   const [headerActionTop, setHeaderActionTop] = useState(132);
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [workbench, setWorkbench] = useState<OwnerWorkbenchView | null>(null);
+  const [pendingPaymentOrders, setPendingPaymentOrders] = useState<V2OrderSummary[]>([]);
   const [openedOnboardingOnce, setOpenedOnboardingOnce] = useState(false);
   const [providerStats, setProviderStats] = useState<V2ProviderStats | null>(null);
   const [serviceClasses, setServiceClasses] = useState<V2ServiceClass[]>([]);
@@ -398,21 +578,26 @@ export default function ProviderWorkbench() {
       promptLogin();
       return;
     }
-    safeNavigateTo('/pages/demand/list/index');
+    switchToOrdersTab('provider').catch(() => {
+      Taro.showToast({ title: '接单需求暂不可用', icon: 'none' });
+    });
   }, [isAuthenticated, promptLogin]);
 
   const refreshDashboard = useCallback(() => {
     if (!isAuthenticated || !canUseProvider) {
       setDashboard(null);
       setWorkbench(null);
+      setPendingPaymentOrders([]);
       return;
     }
     Promise.all([
       homeService.getDashboard().catch(() => null),
       ownerService.getWorkbench().catch(() => null),
-    ]).then(([dashboardRes, workbenchRes]) => {
+      orderV2Service.list({ role: 'provider', status: 'pending_payment', page: 1, page_size: 5 }).catch(() => null),
+    ]).then(([dashboardRes, workbenchRes, pendingPaymentRes]) => {
       setDashboard((dashboardRes as any)?.data || dashboardRes || null);
       setWorkbench((workbenchRes as any)?.data || workbenchRes || null);
+      setPendingPaymentOrders(normalizeProviderItems<V2OrderSummary>(pendingPaymentRes));
     }).catch(() => null);
   }, [canUseProvider, isAuthenticated]);
 
@@ -487,8 +672,8 @@ export default function ProviderWorkbench() {
   }, []);
 
   useDidShow(() => {
-    // 仅同步 TabBar 选中态，不强制改写全局角色身份。
-    syncCustomTabBar(0);
+    dispatch(setHaulRoleMode('provider'));
+    syncCustomTabBar(0, 'provider');
     if (isAuthenticated && !canUseProvider && !openedOnboardingOnce) {
       setOpenedOnboardingOnce(true);
       safeNavigateTo('/pages/provider/onboarding/index?from=workbench');
@@ -545,15 +730,16 @@ export default function ProviderWorkbench() {
       owner?.pending_dispatch_order_count ??
       0,
     );
+    const pendingPaymentCount = pendingPaymentOrders.length;
+    const pendingQuoteCount = Number(workbenchSummary?.pending_quote_count ?? owner?.pending_quote_count ?? 0);
+    const recommendedDemandCount = Number(workbenchSummary?.recommended_demand_count ?? owner?.recommended_demand_count ?? 0);
     return {
-      todayPending: pendingProviderCount + pendingDispatchCount,
-      pendingQuote:
-        Number(owner?.pending_quote_count ?? 0) +
-        Number(owner?.recommended_demand_count ?? workbenchSummary?.recommended_demand_count ?? 0),
-      pendingFulfillment: pendingDispatchCount,
+      todayPending: pendingProviderCount + pendingPaymentCount + pendingDispatchCount,
+      pendingQuote: pendingQuoteCount + recommendedDemandCount,
+      pendingFulfillment: pendingProviderCount + pendingPaymentCount + pendingDispatchCount,
       monthIncome: Number(summary?.today_income_amount ?? 0),
     };
-  }, [dashboard, workbench]);
+  }, [dashboard, pendingPaymentOrders.length, workbench]);
 
   // 单条订单：点击 todo 行时使用，进入该订单详情
   const openFulfillment = useCallback((orderId?: number) => {
@@ -562,23 +748,44 @@ export default function ProviderWorkbench() {
       navigateWithAuth(`/pages/orders/detail/index?orderId=${nextOrderId}`);
       return;
     }
-    // 没传 ID：兜底跳到订单列表
-    Taro.switchTab({ url: '/pages/orders/index' }).catch(() => null);
+    // 没传 ID：兜底跳到明确的服务商订单列表。
+    navigateWithAuth('/pages/orders/provider/index');
   }, [navigateWithAuth]);
 
-  // 聚合数字 / 全部事项：始终跳到订单列表，让用户看到所有待办
+  // 履约类待办默认进入订单列表。
   const openFulfillmentList = useCallback(() => {
     if (!isAuthenticated) {
       promptLogin();
       return;
     }
-    Taro.setStorageSync('provider_orders_default_segment', 'mine');
-    Taro.switchTab({ url: '/pages/orders/index' }).catch(() => {
-      Taro.reLaunch({ url: '/pages/orders/index' }).catch(() => {
+    Taro.navigateTo({ url: '/pages/orders/provider/index' }).catch(() => {
+      Taro.redirectTo({ url: '/pages/orders/provider/index' }).catch(() => {
         Taro.showToast({ title: '订单列表暂不可用', icon: 'none' });
       });
     });
   }, [isAuthenticated, promptLogin]);
+
+  const openTodoList = useCallback(() => {
+    const hasOrderTodo = pendingPaymentOrders.length > 0 ||
+      (workbench?.pending_provider_confirmation_orders || []).length > 0 ||
+      (workbench?.pending_dispatch_orders || []).length > 0;
+    if (hasOrderTodo) {
+      openFulfillmentList();
+      return;
+    }
+    if ((workbench?.recommended_demands || []).length > 0) {
+      openDemandList();
+      return;
+    }
+    openFulfillmentList();
+  }, [
+    openDemandList,
+    openFulfillmentList,
+    pendingPaymentOrders.length,
+    workbench?.pending_dispatch_orders,
+    workbench?.pending_provider_confirmation_orders,
+    workbench?.recommended_demands,
+  ]);
 
   const openGrabbedOrder = useCallback((orderId: number) => {
     const nextOrderId = Number(orderId || 0);
@@ -660,26 +867,39 @@ export default function ProviderWorkbench() {
 
   const todoItems: TodoItem[] = useMemo(() => {
     const items: TodoItem[] = [];
-    (workbench?.recommended_demands || []).slice(0, 1).forEach((item) => {
+    pendingPaymentOrders.slice(0, 2).forEach((item) => {
       items.push({
-        key: `demand-${item.id}`,
-        title: item.title || '新需求待报价',
-        subtitle: `${item.service_address_text || '待补地址'} · 预算 ${formatMoney(Math.round(Number(item.budget_min || 0) / 100))}-${formatMoney(Math.round(Number(item.budget_max || 0) / 100))}元`,
-        status: '待报价',
-        tone: 'orange',
-        icon: todoNewDemandIcon,
-        onClick: () => navigateWithAuth(`/pages/demand/detail/index?id=${item.id}`),
+        key: `selected-quote-${item.id}`,
+        title: item.title || item.order_no || '报价已被客户选中',
+        subtitle: `${formatProviderOrderSubtitle(item)} · 等待客户支付`,
+        status: '报价已选中',
+        tone: 'red',
+        icon: todoOrderScheduleIcon,
+        onClick: () => openFulfillment(item.id),
       });
     });
     (workbench?.pending_provider_confirmation_orders || []).slice(0, 2).forEach((item) => {
       items.push({
         key: `confirm-${item.id}`,
-        title: item.title || item.order_no || '直达订单待确认',
+        title: item.title || item.order_no || '订单待确认',
         subtitle: formatOrderTodoSubtitle(item),
-        status: '待确认',
-        tone: 'orange',
+        status: '立即确认',
+        tone: 'red',
         icon: todoOrderScheduleIcon,
         onClick: () => openFulfillment(item.id),
+      });
+    });
+    (workbench?.recommended_demands || []).slice(0, 1).forEach((item) => {
+      const isInvitation = item.source === 'invitation';
+      const sourceLabel = item.source_label || (isInvitation ? '客户邀请报价' : '');
+      items.push({
+        key: `demand-${item.id}`,
+        title: item.title || '新需求待报价',
+        subtitle: `${sourceLabel ? `${sourceLabel} · ` : ''}${item.service_address_text || '待补地址'} · 预算 ${formatMoney(Math.round(Number(item.budget_min || 0) / 100))}-${formatMoney(Math.round(Number(item.budget_max || 0) / 100))}元`,
+        status: isInvitation ? '客户邀请' : '待报价',
+        tone: 'orange',
+        icon: todoNewDemandIcon,
+        onClick: () => navigateWithAuth(`/pages/demand/detail/index?id=${item.id}`),
       });
     });
     (workbench?.pending_dispatch_orders || []).slice(0, 2).forEach((item) => {
@@ -705,7 +925,29 @@ export default function ProviderWorkbench() {
       }];
     }
     return items.slice(0, 4);
-  }, [navigateWithAuth, openFulfillment, workbench]);
+  }, [navigateWithAuth, openFulfillment, pendingPaymentOrders, workbench]);
+
+  const selectedQuoteAlert = useMemo<SelectedQuoteAlert | null>(() => {
+    if (pendingPaymentOrders.length > 0) {
+      const order = pendingPaymentOrders[0];
+      return {
+        order,
+        title: '报价已被客户选中',
+        desc: `${formatProviderOrderSubtitle(order)}。请关注合同签署和客户支付状态。`,
+        cta: '查看订单',
+      };
+    }
+    const confirmOrder = (workbench?.pending_provider_confirmation_orders || [])[0];
+    if (confirmOrder) {
+      return {
+        order: confirmOrder,
+        title: '有订单需要你立即确认',
+        desc: `${formatOrderTodoSubtitle(confirmOrder)}。确认后客户才能继续支付。`,
+        cta: '立即处理',
+      };
+    }
+    return null;
+  }, [pendingPaymentOrders, workbench?.pending_provider_confirmation_orders]);
 
   const navHeaderStyle = { paddingTop: `${navShift}rpx` } as React.CSSProperties;
   const settingsStyle = { top: `${headerActionTop}rpx` } as React.CSSProperties;
@@ -895,7 +1137,23 @@ export default function ProviderWorkbench() {
 
         {/* Nearby broadcasts */}
         {presence.online ? (
-          <NearbyBroadcasts canSelfExecute={providerCapabilities.canSelfExecute} onGrabbed={openGrabbedOrder} />
+          <>
+            <PendingAssignments onAccepted={openGrabbedOrder} />
+            <NearbyBroadcasts canSelfExecute={providerCapabilities.canSelfExecute} onGrabbed={openGrabbedOrder} />
+          </>
+        ) : null}
+
+        {selectedQuoteAlert ? (
+          <View className='pw-selected-alert' onClick={() => openFulfillment(selectedQuoteAlert.order.id)}>
+            <View className='pw-selected-alert-main'>
+              <Text className='pw-selected-alert-kicker'>重要待办</Text>
+              <Text className='pw-selected-alert-title'>{selectedQuoteAlert.title}</Text>
+              <Text className='pw-selected-alert-desc'>{selectedQuoteAlert.desc}</Text>
+            </View>
+            <View className='pw-selected-alert-cta'>
+              <Text>{selectedQuoteAlert.cta}</Text>
+            </View>
+          </View>
         ) : null}
 
         {/* Metric grid */}
@@ -935,7 +1193,7 @@ export default function ProviderWorkbench() {
         <View className='pw-card'>
           <View className='pw-card-head'>
             <Text className='pw-card-title'>待处理事项</Text>
-            <View className='pw-card-link' onClick={openFulfillmentList}>
+            <View className='pw-card-link' onClick={openTodoList}>
               <Text>全部事项</Text>
               <Image className='pw-card-link-chevron' src={chevronRightIcon} mode='aspectFit' />
             </View>
@@ -963,6 +1221,7 @@ export default function ProviderWorkbench() {
 
         <View className='pw-scroll-spacer' />
       </ScrollView>
+      {presence.online ? <AssignmentModal onAccepted={openGrabbedOrder} /> : null}
       <ProviderOnboardingOverlay visible={showProviderOnboarding} onClose={closeProviderOnboarding} />
     </View>
   );

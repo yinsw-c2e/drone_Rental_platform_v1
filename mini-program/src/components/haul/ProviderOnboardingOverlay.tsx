@@ -52,23 +52,21 @@ export default function ProviderOnboardingOverlay({ visible, onClose }: Provider
   };
 
   return (
-    <View className={`provider-onboarding-overlay provider-onboarding-overlay-${current.key}`}>
-      <View className='provider-onboarding-spotlight' />
+    <View className='provider-onboarding-overlay' catchMove>
       <View className='provider-onboarding-bubble'>
         <Text className='provider-onboarding-count'>{stepIndex + 1} / {steps.length}</Text>
         <Text className='provider-onboarding-overlay-title'>{current.title}</Text>
         <Text className='provider-onboarding-overlay-desc'>{current.desc}</Text>
         <Text className='provider-onboarding-overlay-hint'>{current.hint}</Text>
-      </View>
-      <View className='provider-onboarding-bottom'>
-        <View className='provider-onboarding-skip' onClick={onClose}>
-          <Text>跳过</Text>
-        </View>
-        <View className='provider-onboarding-next' onClick={goNext}>
-          <Text>{isLast ? '完成' : '下一步'}</Text>
+        <View className='provider-onboarding-bottom'>
+          <View className='provider-onboarding-skip' onClick={onClose}>
+            <Text>跳过</Text>
+          </View>
+          <View className='provider-onboarding-next' onClick={goNext}>
+            <Text>{isLast ? '完成' : '下一步'}</Text>
+          </View>
         </View>
       </View>
     </View>
   );
 }
-

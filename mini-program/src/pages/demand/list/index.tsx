@@ -1,13 +1,15 @@
 import Taro, { useDidShow } from '@tarojs/taro';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, ScrollView, Text, View } from '@tarojs/components';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { demandV2Service, DemandListParams } from '../../../services/demandV2';
-import { DemandSummary } from '../../../types';
+import { orderV2Service } from '../../../services/orderV2';
+import { DemandSummary, V2OrderSummary } from '../../../types';
 import { CARGO_SCENE_LABELS, getDemandSceneLabel } from '../../../utils';
 import { getEffectiveRoleSummary, resolveProviderCapabilities } from '../../../utils/roleSummary';
 import { syncCustomTabBar } from '../../../utils/tabBar';
 import { RootState } from '../../../store/store';
+import { setHaulRoleMode } from '../../../store/slices/roleSlice';
 import filterChevronIcon from '../../../assets/haul/provider-demand-list/icon_filter_chevron_down.png';
 import locationPinIcon from '../../../assets/haul/provider-demand-list/icon_location_pin_blue.png';
 import weightIcon from '../../../assets/haul/provider-demand-list/icon_metric_weight_blue.png';
@@ -38,12 +40,15 @@ type VisualDemand = {
   scheduleDate: Date | null;
   scene: string;
   sceneKey: string;
+  priceLabel: string;
   price: string;
   priceSort: number | null;
   airspace: string;
   airspaceTone: 'green' | 'orange';
   hasQuoted: boolean;
   suggestedPriceYuan: number | null;
+  source: string;
+  sourceLabel: string;
 };
 
 type ProviderCapabilityCopy = {
@@ -82,6 +87,34 @@ const formatPrice = (min?: number | null, max?: number | null) => {
   if (hi > 0) return `${formatYuan(hi)}以内`;
   if (lo > 0) return `${formatYuan(lo)}起`;
   return '待报价';
+};
+
+const formatQuotePrice = (amount?: number | null) => {
+  const cents = Number(amount || 0);
+  if (!Number.isFinite(cents) || cents <= 0) return '';
+  const yuan = cents / 100;
+  return `¥${yuan.toLocaleString('zh-CN', {
+    minimumFractionDigits: Number.isInteger(yuan) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
+const orderItemsOf = (response: unknown): V2OrderSummary[] => {
+  const data = response as any;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  return [];
+};
+
+const formatOrderRoute = (order?: V2OrderSummary | null) =>
+  [order?.service_address, order?.dest_address].filter(Boolean).join(' → ') || order?.title || '已选中订单';
+
+const selectedOrderNoticeText = (orders: V2OrderSummary[]) => {
+  const first = orders[0];
+  const count = orders.length;
+  const route = formatOrderRoute(first);
+  const suffix = count > 1 ? `等 ${count} 笔订单` : '这笔订单';
+  return `${route}，${suffix}正在等待合同签署或客户支付。`;
 };
 
 const providerCapabilityCopyOf = (canQuote: boolean, canSelfExecute: boolean): ProviderCapabilityCopy | null => {
@@ -185,13 +218,37 @@ const arrivalLabelOf = (minutes?: number | null) => {
   return `约${Math.ceil(value)}分`;
 };
 
-const airspaceMetaOf = (value?: string | null): Pick<VisualDemand, 'airspace' | 'airspaceTone'> => {
+const hasCoordinate = (value: any) => {
+  const lat = Number(value?.latitude ?? value?.lat);
+  const lng = Number(value?.longitude ?? value?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng);
+};
+
+const demandHasCheckedAirspaceInput = (item: DemandSummary) => {
+  const anyItem = item as any;
+  return [
+    anyItem.departure_address,
+    anyItem.destination_address,
+    anyItem.service_address,
+  ].some(value => value && (hasCoordinate(value) || snapshotAddressText(value)));
+};
+
+const airspaceMetaOf = (
+  value?: string | null,
+  checkedFallback = false,
+): Pick<VisualDemand, 'airspace' | 'airspaceTone'> => {
   const status = String(value || '').toLowerCase();
-  if (['approved', 'available', 'clear', 'safe'].includes(status)) {
+  if (['approved', 'available', 'clear', 'safe', 'passed'].includes(status)) {
     return { airspace: '空域可飞', airspaceTone: 'green' };
+  }
+  if (['not_required', 'checked'].includes(status)) {
+    return { airspace: '空域已检查', airspaceTone: 'green' };
   }
   if (['rejected', 'blocked', 'no_fly', 'forbidden'].includes(status)) {
     return { airspace: '不可飞', airspaceTone: 'orange' };
+  }
+  if (checkedFallback) {
+    return { airspace: '空域已检查', airspaceTone: 'green' };
   }
   return { airspace: '待确认', airspaceTone: 'orange' };
 };
@@ -207,6 +264,22 @@ const suggestedPriceYuanOf = (item: DemandSummary) => {
   return null;
 };
 
+const priceMetaOf = (item: DemandSummary) => {
+  const myQuoteAmount = Number(item.my_quote?.price_amount || 0);
+  if (myQuoteAmount > 0) {
+    return {
+      priceLabel: '我的报价',
+      price: formatQuotePrice(myQuoteAmount),
+      priceSort: myQuoteAmount,
+    };
+  }
+  return {
+    priceLabel: '平台预估价',
+    price: formatPrice(item.budget_min, item.budget_max),
+    priceSort: positiveNumber(item.budget_min) || positiveNumber(item.budget_max),
+  };
+};
+
 const mapDemand = (item: DemandSummary): VisualDemand => {
   const anyItem = item as any;
   const start = compactAddress(snapshotAddressText(anyItem.departure_address) || anyItem.service_address_text);
@@ -217,8 +290,8 @@ const mapDemand = (item: DemandSummary): VisualDemand => {
   const coverageLabel = distanceKm ? coverageLabelOf(anyItem.service_coverage_status) : '';
   const arrivalLabel = arrivalLabelOf(anyItem.estimated_arrival_minutes);
   const scheduleDate = parseDate(item.scheduled_start_at);
-  const priceSort = positiveNumber(item.budget_min) || positiveNumber(item.budget_max);
-  const airspace = airspaceMetaOf(anyItem.airspace_status);
+  const priceMeta = priceMetaOf(item);
+  const airspace = airspaceMetaOf(anyItem.airspace_status, demandHasCheckedAirspaceInput(item));
   const region = demandRegionLabel(item);
 
   return {
@@ -236,11 +309,12 @@ const mapDemand = (item: DemandSummary): VisualDemand => {
     scheduleDate,
     scene: item.cargo_scene ? getDemandSceneLabel(item.cargo_scene) : '场景待补',
     sceneKey: item.cargo_scene || '',
-    price: formatPrice(item.budget_min, item.budget_max),
-    priceSort,
+    ...priceMeta,
     ...airspace,
     hasQuoted: Boolean(item.my_quote?.id),
     suggestedPriceYuan: suggestedPriceYuanOf(item),
+    source: item.source || '',
+    sourceLabel: item.source_label || (item.source === 'invitation' ? '客户邀请报价' : ''),
   };
 };
 
@@ -330,9 +404,11 @@ const matchesFilters = (item: VisualDemand, filters: Record<FilterKey, string>) 
 };
 
 export default function DemandListPage({ headerExtra }: { headerExtra?: React.ReactNode } = {}) {
+  const dispatch = useDispatch();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
   const [demands, setDemands] = useState<DemandSummary[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<V2OrderSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -387,17 +463,32 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
     }
   }, [canQuoteAsProvider, filters, isAuthenticated, providerCapabilityCopy?.title, sortKey]);
 
+  const fetchSelectedOrders = useCallback(async () => {
+    if (!isAuthenticated || !canQuoteAsProvider) {
+      setSelectedOrders([]);
+      return;
+    }
+    try {
+      const res = await orderV2Service.list({ role: 'provider', status: 'pending_payment', page: 1, page_size: 3 });
+      setSelectedOrders(orderItemsOf(res));
+    } catch {
+      setSelectedOrders([]);
+    }
+  }, [canQuoteAsProvider, isAuthenticated]);
+
   useDidShow(() => {
-    // 仅同步 TabBar 选中态，不强制改写全局角色身份。
-    syncCustomTabBar(1);
+    dispatch(setHaulRoleMode('provider'));
+    syncCustomTabBar(1, 'provider');
     setPage(1);
     if (!isAuthenticated || !canQuoteAsProvider) {
       setDemands([]);
       setHasMore(false);
       setFetchError(isAuthenticated ? (providerCapabilityCopy?.title || '接单资质通过后才能查看可接需求') : '请先登录服务商账号后查看可接需求。');
       setLoading(false);
+      setSelectedOrders([]);
       return;
     }
+    fetchSelectedOrders();
     fetchDemands(1, true);
   });
 
@@ -484,6 +575,17 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
     Taro.switchTab({ url: '/pages/messages/index' }).catch(() => null);
   };
 
+  const openSelectedOrder = () => {
+    const first = selectedOrders[0];
+    if (first?.id) {
+      Taro.navigateTo({ url: `/pages/orders/detail/index?orderId=${first.id}` }).catch(() => {
+        Taro.navigateTo({ url: '/pages/orders/provider/index' }).catch(() => null);
+      });
+      return;
+    }
+    Taro.navigateTo({ url: '/pages/orders/provider/index' }).catch(() => null);
+  };
+
   const goProviderOnboarding = () => {
     Taro.navigateTo({ url: '/pages/provider/onboarding/index?from=demand-list' }).catch(() => {
       Taro.showToast({ title: '入驻页暂不可用', icon: 'none' });
@@ -561,6 +663,18 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
             </View>
           </View>
         ) : null}
+        {selectedOrders.length > 0 ? (
+          <View className='pd-selected-order-card' onClick={openSelectedOrder}>
+            <View className='pd-selected-order-main'>
+              <Text className='pd-selected-order-kicker'>报价已被客户选中</Text>
+              <Text className='pd-selected-order-title'>有订单需要关注</Text>
+              <Text className='pd-selected-order-desc'>{selectedOrderNoticeText(selectedOrders)}</Text>
+            </View>
+            <View className='pd-selected-order-action'>
+              <Text>查看订单</Text>
+            </View>
+          </View>
+        ) : null}
         <View className='pd-filter-area'>
           <View className='pd-filter-row'>
             {filterMeta.map(item => (
@@ -597,6 +711,11 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
             className='pd-demand-card'
             onClick={() => goDetail(item)}
           >
+            {item.sourceLabel ? (
+              <View className='pd-source-row'>
+                <Text className='pd-source-badge'>{item.sourceLabel}</Text>
+              </View>
+            ) : null}
             <View className='pd-route'>
               <Image className='pd-route-pin' src={locationPinIcon} mode='aspectFit' />
               <Text className='pd-route-title'>{item.route}</Text>
@@ -628,7 +747,7 @@ export default function DemandListPage({ headerExtra }: { headerExtra?: React.Re
               <View className='pd-metric'>
                 <Image className='pd-metric-icon' src={priceIcon} mode='aspectFit' />
                 <View className='pd-metric-body'>
-                  <Text className='pd-metric-label'>平台预估价</Text>
+                  <Text className='pd-metric-label'>{item.priceLabel}</Text>
                   <Text className='pd-metric-value pd-metric-value-price'>{item.price}</Text>
                 </View>
               </View>
