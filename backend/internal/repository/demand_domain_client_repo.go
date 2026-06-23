@@ -177,6 +177,107 @@ func (r *DemandDomainRepo) ListLatestQuotesByDemandIDsAndOwner(demandIDs []int64
 	return result, nil
 }
 
+func (r *DemandDomainRepo) CountProviderDemandInvitations(providerUserID int64, statuses []string) (int64, error) {
+	if providerUserID <= 0 || len(statuses) == 0 {
+		return 0, nil
+	}
+
+	var total int64
+	err := r.db.Model(&model.DemandProviderInvitation{}).
+		Joins("JOIN demands ON demands.id = demand_provider_invitations.demand_id").
+		Where("demand_provider_invitations.provider_user_id = ?", providerUserID).
+		Where("demand_provider_invitations.status IN ?", statuses).
+		Where("demands.status IN ?", []string{"published", "quoting"}).
+		Where("(demands.expires_at IS NULL OR demands.expires_at > ?)", time.Now()).
+		Count(&total).Error
+	return total, err
+}
+
+func (r *DemandDomainRepo) ListProviderDemandInvitations(providerUserID int64, statuses []string, filter RecommendedDemandQuery, limit int) ([]model.DemandProviderInvitation, int64, error) {
+	var invitations []model.DemandProviderInvitation
+	var total int64
+	if providerUserID <= 0 || len(statuses) == 0 {
+		return invitations, 0, nil
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	query := r.db.Model(&model.DemandProviderInvitation{}).
+		Joins("JOIN demands ON demands.id = demand_provider_invitations.demand_id").
+		Where("demand_provider_invitations.provider_user_id = ?", providerUserID).
+		Where("demand_provider_invitations.status IN ?", statuses).
+		Where("demands.status IN ?", []string{"published", "quoting"}).
+		Where("(demands.expires_at IS NULL OR demands.expires_at > ?)", time.Now())
+	query = applyProviderInvitationDemandFilters(query, filter)
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Preload("Demand").
+		Order("demand_provider_invitations.updated_at DESC, demand_provider_invitations.id DESC").
+		Limit(limit).
+		Find(&invitations).Error
+	return invitations, total, err
+}
+
+func (r *DemandDomainRepo) ListProviderDemandInvitationsByDemandIDs(providerUserID int64, demandIDs []int64, statuses []string) (map[int64]model.DemandProviderInvitation, error) {
+	result := make(map[int64]model.DemandProviderInvitation)
+	if providerUserID <= 0 || len(demandIDs) == 0 || len(statuses) == 0 {
+		return result, nil
+	}
+
+	var invitations []model.DemandProviderInvitation
+	if err := r.db.
+		Where("provider_user_id = ? AND demand_id IN ? AND status IN ?", providerUserID, demandIDs, statuses).
+		Order("updated_at DESC, id DESC").
+		Find(&invitations).Error; err != nil {
+		return nil, err
+	}
+	for _, invitation := range invitations {
+		if _, exists := result[invitation.DemandID]; !exists {
+			result[invitation.DemandID] = invitation
+		}
+	}
+	return result, nil
+}
+
+func applyProviderInvitationDemandFilters(query *gorm.DB, filter RecommendedDemandQuery) *gorm.DB {
+	if trimmed := strings.TrimSpace(filter.ServiceType); trimmed != "" {
+		query = query.Where("demands.service_type = ?", trimmed)
+	}
+	if trimmed := strings.TrimSpace(filter.Region); trimmed != "" {
+		like := "%" + trimmed + "%"
+		query = query.Where(
+			`(
+				demands.title LIKE ? OR
+				CAST(demands.service_address_snapshot AS CHAR) LIKE ? OR
+				CAST(demands.departure_address_snapshot AS CHAR) LIKE ? OR
+				CAST(demands.destination_address_snapshot AS CHAR) LIKE ?
+			)`,
+			like, like, like, like,
+		)
+	}
+	if trimmed := strings.TrimSpace(filter.CargoScene); trimmed != "" {
+		query = query.Where("demands.cargo_scene = ?", trimmed)
+	}
+	if filter.MinWeightKG > 0 {
+		query = query.Where("demands.cargo_weight_kg >= ?", filter.MinWeightKG)
+	}
+	if filter.MaxWeightKG > 0 {
+		query = query.Where("demands.cargo_weight_kg <= ?", filter.MaxWeightKG)
+	}
+	if filter.StartFrom != nil {
+		query = query.Where("demands.scheduled_start_at >= ?", *filter.StartFrom)
+	}
+	if filter.StartTo != nil {
+		query = query.Where("demands.scheduled_start_at < ?", *filter.StartTo)
+	}
+	return query
+}
+
 func (r *DemandDomainRepo) ListLatestCandidatesByDemandIDsAndPilot(demandIDs []int64, pilotUserID int64) (map[int64]*model.DemandCandidatePilot, error) {
 	result := make(map[int64]*model.DemandCandidatePilot)
 	if len(demandIDs) == 0 || pilotUserID == 0 {

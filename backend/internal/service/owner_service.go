@@ -81,6 +81,7 @@ type OwnerProfileInput struct {
 
 type OwnerWorkbenchSummary struct {
 	RecommendedDemandCount                int64 `json:"recommended_demand_count"`
+	PendingInvitationCount                int64 `json:"pending_invitation_count"`
 	PendingQuoteCount                     int64 `json:"pending_quote_count"`
 	PendingProviderConfirmationOrderCount int64 `json:"pending_provider_confirmation_order_count"`
 	PendingDispatchOrderCount             int64 `json:"pending_dispatch_order_count"`
@@ -99,6 +100,9 @@ type OwnerWorkbenchDemandItem struct {
 	BudgetMax           int64      `json:"budget_max"`
 	QuoteCount          int64      `json:"quote_count"`
 	CandidatePilotCount int64      `json:"candidate_pilot_count"`
+	Source              string     `json:"source,omitempty"`
+	SourceLabel         string     `json:"source_label,omitempty"`
+	InvitationID        int64      `json:"invitation_id,omitempty"`
 }
 
 type OwnerWorkbenchOrderItem struct {
@@ -138,6 +142,17 @@ type OwnerWorkbenchView struct {
 	PendingDispatchOrders             []OwnerWorkbenchOrderItem  `json:"pending_dispatch_orders"`
 	DraftSupplies                     []OwnerWorkbenchSupplyItem `json:"draft_supplies"`
 }
+
+type DemandSourceInfo struct {
+	Source       string
+	SourceLabel  string
+	InvitationID int64
+}
+
+const (
+	ownerDemandSourceInvitation      = "invitation"
+	ownerDemandSourceInvitationLabel = "客户邀请报价"
+)
 
 func (s *OwnerService) SetMatchingService(matchingService *MatchingService) {
 	s.matchingService = matchingService
@@ -495,6 +510,64 @@ func (s *OwnerService) ListRecommendedDemands(ownerUserID int64, page, pageSize 
 	if pageSize <= 0 {
 		pageSize = 20
 	}
+
+	invitations := []model.DemandProviderInvitation{}
+	if page == 1 {
+		var err error
+		invitations, _, err = s.demandDomainRepo.ListProviderDemandInvitations(ownerUserID, pendingProviderInvitationStatuses(), query.repoQuery(), pageSize)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	basePageSize := pageSize
+	if page == 1 && len(invitations) > 0 {
+		basePageSize += len(invitations)
+	}
+	demands, total, err := s.listRecommendedDemandsBase(ownerUserID, page, basePageSize, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	if page != 1 || len(invitations) == 0 {
+		return demands, total, nil
+	}
+
+	merged := make([]model.Demand, 0, pageSize)
+	seen := make(map[int64]struct{}, pageSize+len(invitations))
+	for i := range invitations {
+		if invitations[i].Demand == nil {
+			continue
+		}
+		demand := *invitations[i].Demand
+		if demand.ID <= 0 {
+			continue
+		}
+		if _, exists := seen[demand.ID]; exists {
+			continue
+		}
+		seen[demand.ID] = struct{}{}
+		merged = append(merged, demand)
+	}
+	for i := range demands {
+		if demands[i].ID <= 0 {
+			continue
+		}
+		if _, exists := seen[demands[i].ID]; exists {
+			continue
+		}
+		seen[demands[i].ID] = struct{}{}
+		merged = append(merged, demands[i])
+	}
+	if len(merged) > pageSize {
+		merged = merged[:pageSize]
+	}
+	if total < int64(len(merged)) {
+		total = int64(len(merged))
+	}
+	return merged, total, nil
+}
+
+func (s *OwnerService) listRecommendedDemandsBase(ownerUserID int64, page, pageSize int, query RecommendedDemandQuery) ([]model.Demand, int64, error) {
 	if s.matchingService != nil && query.IsZero() {
 		return s.matchingService.RecommendDemandsForOwner(ownerUserID, page, pageSize)
 	}
@@ -860,8 +933,16 @@ func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, err
 	if err != nil {
 		return nil, err
 	}
+	invitationSources, err := s.GetPendingInvitationDemandSources(ownerUserID, demandIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	_, pendingQuoteTotal, err := s.ListMyQuotes(ownerUserID, "submitted", 1, 1)
+	if err != nil {
+		return nil, err
+	}
+	pendingInvitationTotal, err := s.demandDomainRepo.CountProviderDemandInvitations(ownerUserID, pendingProviderInvitationStatuses())
 	if err != nil {
 		return nil, err
 	}
@@ -883,6 +964,7 @@ func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, err
 	view := &OwnerWorkbenchView{
 		Summary: OwnerWorkbenchSummary{
 			RecommendedDemandCount:                recommendedTotal,
+			PendingInvitationCount:                pendingInvitationTotal,
 			PendingQuoteCount:                     pendingQuoteTotal,
 			PendingProviderConfirmationOrderCount: pendingProviderTotal,
 			PendingDispatchOrderCount:             pendingDispatchTotal,
@@ -897,6 +979,7 @@ func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, err
 	for i := range recommendedDemands {
 		item := recommendedDemands[i]
 		stats := demandStats[item.ID]
+		sourceInfo := invitationSources[item.ID]
 		view.RecommendedDemands = append(view.RecommendedDemands, OwnerWorkbenchDemandItem{
 			ID:                  item.ID,
 			DemandNo:            item.DemandNo,
@@ -909,6 +992,9 @@ func (s *OwnerService) GetWorkbench(ownerUserID int64) (*OwnerWorkbenchView, err
 			BudgetMax:           item.BudgetMax,
 			QuoteCount:          stats.QuoteCount,
 			CandidatePilotCount: stats.CandidatePilotCount,
+			Source:              sourceInfo.Source,
+			SourceLabel:         sourceInfo.SourceLabel,
+			InvitationID:        sourceInfo.InvitationID,
 		})
 	}
 
@@ -947,6 +1033,29 @@ func (s *OwnerService) GetDemandStats(demandIDs []int64) (map[int64]DemandStats,
 		}
 	}
 	return result, nil
+}
+
+func (s *OwnerService) GetPendingInvitationDemandSources(ownerUserID int64, demandIDs []int64) (map[int64]DemandSourceInfo, error) {
+	result := make(map[int64]DemandSourceInfo)
+	if s.demandDomainRepo == nil || ownerUserID <= 0 || len(demandIDs) == 0 {
+		return result, nil
+	}
+	invitations, err := s.demandDomainRepo.ListProviderDemandInvitationsByDemandIDs(ownerUserID, demandIDs, pendingProviderInvitationStatuses())
+	if err != nil {
+		return nil, err
+	}
+	for demandID, invitation := range invitations {
+		result[demandID] = DemandSourceInfo{
+			Source:       ownerDemandSourceInvitation,
+			SourceLabel:  ownerDemandSourceInvitationLabel,
+			InvitationID: invitation.ID,
+		}
+	}
+	return result, nil
+}
+
+func pendingProviderInvitationStatuses() []string {
+	return []string{model.DemandProviderInvitationStatusPendingQuote}
 }
 
 func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *CreateQuoteInput) (*model.DemandQuote, error) {
@@ -1026,6 +1135,9 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 					return err
 				}
 				result = updated
+				if err := repository.NewProviderRecommendationRepo(tx).MarkInvitationQuoted(demand.ID, ownerUserID); err != nil && !isOptionalProviderLookupError(err) {
+					return err
+				}
 				return nil
 			}
 		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1055,6 +1167,9 @@ func (s *OwnerService) CreateDemandQuote(ownerUserID, demandID int64, input *Cre
 			}
 		}
 		result = quote
+		if err := repository.NewProviderRecommendationRepo(tx).MarkInvitationQuoted(demand.ID, ownerUserID); err != nil && !isOptionalProviderLookupError(err) {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

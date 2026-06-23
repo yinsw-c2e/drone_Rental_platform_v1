@@ -441,6 +441,11 @@ response `data`:
 
 `GET /api/v2/supplies`
 
+适用范围：
+
+- 供给市场/服务市场浏览，不作为客户议价单的服务商方案来源
+- 客户议价链路应使用 `demands`、服务商推荐和定向邀请报价，不应读取 `owner_supplies.base_price_amount` 作为本单报价
+
 query:
 
 - `region`
@@ -470,6 +475,12 @@ query:
 ### 5.6 从供给发起直达下单
 
 `POST /api/v2/supplies/{supply_id}/orders`
+
+适用范围：
+
+- 仅保留给未来独立服务市场的直达供给下单能力
+- 不属于“发布议价单 / 挑选服务商邀请报价”链路
+- 快速吊运页和服务商推荐页不得通过 `supplyId` 调用此接口创建订单
 
 request:
 
@@ -562,7 +573,7 @@ request:
 说明：
 
 - 仅 `status=draft` 时可调用
-- 发布后需求进入 `published`，对机主和飞手可见
+- 发布后需求进入 `published`，对符合接单资质的服务商可见
 - 发布时校验必填字段完整性
 - 同时校验客户资格，口径与 `GET /api/v2/client/eligibility` 一致
 
@@ -747,11 +758,13 @@ request:
 
 `GET /api/v2/owner/quotes`
 
-### 6.13 获取绑定飞手列表
+### 6.13 历史兼容：获取执行人员绑定列表
 
 `GET /api/v2/owner/pilot-bindings`
 
-### 6.14 机主邀请绑定飞手
+> 兼容说明：该接口保留给旧版机主/执行人员协作数据，不参与当前客户议价单的服务商推荐、搜索、邀请报价链路。新服务商画像以服务商档案、认证无人机、履约资质和履约数据为准，不要求服务商绑定其他执行人员。
+
+### 6.14 历史兼容：邀请执行人员绑定
 
 `POST /api/v2/owner/pilot-bindings`
 
@@ -761,25 +774,25 @@ request:
 {
   "pilot_user_id": 51,
   "is_priority": true,
-  "note": "长期合作飞手"
+  "note": "长期合作执行人员"
 }
 ```
 
 说明：
 
 - 创建 `initiated_by=owner` 的绑定记录，初始状态为 `pending_confirmation`
-- 飞手收到绑定邀请通知后，通过飞手侧接口确认或拒绝
+- 执行人员收到绑定邀请通知后，通过历史兼容接口确认或拒绝
 
-### 6.15 机主确认飞手申请
+### 6.15 历史兼容：确认执行人员申请
 
 `POST /api/v2/owner/pilot-bindings/{binding_id}/confirm`
 
 说明：
 
-- 仅用于 `initiated_by=pilot` 且 `status=pending_confirmation` 的绑定记录
+- 仅用于 `initiated_by=pilot` 且 `status=pending_confirmation` 的历史绑定记录
 - 确认后绑定进入 `active`
 
-### 6.16 机主拒绝飞手申请
+### 6.16 历史兼容：拒绝执行人员申请
 
 `POST /api/v2/owner/pilot-bindings/{binding_id}/reject`
 
@@ -799,15 +812,17 @@ request:
 
 - 可操作状态变更：`active → paused`、`paused → active`、`active → dissolved`、`paused → dissolved`
 
-## 7. 飞手域接口
+## 7. 历史兼容执行人员域接口
 
-### 7.1 获取飞手档案
+> 兼容说明：`/pilot/*` 接口保留给旧版执行人员资料、候选报名和履约任务数据。当前 MVP 的客户下单与挑选服务商链路不向客户展示独立执行人员角色，也不要求服务商绑定其他执行人员。
+
+### 7.1 获取执行人员档案
 
 `GET /api/v2/pilot/profile`
 
 说明：
 
-- 响应中新增 `eligibility`，用于表达阶段 4 的飞手分级准入口径
+- 响应中新增 `eligibility`，用于表达阶段 4 的执行人员分级准入口径
 - `eligibility.tier` 当前可能为：
   - `profile_setup`
   - `candidate_ready`
@@ -818,11 +833,11 @@ request:
 - 正式派单/执行链路使用 `eligibility.can_accept_dispatch` / `eligibility.can_start_execution`
 - `eligibility.recommended_next_step` 和 `eligibility.blockers` 用于前端给出“还缺什么、下一步做什么”的说明
 
-### 7.2 创建或更新飞手档案
+### 7.2 创建或更新执行人员档案
 
 `PUT /api/v2/pilot/profile`
 
-### 7.3 更新飞手在线状态
+### 7.3 更新执行人员在线状态
 
 `PATCH /api/v2/pilot/availability`
 
@@ -840,9 +855,9 @@ request:
 
 说明：
 
-- 返回飞手视角的绑定关系列表，包含机主摘要、绑定状态、是否优先合作
+- 返回执行人员视角的绑定关系列表，包含机主摘要、绑定状态、是否优先合作
 
-### 7.5 飞手申请绑定机主
+### 7.5 执行人员申请绑定机主
 
 `POST /api/v2/pilot/owner-bindings`
 
@@ -860,7 +875,7 @@ request:
 - 创建 `initiated_by=pilot` 的绑定记录，初始状态为 `pending_confirmation`
 - 机主收到绑定申请通知后，通过机主侧接口确认或拒绝
 
-### 7.6 飞手确认机主邀请
+### 7.6 执行人员确认机主邀请
 
 `POST /api/v2/pilot/owner-bindings/{binding_id}/confirm`
 
@@ -869,11 +884,11 @@ request:
 - 仅用于 `initiated_by=owner` 且 `status=pending_confirmation` 的绑定记录
 - 确认后绑定进入 `active`
 
-### 7.7 飞手拒绝机主邀请
+### 7.7 执行人员拒绝机主邀请
 
 `POST /api/v2/pilot/owner-bindings/{binding_id}/reject`
 
-### 7.8 飞手更新绑定状态（暂停/恢复/解除）
+### 7.8 执行人员更新绑定状态（暂停/恢复/解除）
 
 `PATCH /api/v2/pilot/owner-bindings/{binding_id}/status`
 
@@ -884,9 +899,9 @@ request:
 说明：
 
 - 只返回 `allows_pilot_candidate=true` 的公开需求
-- 只返回飞手当前可见的需求摘要
-- 从阶段 4 开始，待审核但已补齐基础执照资料的飞手也可以先浏览并报名候选需求
-- 正式派单与执行仍要求飞手认证通过
+- 只返回执行人员当前可见的需求摘要
+- 从阶段 4 开始，待审核但已补齐基础执照资料的执行人员也可以先浏览并报名候选需求
+- 正式派单与执行仍要求执行人员认证通过
 
 ### 7.10 报名候选
 
@@ -937,7 +952,7 @@ query:
 
 - `role=client` 返回客户订单
 - `role=owner` 返回机主承接订单
-- `role=pilot` 返回飞手参与执行的订单
+- `role=pilot` 返回执行人员参与执行的订单
 
 补充：
 
@@ -1016,7 +1031,7 @@ request:
 说明：
 
 - 仅 `status=assigned` 时可调用
-- 调用方为执行飞手（自执行场景下为机主本人）
+- 调用方为执行人员（自执行场景下为机主本人）
 - 调用成功后订单进入 `preparing`
 
 ### 8.8 执行人上报"已起飞"
@@ -1073,15 +1088,15 @@ request:
 {
   "dispatch_mode": "bound_pilot",
   "target_pilot_user_id": 51,
-  "reason": "优先指派合作飞手"
+  "reason": "优先指派合作执行人员"
 }
 ```
 
 说明：
 
 - `dispatch_mode=self_execute` 时，不创建派单任务，订单直接进入 `assigned`
-- `dispatch_mode=bound_pilot` 时，目标飞手必填
-- `dispatch_mode=candidate_pool` / `general_pool` 时，可由系统自动筛选目标飞手
+- `dispatch_mode=bound_pilot` 时，目标执行人员必填
+- `dispatch_mode=candidate_pool` / `general_pool` 时，可由系统自动筛选目标执行人员
 
 ### 8.14 获取正式派单列表
 
@@ -1097,7 +1112,7 @@ query:
 说明：
 
 - `role=owner` 返回当前机主发出的正式派单
-- `role=pilot` 返回当前飞手收到的正式派单
+- `role=pilot` 返回当前执行人员收到的正式派单
 - 只返回正式派单对象，不混旧任务池、需求候选或订单列表
 
 ### 8.15 获取派单详情
@@ -1223,8 +1238,8 @@ request:
 | `FORBIDDEN` | 无权限 |
 | `PROFILE_REQUIRED` | 缺少身份档案 |
 | `OWNER_PROFILE_REQUIRED` | 缺少机主档案 |
-| `PILOT_PROFILE_REQUIRED` | 缺少飞手档案 |
-| `PILOT_NOT_VERIFIED` | 飞手未认证 |
+| `PILOT_PROFILE_REQUIRED` | 缺少执行人员档案 |
+| `PILOT_NOT_VERIFIED` | 执行人员未认证 |
 | `DRONE_NOT_AVAILABLE` | 无人机不可用 |
 | `SUPPLY_NOT_ACTIVE` | 供给未生效 |
 | `DEMAND_NOT_OPEN` | 需求不可操作 |

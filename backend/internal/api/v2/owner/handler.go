@@ -430,10 +430,21 @@ func (h *Handler) ListRecommendedDemands(c *gin.Context) {
 		v2common.HandleServiceError(c, err)
 		return
 	}
+	sources, err := h.ownerService.GetPendingInvitationDemandSources(userID, demandIDs)
+	if err != nil {
+		v2common.HandleServiceError(c, err)
+		return
+	}
 
 	items := make([]gin.H, 0, len(demands))
 	for i := range demands {
-		items = append(items, buildDemandSummary(&demands[i], stats[demands[i].ID], metrics[demands[i].ID], myQuotes[demands[i].ID]))
+		item := buildDemandSummary(&demands[i], stats[demands[i].ID], metrics[demands[i].ID], myQuotes[demands[i].ID])
+		if source := sources[demands[i].ID]; source.Source != "" {
+			item["source"] = source.Source
+			item["source_label"] = source.SourceLabel
+			item["invitation_id"] = source.InvitationID
+		}
+		items = append(items, item)
 	}
 	response.V2SuccessList(c, items, total)
 }

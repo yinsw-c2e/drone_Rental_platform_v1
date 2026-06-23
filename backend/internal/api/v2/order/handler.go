@@ -285,7 +285,12 @@ func (h *Handler) List(c *gin.Context) {
 
 	items := make([]gin.H, 0, len(orders))
 	for i := range orders {
-		items = append(items, buildOrderSummary(&orders[i]))
+		item, summaryErr := h.buildOrderSummaryWithContract(&orders[i])
+		if summaryErr != nil {
+			v2common.HandleServiceError(c, summaryErr)
+			return
+		}
+		items = append(items, item)
 	}
 	response.V2SuccessList(c, items, total)
 }
@@ -308,7 +313,7 @@ func (h *Handler) Get(c *gin.Context) {
 		return
 	}
 
-	detail, err := h.buildOrderDetail(order)
+	detail, err := h.buildOrderDetail(order, userID)
 	if err != nil {
 		v2common.HandleServiceError(c, err)
 		return
@@ -937,7 +942,7 @@ func (h *Handler) ListDisputes(c *gin.Context) {
 	response.V2Success(c, gin.H{"items": buildDisputeList(disputes)})
 }
 
-func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
+func (h *Handler) buildOrderDetail(order *model.Order, viewerUserID int64) (gin.H, error) {
 	payments, err := h.orderService.ListPaymentsByOrder(order.ID)
 	if err != nil {
 		return nil, err
@@ -972,19 +977,9 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 		return nil, err
 	}
 
-	data := buildOrderSummary(order)
-	if h.contractService != nil {
-		contract, contractErr := h.contractService.GetContractByOrder(order.ID)
-		if contractErr == nil && contract != nil {
-			data["contract"] = buildOrderContractSummary(contract)
-			data["payment_ready"] = contract.Status == "fully_signed"
-		} else if errors.Is(contractErr, gorm.ErrRecordNotFound) {
-			data["payment_ready"] = true
-		} else if contractErr != nil {
-			return nil, contractErr
-		}
-	} else {
-		data["payment_ready"] = true
+	data, err := h.buildOrderSummaryWithContract(order)
+	if err != nil {
+		return nil, err
 	}
 	data["source_info"] = gin.H{
 		"order_source":     order.OrderSource,
@@ -992,10 +987,14 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 		"source_supply_id": nullableInt64(order.SourceSupplyID),
 		"snapshots":        buildSnapshotMap(snapshots),
 	}
+	clientSummary := buildUserSummary(order.Renter, order.ClientUserID, "client")
+	providerSummary := buildUserSummary(order.Owner, order.ProviderUserID, "owner")
+	executorSummary := buildExecutorSummary(order, currentDispatch)
+	attachCounterpartyCallPhone(order, currentDispatch, viewerUserID, clientSummary, providerSummary, executorSummary)
 	data["participants"] = gin.H{
-		"client":   buildUserSummary(order.Renter, order.ClientUserID, "client"),
-		"provider": buildUserSummary(order.Owner, order.ProviderUserID, "owner"),
-		"executor": buildExecutorSummary(order, currentDispatch),
+		"client":   clientSummary,
+		"provider": providerSummary,
+		"executor": executorSummary,
 	}
 	data["current_dispatch"] = buildDispatchTaskSummary(currentDispatch)
 	data["dispatch_history"] = buildDispatchTaskList(dispatchHistory)
@@ -1014,6 +1013,32 @@ func (h *Handler) buildOrderDetail(order *model.Order) (gin.H, error) {
 		data["live"] = live
 	}
 	return data, nil
+}
+
+func (h *Handler) buildOrderSummaryWithContract(order *model.Order) (gin.H, error) {
+	data := buildOrderSummary(order)
+	if order == nil {
+		return data, nil
+	}
+	if h.contractService == nil {
+		if order.Status == "pending_payment" {
+			data["payment_ready"] = false
+		}
+		return data, nil
+	}
+	contract, err := h.contractService.GetContractByOrder(order.ID)
+	if err == nil && contract != nil {
+		data["contract"] = buildOrderContractSummary(contract)
+		data["payment_ready"] = contract.Status == "fully_signed"
+		return data, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if order.Status == "pending_payment" {
+			data["payment_ready"] = false
+		}
+		return data, nil
+	}
+	return data, err
 }
 
 func (h *Handler) buildOrderMonitor(order *model.Order) (gin.H, error) {
@@ -1290,6 +1315,44 @@ func buildUserSummary(user *model.User, fallbackID int64, role string) gin.H {
 		result["phone"] = maskOrderPartyPhone(user.Phone)
 	}
 	return result
+}
+
+func attachCounterpartyCallPhone(order *model.Order, task *model.FormalDispatchTask, viewerUserID int64, clientSummary, providerSummary, executorSummary gin.H) {
+	if order == nil || viewerUserID <= 0 {
+		return
+	}
+	isClientViewer := viewerUserID == order.ClientUserID || viewerUserID == order.RenterID
+	isProviderViewer := viewerUserID == order.ProviderUserID || viewerUserID == order.OwnerID || viewerUserID == order.DroneOwnerUserID || viewerUserID == order.ExecutorPilotUserID
+	if isClientViewer && !isProviderViewer {
+		attachCallPhone(providerSummary, order.Owner)
+		attachCallPhone(executorSummary, executorUserOf(order, task))
+		return
+	}
+	if isProviderViewer && !isClientViewer {
+		attachCallPhone(clientSummary, order.Renter)
+	}
+}
+
+func attachCallPhone(summary gin.H, user *model.User) {
+	if summary == nil || user == nil {
+		return
+	}
+	if phone := strings.TrimSpace(user.Phone); phone != "" {
+		summary["call_phone"] = phone
+	}
+}
+
+func executorUserOf(order *model.Order, task *model.FormalDispatchTask) *model.User {
+	if order == nil {
+		return nil
+	}
+	if order.ExecutionMode == "self_execute" {
+		return order.Owner
+	}
+	if task != nil && task.TargetPilot != nil {
+		return task.TargetPilot
+	}
+	return nil
 }
 
 func maskOrderPartyPhone(phone string) string {
@@ -2208,25 +2271,32 @@ func buildContractResponse(c *model.OrderContract, order *model.Order) gin.H {
 	}
 	canSign, signBlockReason := contractSignAvailability(order)
 	return gin.H{
-		"id":                  c.ID,
-		"contract_no":         c.ContractNo,
-		"order_id":            c.OrderID,
-		"order_no":            c.OrderNo,
-		"title":               c.Title,
-		"status":              c.Status,
-		"client_user_id":      c.ClientUserID,
-		"provider_user_id":    c.ProviderUserID,
-		"contract_amount":     c.ContractAmount,
-		"platform_commission": c.PlatformCommission,
-		"provider_amount":     c.ProviderAmount,
-		"client_signed_at":    c.ClientSignedAt,
-		"provider_signed_at":  c.ProviderSignedAt,
-		"contract_html":       c.ContractHTML,
-		"order_status":        contractOrderStatus(order),
-		"can_sign":            canSign,
-		"sign_block_reason":   signBlockReason,
-		"created_at":          c.CreatedAt,
-		"updated_at":          c.UpdatedAt,
+		"id":                   c.ID,
+		"contract_no":          c.ContractNo,
+		"order_id":             c.OrderID,
+		"order_no":             c.OrderNo,
+		"template_key":         c.TemplateKey,
+		"title":                c.Title,
+		"status":               c.Status,
+		"client_user_id":       c.ClientUserID,
+		"provider_user_id":     c.ProviderUserID,
+		"service_description":  c.ServiceDescription,
+		"service_address":      c.ServiceAddress,
+		"scheduled_start_at":   c.ScheduledStartAt,
+		"scheduled_end_at":     c.ScheduledEndAt,
+		"cargo_weight_kg":      c.CargoWeightKG,
+		"estimated_trip_count": c.EstimatedTripCount,
+		"contract_amount":      c.ContractAmount,
+		"platform_commission":  c.PlatformCommission,
+		"provider_amount":      c.ProviderAmount,
+		"client_signed_at":     c.ClientSignedAt,
+		"provider_signed_at":   c.ProviderSignedAt,
+		"contract_html":        c.ContractHTML,
+		"order_status":         contractOrderStatus(order),
+		"can_sign":             canSign,
+		"sign_block_reason":    signBlockReason,
+		"created_at":           c.CreatedAt,
+		"updated_at":           c.UpdatedAt,
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 	"wurenji-backend/internal/repository"
 )
 
-func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) {
+func TestOwnerWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) {
 	now := time.Now()
 	db := newServiceTestDB(t,
 		&model.User{},
@@ -21,6 +21,7 @@ func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) 
 		&model.Demand{},
 		&model.DemandQuote{},
 		&model.DemandCandidatePilot{},
+		&model.DemandProviderInvitation{},
 		&model.OwnerSupply{},
 		&model.Order{},
 	)
@@ -101,6 +102,36 @@ func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) 
 	}
 	if err := db.Create(demand).Error; err != nil {
 		t.Fatalf("create demand: %v", err)
+	}
+	invitedDemand := &model.Demand{
+		ID:                     3002,
+		DemandNo:               "DMTEST0002",
+		ClientUserID:           clientUser.ID,
+		Title:                  "客户定向邀请吊运",
+		ServiceType:            "heavy_cargo_lift_transport",
+		CargoScene:             "mountain_agriculture",
+		ServiceAddressSnapshot: model.JSON(`{"text":"佛山市南海区邀请地址"}`),
+		BudgetMin:              130000,
+		BudgetMax:              190000,
+		ExpiresAt:              &expiresAt,
+		Status:                 "published",
+		CreatedAt:              now.Add(-3 * time.Hour),
+		UpdatedAt:              now.Add(-3 * time.Hour),
+	}
+	if err := db.Create(invitedDemand).Error; err != nil {
+		t.Fatalf("create invited demand: %v", err)
+	}
+	if err := db.Create(&model.DemandProviderInvitation{
+		ID:             3101,
+		DemandID:       invitedDemand.ID,
+		ClientUserID:   clientUser.ID,
+		ProviderUserID: ownerUser.ID,
+		Status:         model.DemandProviderInvitationStatusPendingQuote,
+		Message:        "请看一下这单",
+		CreatedAt:      now.Add(-30 * time.Minute),
+		UpdatedAt:      now.Add(-30 * time.Minute),
+	}).Error; err != nil {
+		t.Fatalf("create provider invitation: %v", err)
 	}
 
 	quote := &model.DemandQuote{
@@ -198,8 +229,11 @@ func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) 
 		t.Fatal("expected workbench view")
 	}
 
-	if workbench.Summary.RecommendedDemandCount != 1 {
-		t.Fatalf("expected 1 recommended demand, got %d", workbench.Summary.RecommendedDemandCount)
+	if workbench.Summary.RecommendedDemandCount != 2 {
+		t.Fatalf("expected 2 recommended demands, got %d", workbench.Summary.RecommendedDemandCount)
+	}
+	if workbench.Summary.PendingInvitationCount != 1 {
+		t.Fatalf("expected 1 pending invitation, got %d", workbench.Summary.PendingInvitationCount)
 	}
 	if workbench.Summary.PendingQuoteCount != 1 {
 		t.Fatalf("expected 1 pending quote, got %d", workbench.Summary.PendingQuoteCount)
@@ -214,17 +248,23 @@ func TestOwnerServiceGetWorkbenchAggregatesRestartWorkbenchSlices(t *testing.T) 
 		t.Fatalf("expected 1 draft supply, got %d", workbench.Summary.DraftSupplyCount)
 	}
 
-	if len(workbench.RecommendedDemands) != 1 {
-		t.Fatalf("expected 1 recommended demand item, got %d", len(workbench.RecommendedDemands))
+	if len(workbench.RecommendedDemands) != 2 {
+		t.Fatalf("expected 2 recommended demand items, got %d", len(workbench.RecommendedDemands))
 	}
-	if workbench.RecommendedDemands[0].QuoteCount != 1 {
-		t.Fatalf("expected demand quote count 1, got %d", workbench.RecommendedDemands[0].QuoteCount)
+	if workbench.RecommendedDemands[0].ID != invitedDemand.ID {
+		t.Fatalf("expected invited demand to be first, got %d", workbench.RecommendedDemands[0].ID)
 	}
-	if workbench.RecommendedDemands[0].CandidatePilotCount != 1 {
-		t.Fatalf("expected candidate count 1, got %d", workbench.RecommendedDemands[0].CandidatePilotCount)
+	if workbench.RecommendedDemands[0].Source != "invitation" || workbench.RecommendedDemands[0].SourceLabel != "客户邀请报价" {
+		t.Fatalf("expected invited demand source label, got %+v", workbench.RecommendedDemands[0])
 	}
-	if workbench.RecommendedDemands[0].ServiceAddressText != "佛山市禅城区测试地址" {
-		t.Fatalf("expected service address text to be preserved, got %q", workbench.RecommendedDemands[0].ServiceAddressText)
+	if workbench.RecommendedDemands[1].QuoteCount != 1 {
+		t.Fatalf("expected demand quote count 1, got %d", workbench.RecommendedDemands[1].QuoteCount)
+	}
+	if workbench.RecommendedDemands[1].CandidatePilotCount != 1 {
+		t.Fatalf("expected candidate count 1, got %d", workbench.RecommendedDemands[1].CandidatePilotCount)
+	}
+	if workbench.RecommendedDemands[1].ServiceAddressText != "佛山市禅城区测试地址" {
+		t.Fatalf("expected service address text to be preserved, got %q", workbench.RecommendedDemands[1].ServiceAddressText)
 	}
 
 	if len(workbench.PendingProviderConfirmationOrders) != 1 || workbench.PendingProviderConfirmationOrders[0].ID != providerOrder.ID {
@@ -378,8 +418,11 @@ func TestOwnerServiceListRecommendedDemandsSortsByOwnerSupplyDistance(t *testing
 		&model.User{},
 		&model.Drone{},
 		&model.Pilot{},
+		&model.OwnerProfile{},
+		&model.PilotProfile{},
 		&model.OwnerSupply{},
 		&model.Demand{},
+		&model.DemandProviderInvitation{},
 	)
 
 	ownerUser := &model.User{ID: 1101, Phone: "13800001101", Nickname: "距离测试机主", Status: "active"}
@@ -533,8 +576,11 @@ func TestOwnerServiceListRecommendedDemandsFallsBackToDroneDistance(t *testing.T
 		&model.User{},
 		&model.Drone{},
 		&model.Pilot{},
+		&model.OwnerProfile{},
+		&model.PilotProfile{},
 		&model.OwnerSupply{},
 		&model.Demand{},
+		&model.DemandProviderInvitation{},
 	)
 
 	ownerUser := &model.User{ID: 1201, Phone: "13800001201", Nickname: "无供给服务商", Status: "active"}

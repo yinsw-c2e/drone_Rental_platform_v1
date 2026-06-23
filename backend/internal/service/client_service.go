@@ -133,6 +133,8 @@ type SupplyMarketQuery struct {
 	ServiceType        string
 	MinPayloadKG       float64
 	AcceptsDirectOrder *bool
+	OriginLatitude     float64
+	OriginLongitude    float64
 }
 
 type DemandStats struct {
@@ -435,6 +437,8 @@ func (s *ClientService) ListMarketplaceSupplies(query SupplyMarketQuery, page, p
 		query.ServiceType,
 		query.MinPayloadKG,
 		query.AcceptsDirectOrder,
+		query.OriginLatitude,
+		query.OriginLongitude,
 		page,
 		pageSize,
 	)

@@ -38,6 +38,22 @@ func (h *Handler) List(c *gin.Context) {
 		}
 		query.MinPayloadKG = value
 	}
+	if raw := c.Query("origin_latitude"); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value < -90 || value > 90 {
+			response.V2ValidationError(c, "invalid origin_latitude")
+			return
+		}
+		query.OriginLatitude = value
+	}
+	if raw := c.Query("origin_longitude"); raw != "" {
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil || value < -180 || value > 180 {
+			response.V2ValidationError(c, "invalid origin_longitude")
+			return
+		}
+		query.OriginLongitude = value
+	}
 	if raw := c.Query("accepts_direct_order"); raw != "" {
 		value, err := strconv.ParseBool(raw)
 		if err != nil {

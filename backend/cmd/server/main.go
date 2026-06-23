@@ -163,6 +163,7 @@ func main() {
 	providerPresenceRepo := repository.NewProviderPresenceRepo(db)
 	orderBroadcastRepo := repository.NewOrderBroadcastRepo(db)
 	broadcastAssignmentRepo := repository.NewBroadcastAssignmentRepo(db)
+	providerRecommendationRepo := repository.NewProviderRecommendationRepo(db)
 	wechatSubscribeRepo := repository.NewWeChatSubscribeRepo(db)
 
 	contractRepo := repository.NewContractRepo(db)
@@ -257,6 +258,7 @@ func main() {
 	pricingService := service.NewPricingService(serviceClassRepo)
 	systemConfigService := service.NewSystemConfigService(db)
 	broadcastService := service.NewBroadcastService(providerPresenceRepo, orderBroadcastRepo, broadcastAssignmentRepo, orderRepo, orderArtifactRepo, userService, zapLogger)
+	providerRecommendationService := service.NewProviderRecommendationService(providerRecommendationRepo)
 	demandService := service.NewDemandService(demandRepo, clientRepo)
 	matchingService := service.NewMatchingService(matchingRepo, demandRepo, droneRepo, clientRepo, ownerDomainRepo, demandDomainRepo, zapLogger)
 	paymentService := service.NewPaymentService(paymentRepo, orderRepo, droneRepo, pilotRepo, orderArtifactRepo, paymentProvider, zapLogger)
@@ -367,7 +369,7 @@ func main() {
 		Analytics:  longanalytics.NewHandler(analyticsService),
 	}
 	longtailHandlers.Admin.SetH9Dependencies(serviceClassRepo, orderBroadcastRepo, systemConfigService)
-	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, pricingService, broadcastService, paymentService, settlementService, messageService, reviewService, pushService, wechatSubscribeService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
+	v2Handlers := v2.NewHandlers(authService, userService, homeService, orderAnomalyService, clientService, ownerService, droneService, pilotService, orderService, dispatchService, flightService, pricingService, broadcastService, providerRecommendationService, paymentService, settlementService, messageService, reviewService, pushService, wechatSubscribeService, uploadService, wechatOAuth, wechatMiniOAuth, qqOAuth, cfg.Server.Mode, longtailHandlers)
 	v2Handlers.Order.SetContractService(contractService)
 	clientService.SetContractService(contractService)
 	orderService.SetContractService(contractService)

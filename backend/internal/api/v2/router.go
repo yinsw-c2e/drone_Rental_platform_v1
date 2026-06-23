@@ -40,6 +40,7 @@ import (
 	v2payment "wurenji-backend/internal/api/v2/payment"
 	v2pilot "wurenji-backend/internal/api/v2/pilot"
 	v2provider "wurenji-backend/internal/api/v2/provider"
+	v2providerrecommendation "wurenji-backend/internal/api/v2/provider_recommendation"
 	v2push "wurenji-backend/internal/api/v2/push"
 	v2review "wurenji-backend/internal/api/v2/review"
 	v2settlement "wurenji-backend/internal/api/v2/settlement"
@@ -51,27 +52,28 @@ import (
 )
 
 type Handlers struct {
-	Base         *base.Handler
-	Auth         *v2auth.Handler
-	Me           *v2me.Handler
-	Home         *v2home.Handler
-	Anomaly      *v2anomaly.Handler
-	Client       *v2client.Handler
-	Supply       *v2supply.Handler
-	Demand       *v2demand.Handler
-	Owner        *v2owner.Handler
-	Pilot        *v2pilot.Handler
-	Provider     *v2provider.Handler
-	Order        *v2order.Handler
-	Dispatch     *v2dispatch.Handler
-	Flight       *v2flight.Handler
-	Message      *v2message.Handler
-	Payment      *v2payment.Handler
-	Settlement   *v2settlement.Handler
-	Notification *v2notification.Handler
-	Push         *v2push.Handler
-	Review       *v2review.Handler
-	Longtail     *LongtailHandlers
+	Base                   *base.Handler
+	Auth                   *v2auth.Handler
+	Me                     *v2me.Handler
+	Home                   *v2home.Handler
+	Anomaly                *v2anomaly.Handler
+	Client                 *v2client.Handler
+	Supply                 *v2supply.Handler
+	Demand                 *v2demand.Handler
+	Owner                  *v2owner.Handler
+	Pilot                  *v2pilot.Handler
+	Provider               *v2provider.Handler
+	ProviderRecommendation *v2providerrecommendation.Handler
+	Order                  *v2order.Handler
+	Dispatch               *v2dispatch.Handler
+	Flight                 *v2flight.Handler
+	Message                *v2message.Handler
+	Payment                *v2payment.Handler
+	Settlement             *v2settlement.Handler
+	Notification           *v2notification.Handler
+	Push                   *v2push.Handler
+	Review                 *v2review.Handler
+	Longtail               *LongtailHandlers
 }
 
 type LongtailHandlers struct {
@@ -97,29 +99,30 @@ type LongtailHandlers struct {
 	Owner      *longowner.Handler
 }
 
-func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, broadcastService *service.BroadcastService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, wechatSubscribe v2push.WeChatSubscribeGrantRecorder, uploadService *uploadpkg.UploadService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth, serverMode string, longtail *LongtailHandlers) *Handlers {
+func NewHandlers(authService *service.AuthService, userService *service.UserService, homeService *service.HomeService, orderAnomalyService *service.OrderAnomalyService, clientService *service.ClientService, ownerService *service.OwnerService, droneService *service.DroneService, pilotService *service.PilotService, orderService *service.OrderService, dispatchService *service.DispatchService, flightService *service.FlightService, pricingService *service.PricingService, broadcastService *service.BroadcastService, providerRecommendationService *service.ProviderRecommendationService, paymentService *service.PaymentService, settlementService *service.SettlementService, messageService *service.MessageService, reviewService *service.ReviewService, pushService pushpkg.PushService, wechatSubscribe v2push.WeChatSubscribeGrantRecorder, uploadService *uploadpkg.UploadService, wechatOAuth *oauth.WeChatOAuth, wechatMiniOAuth *oauth.WeChatOAuth, qqOAuth *oauth.QQOAuth, serverMode string, longtail *LongtailHandlers) *Handlers {
 	return &Handlers{
-		Base:         base.NewHandler(),
-		Auth:         v2auth.NewHandler(authService, userService, wechatOAuth, wechatMiniOAuth, qqOAuth),
-		Me:           v2me.NewHandler(userService),
-		Home:         v2home.NewHandler(homeService),
-		Anomaly:      v2anomaly.NewHandler(orderAnomalyService),
-		Client:       v2client.NewHandler(clientService),
-		Supply:       v2supply.NewHandler(clientService),
-		Demand:       v2demand.NewHandler(clientService),
-		Owner:        v2owner.NewHandler(ownerService, droneService),
-		Pilot:        v2pilot.NewHandler(pilotService, uploadService),
-		Provider:     v2provider.NewHandler(broadcastService),
-		Order:        v2order.NewHandler(orderService, dispatchService, flightService, pricingService, settlementService, broadcastService),
-		Dispatch:     v2dispatch.NewHandler(dispatchService, orderService),
-		Flight:       v2flight.NewHandler(flightService, orderService),
-		Message:      v2message.NewHandler(messageService),
-		Payment:      v2payment.NewHandler(orderService, paymentService),
-		Settlement:   v2settlement.NewHandler(orderService, settlementService),
-		Notification: v2notification.NewHandler(messageService),
-		Push:         v2push.NewHandler(pushService, serverMode, wechatSubscribe),
-		Review:       v2review.NewHandler(orderService, reviewService),
-		Longtail:     longtail,
+		Base:                   base.NewHandler(),
+		Auth:                   v2auth.NewHandler(authService, userService, wechatOAuth, wechatMiniOAuth, qqOAuth),
+		Me:                     v2me.NewHandler(userService),
+		Home:                   v2home.NewHandler(homeService),
+		Anomaly:                v2anomaly.NewHandler(orderAnomalyService),
+		Client:                 v2client.NewHandler(clientService),
+		Supply:                 v2supply.NewHandler(clientService),
+		Demand:                 v2demand.NewHandler(clientService),
+		Owner:                  v2owner.NewHandler(ownerService, droneService),
+		Pilot:                  v2pilot.NewHandler(pilotService, uploadService),
+		Provider:               v2provider.NewHandler(broadcastService),
+		ProviderRecommendation: v2providerrecommendation.NewHandler(providerRecommendationService),
+		Order:                  v2order.NewHandler(orderService, dispatchService, flightService, pricingService, settlementService, broadcastService),
+		Dispatch:               v2dispatch.NewHandler(dispatchService, orderService),
+		Flight:                 v2flight.NewHandler(flightService, orderService),
+		Message:                v2message.NewHandler(messageService),
+		Payment:                v2payment.NewHandler(orderService, paymentService),
+		Settlement:             v2settlement.NewHandler(orderService, settlementService),
+		Notification:           v2notification.NewHandler(messageService),
+		Push:                   v2push.NewHandler(pushService, serverMode, wechatSubscribe),
+		Review:                 v2review.NewHandler(orderService, reviewService),
+		Longtail:               longtail,
 	}
 }
 
@@ -233,6 +236,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			demandGroup.POST("/:demand_id/publish", h.Demand.Publish)
 			demandGroup.POST("/:demand_id/cancel", h.Demand.Cancel)
 			demandGroup.GET("/:demand_id/quotes", h.Demand.ListQuotes)
+			demandGroup.POST("/:demand_id/provider-invitations", h.ProviderRecommendation.Invite)
 			demandGroup.POST("/:demand_id/suggested-price", h.Demand.SuggestedPrice)
 			demandGroup.POST("/:demand_id/select-provider", h.Demand.SelectProvider)
 			demandGroup.POST("/:demand_id/quotes", h.Owner.CreateQuote)
@@ -274,6 +278,11 @@ func RegisterRoutes(r *gin.Engine, h *Handlers) {
 			providerGroup.POST("/broadcast-assignments/:id/accept", h.Provider.AcceptAssignment)
 			providerGroup.POST("/broadcast-assignments/:id/decline", h.Provider.DeclineAssignment)
 			providerGroup.GET("/me/stats", h.Provider.MeStats)
+		}
+
+		providersGroup := authenticated.Group("/providers")
+		{
+			providersGroup.GET("/recommended", h.ProviderRecommendation.List)
 		}
 
 		pilotGroup := authenticated.Group("/pilot")

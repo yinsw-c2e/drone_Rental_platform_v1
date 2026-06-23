@@ -9,13 +9,16 @@ import (
 
 func TestBuildHomeSummaryCountsTodayIncomeAndAlerts(t *testing.T) {
 	now := time.Now()
-	inProgressCreatedAt := now.Add(-7 * time.Hour)
-	completedCreatedAt := now.Add(-2 * time.Hour)
-	yesterday := now.Add(-24 * time.Hour)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	alertCreatedAt := todayStart.Add(-7 * time.Hour)
+	completedCreatedAt := todayStart.Add(time.Minute)
+	todayCancelledAt := todayStart.Add(2 * time.Minute)
+	yesterday := todayStart.Add(-time.Hour)
 
 	orders := []model.Order{
-		{Status: "assigned", CreatedAt: inProgressCreatedAt, TotalAmount: 1000},
+		{Status: "assigned", CreatedAt: alertCreatedAt, TotalAmount: 1000},
 		{Status: "completed", CreatedAt: completedCreatedAt, TotalAmount: 2500},
+		{Status: "cancelled", CreatedAt: todayCancelledAt, TotalAmount: 1200},
 		{Status: "completed", CreatedAt: yesterday, TotalAmount: 9000},
 	}
 

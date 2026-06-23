@@ -35,10 +35,10 @@ const (
 	defaultBroadcastTTL         = 120 * time.Second
 	defaultPresenceStaleTimeout = 60 * time.Second
 	defaultReservationLeadTime  = 2 * time.Hour
-	defaultReservationTick      = time.Minute
+	defaultSchedulerTick        = 15 * time.Second
 
 	defaultAutoAssignEnabled          = true
-	defaultAutoAssignTriggerLead      = 90 * time.Second
+	defaultAutoAssignTriggerLead      = 0 * time.Second
 	defaultAutoAssignAcceptWindow     = 60 * time.Second
 	defaultAutoAssignMaxAttempts      = 3
 	defaultAutoAssignDistanceWeight   = 0.6
@@ -237,10 +237,10 @@ func (s *BroadcastService) GetDispatchState(order *model.Order, now time.Time) (
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if !order.CreatedAt.IsZero() && now.After(order.CreatedAt) {
-		state.ElapsedSeconds = int64(now.Sub(order.CreatedAt).Seconds())
-	}
 	if s == nil || s.broadcastRepo == nil {
+		if !order.CreatedAt.IsZero() && now.After(order.CreatedAt) {
+			state.ElapsedSeconds = int64(now.Sub(order.CreatedAt).Seconds())
+		}
 		return state, nil
 	}
 
@@ -250,6 +250,13 @@ func (s *BroadcastService) GetDispatchState(order *model.Order, now time.Time) (
 			return state, nil
 		}
 		return nil, err
+	}
+	elapsedFrom := order.CreatedAt
+	if !broadcast.CreatedAt.IsZero() {
+		elapsedFrom = broadcast.CreatedAt
+	}
+	if !elapsedFrom.IsZero() && now.After(elapsedFrom) {
+		state.ElapsedSeconds = int64(now.Sub(elapsedFrom).Seconds())
 	}
 	if broadcast.ExpiresAt.After(now) && (broadcast.Status == broadcastStatusOpen || broadcast.Status == broadcastStatusAutoAssigning) {
 		state.EstimatedWaitSeconds = int64(broadcast.ExpiresAt.Sub(now).Seconds())
@@ -313,6 +320,17 @@ func (s *BroadcastService) reservationLeadTime() time.Duration {
 	}
 	if seconds <= 0 {
 		seconds = int(defaultReservationLeadTime.Seconds())
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func (s *BroadcastService) schedulerTick() time.Duration {
+	seconds := int(defaultSchedulerTick.Seconds())
+	if s != nil && s.systemConfigService != nil {
+		seconds = s.systemConfigService.GetInt("broadcast.scheduler.tick_seconds", seconds)
+	}
+	if seconds <= 0 {
+		seconds = int(defaultSchedulerTick.Seconds())
 	}
 	return time.Duration(seconds) * time.Second
 }
@@ -466,7 +484,9 @@ func (s *BroadcastService) ListOpenForProvider(userID int64, limit int) ([]Provi
 
 	now := time.Now()
 	_, _ = s.presenceRepo.MarkStaleOffline(now.Add(-s.presenceStaleTimeout()))
-	_, _ = s.broadcastRepo.MarkExpired(now, 200)
+	if !s.shouldAutoAssign() {
+		_, _ = s.broadcastRepo.MarkExpired(now, 200)
+	}
 
 	presence, err := s.requireOnlinePresence(userID, now)
 	if err != nil {
@@ -887,14 +907,14 @@ func (s *BroadcastService) StartReservationScheduler(ctx context.Context) {
 	if s == nil {
 		return
 	}
-	ticker := time.NewTicker(defaultReservationTick)
 	go func() {
-		defer ticker.Stop()
+		timer := time.NewTimer(s.schedulerTick())
+		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case now := <-ticker.C:
+			case now := <-timer.C:
 				if _, err := s.EnqueueDueReservations(now, 200); err != nil && s.logger != nil {
 					s.logger.Warn("enqueue due reservation broadcasts failed", zap.Error(err))
 				}
@@ -916,6 +936,7 @@ func (s *BroadcastService) StartReservationScheduler(ctx context.Context) {
 				if _, err := s.ExpireOpenBroadcasts(now, 500); err != nil && s.logger != nil {
 					s.logger.Warn("expire open broadcasts failed", zap.Error(err))
 				}
+				timer.Reset(s.schedulerTick())
 			}
 		}
 	}()
@@ -952,16 +973,6 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 	if broadcast.Status != broadcastStatusOpen {
 		return outcome, nil
 	}
-	if !broadcast.ExpiresAt.After(now) {
-		if err := broadcastRepo.UpdateFields(broadcast.ID, map[string]interface{}{
-			"status":     broadcastStatusExpired,
-			"updated_at": now,
-		}); err != nil {
-			return outcome, err
-		}
-		return outcome, nil
-	}
-
 	order, err := orderRepo.LockByID(broadcast.OrderID)
 	if err != nil {
 		return outcome, err
@@ -1022,6 +1033,7 @@ func (s *BroadcastService) attemptAutoAssignWithRepos(
 	}
 	if err := broadcastRepo.UpdateFields(broadcast.ID, map[string]interface{}{
 		"status":     broadcastStatusAutoAssigning,
+		"expires_at": deadline,
 		"updated_at": now,
 	}); err != nil {
 		return outcome, err
@@ -1217,7 +1229,7 @@ func (s *BroadcastService) redispatchOrderWithRepos(
 	ownerAmount := newTotalAmount - commission
 	priceBreakdown := s.buildRedispatchPriceBreakdown(order, newTotalAmount, priceBumpCents, matchingRadiusKM, opts.PriceBumpPercent, now)
 
-	if err := broadcastRepo.DeleteTimeoutExclusionsByOrder(order.ID); err != nil {
+	if err := broadcastRepo.DeleteRedispatchExclusionsByOrder(order.ID); err != nil {
 		return nil, err
 	}
 

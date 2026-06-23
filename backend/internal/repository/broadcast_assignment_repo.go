@@ -78,9 +78,13 @@ func (r *BroadcastAssignmentRepo) ListPendingByProvider(providerUserID int64, no
 	var items []model.BroadcastAssignment
 	limit = limits.NormalizeLimit(limit, 20, 100)
 	err := r.db.Preload("Broadcast").Preload("Order").
-		Where("provider_user_id = ? AND status = ?", providerUserID, "pending_accept").
-		Where("accept_deadline_at > ?", now).
-		Order("accept_deadline_at ASC, id ASC").
+		Joins("JOIN orders ON orders.id = broadcast_assignments.order_id").
+		Joins("JOIN order_broadcasts ON order_broadcasts.id = broadcast_assignments.broadcast_id").
+		Where("broadcast_assignments.provider_user_id = ? AND broadcast_assignments.status = ?", providerUserID, "pending_accept").
+		Where("broadcast_assignments.accept_deadline_at > ?", now).
+		Where("orders.status = ? AND COALESCE(orders.provider_user_id, 0) = 0 AND COALESCE(orders.grabbed_by_user_id, 0) = 0", "pending_dispatch").
+		Where("order_broadcasts.status = ?", "auto_assigning").
+		Order("broadcast_assignments.accept_deadline_at ASC, broadcast_assignments.id ASC").
 		Limit(limit).
 		Find(&items).Error
 	return items, err
@@ -112,13 +116,20 @@ func (r *BroadcastAssignmentRepo) SupersedeOtherPending(broadcastID, keepID int6
 
 func (r *BroadcastAssignmentRepo) ExpireOverdue(now time.Time, limit int) (int64, error) {
 	limit = limits.NormalizeLimit(limit, 100, 1000)
-	subquery := r.db.Model(&model.BroadcastAssignment{}).
-		Select("id").
+	var ids []int64
+	if err := r.db.Model(&model.BroadcastAssignment{}).
 		Where("status = ? AND accept_deadline_at <= ?", "pending_accept", now).
 		Order("accept_deadline_at ASC, id ASC").
-		Limit(limit)
+		Limit(limit).
+		Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
 	result := r.db.Model(&model.BroadcastAssignment{}).
-		Where("id IN (?)", subquery).
+		Where("id IN ?", ids).
+		Where("status = ? AND accept_deadline_at <= ?", "pending_accept", now).
 		Updates(map[string]interface{}{
 			"status":       "expired",
 			"responded_at": now,

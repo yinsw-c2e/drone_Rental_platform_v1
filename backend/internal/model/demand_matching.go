@@ -146,6 +146,33 @@ func (DemandCandidatePilot) TableName() string {
 	return "demand_candidate_pilots"
 }
 
+const (
+	DemandProviderInvitationStatusPendingQuote = "pending_quote"
+	DemandProviderInvitationStatusQuoted       = "quoted"
+	DemandProviderInvitationStatusDeclined     = "declined"
+	DemandProviderInvitationStatusExpired      = "expired"
+	DemandProviderInvitationStatusSelected     = "selected"
+)
+
+type DemandProviderInvitation struct {
+	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	DemandID       int64     `gorm:"uniqueIndex:uk_demand_provider_invitation;index;not null" json:"demand_id"`
+	ClientUserID   int64     `gorm:"index;not null" json:"client_user_id"`
+	ProviderUserID int64     `gorm:"uniqueIndex:uk_demand_provider_invitation;index;not null" json:"provider_user_id"`
+	Status         string    `gorm:"type:varchar(30);default:pending_quote;index" json:"status"`
+	Message        string    `gorm:"type:varchar(500)" json:"message"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+
+	Demand   *Demand `gorm:"foreignKey:DemandID" json:"demand,omitempty"`
+	Client   *User   `gorm:"foreignKey:ClientUserID" json:"client,omitempty"`
+	Provider *User   `gorm:"foreignKey:ProviderUserID" json:"provider,omitempty"`
+}
+
+func (DemandProviderInvitation) TableName() string {
+	return "demand_provider_invitations"
+}
+
 type MatchingLog struct {
 	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	DemandID       int64     `gorm:"index;not null" json:"demand_id"`

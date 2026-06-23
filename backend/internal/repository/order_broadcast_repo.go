@@ -93,7 +93,7 @@ func (r *OrderBroadcastRepo) ListAwaitingAutoAssign(now time.Time, attemptCutoff
 	var items []model.OrderBroadcast
 	limit = limits.NormalizeLimit(limit, 100, 500)
 	err := r.db.Preload("Order").
-		Where("status = ? AND expires_at > ? AND expires_at <= ?", "open", now, attemptCutoff).
+		Where("status = ? AND expires_at <= ?", "open", attemptCutoff).
 		Order("expires_at ASC, id ASC").
 		Limit(limit).
 		Find(&items).Error
@@ -143,11 +143,11 @@ func (r *OrderBroadcastRepo) ExcludeProvider(orderID, broadcastID, providerUserI
 	})
 }
 
-func (r *OrderBroadcastRepo) DeleteTimeoutExclusionsByOrder(orderID int64) error {
+func (r *OrderBroadcastRepo) DeleteRedispatchExclusionsByOrder(orderID int64) error {
 	if r == nil || r.db == nil || orderID <= 0 {
 		return nil
 	}
-	return r.db.Where("order_id = ? AND reason = ?", orderID, "assignment_timeout").
+	return r.db.Where("order_id = ? AND reason IN ?", orderID, []string{"assignment_timeout", "assignment_declined"}).
 		Delete(&model.OrderBroadcastExclusion{}).Error
 }
 
@@ -178,13 +178,20 @@ func (r *OrderBroadcastRepo) IsProviderExcluded(orderID, broadcastID, providerUs
 
 func (r *OrderBroadcastRepo) MarkExpired(now time.Time, limit int) (int64, error) {
 	limit = limits.NormalizeLimit(limit, 100, 1000)
-	subquery := r.db.Model(&model.OrderBroadcast{}).
-		Select("id").
+	var ids []int64
+	if err := r.db.Model(&model.OrderBroadcast{}).
 		Where("status = ? AND expires_at <= ?", "open", now).
 		Order("expires_at ASC, id ASC").
-		Limit(limit)
+		Limit(limit).
+		Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
 	result := r.db.Model(&model.OrderBroadcast{}).
-		Where("id IN (?)", subquery).
+		Where("id IN ?", ids).
+		Where("status = ? AND expires_at <= ?", "open", now).
 		Updates(map[string]interface{}{
 			"status":     "expired",
 			"updated_at": now,

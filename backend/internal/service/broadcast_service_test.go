@@ -157,6 +157,73 @@ func TestBroadcastExclusionFiltersListAndGrab(t *testing.T) {
 	}
 }
 
+func TestListPendingAssignmentsForProviderSkipsCancelledOrders(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	providerUserID := int64(7007)
+	now := time.Now()
+
+	activeOrder := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-ASSIGN-ACTIVE", "light_heavy", 22.5431, 114.0579, 168000)
+	activeBroadcast := &model.OrderBroadcast{
+		OrderID:             activeOrder.ID,
+		OriginLatitude:      activeOrder.ServiceLatitude,
+		OriginLongitude:     activeOrder.ServiceLongitude,
+		ServiceClassCode:    activeOrder.ServiceClassCode,
+		WeightKG:            activeOrder.CargoWeightKG,
+		EstimatedTotalCents: activeOrder.TotalAmount,
+		Status:              broadcastStatusAutoAssigning,
+		ExpiresAt:           now.Add(-10 * time.Second),
+	}
+	if err := handles.broadcastRepo.Create(activeBroadcast); err != nil {
+		t.Fatalf("create active broadcast: %v", err)
+	}
+	if err := handles.assignmentRepo.Create(&model.BroadcastAssignment{
+		BroadcastID:      activeBroadcast.ID,
+		OrderID:          activeOrder.ID,
+		ProviderUserID:   providerUserID,
+		AttemptSeq:       1,
+		Status:           assignmentStatusPendingAccept,
+		AcceptDeadlineAt: now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("create active assignment: %v", err)
+	}
+
+	cancelledOrder := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-ASSIGN-CANCELLED", "light_heavy", 22.5431, 114.0579, 168000)
+	if err := handles.orderRepo.UpdateFields(cancelledOrder.ID, map[string]interface{}{"status": "cancelled"}); err != nil {
+		t.Fatalf("cancel order: %v", err)
+	}
+	cancelledBroadcast := &model.OrderBroadcast{
+		OrderID:             cancelledOrder.ID,
+		OriginLatitude:      cancelledOrder.ServiceLatitude,
+		OriginLongitude:     cancelledOrder.ServiceLongitude,
+		ServiceClassCode:    cancelledOrder.ServiceClassCode,
+		WeightKG:            cancelledOrder.CargoWeightKG,
+		EstimatedTotalCents: cancelledOrder.TotalAmount,
+		Status:              broadcastStatusAutoAssigning,
+		ExpiresAt:           now.Add(time.Minute),
+	}
+	if err := handles.broadcastRepo.Create(cancelledBroadcast); err != nil {
+		t.Fatalf("create cancelled broadcast: %v", err)
+	}
+	if err := handles.assignmentRepo.Create(&model.BroadcastAssignment{
+		BroadcastID:      cancelledBroadcast.ID,
+		OrderID:          cancelledOrder.ID,
+		ProviderUserID:   providerUserID,
+		AttemptSeq:       1,
+		Status:           assignmentStatusPendingAccept,
+		AcceptDeadlineAt: now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("create cancelled assignment: %v", err)
+	}
+
+	views, err := service.ListPendingAssignmentsForProvider(providerUserID, 10)
+	if err != nil {
+		t.Fatalf("list pending assignments: %v", err)
+	}
+	if len(views) != 1 || views[0].Order == nil || views[0].Order.ID != activeOrder.ID {
+		t.Fatalf("expected only active order assignment, got %#v", views)
+	}
+}
+
 func TestBroadcastGrabConflictReasonSentinels(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -396,6 +463,119 @@ func TestAutoAssignPicksNearestEligibleProvider(t *testing.T) {
 	}
 	if updated.Status != broadcastStatusAutoAssigning {
 		t.Fatalf("expected auto_assigning broadcast, got %s", updated.Status)
+	}
+	if updated.ExpiresAt.Before(assignment.AcceptDeadlineAt.Add(-time.Second)) || updated.ExpiresAt.After(assignment.AcceptDeadlineAt.Add(time.Second)) {
+		t.Fatalf("expected broadcast deadline to follow assignment deadline, broadcast=%s assignment=%s", updated.ExpiresAt, assignment.AcceptDeadlineAt)
+	}
+}
+
+func TestAutoAssignWindowKeepsBroadcastOpenDuringPublicCountdown(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	now := time.Now()
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-AUTO-PUBLIC-WINDOW", "light_heavy", 22.5431, 114.0579, 168000)
+	broadcast := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      order.ServiceLatitude,
+		OriginLongitude:     order.ServiceLongitude,
+		ServiceClassCode:    order.ServiceClassCode,
+		WeightKG:            order.CargoWeightKG,
+		EstimatedTotalCents: order.TotalAmount,
+		Status:              broadcastStatusOpen,
+		ExpiresAt:           now.Add(defaultBroadcastTTL),
+		CreatedAt:           now,
+		UpdatedAt:           now,
+	}
+	if err := handles.broadcastRepo.Create(broadcast); err != nil {
+		t.Fatalf("create broadcast: %v", err)
+	}
+
+	fortyEightSecondsLater := now.Add(48 * time.Second)
+	candidates, err := handles.broadcastRepo.ListAwaitingAutoAssign(
+		fortyEightSecondsLater,
+		fortyEightSecondsLater.Add(service.autoAssignTriggerLead()),
+		20,
+	)
+	if err != nil {
+		t.Fatalf("list auto assign candidates: %v", err)
+	}
+	if len(candidates) != 0 {
+		t.Fatalf("expected public countdown to keep broadcast open after 48s, got %d candidates", len(candidates))
+	}
+}
+
+func TestDispatchStateElapsedUsesLatestBroadcastWindow(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	now := time.Now()
+	oldOrderCreatedAt := now.Add(-8 * time.Minute)
+	latestBroadcastCreatedAt := now.Add(-15 * time.Second)
+	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-DISPATCH-STATE-REDISPATCH", "light_heavy", 22.5431, 114.0579, 168000)
+	if err := handles.orderRepo.UpdateFields(order.ID, map[string]interface{}{
+		"created_at": oldOrderCreatedAt,
+		"updated_at": oldOrderCreatedAt,
+	}); err != nil {
+		t.Fatalf("age order: %v", err)
+	}
+	order.CreatedAt = oldOrderCreatedAt
+	oldBroadcast := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      order.ServiceLatitude,
+		OriginLongitude:     order.ServiceLongitude,
+		ServiceClassCode:    order.ServiceClassCode,
+		WeightKG:            order.CargoWeightKG,
+		EstimatedTotalCents: order.TotalAmount,
+		Status:              broadcastStatusExpired,
+		ExpiresAt:           now.Add(-time.Minute),
+		CreatedAt:           oldOrderCreatedAt,
+	}
+	if err := handles.broadcastRepo.Create(oldBroadcast); err != nil {
+		t.Fatalf("create old broadcast: %v", err)
+	}
+	latestBroadcast := &model.OrderBroadcast{
+		OrderID:             order.ID,
+		OriginLatitude:      order.ServiceLatitude,
+		OriginLongitude:     order.ServiceLongitude,
+		ServiceClassCode:    order.ServiceClassCode,
+		WeightKG:            order.CargoWeightKG,
+		EstimatedTotalCents: order.TotalAmount,
+		Status:              broadcastStatusOpen,
+		ExpiresAt:           now.Add(105 * time.Second),
+		CreatedAt:           latestBroadcastCreatedAt,
+	}
+	if err := handles.broadcastRepo.Create(latestBroadcast); err != nil {
+		t.Fatalf("create latest broadcast: %v", err)
+	}
+
+	state, err := service.GetDispatchState(order, now)
+	if err != nil {
+		t.Fatalf("get dispatch state: %v", err)
+	}
+	if state.ElapsedSeconds < 10 || state.ElapsedSeconds > 20 {
+		t.Fatalf("expected elapsed from latest broadcast, got %d", state.ElapsedSeconds)
+	}
+	if state.EstimatedWaitSeconds < 100 || state.EstimatedWaitSeconds > 110 {
+		t.Fatalf("expected wait from latest broadcast, got %d", state.EstimatedWaitSeconds)
+	}
+}
+
+func TestBroadcastSchedulerTickUsesDefaultAndSystemConfig(t *testing.T) {
+	service, handles := newBroadcastTestService(t)
+	config := NewSystemConfigService(handles.broadcastRepo.DB())
+	service.SetSystemConfigService(config)
+
+	if got := service.schedulerTick(); got != 15*time.Second {
+		t.Fatalf("expected default scheduler tick 15s, got %s", got)
+	}
+	if _, err := config.Upsert("broadcast.scheduler.tick_seconds", "10", "test scheduler tick"); err != nil {
+		t.Fatalf("upsert scheduler tick: %v", err)
+	}
+	if got := service.schedulerTick(); got != 10*time.Second {
+		t.Fatalf("expected configured scheduler tick 10s, got %s", got)
+	}
+	if _, err := config.Upsert("broadcast.scheduler.tick_seconds", "-1", "invalid scheduler tick"); err != nil {
+		t.Fatalf("upsert invalid scheduler tick: %v", err)
+	}
+	if got := service.schedulerTick(); got != 15*time.Second {
+		t.Fatalf("expected invalid scheduler tick to fall back to 15s, got %s", got)
 	}
 }
 
@@ -720,7 +900,7 @@ func TestAutoAssignTimeoutExclusionIsBroadcastScoped(t *testing.T) {
 	}
 }
 
-func TestRedispatchOrderClearsTimeoutKeepsDeclineAndCreatesNewBroadcast(t *testing.T) {
+func TestRedispatchOrderClearsPreviousRoundExclusionsAndCreatesNewBroadcast(t *testing.T) {
 	service, handles := newBroadcastTestService(t)
 	order := seedBroadcastOrder(t, handles.orderRepo, "WRJ-H3-REDISPATCH", "light_heavy", 22.5431, 114.0579, 168000)
 	order.PriceBreakdownJSON = model.JSON(`{"source":"test","matching_radius_km":30,"total_estimated_cents":168000}`)
@@ -786,8 +966,8 @@ func TestRedispatchOrderClearsTimeoutKeepsDeclineAndCreatesNewBroadcast(t *testi
 	if err != nil {
 		t.Fatalf("check declined exclusion: %v", err)
 	}
-	if !declinedExcluded {
-		t.Fatalf("expected declined provider to remain excluded")
+	if declinedExcluded {
+		t.Fatalf("expected declined provider to be eligible after redispatch")
 	}
 	timeoutExcluded, err := handles.broadcastRepo.IsProviderExcluded(order.ID, result.Broadcast.ID, timeoutProviderID)
 	if err != nil {
@@ -796,13 +976,20 @@ func TestRedispatchOrderClearsTimeoutKeepsDeclineAndCreatesNewBroadcast(t *testi
 	if timeoutExcluded {
 		t.Fatalf("expected timed-out provider to be eligible after redispatch")
 	}
+	views, err := service.ListOpenForProvider(declinedProviderID, 20)
+	if err != nil {
+		t.Fatalf("list redispatch broadcast for declined provider: %v", err)
+	}
+	if len(views) != 1 || views[0].Broadcast.ID != result.Broadcast.ID {
+		t.Fatalf("expected declined provider to see redispatch broadcast %d, got %#v", result.Broadcast.ID, views)
+	}
 
 	candidate, ok, err := service.selectAutoAssignCandidate(result.Broadcast, result.Order, map[int64]struct{}{}, time.Now(), handles.broadcastRepo)
 	if err != nil {
 		t.Fatalf("select redispatch candidate: %v", err)
 	}
-	if !ok || candidate.presence.UserID != timeoutProviderID {
-		t.Fatalf("expected timed-out provider to be reselected after radius bump, got ok=%v candidate=%#v", ok, candidate)
+	if !ok || candidate.presence.UserID != declinedProviderID {
+		t.Fatalf("expected declined provider to be eligible for redispatch after price/radius bump, got ok=%v candidate=%#v", ok, candidate)
 	}
 }
 

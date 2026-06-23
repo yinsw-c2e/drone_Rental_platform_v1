@@ -120,6 +120,47 @@ func TestBuildAggregatedOrderTimelineSortsAndExpandsSources(t *testing.T) {
 	}
 }
 
+func TestAttachCounterpartyCallPhoneOnlyExposesAuthorizedCounterparty(t *testing.T) {
+	client := &model.User{ID: 101, Phone: "13800000101", Nickname: "客户"}
+	provider := &model.User{ID: 202, Phone: "13800000202", Nickname: "服务商"}
+	order := &model.Order{
+		ClientUserID:   client.ID,
+		RenterID:       client.ID,
+		ProviderUserID: provider.ID,
+		OwnerID:        provider.ID,
+		Renter:         client,
+		Owner:          provider,
+	}
+
+	clientSummary := buildUserSummary(client, client.ID, "client")
+	providerSummary := buildUserSummary(provider, provider.ID, "owner")
+	attachCounterpartyCallPhone(order, nil, provider.ID, clientSummary, providerSummary, nil)
+
+	if got := clientSummary["call_phone"]; got != client.Phone {
+		t.Fatalf("expected provider viewer to receive client call phone %q, got %#v", client.Phone, got)
+	}
+	if got := providerSummary["call_phone"]; got != nil {
+		t.Fatalf("expected provider viewer not to receive own call phone, got %#v", got)
+	}
+	if got := clientSummary["phone"]; got != "138****0101" {
+		t.Fatalf("expected masked client phone to stay masked, got %#v", got)
+	}
+
+	clientSummary = buildUserSummary(client, client.ID, "client")
+	providerSummary = buildUserSummary(provider, provider.ID, "owner")
+	attachCounterpartyCallPhone(order, nil, client.ID, clientSummary, providerSummary, nil)
+
+	if got := providerSummary["call_phone"]; got != provider.Phone {
+		t.Fatalf("expected client viewer to receive provider call phone %q, got %#v", provider.Phone, got)
+	}
+	if got := clientSummary["call_phone"]; got != nil {
+		t.Fatalf("expected client viewer not to receive own call phone, got %#v", got)
+	}
+	if got := providerSummary["phone"]; got != "138****0202" {
+		t.Fatalf("expected masked provider phone to stay masked, got %#v", got)
+	}
+}
+
 func TestRedispatchOrderRequestToOptions(t *testing.T) {
 	tests := []struct {
 		name    string

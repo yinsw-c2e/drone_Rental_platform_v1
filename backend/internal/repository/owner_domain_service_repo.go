@@ -2,6 +2,7 @@ package repository
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,10 +20,76 @@ type SupplyMarketStats struct {
 	RatingSource           string
 }
 
-func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, serviceType string, minPayloadKG float64, acceptsDirectOrder *bool, page, pageSize int) ([]model.OwnerSupply, int64, error) {
+type supplyWithDistance struct {
+	supply   model.OwnerSupply
+	distance float64
+}
+
+func hasMarketCoordinate(lat, lng float64) bool {
+	return lat >= -90 && lat <= 90 &&
+		lng >= -180 && lng <= 180 &&
+		!(lat == 0 && lng == 0)
+}
+
+func haversineKM(lat1, lng1, lat2, lng2 float64) float64 {
+	const earthRadiusKM = 6371.0
+	toRad := func(value float64) float64 { return value * math.Pi / 180 }
+	dLat := toRad(lat2 - lat1)
+	dLng := toRad(lng2 - lng1)
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*math.Sin(dLng/2)*math.Sin(dLng/2)
+	return 2 * earthRadiusKM * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
+func supplyRangeKM(supply model.OwnerSupply) float64 {
+	if supply.MaxRangeKM > 0 {
+		return supply.MaxRangeKM
+	}
+	if supply.Drone != nil && supply.Drone.MaxDistance > 0 {
+		return supply.Drone.MaxDistance
+	}
+	return 0
+}
+
+func supplyDistanceFromOrigin(supply model.OwnerSupply, originLat, originLng float64) (float64, bool) {
+	if supply.Drone == nil || !hasMarketCoordinate(supply.Drone.Latitude, supply.Drone.Longitude) {
+		return 0, false
+	}
+	return haversineKM(originLat, originLng, supply.Drone.Latitude, supply.Drone.Longitude), true
+}
+
+func regionSearchTerms(region string) []string {
+	trimmed := strings.TrimSpace(region)
+	if trimmed == "" {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	terms := make([]string, 0, 3)
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		if _, ok := seen[value]; ok {
+			return
+		}
+		seen[value] = struct{}{}
+		terms = append(terms, value)
+	}
+
+	add(trimmed)
+	short := strings.TrimSuffix(trimmed, "市")
+	short = strings.TrimPrefix(short, "广东省")
+	short = strings.TrimSuffix(short, "市")
+	add(short)
+	return terms
+}
+
+func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, serviceType string, minPayloadKG float64, acceptsDirectOrder *bool, originLat, originLng float64, page, pageSize int) ([]model.OwnerSupply, int64, error) {
 	var supplies []model.OwnerSupply
 	var total int64
 	page, pageSize = limits.NormalizePagination(page, pageSize)
+	useOriginCoordinate := hasMarketCoordinate(originLat, originLng)
 
 	query := r.db.Model(&model.OwnerSupply{}).
 		Joins("JOIN drones ON drones.id = owner_supplies.drone_id AND drones.deleted_at IS NULL").
@@ -34,9 +101,15 @@ func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, s
 		Where("drones.insurance_verified = ?", "verified").
 		Where("drones.airworthiness_verified = ?", "verified")
 
-	if trimmed := strings.TrimSpace(region); trimmed != "" {
-		like := "%" + trimmed + "%"
-		query = query.Where("(drones.city LIKE ? OR CAST(owner_supplies.service_area_snapshot AS CHAR) LIKE ?)", like, like)
+	if terms := regionSearchTerms(region); len(terms) > 0 && !useOriginCoordinate {
+		conditions := make([]string, 0, len(terms))
+		values := make([]interface{}, 0, len(terms)*2)
+		for _, term := range terms {
+			conditions = append(conditions, "(drones.city LIKE ? OR CAST(owner_supplies.service_area_snapshot AS CHAR) LIKE ?)")
+			like := "%" + term + "%"
+			values = append(values, like, like)
+		}
+		query = query.Where(strings.Join(conditions, " OR "), values...)
 	}
 	if trimmed := strings.TrimSpace(keyword); trimmed != "" {
 		like := "%" + trimmed + "%"
@@ -65,6 +138,54 @@ func (r *OwnerDomainRepo) ListMarketplaceSupplies(region, keyword, cargoScene, s
 	}
 	if acceptsDirectOrder != nil {
 		query = query.Where("owner_supplies.accepts_direct_order = ?", *acceptsDirectOrder)
+	}
+
+	if useOriginCoordinate {
+		var candidates []model.OwnerSupply
+		if err := query.
+			Preload("Drone").
+			Preload("Owner").
+			Order("owner_supplies.updated_at DESC, owner_supplies.id DESC").
+			Find(&candidates).Error; err != nil {
+			return nil, 0, err
+		}
+
+		filtered := make([]supplyWithDistance, 0, len(candidates))
+		for _, supply := range candidates {
+			distance, ok := supplyDistanceFromOrigin(supply, originLat, originLng)
+			if !ok {
+				continue
+			}
+			rangeKM := supplyRangeKM(supply)
+			if rangeKM <= 0 || distance > rangeKM {
+				continue
+			}
+			filtered = append(filtered, supplyWithDistance{supply: supply, distance: distance})
+		}
+		sort.SliceStable(filtered, func(i, j int) bool {
+			if math.Abs(filtered[i].distance-filtered[j].distance) > 0.001 {
+				return filtered[i].distance < filtered[j].distance
+			}
+			if !filtered[i].supply.UpdatedAt.Equal(filtered[j].supply.UpdatedAt) {
+				return filtered[i].supply.UpdatedAt.After(filtered[j].supply.UpdatedAt)
+			}
+			return filtered[i].supply.ID > filtered[j].supply.ID
+		})
+
+		total = int64(len(filtered))
+		start := (page - 1) * pageSize
+		if start >= len(filtered) {
+			return []model.OwnerSupply{}, total, nil
+		}
+		end := start + pageSize
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+		supplies = make([]model.OwnerSupply, 0, end-start)
+		for _, item := range filtered[start:end] {
+			supplies = append(supplies, item.supply)
+		}
+		return supplies, total, nil
 	}
 
 	if err := query.Count(&total).Error; err != nil {
