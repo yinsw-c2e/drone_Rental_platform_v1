@@ -110,9 +110,17 @@ jobs:
           docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_api:8080/healthz >/dev/null
           EOF
 
-      - name: Public smoke test
+      - name: Post-deploy smoke test
         if: env.DEPLOY_READY == 'true'
         run: |
-          curl -fsS "$V1_PUBLIC_ORIGIN/readyz"
-          curl -fsS "$V1_PUBLIC_ORIGIN/api/v2/status"
-          curl -fsSI "$V1_PUBLIC_ORIGIN"
+          ssh -i ~/.ssh/tencent_cloud_key -o BatchMode=yes -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" <<'EOF'
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:18080/readyz >/dev/null
+          curl -fsS http://127.0.0.1:18081/ >/dev/null
+          docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_static:18081/ >/dev/null
+          docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://api:8088/api/v1/health >/dev/null
+          EOF
+
+          if ! curl -fsS --max-time 15 "$V1_PUBLIC_ORIGIN/readyz" >/dev/null; then
+            echo "::warning::V1 deployed, but $V1_PUBLIC_ORIGIN is not publicly reachable yet. Check DNSPod blocking, ICP备案, and TLS."
+          fi
