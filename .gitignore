@@ -64,6 +64,7 @@ mobile/.env.*
 /backend/config.yaml
 /backend/config.*.yaml
 !/backend/config.example.yaml
+!/backend/config.cloud.example.yaml
 
 # Uploads
 /backend/uploads/**
@@ -75,6 +76,7 @@ npm-debug.log*
 /backend/docs/*_last_run.json
 
 # Runtime databases / local state
+/tmp/
 *.db
 *.sqlite
 *.sqlite3
@@ -118,3 +120,10 @@ AUX
 
 /external_resource/**/*
 /design_handoff/**/*
+
+# web-h5 (H5 独立工程)
+web-h5/node_modules/
+web-h5/dist/
+web-h5/dist-h5/
+web-h5/.swc/
+web-h5/.env.*.local

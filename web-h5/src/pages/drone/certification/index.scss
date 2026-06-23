@@ -1,0 +1,17 @@
+.page-wrap { min-height: 100vh; background-color: #F9FAFB; display: flex; flex-direction: column; }
+.tabs-header { display: flex; flex-direction: row; background-color: #fff; border-bottom: 1px solid #E5E7EB; }
+.tab-item { flex: 1; padding: 14px 0; display: flex; align-items: center; justify-content: center; position: relative; }
+.tab-text { font-size: 15px; color: #6B7280; }
+.active .tab-text { color: #1677FF; font-weight: 500; }
+.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 3px; background-color: #1677FF; border-radius: 2px 2px 0 0; }
+.tab-content { flex: 1; padding: 16px; }
+.form-group { background-color: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.form-item { display: flex; flex-direction: row; align-items: center; padding: 14px 0; border-bottom: 1px solid #F3F4F6; }
+.form-date-item { display: block; }
+.border-none { border-bottom: none; align-items: flex-start; }
+.form-label { width: 80px; font-size: 15px; color: #1A1D26; }
+.form-input { flex: 1; font-size: 15px; color: #1A1D26; }
+.doc-image { width: 100px; height: 100px; border-radius: 8px; background-color: #F3F4F6; margin-top: 8px; }
+.btn-upload { width: 100px; height: 100px; border: 1px dashed #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6B7280; font-size: 14px; margin-top: 8px; }
+.btn-primary { background-color: #1677FF; border-radius: 8px; padding: 14px; display: flex; align-items: center; justify-content: center; margin-top: 24px; }
+.btn-text { color: #fff; font-size: 16px; font-weight: 500; }

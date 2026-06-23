@@ -1,0 +1,51 @@
+.dt-field {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.dt-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1D26;
+  margin-bottom: 8px;
+}
+
+.dt-required {
+  color: #EF4444;
+}
+
+.dt-control-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  width: 100%;
+}
+
+.dt-control {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
+  background-color: #F9FAFB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 136px;
+  box-sizing: border-box;
+}
+
+.dt-time {
+  min-width: 96px;
+}
+
+.dt-control-text {
+  font-size: 15px;
+  color: #1A1D26;
+  font-weight: 600;
+}
+
+.dt-placeholder .dt-control-text {
+  color: #9CA3AF;
+  font-weight: 500;
+}

@@ -1,0 +1,78 @@
+// my-quotes page specific styles
+.my-quotes-wrap {
+  flex: 1;
+  background-color: #f5f7fa;
+  padding: 14px;
+}
+
+.my-quotes-hero {
+  background-color: #fa8c16;
+}
+
+.mq-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.mq-status-badge {
+  background-color: rgba(250, 140, 22, 0.12);
+  color: #fa8c16;
+}
+
+.mq-demand-no {
+  font-size: 12px;
+  color: #999;
+  margin-top: 6px;
+}
+
+.mq-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1677ff;
+}
+
+.my-quotes-item {
+  .list-item-title {
+    margin-bottom: 4px;
+  }
+}
+
+.quote-card {
+  position: relative;
+}
+
+.quote-card-selected {
+  border-color: #fb923c;
+  background: #fffaf5;
+  box-shadow: 0 8px 22px rgba(249, 115, 22, 0.12);
+}
+
+.status-quotes-selected {
+  color: #ffffff;
+  background: #f97316;
+}
+
+.quote-selected-notice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.quote-selected-notice-title {
+  display: block;
+  color: #c2410c;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 800;
+}
+
+.quote-selected-notice-desc {
+  display: block;
+  margin-top: 3px;
+  color: #7c2d12;
+  font-size: 12px;
+  line-height: 17px;
+}

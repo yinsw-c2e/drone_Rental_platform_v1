@@ -1,0 +1,119 @@
+// dispatch/detail page specific styles
+$primary: #1677FF;
+$danger: #F5222D;
+
+.dispatch-detail-wrap {
+  flex: 1;
+}
+
+.dispatch-detail-scroll {
+  flex: 1;
+  background-color: #f5f7fa;
+  padding: 14px;
+}
+
+.dispatch-detail-loading,
+.dispatch-detail-empty {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.dispatch-detail-hero {
+  background-color: $primary;
+}
+
+.dispatch-hero-tags {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.dispatch-hero-status-badge {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.dispatch-action-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dispatch-btn {
+  flex: 1;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 110px;
+}
+
+.dispatch-btn-primary {
+  background-color: $primary;
+}
+
+.dispatch-btn-highlight {
+  background-color: #FF6A00;
+}
+
+.dispatch-btn-danger {
+  background-color: $danger;
+}
+
+.dispatch-btn-ghost {
+  flex: 1;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #666;
+  background-color: #f0f2f5;
+  min-width: 110px;
+}
+
+.dispatch-reject-card {
+  margin-bottom: 10px;
+}
+
+.dispatch-execution-card {
+  margin-bottom: 10px;
+}
+
+.dispatch-execution-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.dispatch-execution-desc {
+  display: block;
+  font-size: 13px;
+  line-height: 20px;
+  color: #6B7280;
+  margin-bottom: 12px;
+}
+
+.dispatch-execution-btn {
+  width: 100%;
+}
+
+.dispatch-reject-input {
+  width: 100%;
+  min-height: 100px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 12px;
+  background-color: #f9fafb;
+}
+
+.dispatch-reject-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+}

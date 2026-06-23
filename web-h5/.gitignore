@@ -1,0 +1,15 @@
+# 依赖与构建产物
+node_modules/
+dist/
+dist-h5/
+.swc/
+.temp/
+.rn_temp/
+
+# 本地配置（含高德 Key，勿提交）
+.env.h5.local
+.env.*.local
+
+# 杂项
+*.log
+.DS_Store

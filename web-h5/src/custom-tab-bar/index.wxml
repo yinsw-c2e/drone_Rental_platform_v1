@@ -1,0 +1,28 @@
+<view class="custom-tabbar">
+  <view class="custom-tabbar-inner">
+    <view
+      wx:for="{{list}}"
+      wx:key="key"
+      class="tabbar-item {{selected == index ? 'tabbar-item-active' : ''}}"
+      data-index="{{index}}"
+      data-path="{{item.pagePath}}"
+      bindtap="switchTab"
+    >
+      <view class="tabbar-icon-shell">
+        <view wx:if="{{item.badge}}" class="tabbar-badge">
+          <text class="tabbar-badge-text">{{item.badge}}</text>
+        </view>
+        <view wx:elif="{{item.badgeDot}}" class="tabbar-badge-dot"></view>
+
+        <image
+          class="tabbar-icon-img tabbar-icon-{{item.key}}"
+          src="{{selected == index ? item.selectedIconPath : item.iconPath}}"
+          style="width: {{selected == index ? (item.selectedIconWidth || item.iconWidth) : item.iconWidth}}rpx; height: {{selected == index ? (item.selectedIconHeight || item.iconHeight) : item.iconHeight}}rpx;"
+          mode="aspectFit"
+        ></image>
+      </view>
+
+      <text class="tabbar-label">{{item.text}}</text>
+    </view>
+  </view>
+</view>

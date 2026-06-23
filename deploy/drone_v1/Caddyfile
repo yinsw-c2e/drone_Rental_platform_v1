@@ -1,0 +1,31 @@
+:18081 {
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle /uploads/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		root * /srv/web-h5
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+:18082 {
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle /uploads/* {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		root * /srv/admin
+		try_files {path} /index.html
+		file_server
+	}
+}

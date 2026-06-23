@@ -1,0 +1,197 @@
+// my-drones page specific styles
+$primary: #1677FF;
+
+.my-drones-wrap {
+  flex: 1;
+  background-color: #f5f7fa;
+  padding: 14px;
+}
+
+.my-drones-hero {
+  background-color: $primary;
+}
+
+.drone-status-badge {
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.drone-status-badge-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.md-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.my-drones-item {
+  border-radius: 16px;
+}
+
+.my-drones-item .list-item-header {
+  align-items: center;
+  gap: 10px;
+}
+
+.my-drones-item .list-item-title {
+  display: block;
+  max-width: 100%;
+  line-height: 21px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-spec-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.md-spec-item {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  background: #F8FAFC;
+  padding: 10px 12px;
+}
+
+.md-spec-label {
+  display: block;
+  font-size: 11px;
+  line-height: 15px;
+  color: #8A94A6;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.md-spec-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 20px;
+  color: #1A1D26;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-meta-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.md-meta-row-single {
+  padding-top: 10px;
+  border-top: 1px solid #F1F3F6;
+}
+
+.md-meta-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: #8A94A6;
+  font-weight: 700;
+}
+
+.md-meta-label-right {
+  margin-left: 8px;
+}
+
+.md-meta-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: #4B5563;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.md-meta-value-right {
+  flex: 0 1 auto;
+  max-width: 96px;
+  text-align: right;
+}
+
+.my-drones-qualification-row-active {
+  cursor: pointer;
+}
+
+.my-drones-qualification-value {
+  text-align: right;
+}
+
+.my-drones-qualification-value-complete {
+  color: #0ba34a;
+  font-weight: 700;
+}
+
+.my-drones-qualification-value-pending {
+  color: #f26a0a;
+  font-weight: 700;
+}
+
+.md-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.md-btn-secondary {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid $primary;
+  font-size: 12px;
+  font-weight: 700;
+  color: $primary;
+  background-color: #f0f7ff;
+}
+
+.page-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative;
+}
+
+.bottom-fixed-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  padding: 12px 16px 32px;
+  border-top: 1px solid #E5E7EB;
+  z-index: 10;
+}
+
+.btn-primary {
+  background-color: #1677FF;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-text {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+}

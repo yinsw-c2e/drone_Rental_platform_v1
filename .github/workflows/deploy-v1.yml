@@ -1,0 +1,118 @@
+name: Deploy drone_v1
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-drone-v1-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy v1
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DEPLOY_HOST: ${{ secrets.TENCENT_CLOUD_HOST }}
+      DEPLOY_USER: ${{ secrets.TENCENT_CLOUD_USER }}
+      DEPLOY_KEY: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
+      DEPLOY_DIR: /opt/drone_v1
+      V1_PUBLIC_ORIGIN: https://swvictory.top
+      DEPLOY_READY: ${{ secrets.TENCENT_CLOUD_HOST != '' && secrets.TENCENT_CLOUD_USER != '' && secrets.TENCENT_CLOUD_SSH_KEY != '' }}
+
+    steps:
+      - name: Skip until deploy secrets are configured
+        if: env.DEPLOY_READY != 'true'
+        run: |
+          echo "::warning::Skipping deploy because TENCENT_CLOUD_HOST, TENCENT_CLOUD_USER, or TENCENT_CLOUD_SSH_KEY is not configured."
+
+      - name: Checkout code
+        if: env.DEPLOY_READY == 'true'
+        uses: actions/checkout@v4
+
+      - name: Check deploy secrets
+        if: env.DEPLOY_READY == 'true'
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_KEY"
+
+      - name: Setup Go
+        if: env.DEPLOY_READY == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Test backend
+        if: env.DEPLOY_READY == 'true'
+        working-directory: backend
+        run: go test ./...
+
+      - name: Build backend Linux binary
+        if: env.DEPLOY_READY == 'true'
+        working-directory: backend
+        run: |
+          mkdir -p ../release/backend
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../release/backend/server ./cmd/server
+
+      - name: Setup Node.js
+        if: env.DEPLOY_READY == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+
+      - name: Build H5
+        if: env.DEPLOY_READY == 'true'
+        working-directory: web-h5
+        run: |
+          npm ci
+          H5_CLOUD_API_BASE="$V1_PUBLIC_ORIGIN/api/v2" npm run build:h5:cloud
+
+      - name: Build admin
+        if: env.DEPLOY_READY == 'true'
+        working-directory: admin
+        run: |
+          npm ci
+          VITE_CLOUD_API_BASE_URL="$V1_PUBLIC_ORIGIN" npm run build:cloud
+
+      - name: Prepare SSH
+        if: env.DEPLOY_READY == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/tencent_cloud_key
+          chmod 600 ~/.ssh/tencent_cloud_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync release files
+        if: env.DEPLOY_READY == 'true'
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/tencent_cloud_key -o BatchMode=yes -o StrictHostKeyChecking=yes"
+          rsync -az --delete web-h5/dist-h5/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/web-h5/" -e "$SSH_CMD"
+          rsync -az --delete admin/dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/admin/" -e "$SSH_CMD"
+          rsync -az release/backend/server backend/Dockerfile.cloud "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/backend/" -e "$SSH_CMD"
+          rsync -az deploy/drone_v1/docker-compose.cloud.yml deploy/drone_v1/Caddyfile "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/" -e "$SSH_CMD"
+
+      - name: Restart v1 services
+        if: env.DEPLOY_READY == 'true'
+        run: |
+          ssh -i ~/.ssh/tencent_cloud_key -o BatchMode=yes -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" <<'EOF'
+          set -euo pipefail
+          cd /opt/drone_v1
+          test -f .env
+          test -f backend/config.cloud.yaml
+          docker network connect drone_v1_net drone-v2-prod-caddy-1 2>/dev/null || true
+          docker compose -f docker-compose.cloud.yml --env-file .env up -d --no-deps --build api static
+          curl -fsS http://127.0.0.1:18080/readyz >/dev/null
+          docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_api:8080/healthz >/dev/null
+          EOF
+
+      - name: Public smoke test
+        if: env.DEPLOY_READY == 'true'
+        run: |
+          curl -fsS "$V1_PUBLIC_ORIGIN/readyz"
+          curl -fsS "$V1_PUBLIC_ORIGIN/api/v2/status"
+          curl -fsSI "$V1_PUBLIC_ORIGIN"

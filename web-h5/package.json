@@ -1,0 +1,44 @@
+{
+  "name": "wurenji-h5",
+  "version": "0.1.0",
+  "private": true,
+  "description": "无人机重载吊运平台 - H5 网页版（从 mini-program 复制的独立工程）",
+  "scripts": {
+    "dev:h5": "node scripts/dev-h5.mjs",
+    "build:h5": "node scripts/build-h5.mjs",
+    "build:h5:cloud": "MINI_PROGRAM_API_BASE=${H5_CLOUD_API_BASE:-https://swvictory.top/api/v2} node scripts/build-h5.mjs",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.25.0",
+    "@reduxjs/toolkit": "^2.11.2",
+    "@tarojs/components": "^4.1.9",
+    "@tarojs/helper": "^4.1.9",
+    "@tarojs/plugin-framework-react": "^4.1.9",
+    "@tarojs/plugin-platform-h5": "^4.2.0",
+    "@tarojs/react": "^4.1.9",
+    "@tarojs/router": "^4.2.0",
+    "@tarojs/runtime": "^4.1.9",
+    "@tarojs/shared": "^4.1.9",
+    "@tarojs/taro": "^4.1.9",
+    "axios": "^1.13.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-redux": "^9.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/preset-react": "^7.24.7",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.17",
+    "@tarojs/cli": "^4.1.9",
+    "@tarojs/webpack5-runner": "^4.2.0",
+    "@types/react": "^18.3.12",
+    "babel-preset-taro": "^4.1.9",
+    "eslint": "^8.19.0",
+    "react-refresh": "^0.14.2",
+    "sass": "^1.80.6",
+    "typescript": "^5.8.3",
+    "webpack": "^5.91.0"
+  }
+}

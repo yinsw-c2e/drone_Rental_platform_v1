@@ -6,7 +6,8 @@
   "scripts": {
     "build:weapp": "MINI_PROGRAM_API_BASE=${MINI_PROGRAM_API_BASE:-https://dronerentalplat.cpolar.top/api/v2} taro build --type weapp && node scripts/fix-weapp-wxss-imports.mjs",
     "build:weapp:e2e": "MINI_PROGRAM_API_BASE=https://dronerentalplat.cpolar.top/api/v2 npm run build:weapp",
-    "build:weapp:prod": "MINI_PROGRAM_BUILD_ENV=production MINI_PROGRAM_API_BASE=${MINI_PROGRAM_PROD_API_BASE:-https://dronerentalplat.cpolar.top/api/v2} npm run build:weapp",
+    "build:weapp:cloud": "MINI_PROGRAM_BUILD_ENV=production MINI_PROGRAM_API_BASE=${MINI_PROGRAM_CLOUD_API_BASE:-https://swvictory.top/api/v2} npm run build:weapp",
+    "build:weapp:prod": "MINI_PROGRAM_BUILD_ENV=production MINI_PROGRAM_API_BASE=${MINI_PROGRAM_PROD_API_BASE:-https://swvictory.top/api/v2} npm run build:weapp",
     "check:p1-freeze": "../scripts/mini_program_p1_freeze_check.sh",
     "dev:weapp": "taro build --type weapp --watch",
     "open:devtools": "../scripts/open_mini_program_devtools.sh",

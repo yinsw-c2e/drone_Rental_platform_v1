@@ -1,0 +1,170 @@
+// 我的需求 / 我的报价 / 我的服务 — 共享过滤+列表样式
+$primary: #2563EB;
+
+.profile-list-page {
+  flex: 1;
+  background: #F5F7FA;
+}
+.profile-list-content {
+  padding: 12px;
+  padding-bottom: 80px;
+}
+
+.list-header-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1A1D26;
+  margin-bottom: 14px;
+  display: block;
+}
+
+.filter-chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.filter-chip {
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #E8EDF2;
+  color: #6B7280;
+}
+.filter-chip-active {
+  color: #FFFFFF;
+}
+.filter-chip-active-demands { background: $primary; }
+.filter-chip-active-offers { background: #52C41A; }
+.filter-chip-active-quotes { background: #FA8C16; }
+
+.list-item-card {
+  background: #FFF;
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid #E2E8F0;
+}
+.list-item-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.list-item-card-no {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: #9CA3AF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-item-card-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.status-demands { background: #E6F4FF; color: $primary; }
+.status-offers { background: #F6FFED; color: #52C41A; }
+.status-quotes { background: #FFF7E6; color: #FA8C16; }
+.list-item-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 700;
+  color: #1A1D26;
+}
+.list-item-card-stats {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  gap: 8px;
+  background: #F8FAFC;
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 10px;
+}
+.list-item-card-stat {
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  text-align: center;
+}
+.list-item-card-stat-value {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 800;
+  color: $primary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-item-card-stat-label {
+  font-size: 10px;
+  line-height: 14px;
+  color: #9CA3AF;
+  white-space: nowrap;
+}
+.list-item-card-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.list-item-card-meta-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: #6B7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-item-card-price {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 800;
+  color: #F5222D;
+  white-space: nowrap;
+}
+.list-item-card-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.list-item-card-action {
+  min-width: 58px;
+  padding: 6px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 17px;
+  color: #475569;
+  text-align: center;
+  white-space: nowrap;
+}
+.list-item-card-action-primary {
+  background: $primary;
+  border-color: $primary;
+  color: #FFF;
+}

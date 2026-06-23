@@ -1,0 +1,205 @@
+// 上架服务页面样式 — 复用 publish/demand 的共享样式
+.publish-wrap {
+  height: 100vh;
+  min-height: 100vh;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #F5F7FA;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.publish-steps {
+  flex-shrink: 0;
+  padding: 16px 40px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #EEEFF2;
+}
+
+.publish-step-track {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.publish-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background: #E8ECF1;
+}
+
+.publish-step-dot-active {
+  background: #1677FF;
+}
+
+.publish-step-line {
+  flex: 1;
+  height: 2px;
+  background: #E8ECF1;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+
+.publish-step-line-active {
+  background: #1677FF;
+}
+
+.publish-step-labels {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.publish-step-label {
+  font-size: 11px;
+  color: #9CA3AF;
+  font-weight: 600;
+}
+
+.publish-step-label-active {
+  color: #1677FF;
+  font-weight: 800;
+}
+
+.publish-scroll {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.publish-scroll > .card {
+  margin: 16px 16px calc(132px + env(safe-area-inset-bottom));
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.publish-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1D26;
+  margin-bottom: 8px;
+  margin-top: 14px;
+  display: block;
+}
+
+.publish-input {
+  width: 100%;
+  height: 48px;
+  min-height: 48px;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 15px;
+  line-height: 48px;
+  background: #F9FAFB;
+}
+
+.publish-textarea {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: #F9FAFB;
+  min-height: 96px;
+}
+
+.publish-option-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.publish-option-btn {
+  padding: 8px 14px;
+  border-radius: 18px;
+  border: 1px solid #E5E7EB;
+  background: #FFFFFF;
+}
+
+.publish-option-active {
+  border-color: #1677FF;
+  background: #F0F7FF;
+}
+
+.publish-option-text {
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.publish-option-text-active {
+  color: #1677FF;
+  font-weight: 600;
+}
+
+.publish-custom-scene-input {
+  margin-top: 2px;
+}
+
+.publish-budget-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.publish-flex-input {
+  flex: 1;
+}
+
+.publish-split {
+  color: #9CA3AF;
+}
+
+.publish-actions {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.publish-actions-multi {
+  justify-content: flex-end;
+}
+
+.publish-btn-primary {
+  flex: 1;
+  height: 48px;
+  border-radius: 14px;
+  background: #1677FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.publish-btn-disabled {
+  opacity: 0.6;
+}
+
+.publish-btn-primary-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.publish-btn-ghost {
+  flex: 1;
+  height: 48px;
+  border-radius: 14px;
+  background: #F5F7FA;
+  border: 1px solid #E8ECF1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.publish-btn-ghost-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #6B7280;
+}

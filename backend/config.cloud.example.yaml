@@ -1,0 +1,131 @@
+server:
+  port: 8080
+  mode: release
+
+database:
+  host: mysql
+  port: 3306
+  user: drone_v1
+  password: replace_with_database_password
+  dbname: drone_v1
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 50
+
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+
+jwt:
+  secret: replace_with_random_jwt_secret_at_least_32_chars
+  access_expire: 7200
+  refresh_expire: 604800
+
+upload:
+  max_size: 10
+  save_path: /app/uploads
+  allowed_exts:
+    - .jpg
+    - .jpeg
+    - .png
+    - .gif
+    - .pdf
+
+sms:
+  provider: mock
+  sign_name: "无人机平台"
+  template_code: "SMS_000000"
+  aliyun:
+    access_key_id: ""
+    access_key_secret: ""
+    region_id: "cn-hangzhou"
+  tencent:
+    secret_id: ""
+    secret_key: ""
+    sdk_app_id: ""
+
+payment:
+  commission_rate: 10
+  allow_mock: true
+  wechat:
+    app_id: ""
+    mch_id: ""
+    api_key: ""
+    cert_path: ""
+    key_path: ""
+    notify_url: ""
+  alipay:
+    app_id: ""
+    private_key: ""
+    public_key: ""
+    sandbox: false
+    notify_url: ""
+
+amap:
+  api_key: ""
+  web_key: ""
+
+websocket:
+  max_message_size: 4096
+  write_wait: 10
+  pong_wait: 60
+  ping_period: 54
+
+log:
+  level: info
+  output: console
+  file_path: /app/logs/app.log
+  max_size: 100
+  max_age: 30
+  max_backups: 10
+
+cors:
+  allowed_origins:
+    - "http://106.55.151.5:18081"
+    - "http://106.55.151.5:18082"
+    - "https://swvictory.top"
+    - "https://swvictory.com"
+    - "https://v1.swvictory.com"
+    - "https://admin-v1.swvictory.com"
+    - "http://localhost:3000"
+    - "http://localhost:3100"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:3100"
+    - "http://127.0.0.1:5173"
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+  allowed_headers:
+    - Origin
+    - Content-Type
+    - Authorization
+    - Accept
+
+push:
+  provider: mock
+  jpush:
+    app_key: ""
+    master_secret: ""
+
+wechat:
+  subscribe:
+    enabled: false
+    templates: {}
+
+oauth:
+  wechat:
+    app_id: ""
+    app_secret: ""
+  wechat_mini:
+    app_id: ""
+    app_secret: ""
+  qq:
+    app_id: ""
+    app_key: ""

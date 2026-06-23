@@ -1,0 +1,350 @@
+$primary: #1677FF;
+
+.supply-detail-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #F5F7FA;
+  overflow: hidden;
+}
+
+.supply-detail-scroll {
+  flex: 1;
+  height: 0;
+}
+
+.supply-detail-content {
+  padding: 12px 16px 110px;
+}
+
+.supply-hero {
+  background: #FFF;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid #E8ECF1;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
+}
+.supply-hero-top {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.supply-hero-tags {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.supply-tag {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.supply-tag-source {
+  background: #E6F4FF;
+  color: $primary;
+}
+.supply-tag-status {
+  background: #F6FFED;
+  color: #52C41A;
+}
+.supply-hero-no {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  line-height: 14px;
+  color: #9CA3AF;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.supply-hero-title {
+  margin-top: 12px;
+  font-size: 20px;
+  line-height: 27px;
+  color: #1A1D26;
+  font-weight: 800;
+}
+.supply-hero-price-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.supply-hero-price {
+  font-size: 20px;
+  line-height: 26px;
+  color: #F5222D;
+  font-weight: 800;
+}
+.supply-hero-direct-tag {
+  background: rgba(82,196,26,0.08);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 14px;
+  color: #52C41A;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.supply-section-card {
+  margin-top: 12px;
+}
+
+.supply-owner-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.supply-owner-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #E6F4FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.supply-owner-avatar-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: $primary;
+}
+.supply-owner-info {
+  flex: 1;
+  min-width: 0;
+}
+.supply-owner-name {
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 700;
+  color: #1A1D26;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.supply-owner-sub {
+  font-size: 12px;
+  line-height: 17px;
+  color: #6B7280;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.supply-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #F5F7FA;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.supply-metric-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.supply-grid-item,
+.supply-scene-row {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  background: #FFFFFF;
+  padding: 12px;
+  border: 1px solid #EEF1F5;
+}
+
+.supply-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.supply-scene-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.supply-grid-label {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 14px;
+  color: #9CA3AF;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.supply-grid-value {
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 800;
+  color: #1A1D26;
+  white-space: nowrap;
+}
+.supply-scene-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 800;
+  color: #1A1D26;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.supply-detail-page .card {
+  border-radius: 18px;
+  border-color: #E8ECF1;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.035);
+}
+
+.supply-detail-page .detail-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 0;
+}
+
+.supply-detail-page .detail-row-label {
+  flex-shrink: 0;
+  min-width: 64px;
+  color: #8A94A6;
+}
+
+.supply-detail-page .detail-row-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  color: #1A1D26;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.supply-desc {
+  font-size: 14px;
+  line-height: 22px;
+  color: #6B7280;
+}
+
+.supply-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #E8ECF1;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  z-index: 10;
+  box-shadow: 0 -8px 24px rgba(17, 24, 39, 0.06);
+}
+.supply-footer-btn {
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+.supply-footer-btn-secondary {
+  flex: 1;
+  border: 1px solid #E8ECF1;
+  background: #FFFFFF;
+}
+.supply-footer-btn-primary {
+  flex: 2;
+  background: $primary;
+  box-shadow: 0 8px 18px rgba(22, 119, 255, 0.22);
+}
+.supply-footer-btn-disabled {
+  opacity: 0.5;
+}
+.supply-footer-btn-secondary-text,
+.supply-footer-btn-primary-text {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.supply-footer-btn-secondary-text {
+  color: #1A1D26;
+  font-weight: 700;
+}
+.supply-footer-btn-primary-text {
+  color: #FFFFFF;
+}
+
+// Step header
+.supply-step-header {
+  padding: 12px 24px;
+  background: #FFF;
+  border-bottom: 1px solid #E8ECF1;
+}
+.supply-step-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.supply-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #E8ECF1;
+}
+.supply-step-dot-active {
+  background: $primary;
+  width: 10px;
+  height: 10px;
+}
+.supply-step-dot-done {
+  background: $primary;
+}
+.supply-step-line {
+  width: 50px;
+  height: 2px;
+  background: #E8ECF1;
+  margin: 0 4px;
+}
+.supply-step-line-done {
+  background: $primary;
+}
+.supply-step-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.supply-step-label {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: 600;
+}
+.supply-step-label-active {
+  color: $primary;
+  font-weight: 700;
+}
+.supply-step-label-done {
+  color: #6B7280;
+}

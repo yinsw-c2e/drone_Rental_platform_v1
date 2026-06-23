@@ -8,6 +8,7 @@
     "ios": "react-native run-ios",
     "web": "vite",
     "web:build": "vite build",
+    "web:build:cloud": "VITE_API_BASE_URL=${VITE_CLOUD_API_BASE_URL:-https://swvictory.top/api} VITE_WS_BASE_URL=${VITE_CLOUD_WS_BASE_URL:-wss://swvictory.top/ws} VITE_APP_ENV=staging VITE_DEBUG_MODE=false vite build",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"

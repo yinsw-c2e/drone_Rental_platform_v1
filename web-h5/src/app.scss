@@ -1,0 +1,364 @@
+// material symbols 图标基础类
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+// 全局共享设计变量 (Clean & Flat UI System)
+$primary: #2563eb;
+$primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+$success: #10b981;
+$warning: #f59e0b;
+$danger: #ef4444;
+$teal: #14b8a6;
+$purple: #8b5cf6;
+
+$text: #0f172a;
+$textSub: #475569;
+$textHint: #94a3b8;
+
+$bg: #f5f7fa;
+$card: #ffffff;
+$cardBorder: transparent;
+$inputBg: #f8fafc;
+$inputBorder: #e2e8f0;
+$divider: #f1f5f9;
+
+$radiusSm: 12rpx;
+$radiusMd: 16rpx;
+$radiusLg: 24rpx;
+$radiusXl: 32rpx;
+
+$shadowCard: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+$shadowBtn: 0 8rpx 16rpx rgba(37, 99, 235, 0.2);
+
+// 全局重置
+page {
+  width: 100%;
+  height: 100%;
+  background: $bg;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: PingFang SC, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  color: $text;
+}
+
+view, text, scroll-view, input, textarea {
+  box-sizing: border-box;
+}
+
+/* Hide all scrollbars globally */
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  color: transparent;
+}
+
+// 确保所有容器默认铺满宽度
+.profile-page, .publish-wrap, .settings-wrap, .msg-page, .page-wrap {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: $bg;
+}
+
+// 通用卡片 (Clean Flat Design)
+.card {
+  background: $card;
+  border-radius: $radiusLg;
+  padding: 32rpx;
+  border: 1rpx solid transparent;
+  box-shadow: $shadowCard;
+  margin: 24rpx;
+}
+
+// 详情行
+.detail-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid $divider;
+}
+.detail-row:last-child {
+  border-bottom: none;
+}
+.detail-row-label {
+  font-size: 26rpx;
+  color: $textSub;
+  min-width: 140rpx;
+  font-weight: 500;
+}
+.detail-row-value {
+  flex: 1;
+  text-align: right;
+  font-size: 28rpx;
+  color: $text;
+  font-weight: 700;
+  margin-left: 24rpx;
+}
+
+// Hero 区域（页面顶部渐变色块）
+.page-hero {
+  position: relative;
+  background: $primary-gradient;
+  border-bottom-left-radius: 40rpx;
+  border-bottom-right-radius: 40rpx;
+  padding: 40rpx 40rpx 84rpx;
+  margin-bottom: -40rpx; // 制造错层感
+  overflow: hidden;
+  z-index: 10;
+  box-shadow: 0 10rpx 30rpx rgba(30, 58, 138, 0.15);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -40rpx;
+    right: -60rpx;
+    width: 320rpx;
+    height: 320rpx;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -80rpx;
+    left: -40rpx;
+    width: 240rpx;
+    height: 240rpx;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 70%);
+    pointer-events: none;
+  }
+}
+
+.page-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.page-hero-no {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.page-hero-title {
+  font-size: 44rpx;
+  font-weight: 900;
+  color: #ffffff;
+  margin-top: 16rpx;
+  display: block;
+  position: relative;
+  z-index: 2;
+  letter-spacing: 1rpx;
+}
+
+.page-hero-sub {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: 8rpx;
+  display: block;
+  position: relative;
+  z-index: 2;
+}
+
+// 状态标签
+.status-badge {
+  padding: 6rpx 20rpx;
+  border-radius: 99rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+}
+
+// 筛选标签
+.filter-tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+  padding: 0 24rpx;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 64rpx;
+  padding: 0 32rpx;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  background: $card;
+  color: $textSub;
+  flex-shrink: 0;
+  box-shadow: 0 2rpx 8rpx rgba(15, 23, 42, 0.02);
+  transition: all 0.2s ease;
+}
+.filter-tab-active {
+  background: #eff6ff;
+  color: $primary;
+  font-weight: 800;
+}
+
+// 操作按钮（底部固定）
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1rpx solid $divider;
+  padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 20rpx;
+  justify-content: flex-end;
+  z-index: 100;
+}
+
+// 按钮统一样式
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 80rpx;
+  padding: 0 40rpx;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+
+  &:active {
+    transform: scale(0.96);
+  }
+}
+.btn-primary {
+  color: #ffffff;
+  background: $primary-gradient;
+  box-shadow: $shadowBtn;
+}
+.btn-outline {
+  background: #ffffff;
+  border: 2rpx solid $textHint;
+  color: $textSub;
+}
+.btn-warning {
+  color: #ffffff;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 8rpx 16rpx rgba(249, 115, 22, 0.2);
+}
+.btn-danger {
+  color: #ffffff;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 8rpx 16rpx rgba(239, 68, 68, 0.2);
+}
+
+// 列表项
+.list-item {
+  background: $card;
+  border-radius: $radiusLg;
+  padding: 32rpx;
+  margin: 0 24rpx 24rpx;
+  box-shadow: $shadowCard;
+  border: none;
+}
+.list-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16rpx;
+}
+.list-item-no {
+  font-size: 24rpx;
+  color: $textHint;
+  font-weight: 500;
+}
+.list-item-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: $text;
+  line-height: 42rpx;
+}
+.list-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 16rpx;
+}
+.list-item-meta-text {
+  font-size: 26rpx;
+  color: $textSub;
+  font-weight: 500;
+}
+
+// 区块标题
+.section-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: $text;
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+// 空状态
+.empty-state {
+  padding: 100rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+.empty-state-icon {
+  width: 120rpx;
+  height: 120rpx;
+  margin-bottom: 24rpx;
+  opacity: 0.5;
+}
+/* H5 高德地图 marker 文字标签（订单实时轨迹），AMap 注入 DOM 在 React 之外，使用全局样式。 */
+.live-map-label {
+  padding: 2px 6px;
+  background: #ffffff;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2329;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+
+.empty-state-text {
+  font-size: 28rpx;
+  color: $textHint;
+  font-weight: 600;
+}

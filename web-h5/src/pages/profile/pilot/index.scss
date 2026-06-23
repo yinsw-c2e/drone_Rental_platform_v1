@@ -1,0 +1,479 @@
+.pilot-wrap {
+  height: 100vh;
+  background: #f5f7fa;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pilot-scroll {
+  flex: 1;
+  height: 100%;
+}
+
+.pilot-content {
+  padding: 12px;
+  padding-bottom: 40px;
+}
+
+.pilot-loading,
+.pilot-empty {
+  padding-top: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pilot-loading-text,
+.pilot-empty-desc {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.pilot-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.pilot-empty-btn {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.pilot-empty-btn-text {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pilot-hero {
+  background: #7c3aed;
+  border-radius: 24px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+.pilot-hero-top {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.pilot-hero-title {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.pilot-hero-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.pilot-stats-grid,
+.pilot-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pilot-stats-grid {
+  margin-top: 16px;
+}
+
+.pilot-stat-card {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.pilot-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.pilot-stat-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.pilot-section {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.pilot-section-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pilot-section-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pilot-readiness-card {
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.pilot-readiness-header {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pilot-readiness-main {
+  flex: 1;
+  padding-right: 12px;
+}
+
+.pilot-readiness-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pilot-readiness-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #64748b;
+}
+
+.pilot-blocker-box {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+
+.pilot-blocker-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.pilot-blocker-title {
+  display: block;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c2410c;
+}
+
+.pilot-blocker-action {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pilot-blocker-action-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.pilot-blocker-item {
+  display: block;
+  font-size: 13px;
+  line-height: 18px;
+  color: #9a3412;
+}
+
+.pilot-blocker-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #fed7aa;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pilot-blocker-footer-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c2410c;
+}
+
+.pilot-blocker-footer-arrow {
+  font-size: 18px;
+  line-height: 18px;
+  color: #ea580c;
+}
+
+.pilot-availability-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pilot-availability-main {
+  flex: 1;
+  padding-right: 12px;
+}
+
+.pilot-availability-label {
+  display: block;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.pilot-availability-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #64748b;
+}
+
+.pilot-quick-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.pilot-quick-icon {
+  position: relative;
+  width: 44rpx;
+  height: 44rpx;
+  margin: 4rpx 0 8rpx;
+}
+
+/* 履约订单：信封轮廓 */
+.pilot-quick-icon-orders {
+  border: 3rpx solid #1677ff;
+  border-radius: 6rpx;
+  background: #eaf2ff;
+}
+.pilot-quick-icon-orders::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4rpx;
+  width: 0;
+  height: 0;
+  margin-left: -16rpx;
+  border-left: 16rpx solid transparent;
+  border-right: 16rpx solid transparent;
+  border-top: 14rpx solid #1677ff;
+}
+
+/* 飞行记录：上升折线 */
+.pilot-quick-icon-flight {
+  border-bottom: 3rpx solid #16a34a;
+  border-left: 3rpx solid #16a34a;
+}
+.pilot-quick-icon-flight::after {
+  content: '';
+  position: absolute;
+  left: 8rpx;
+  bottom: 6rpx;
+  width: 24rpx;
+  height: 18rpx;
+  border-top: 3rpx solid #16a34a;
+  border-right: 3rpx solid #16a34a;
+  transform: skewY(-18deg);
+  border-top-right-radius: 2rpx;
+}
+
+/* 服务商档案：指南针 (圆环 + 指针 + 中心) */
+.pilot-quick-icon-owner {
+  border: 3rpx solid #6d35ff;
+  border-radius: 50%;
+}
+.pilot-quick-icon-owner::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6rpx;
+  width: 4rpx;
+  height: 14rpx;
+  margin-left: -2rpx;
+  background: #6d35ff;
+  border-radius: 2rpx;
+}
+.pilot-quick-icon-owner::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10rpx;
+  height: 10rpx;
+  margin-left: -5rpx;
+  margin-top: -5rpx;
+  background: #6d35ff;
+  border-radius: 50%;
+}
+
+/* 设备资质：无人机 (中心机身 + 4 角螺旋桨) */
+.pilot-quick-icon-drone {
+  background:
+    radial-gradient(circle 6rpx at 6rpx 6rpx, #ff7a1a 90%, transparent 100%),
+    radial-gradient(circle 6rpx at 38rpx 6rpx, #ff7a1a 90%, transparent 100%),
+    radial-gradient(circle 6rpx at 6rpx 38rpx, #ff7a1a 90%, transparent 100%),
+    radial-gradient(circle 6rpx at 38rpx 38rpx, #ff7a1a 90%, transparent 100%);
+}
+.pilot-quick-icon-drone::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16rpx;
+  height: 16rpx;
+  margin-left: -8rpx;
+  margin-top: -8rpx;
+  background: #ff7a1a;
+  border-radius: 4rpx;
+}
+
+.pilot-quick-title {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pilot-label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pilot-input {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  height: 44px;
+  line-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.pilot-location-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+
+.pilot-location-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.pilot-location-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 21px;
+  color: #0f172a;
+}
+
+.pilot-location-sub {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 17px;
+  color: #64748b;
+}
+
+.pilot-location-arrow {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.pilot-skill-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pilot-skill-chip {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.pilot-skill-chip-active {
+  background: #f3e8ff;
+  border: 1px solid #d8b4fe;
+}
+
+.pilot-skill-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.pilot-skill-text-active {
+  color: #7c3aed;
+}
+
+.pilot-save-btn {
+  height: 48px;
+  border-radius: 24px;
+  background: #7c3aed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pilot-save-disabled {
+  opacity: 0.6;
+}
+
+.pilot-save-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}

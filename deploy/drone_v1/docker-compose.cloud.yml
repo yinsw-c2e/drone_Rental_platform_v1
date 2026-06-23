@@ -1,0 +1,85 @@
+name: drone_v1_prod
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: drone_v1_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-drone_v1}"
+      MYSQL_USER: "${MYSQL_USER:-drone_v1}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+      TZ: Asia/Shanghai
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - drone_v1_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - drone_v1_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: drone_v1_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - drone_v1_redis_data:/data
+    networks:
+      - drone_v1_net
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.cloud
+    image: drone_v1_api:cloud
+    container_name: drone_v1_api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      CONFIG_PATH: /app/config.cloud.yaml
+      TZ: Asia/Shanghai
+    volumes:
+      - ./backend/config.cloud.yaml:/app/config.cloud.yaml:ro
+      - ./uploads:/app/uploads
+    ports:
+      - "18080:8080"
+    networks:
+      - drone_v1_net
+
+  static:
+    image: caddy:2-alpine
+    container_name: drone_v1_static
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web-h5:/srv/web-h5:ro
+      - ./admin:/srv/admin:ro
+    ports:
+      - "18081:18081"
+      - "18082:18082"
+    networks:
+      - drone_v1_net
+
+networks:
+  drone_v1_net:
+    name: drone_v1_net
+
+volumes:
+  drone_v1_mysql_data:
+    name: drone_v1_mysql_data
+  drone_v1_redis_data:
+    name: drone_v1_redis_data

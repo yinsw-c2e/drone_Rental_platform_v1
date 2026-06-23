@@ -1,0 +1,62 @@
+// 历史合作入口页面样式
+.bd-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.bd-hero {
+  background: #1677FF;
+}
+
+.bd-hero-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 20px;
+  color: rgba(255,255,255,0.85);
+  display: block;
+}
+
+.bd-desc {
+  font-size: 13px;
+  line-height: 20px;
+  color: #6B7280;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.bd-input {
+  border: 1px solid #E8ECF1;
+  border-radius: 12px;
+  height: 44px;
+  line-height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  background: #F9FAFB;
+  margin-bottom: 12px;
+}
+
+.bd-input-textarea {
+  height: 88px;
+  line-height: 22px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.bd-submit-btn {
+  background: #1677FF;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bd-btn-disabled {
+  opacity: 0.6;
+}
+
+.bd-submit-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+}

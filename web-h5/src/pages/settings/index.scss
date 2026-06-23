@@ -1,0 +1,141 @@
+.settings-page {
+  height: 100vh;
+  background: #f5f7fa;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-scroll {
+  flex: 1;
+  height: 100%;
+}
+
+.settings-content {
+  padding: 12px;
+  padding-bottom: 108px;
+}
+
+.settings-section-header {
+  padding: 4px 4px 8px;
+}
+
+.settings-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.settings-section {
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.settings-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.settings-row-last {
+  border-bottom: 0;
+}
+
+.settings-row-clickable:active {
+  background: #f8fafc;
+}
+
+.settings-row-main {
+  flex: 1;
+  min-width: 0;
+  margin-right: 16px;
+}
+
+.settings-row-label {
+  display: block;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.settings-row-label-muted {
+  color: #94a3b8;
+}
+
+.settings-row-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #64748b;
+}
+
+.settings-row-hint-muted {
+  color: #94a3b8;
+}
+
+.settings-row-right {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.settings-row-value {
+  font-size: 15px;
+  color: #64748b;
+}
+
+.settings-row-value-success {
+  color: #16a34a;
+}
+
+.settings-row-value-warning {
+  color: #f59e0b;
+}
+
+.settings-mini-status {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.settings-row-arrow {
+  margin-left: 8px;
+  font-size: 22px;
+  color: #cbd5e1;
+}
+
+.settings-dev-section {
+  border: 1px solid #dbeafe;
+}
+
+.settings-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  padding-bottom: 28px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.settings-logout-btn {
+  height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: rgba(220, 38, 38, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-logout-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #dc2626;
+}

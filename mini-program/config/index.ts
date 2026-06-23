@@ -7,7 +7,7 @@ const isProductionBuild =
   process.argv.some((arg) => arg === 'production' || arg === '--mode=production');
 const apiBase =
   process.env.MINI_PROGRAM_API_BASE ||
-  (isProductionBuild ? 'https://dronerentalplat.cpolar.top/api/v2' : 'http://127.0.0.1:8080/api/v2');
+  (isProductionBuild ? 'https://swvictory.top/api/v2' : 'http://127.0.0.1:8080/api/v2');
 
 export default defineConfig({
   projectName: 'wurenji-mini',

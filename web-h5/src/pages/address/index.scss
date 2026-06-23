@@ -1,0 +1,430 @@
+page {
+  background: #f4f7fb;
+}
+
+.addr-page,
+.addr-page text {
+  font-family: PingFang SC, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+.addr-page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 0;
+  box-sizing: border-box;
+  color: #061e4f;
+}
+
+/* ── 搜索胶囊（实际是地图选点入口） ── */
+.addr-search {
+  display: flex;
+  align-items: center;
+  height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 18rpx;
+  background: #ffffff;
+  box-shadow: 0 4rpx 14rpx rgba(15, 35, 65, 0.05);
+}
+
+.addr-search-icon {
+  position: relative;
+  width: 32rpx;
+  height: 32rpx;
+  margin-right: 16rpx;
+}
+
+.addr-search-icon-glass {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22rpx;
+  height: 22rpx;
+  border: 3rpx solid #8a96ad;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.addr-search-icon-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 11rpx;
+  height: 3rpx;
+  background: #8a96ad;
+  border-radius: 2rpx;
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.addr-search-placeholder {
+  color: #99a4b8;
+  font-size: 26rpx;
+}
+
+/* ── 操作动作卡片 ── */
+.addr-action-card {
+  margin-top: 20rpx;
+  padding: 8rpx 0;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(15, 35, 65, 0.06);
+}
+
+.addr-action {
+  display: flex;
+  align-items: center;
+  padding: 22rpx 24rpx;
+}
+
+.addr-action-divider {
+  height: 1rpx;
+  margin-left: 96rpx;
+  margin-right: 24rpx;
+  background: #eef2f8;
+}
+
+.addr-action-icon {
+  position: relative;
+  width: 64rpx;
+  height: 64rpx;
+  margin-right: 20rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.addr-action-icon-locate {
+  background: #eaf2ff;
+}
+
+.addr-action-icon-locate .addr-action-icon-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28rpx;
+  height: 28rpx;
+  margin-left: -14rpx;
+  margin-top: -14rpx;
+  border: 3rpx solid #1677ff;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.addr-action-icon-locate .addr-action-icon-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10rpx;
+  height: 10rpx;
+  margin-left: -5rpx;
+  margin-top: -5rpx;
+  background: #1677ff;
+  border-radius: 50%;
+}
+
+.addr-action-icon-pin {
+  background: #fff1e6;
+}
+
+.addr-action-icon-pin .addr-action-icon-pin-body {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28rpx;
+  height: 28rpx;
+  margin-left: -14rpx;
+  margin-top: -18rpx;
+  background: #ff7a1a;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+}
+
+.addr-action-icon-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -8rpx;
+  margin-top: 4rpx;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 12rpx solid #ff7a1a;
+}
+
+.addr-action-icon-pin .addr-action-icon-pin-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8rpx;
+  height: 8rpx;
+  margin-left: -4rpx;
+  margin-top: -12rpx;
+  background: #ffffff;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.addr-action-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.addr-action-title {
+  display: block;
+  color: #111827;
+  font-size: 30rpx;
+  line-height: 40rpx;
+  font-weight: 700;
+}
+
+.addr-action-sub {
+  display: block;
+  margin-top: 4rpx;
+  color: #7a8499;
+  font-size: 22rpx;
+  line-height: 30rpx;
+}
+
+.addr-action-arrow {
+  width: 16rpx;
+  height: 16rpx;
+  margin-left: 12rpx;
+  border-top: 3rpx solid #c0c8d6;
+  border-right: 3rpx solid #c0c8d6;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+/* ── Tab 切换 ── */
+.addr-tabs {
+  display: flex;
+  align-items: center;
+  margin-top: 24rpx;
+  padding: 6rpx;
+  border-radius: 14rpx;
+  background: #e8edf6;
+}
+
+.addr-tab {
+  flex: 1;
+  height: 64rpx;
+  border-radius: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b778c;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.addr-tab.is-active {
+  color: #005bea;
+  font-weight: 800;
+  background: #ffffff;
+  box-shadow: 0 4rpx 14rpx rgba(11, 24, 54, 0.08);
+}
+
+/* ── 列表卡 ── */
+.addr-list-card {
+  margin-top: 20rpx;
+  padding: 4rpx 0 6rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(15, 35, 65, 0.05);
+}
+
+.addr-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 24rpx 14rpx;
+}
+
+.addr-list-title {
+  color: #111827;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.addr-list-link {
+  color: #005bea;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.addr-loading {
+  padding: 48rpx 24rpx;
+  color: #99a4b8;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+/* ── 行 ── */
+.addr-row {
+  display: flex;
+  align-items: center;
+  padding: 22rpx 24rpx;
+  border-top: 1rpx solid #f0f3f8;
+}
+
+.addr-row:first-of-type {
+  border-top: 0;
+}
+
+.addr-row-icon {
+  position: relative;
+  width: 52rpx;
+  height: 52rpx;
+  margin-right: 18rpx;
+  border-radius: 50%;
+  background: #eaf2ff;
+  flex-shrink: 0;
+}
+
+.addr-row-icon-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22rpx;
+  height: 22rpx;
+  margin-left: -11rpx;
+  margin-top: -14rpx;
+  background: #1677ff;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+}
+
+.addr-row-icon-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 0;
+  height: 0;
+  margin-left: -6rpx;
+  border-left: 6rpx solid transparent;
+  border-right: 6rpx solid transparent;
+  border-top: 8rpx solid #1677ff;
+}
+
+.addr-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.addr-row-line {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.addr-row-title {
+  flex-shrink: 1;
+  max-width: 420rpx;
+  color: #111827;
+  font-size: 28rpx;
+  line-height: 38rpx;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addr-row-sub {
+  display: block;
+  margin-top: 6rpx;
+  color: #7a8499;
+  font-size: 22rpx;
+  line-height: 30rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addr-row-delete {
+  margin-left: 12rpx;
+  padding: 4rpx 14rpx;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 999rpx;
+  color: #98a1b3;
+  font-size: 22rpx;
+  line-height: 32rpx;
+}
+
+/* ── tag ── */
+.addr-tag {
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 20rpx;
+  line-height: 26rpx;
+  white-space: nowrap;
+}
+
+.addr-tag-primary {
+  color: #1677ff;
+  background: #eaf2ff;
+}
+
+.addr-tag-neutral {
+  color: #6b778c;
+  background: #f0f3f8;
+}
+
+/* ── 空状态 ── */
+.addr-empty {
+  padding: 60rpx 32rpx 80rpx;
+  text-align: center;
+}
+
+.addr-empty-illus {
+  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 22rpx;
+  border-radius: 50%;
+  background: #f0f4fa;
+}
+
+.addr-empty-illus::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36rpx;
+  height: 36rpx;
+  margin-left: -18rpx;
+  margin-top: -24rpx;
+  background: #c8d2e0;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+}
+
+.addr-empty-illus::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -10rpx;
+  margin-top: 8rpx;
+  border-left: 10rpx solid transparent;
+  border-right: 10rpx solid transparent;
+  border-top: 14rpx solid #c8d2e0;
+}
+
+.addr-empty-title {
+  display: block;
+  color: #4b5670;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.addr-empty-hint {
+  display: block;
+  margin-top: 8rpx;
+  color: #99a4b8;
+  font-size: 22rpx;
+  line-height: 30rpx;
+}
+
+.addr-page-spacer {
+  height: 80rpx;
+}

@@ -1,0 +1,167 @@
+// 历史履约入口页面样式
+.dc-wrap {
+  flex: 1;
+  background: #F5F7FA;
+}
+
+.dc-hero {
+  background: #1677FF;
+}
+
+.dc-mode-card {
+  border-radius: 18px;
+  border: 1px solid #E8ECF1;
+  background: #FFFFFF;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.dc-mode-active {
+  border-width: 2px;
+}
+
+.dc-mode-top {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dc-mode-title {
+  font-size: 15px;
+  color: #1A1D26;
+  font-weight: 800;
+}
+
+.dc-mode-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+}
+
+.dc-mode-desc {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #6B7280;
+}
+
+.dc-input {
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: #F9FAFB;
+}
+
+.dc-card-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dc-current-status {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dc-binding-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dc-binding-active {
+  border-color: #1677FF;
+  background: #F0F6FF;
+}
+
+.dc-binding-name {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dc-binding-meta {
+  color: #6B7280;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dc-binding-check {
+  min-width: 54px;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  border-radius: 999px;
+  background: #F3F4F6;
+  color: #6B7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dc-binding-check.active {
+  background: #1677FF;
+  color: #FFFFFF;
+}
+
+.dc-bind-entry {
+  margin-top: 12px;
+  height: 40px;
+  border-radius: 20px;
+  border: 1px solid #1677FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dc-bind-entry-text {
+  color: #1677FF;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dc-hint {
+  font-size: 12px;
+  line-height: 18px;
+  color: #6B7280;
+  margin-bottom: 10px;
+}
+
+.dc-textarea {
+  min-height: 110px;
+  border-radius: 16px;
+  border: 1px solid #E5E7EB;
+  background: #F9FAFB;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.dc-submit-btn {
+  flex: 1;
+  border-radius: 999px;
+  background: #1677FF;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dc-submit-disabled {
+  background: #9CA3AF;
+}
+
+.dc-submit-text {
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+}
