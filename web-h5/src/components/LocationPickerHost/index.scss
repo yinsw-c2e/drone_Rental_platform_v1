@@ -151,8 +151,18 @@
 }
 
 .lp-result-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 14px;
   color: #1f2329;
+}
+
+.lp-result-distance {
+  flex: none;
+  font-size: 12px;
+  color: #8a94a6;
 }
 
 .lp-result-addr {

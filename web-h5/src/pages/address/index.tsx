@@ -105,7 +105,13 @@ export default function AddressPickerPage() {
   const handleMapPicker = async () => {
     try {
       const res = await chooseLocationCompat();
-      if (!res || !res.name || !res.address) return;
+      if (!res || (!res.name && !res.address)) return;
+      const pickedName = String(res.name || res.address || '地图选点').trim();
+      const pickedAddress = String(
+        res.address ||
+        res.name ||
+        `经度 ${Number(res.longitude).toFixed(6)}，纬度 ${Number(res.latitude).toFixed(6)}`,
+      ).trim();
       let province = '';
       let city = '';
       let district = '';
@@ -122,12 +128,12 @@ export default function AddressPickerPage() {
         // 逆地理失败时从 address 文本兜底
       }
       if (!city) {
-        const match = String(res.address || '').match(/([一-龥]{2,}?)市/);
+        const match = pickedAddress.match(/([一-龥]{2,}?)市/);
         if (match) city = `${match[1]}市`;
       }
       handleSelectAddress({
-        name: res.name,
-        address: res.address,
+        name: pickedName,
+        address: pickedAddress,
         latitude: res.latitude,
         longitude: res.longitude,
         province,
