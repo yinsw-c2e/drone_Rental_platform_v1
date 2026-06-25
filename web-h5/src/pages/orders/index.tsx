@@ -1,5 +1,5 @@
 import Taro, { useDidShow } from '@tarojs/taro';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, View } from '@tarojs/components';
 import { useDispatch } from 'react-redux';
 import { readStoredRoleMode, setHaulRoleMode } from '../../store/slices/roleSlice';
@@ -587,10 +587,11 @@ function CustomerOrdersPage({
   offerDraftCard?: React.ReactNode;
 }) {
   const [activeStatus, setActiveStatus] = useState<StatusFilter>('all');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<V2OrderSummary[]>([]);
   const [topInsetRpx, setTopInsetRpx] = useState(132);
+  const skipInitialDidShowRef = useRef(true);
 
   useEffect(() => {
     try {
@@ -611,15 +612,22 @@ function CustomerOrdersPage({
       setItems(list);
     } catch (error: any) {
       Taro.showToast({ title: friendlyErrorMessage(error, '订单加载失败'), icon: 'none' });
-      setItems([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
   useDidShow(() => {
     syncCustomTabBar(1, 'customer');
+    if (skipInitialDidShowRef.current) {
+      skipInitialDidShowRef.current = false;
+      return;
+    }
     fetchOrders();
   });
 
