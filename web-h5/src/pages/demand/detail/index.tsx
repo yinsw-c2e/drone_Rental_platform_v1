@@ -147,6 +147,17 @@ const orderIdOfSelectResult = (result: unknown) => {
   );
 };
 
+const buildDemandSharePath = (demandId: number) =>
+  demandId > 0 ? `/pages/demand/detail/index?id=${demandId}` : '/pages/home/index';
+
+const buildH5DemandShareUrl = (demandId: number) => {
+  const path = buildDemandSharePath(demandId);
+  if (typeof window === 'undefined') return path;
+  const origin = window.location.origin;
+  const pathname = window.location.pathname || '/';
+  return `${origin}${pathname}#${path}`;
+};
+
 export default function DemandDetailPage() {
   const user = useSelector((state: RootState) => state.auth.user);
   const roleSummary = useSelector((state: RootState) => state.auth.roleSummary);
@@ -163,8 +174,12 @@ export default function DemandDetailPage() {
   const [selectingQuoteId, setSelectingQuoteId] = useState<number | null>(null);
   const [suggestedPriceText, setSuggestedPriceText] = useState('');
 
+  const shareTitle = `${String(user?.nickname || '客户').trim() || '客户'}发布了一个吊运任务`;
+  const shareText = demand?.title ? `吊运任务：${demand.title}` : '有一个吊运任务需要服务商报价';
+  const sharePath = buildDemandSharePath(demandId);
+  const shareUrl = buildH5DemandShareUrl(demandId);
+
   useShareAppMessage(() => {
-    const nickname = String(user?.nickname || '客户').trim() || '客户';
     if (demand && (isDemandTerminal(demand) || isDemandDraft(demand))) {
       return { title: '重载吊运任务', path: '/pages/home/index' };
     }
@@ -172,10 +187,48 @@ export default function DemandDetailPage() {
       return { title: '重载吊运任务', path: '/pages/home/index' };
     }
     return {
-      title: `${nickname}发布了一个吊运任务`,
-      path: `/pages/demand/detail/index?id=${demandId}`,
+      title: shareTitle,
+      path: sharePath,
     };
   });
+
+  const copyShareUrl = useCallback(async () => {
+    try {
+      const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : null;
+      if (clipboard?.writeText) {
+        await clipboard.writeText(shareUrl);
+      } else {
+        await Taro.setClipboardData({ data: shareUrl });
+      }
+      Taro.showToast({ title: '链接已复制，发给服务商即可', icon: 'none' });
+    } catch {
+      Taro.showModal({
+        title: '分享链接',
+        content: '复制失败，请手动复制浏览器地址栏链接发给服务商。',
+        showCancel: false,
+      });
+    }
+  }, [shareUrl]);
+
+  const handleShareDemand = useCallback(async () => {
+    if (!demandId) return;
+    if (process.env.TARO_ENV !== 'h5') return;
+
+    const webNavigator = typeof navigator !== 'undefined'
+      ? navigator as Navigator & { share?: (data: ShareData) => Promise<void> }
+      : null;
+
+    if (webNavigator?.share) {
+      try {
+        await webNavigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+        return;
+      } catch (error: any) {
+        if (String(error?.name || '').toLowerCase() === 'aborterror') return;
+      }
+    }
+
+    copyShareUrl();
+  }, [copyShareUrl, demandId, shareText, shareTitle, shareUrl]);
 
   const loadData = useCallback(async (options?: { silent?: boolean }) => {
     if (!demandId) { setLoading(false); return; }
@@ -356,9 +409,15 @@ export default function DemandDetailPage() {
                   <Text key={i} className="step-tip-line">{line}</Text>
                 ))}
                 {(demand.quote_count || 0) === 0 ? (
-                  <Button className="step-share-button" openType="share">
-                    <Text className="step-share-text">分享给认识的服务商</Text>
-                  </Button>
+                  process.env.TARO_ENV === 'h5' ? (
+                    <Button className="step-share-button" onClick={handleShareDemand}>
+                      <Text className="step-share-text">分享给认识的服务商</Text>
+                    </Button>
+                  ) : (
+                    <Button className="step-share-button" openType="share">
+                      <Text className="step-share-text">分享给认识的服务商</Text>
+                    </Button>
+                  )
                 ) : null}
               </View>
             );
