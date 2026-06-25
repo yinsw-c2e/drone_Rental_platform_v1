@@ -43,11 +43,43 @@ $shadowCard: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
 $shadowBtn: 0 8rpx 16rpx rgba(37, 99, 235, 0.2);
 
 // 全局重置
-page {
+:root {
+  --app-viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
+}
+
+html,
+body,
+#app {
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+.taro_router,
+.taro_page {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+page {
+  width: 100%;
+  height: var(--app-viewport-height);
+  min-height: var(--app-viewport-height);
   background: $bg;
-  overflow-x: hidden;
+  overflow: hidden;
+  overscroll-behavior: none;
   display: flex;
   flex-direction: column;
   font-family: PingFang SC, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
@@ -56,6 +88,38 @@ page {
 
 view, text, scroll-view, input, textarea {
   box-sizing: border-box;
+}
+
+taro-scroll-view-core,
+scroll-view,
+.taro-scroll-view,
+.taro-scroll-view__scroll-y {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-x pan-y;
+}
+
+input,
+textarea {
+  touch-action: manipulation;
+}
+
+.customer-home-page,
+.customer-home-scroll,
+.pw-page,
+.root-wrap,
+.msg-page,
+.settings-page,
+.profile-page,
+.edit-profile-page,
+.cp-wrap,
+.pilot-register-page,
+.op-page,
+.qo3-page,
+.address-book-page,
+.address-book-scroll {
+  height: var(--app-viewport-height) !important;
+  max-height: var(--app-viewport-height) !important;
 }
 
 /* Hide all scrollbars globally */

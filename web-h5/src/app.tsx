@@ -40,6 +40,35 @@ const isRolePreviewRoute = (route: string, options?: Record<string, unknown>) =>
   (route === 'pages/home/index' || route === 'pages/orders/index') &&
   (options?.mode === 'customer' || options?.mode === 'provider');
 
+function H5ViewportRuntime() {
+  useEffect(() => {
+    if (process.env.TARO_ENV !== 'h5' || typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    const root = document.documentElement;
+    const syncViewportHeight = () => {
+      const height = window.visualViewport?.height || window.innerHeight;
+      if (height > 0) {
+        root.style.setProperty('--app-viewport-height', `${Math.round(height)}px`);
+      }
+    };
+
+    syncViewportHeight();
+    window.addEventListener('resize', syncViewportHeight);
+    window.addEventListener('orientationchange', syncViewportHeight);
+    window.visualViewport?.addEventListener('resize', syncViewportHeight);
+
+    return () => {
+      window.removeEventListener('resize', syncViewportHeight);
+      window.removeEventListener('orientationchange', syncViewportHeight);
+      window.visualViewport?.removeEventListener('resize', syncViewportHeight);
+    };
+  }, []);
+
+  return null;
+}
+
 function safeNavigateTo(url: string) {
   Taro.navigateTo({ url }).catch(() => {
     Taro.showToast({ title: '页面暂未开放', icon: 'none' });
@@ -154,6 +183,7 @@ function AuthGate({ children }: PropsWithChildren) {
 
   return (
     <>
+      {process.env.TARO_ENV === 'h5' ? <H5ViewportRuntime /> : null}
       {children}
       <ProviderGlobalShell />
       {process.env.TARO_ENV === 'h5' ? <H5TabBar /> : null}
