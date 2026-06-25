@@ -111,8 +111,26 @@ jobs:
           test -f backend/config.cloud.yaml
           docker network connect drone_v1_net drone-v2-prod-caddy-1 2>/dev/null || true
           docker compose -f docker-compose.cloud.yml --env-file .env up -d --no-deps --build api static
-          curl -fsS http://127.0.0.1:18080/readyz >/dev/null
-          docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_api:8080/healthz >/dev/null
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/readyz >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "v1 api did not become ready" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          for i in $(seq 1 30); do
+            if docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_api:8080/healthz >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "v1 api is not reachable from public caddy network" >&2
+              exit 1
+            fi
+            sleep 2
+          done
           EOF
 
       - name: Post-deploy smoke test
@@ -120,9 +138,36 @@ jobs:
         run: |
           ssh -i ~/.ssh/tencent_cloud_key -o BatchMode=yes -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" <<'EOF'
           set -euo pipefail
-          curl -fsS http://127.0.0.1:18080/readyz >/dev/null
-          curl -fsS http://127.0.0.1:18081/ >/dev/null
-          docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_static:18081/ >/dev/null
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/readyz >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "v1 api local smoke test failed" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18081/ >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "v1 static local smoke test failed" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          for i in $(seq 1 30); do
+            if docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://drone_v1_static:18081/ >/dev/null; then
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "v1 static is not reachable from public caddy network" >&2
+              exit 1
+            fi
+            sleep 2
+          done
           docker exec drone-v2-prod-caddy-1 wget -qO- -T 8 http://api:8088/api/v1/health >/dev/null
           EOF
 
