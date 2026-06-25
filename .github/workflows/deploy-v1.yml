@@ -68,8 +68,13 @@ jobs:
       - name: Build H5
         if: env.DEPLOY_READY == 'true'
         working-directory: web-h5
+        env:
+          H5_AMAP_KEY: ${{ secrets.H5_AMAP_KEY }}
+          H5_AMAP_SECURITY_CODE: ${{ secrets.H5_AMAP_SECURITY_CODE }}
         run: |
           npm ci
+          test -n "$H5_AMAP_KEY"
+          test -n "$H5_AMAP_SECURITY_CODE"
           H5_CLOUD_API_BASE="$V1_PUBLIC_ORIGIN/api/v2" npm run build:h5:cloud
 
       - name: Build admin
