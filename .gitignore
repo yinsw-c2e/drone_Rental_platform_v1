@@ -26,6 +26,7 @@ build/
 # Local AI / agent tooling
 .ai/
 .qoder/
+.playwright-cli/
 wiki/
 gptimage/
 AGENTS.md
